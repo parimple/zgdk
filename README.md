@@ -1,6 +1,6 @@
 # zgdk
 
-This is a Discord bot that does X, Y, and Z.
+This is a Discord bot that does manage discord server channels, gives moderators the tools to manage the server and introduces currency, a ranking system and many other features.
 
 ## Prerequisites
 
@@ -35,8 +35,7 @@ This is a Discord bot that does X, Y, and Z.
 To use the bot, invite it to a Discord server and use the following commands:
 
 - `!help`: Display a list of available commands.
-- `!command1`: Description of command 1.
-- `!command2`: Description of command 2.
+- `!ping`: Display bot latency.
 
 ## Contributing
 
