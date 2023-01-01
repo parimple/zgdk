@@ -1,1 +1,16 @@
+# Ignore cache files
+__pycache__/
+
+# Ignore these directories
+node_modules/
+dist/
+build/
+
+# Ignore files with sensitive information
 .env
+
+# Ignore venv
+.venv
+
+# Ignore vscode
+.vscode

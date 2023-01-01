@@ -1,0 +1,5 @@
+discord.py
+psycopg2-binary  
+pyyaml
+python-dotenv==0.14.0
+SQLAlchemy==1.3.17
