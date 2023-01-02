@@ -1,0 +1,13 @@
+image: python:3.11
+
+services:
+  - docker:dind
+
+before_script:
+  - apt-get update
+  - apt-get -y install docker-ce
+  - docker build -t my-project .
+
+test:
+  script:
+    - docker run my-project pytest

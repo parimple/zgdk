@@ -1,40 +1,13 @@
-import os
+" test functions for client.py cog"
 import pytest
-from discord.ext import commands
-import discord
-import sys
-import threading
-import asyncio
+from ...cogs.commands.client import add_numbers
 
-sys.path.append("/Users/patrykpyzel/Projects/zgdk")
+class TestClient:
+    def test_add_numbers(self):
+        assert add_numbers(1, 2, 3) == 6, "Should be 6"
 
-# Import your bot class
-from main import Zagadka
+    def test_add_numbers2(self):
+        assert add_numbers(1, 2, 5) == 8, "Should be 8"
 
-import pytest
-
-@pytest.fixture
-def bot(mocker):
-    mock_bot = mocker.Mock()
-    mock_bot.get_command.return_value = mocker.Mock(spec=commands.Command, invoke=lambda ctx: ctx.send("pong"))
-    mock_bot.on_ready = mocker.Mock()
-    return mock_bot
-
-@pytest.fixture
-async def start_bot(bot):
-    await bot.start(os.environ.get("DISCORD_TOKEN"))
-
-@pytest.mark.asyncio
-async def test_bot_ready(bot):
-     # Start the bot in the main thread
-    asyncio.run(start_bot(bot))
-
-    # Wait for the bot to be ready, or for the bot to be closed (whichever comes first)
-    await asyncio.wait_for(bot.wait_until_ready() or bot.is_closed(), timeout=10)
-
-    # Ensure that the bot is in the "ready" state
-    assert bot.is_ready() == True
-
-    # Close the event loop
-    asyncio.AbstractEventLoop.stop()
-
+    def test_add_numbers3(self):
+        assert add_numbers(1, 2, 10) == 13, "Should be 13"

@@ -1,6 +1,11 @@
 import discord
 from discord.ext import commands
 
+def add_numbers(*args):
+    total = 0
+    for a in args:
+        total += a
+    return total
 class CommandsClient(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -18,3 +23,5 @@ class CommandsClient(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(CommandsClient(bot))
+
+""" E   ModuleNotFoundError: No module named 'cogs' """
