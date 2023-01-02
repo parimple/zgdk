@@ -1,7 +1,7 @@
 # zgdk
 
 This is a Discord bot that does manage discord server channels, gives moderators the tools to manage the server and introduces currency, a ranking system and many other features.
-
+gi
 ## Prerequisites
 
 - Docker

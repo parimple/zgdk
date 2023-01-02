@@ -11,7 +11,7 @@ class CommandsClient(commands.Cog):
 
     # @commands.slash_command(name="ping", description="Sends Pong!")
     @commands.command(name="ping", description="Sends Pong!")
-    async def ping(self, ctx):
+    async def ping(self, ctx: commands.Context):
         # Use `await ctx.send()` to send a message
         await ctx.send("pong")
 
