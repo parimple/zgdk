@@ -5,3 +5,17 @@ run_tests:
     - pip install -r requirements.txt
   script:
     - pytest
+
+build_image:
+  image: docker:20.10.22
+  services:
+    - docker:20.10.22-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    IMAGE_NAME: "ppyzel/zgdk"
+    IMAGE_TAG: "0.1"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+  script:
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+    - docker push $IMAGE_NAME:$IMAGE_TAG
