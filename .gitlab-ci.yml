@@ -1,5 +1,5 @@
 run_tests:
-  image: python:3.11-slim
+  image: python:3.10
   before_script:
     - apt-get update -qq && apt-get install -y 
     - pip install -r requirements.txt
