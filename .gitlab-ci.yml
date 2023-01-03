@@ -5,3 +5,7 @@ run_tests:
     - pip install -r requirements.txt
   script:
     - pytest
+
+build_image:
+  script:
+    - docker build
