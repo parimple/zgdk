@@ -1,5 +1,5 @@
 run_tests:
-  image: 3.11-slim-bullseye
+  image: python:3.11-slim
   before_script:
     - apt-get update -qq && apt-get install -y 
     - pip install -r requirements.txt
