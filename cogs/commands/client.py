@@ -23,5 +23,3 @@ class CommandsClient(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(CommandsClient(bot))
-
-""" E   ModuleNotFoundError: No module named 'cogs' """

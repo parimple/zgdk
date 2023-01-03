@@ -1,13 +1,7 @@
-image: python:3.11
-
-services:
-  - docker:dind
-
-before_script:
-  - apt-get update
-  - apt-get -y install docker-ce
-  - docker build -t my-project .
-
-test:
+run_tests:
+  image: 3.11-slim-bullseye
+  before_script:
+    - apt-get update -qq && apt-get install -y 
+    - pip install -r requirements.txt
   script:
-    - docker run my-project pytest
+    - pytest
