@@ -5,7 +5,7 @@ gi
 ## Prerequisites
 
 - Docker
-- Python 3.11 or higher
+- Python 3.10 or higher
 - Discord account and API token
 
 ## Installation
