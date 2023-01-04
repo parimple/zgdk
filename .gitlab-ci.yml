@@ -1,4 +1,9 @@
+stages:
+  - test
+  - build
+
 run_tests:
+  stage: test
   image: python:3.10
   before_script:
     - apt-get update -qq && apt-get install -y 
@@ -7,6 +12,7 @@ run_tests:
     - pytest
 
 build_image:
+  stage: build
   image: docker:20.10.22
   services:
     - docker:20.10.22-dind
