@@ -39,6 +39,6 @@ deploy_to_server:
     - eval $(ssh-agent -s)
     - ssh-add <(echo "$SSH_PRIVATE_KEY")
   script:
-    - ssh -o "StrictHostKeyChecking=no" ubuntu@138.3.245.125 "cd /var/www/html/ && docker-compose pull && docker-compose up -d"
+    - ssh -o "StrictHostKeyChecking=no" ubuntu@138.3.245.125 "docker pull ppyzel/zgdk:0.1 && docker run -d ppyzel/zgdk:0.1"
   only:
-    - master
+    - main
