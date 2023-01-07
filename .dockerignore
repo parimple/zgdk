@@ -1,0 +1,6 @@
+.venv
+.vscode
+.env
+.gitignore
+.gitlab-ci.yml
+.pytest_cache
