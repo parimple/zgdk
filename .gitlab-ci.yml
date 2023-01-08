@@ -37,8 +37,8 @@ deploy_to_server:
   before_script:
     - apt-get update -qq && apt-get install -y openssh-client
     - eval $(ssh-agent -s)
-    # - ssh-add <(echo "$SSH_PRIVATE_KEY")
+    - ssh-add <(echo "$SSH_KEY")
   script:
-    - ssh -o "StrictHostKeyChecking=no" ubuntu@138.3.245.125 "cd $Projects/zgdk && docker run -d -e ZAGADKA_TOKEN=${ZAGADKA_TOKEN} ppyzel/zgdk:0.1"
+    - ssh -o "StrictHostKeyChecking=no" ubuntu@138.3.245.125 "cd $Projects/zgdk && docker run -d -e ZAGADKA_TOKEN=${ZAGADKA_TOKEN} ppyzel/zgdk:0.1" -i ${SSH_KEY}
   only:
     - main
