@@ -29,7 +29,7 @@ build_image:
 
 deploy_to_server:
   stage: deploy
-  image: docker:20.10.22
+  image: ubuntu:20.04
   services:
     - docker:20.10.22-dind
   variables:
@@ -39,6 +39,6 @@ deploy_to_server:
     - eval $(ssh-agent -s)
     - ssh-add <(echo "$SSH_PRIVATE_KEY")
   script:
-    - ssh -o "StrictHostKeyChecking=no" ubuntu@138.3.245.125 "docker pull ppyzel/zgdk:0.1 && docker run -d ppyzel/zgdk:0.1"
+    - ssh -o "StrictHostKeyChecking=no" ubuntu@138.3.245.125 "cd $Projects/zgdk && docker run -d -e ZAGADKA_TOKEN=$ZAGADKA_TOKEN ppyzel/zgdk:0.1"
   only:
     - main
