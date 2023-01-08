@@ -24,12 +24,12 @@ class Zagadka(commands.Bot):
     
     async def load_cogs(self):
         for cog in os.listdir("cogs/commands"):
-            if cog.endswith(".py"):
+            if cog.endswith(".py") and cog != "__init__.py":
                 await self.load_extension(f"cogs.commands.{cog[:-3]}")
         print("All commands loaded")
 
         for cog in os.listdir("cogs/events"):
-            if cog.endswith(".py"):
+            if cog.endswith(".py") and cog != "__init__.py":
                 await self.load_extension(f"cogs.events.{cog[:-3]}")
         print("All events loaded")
 
@@ -43,4 +43,4 @@ class Zagadka(commands.Bot):
         await self.load_cogs()
 
 bot = Zagadka()
-bot.run(os.environ.get("DISCORD_TOKEN"))
+bot.run(os.environ.get("ZAGADKA_TOKEN"))
