@@ -39,7 +39,6 @@ deploy_to_server:
     - eval $(ssh-agent -s)
     # - ssh-add <(echo "$SSH_PRIVATE_KEY")
   script:
-    - ssh -o "StrictHostKeyChecking=no" ubuntu@138.3.245.125 "cd $Projects/zgdk && docker run -d -e ZAGADKA_TOKEN="$ZAGADKA_TOKEN" ppyzel/zgdk:0.1"
-
+    - ssh -o "StrictHostKeyChecking=no" ubuntu@138.3.245.125 "cd $Projects/zgdk && docker run -d -e ZAGADKA_TOKEN=${ZAGADKA_TOKEN} ppyzel/zgdk:0.1"
   only:
     - main
