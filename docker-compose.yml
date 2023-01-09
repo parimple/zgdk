@@ -1,0 +1,10 @@
+version: '3.7'
+services:
+  app:
+    image: ppyzel/zgdk:0.1
+    command: python main.py
+    environment:
+      - ZAGADKA_TOKEN=${ZAGADKA_TOKEN}
+    ports:
+      - 8000:8000
+    platform: linux/amd64
