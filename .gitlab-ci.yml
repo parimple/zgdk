@@ -39,7 +39,6 @@ deploy_to_server:
     - eval $(ssh-agent -s)
     - cat "$SSH_PRIVATE_KEY" | ssh-add -
   script:
-    - ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile /dev/null" -F /dev/null ubuntu@138.3.245.125 "cd Projects/zgdk && docker-compose up -d"
-
+    - ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile /dev/null" -F ~/.ssh/config -i ~/.ssh/id_rsa ubuntu@138.3.245.125 "cd Projects/zgdk && docker-compose pull ppyzel/zgdk:0.1 && docker-compose up -d"
   only:
     - main
