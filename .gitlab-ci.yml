@@ -14,7 +14,7 @@ run_tests:
 
 build_image:
   stage: build
-  image: arm64v8/docker:20.10.22
+  image: docker:20.10.22
   services:
     - arm64v8/docker:20.10.22-dind
   variables:
