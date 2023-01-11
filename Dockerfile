@@ -20,4 +20,4 @@ COPY . .
 RUN ls -la main.py
 
 # Run the bot
-CMD ["bash", "-c", "python main.py &"]
+CMD ["python", "main.py", "&"]
