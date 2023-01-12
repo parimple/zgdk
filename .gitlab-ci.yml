@@ -15,8 +15,6 @@ run_tests:
 build_image:
   stage: build
   image: ubuntu:20.04
-  services:
-    - docker:20.10.22-dind
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
     IMAGE_NAME: "ppyzel/zgdk"
