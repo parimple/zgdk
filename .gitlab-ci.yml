@@ -23,7 +23,6 @@ build_image:
     IMAGE_TAG: "0.1"
   before_script:
     - apt-get update && apt-get install -y docker.io
-    - service docker start
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
   script:
     - docker build --build-arg QEMU_ARCH=aarch64 --build-arg QEMU_LD_PREFIX=/usr/aarch64-linux-gnu -t aarch64/python:3.10 .
