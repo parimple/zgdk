@@ -30,6 +30,7 @@ build_image:
     - apt-get update
     - DEBIAN_FRONTEND=noninteractive apt-get -y install docker-ce docker-ce-cli containerd.io docker-compose-plugin
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+    - echo $DOCKER_HOST
   script:
     - docker build -t $IMAGE_NAME:$IMAGE_TAG .
     - docker tag $IMAGE_NAME:$IMAGE_TAG
