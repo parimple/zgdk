@@ -19,9 +19,11 @@ build_image:
     DOCKER_TLS_CERTDIR: "/certs"
     IMAGE_NAME: "ppyzel/zgdk"
     IMAGE_TAG: "0.1"
+  services:
+    - docker:20.10.22-dind
   before_script:
-    - apt-get update && apt-get install -y docker.io
-    - /etc/init.d/docker start
+    # - apt-get update && apt-get install -y docker.io
+    # - /etc/init.d/docker start
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
   script:
     - docker build -t $IMAGE_NAME:$IMAGE_TAG .
