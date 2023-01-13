@@ -16,6 +16,9 @@ with open("config.yml") as f:
 
 class Zagadka(commands.Bot):
     def __init__(self, **kwargs):
+        self.test = kwargs.get("test", False)
+        self.config = config
+
         super().__init__(
             command_prefix=config["prefix"],
             intents=intents,
@@ -25,12 +28,14 @@ class Zagadka(commands.Bot):
         )
     
     async def load_cogs(self):
-        for cog in os.listdir("cogs/commands"):
+        print(os.getcwd())
+        for cog in os.listdir(os.path.join(os.getcwd(), "cogs/commands")):
+            print(cog)
             if cog.endswith(".py") and cog != "__init__.py":
                 await self.load_extension(f"cogs.commands.{cog[:-3]}")
         print("All commands loaded")
 
-        for cog in os.listdir("cogs/events"):
+        for cog in os.path.join(os.getcwd(), "cogs/events"):
             if cog.endswith(".py") and cog != "__init__.py":
                 await self.load_extension(f"cogs.events.{cog[:-3]}")
         print("All events loaded")
@@ -42,7 +47,12 @@ class Zagadka(commands.Bot):
                 type=discord.ActivityType.playing,
                 name="discord.gg/zagadka"
             ))
-        await self.load_cogs()
+        if not self.test:
+            await self.load_cogs()
+    
+    def run(self):
+        super().run(os.environ.get("ZAGADKA_TOKEN"), reconnect=True)
 
-bot = Zagadka()
-bot.run(os.environ.get("ZAGADKA_TOKEN"))
+if __name__ == "__main__":
+    bot = Zagadka()
+    bot.run()

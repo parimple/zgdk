@@ -6,6 +6,7 @@ def add_numbers(*args):
     for a in args:
         total += a
     return total
+
 class CommandsClient(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -19,7 +20,6 @@ class CommandsClient(commands.Cog):
     async def ping(self, ctx: commands.Context):
         # Use `await ctx.send()` to send a message
         await ctx.send("pong")
-
 
 async def setup(bot):
     await bot.add_cog(CommandsClient(bot))
