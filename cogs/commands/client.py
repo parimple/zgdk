@@ -1,12 +1,6 @@
 import discord
 from discord.ext import commands
 
-def add_numbers(*args):
-    total = 0
-    for a in args:
-        total += a
-    return total
-
 class CommandsClient(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
