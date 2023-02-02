@@ -1,15 +1,14 @@
-import pytest
 import pytest_asyncio
 import discord.ext.test as dpytest
 
 from ...main import Zagadka
-from ... import cogs
+from ...cogs.commands.client import CommandsClient
 
 @pytest_asyncio.fixture()
 async def bot():
     b = Zagadka(test=True)
     await b._async_setup_hook()  # setup the loop
-    await b.add_cog(cogs.commands.client.CommandsClient(b))
+    await b.add_cog(CommandsClient(b))
     dpytest.configure(b)
     return b
 
