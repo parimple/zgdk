@@ -9,8 +9,9 @@ run_tests:
   before_script:
     - apt-get update -qq && apt-get install -y
     - pip install -r requirements.txt
+    - chmod +x run_checks.sh
   script:
-    - pytest
+    - sh run_checks.sh
 
 build_image:
   stage: build

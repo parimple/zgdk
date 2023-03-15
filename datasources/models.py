@@ -1,7 +1,6 @@
 """Models for the zaGadka bot database"""
 
-from sqlalchemy import (BigInteger, Column, DateTime, ForeignKey, Integer,
-                        String)
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 

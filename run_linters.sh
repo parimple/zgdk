@@ -3,5 +3,5 @@
 echo "Linters are running..."
 
 prettier --write .
-black .
 isort .
+black .
