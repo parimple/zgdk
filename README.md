@@ -2,6 +2,7 @@
 
 This is a Discord bot that does manage discord server channels, gives moderators the tools to manage the server and introduces currency, a ranking system and many other features.
 gi
+
 ## Prerequisites
 
 - Docker
@@ -14,21 +15,17 @@ gi
 
 `git clone https://gitlab.com/patrykpyzel/zgdk.git`
 
-
 2. Create a `.env` file in the root directory of the project and set the following environment variable:
 
 `DISCORD_TOKEN=<your Discord API token>`
-
 
 3. Build the Docker image:
 
 `docker build -t zgdk .`
 
-
 4. Run the Docker container:
 
 `docker run -d --name zgdk zgdk`
-
 
 ## Usage
 
@@ -48,5 +45,3 @@ We welcome contributions to this project. If you are interested in contributing,
 ## License
 
 This project is licensed under the MIT License.
-
-

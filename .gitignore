@@ -1,5 +1,7 @@
 # Ignore cache files
 __pycache__/
+.pytest_cache/
+.coverage
 
 # Ignore these directories
 node_modules/
