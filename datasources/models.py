@@ -1,5 +1,4 @@
-from typing import Optional
-
+"""Models for the datasources package"""
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -7,7 +6,7 @@ from sqlalchemy.orm import relationship
 Base = declarative_base()
 
 
-class Member(Base):
+class Member(Base):  # pylint: disable=too-few-public-methods
     """Member Model"""
 
     __tablename__ = "members"
@@ -25,7 +24,7 @@ class Member(Base):
         return f"<Member(id={self.id})>"
 
 
-class MemberMember(Base):
+class MemberMember(Base):  # pylint: disable=too-few-public-methods
     """MemberMember Model"""
 
     __tablename__ = "member_connections"
@@ -41,7 +40,7 @@ class MemberMember(Base):
         return f"<MemberMember(id={self.id})>"
 
 
-class Permission(Base):
+class Permission(Base):  # pylint: disable=too-few-public-methods
     """Permission Model"""
 
     __tablename__ = "permissions"

@@ -1,8 +1,6 @@
 """Voice commands cog."""
 
-import discord
 from discord.ext import commands
-from discord.voice_client import VoiceClient
 
 
 class VoiceCog(commands.Cog):
