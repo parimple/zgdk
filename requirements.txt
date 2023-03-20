@@ -1,5 +1,6 @@
 discord.py==2.1
 PyYAML==6.0
+PyNaCl==1.5.0
 python-dotenv==0.21.0
 SQLAlchemy==1.4.46
 SQLAlchemy-Utils==0.39.0
@@ -7,6 +8,7 @@ SQLAlchemy-Utils==0.39.0
 # local unit testing libraries
 pytest
 pytest-cov
+pytest-mock
 dpytest
 pip-audit
 bandit
