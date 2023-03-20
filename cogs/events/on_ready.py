@@ -1,20 +1,24 @@
 """On Ready Event"""
 
+import logging
+
 from discord.ext import commands
 
+logger = logging.getLogger(__name__)
 
-class EventOnReady(commands.Cog):
+
+class OnReadyEvent(commands.Cog):
     """Class for the On Ready Discord Event"""
 
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @commands.Cog.listener()
     async def on_ready(self):
         """On Ready Event"""
-        print("Cog: on_ready.py Loaded")
+        logger.info("Cog: on_ready.py Loaded")
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot):
     """Setup Function"""
-    await bot.add_cog(EventOnReady(bot))
+    await bot.add_cog(OnReadyEvent(bot))

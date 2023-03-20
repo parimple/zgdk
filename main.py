@@ -1,6 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env python
 """Main file for Zagadka bot"""
 
+import logging
 import os
 
 import discord
@@ -33,24 +34,25 @@ class Zagadka(commands.Bot):
 
     async def load_cogs(self):
         """Load all cogs"""
-        print(os.getcwd())
-        for cog in os.listdir(os.path.join(os.getcwd(), "cogs/commands")):
-            print(cog)
-            if cog.endswith(".py") and cog != "__init__.py":
-                await self.load_extension(f"cogs.commands.{cog[:-3]}")
-        print("All commands loaded")
-
-        for cog in os.path.join(os.getcwd(), "cogs/events"):
-            if cog.endswith(".py") and cog != "__init__.py":
-                await self.load_extension(f"cogs.events.{cog[:-3]}")
-        print("All events loaded")
+        logging.info("Loading cogs...")
+        for folder in ("cogs/commands", "cogs/events"):
+            path = os.path.join(os.getcwd(), folder)
+            for cog in os.listdir(path):
+                if cog.endswith(".py") and cog != "__init__.py":
+                    try:
+                        await self.load_extension(
+                            f"{folder.replace('/', '.')}.{cog[:-3]}"
+                        )
+                        logging.info("Loaded cog: %s", cog)
+                    except (commands.ExtensionError, commands.CommandError) as error:
+                        logging.error("Failed to load cog: %s, error: %s", cog, error)
 
     async def on_ready(self):
         """On ready event"""
-        print("Ready")
+        logging.info("Ready")
         await self.change_presence(
             activity=discord.Activity(
-                type=discord.ActivityType.playing, name="discord.gg/zagadka"
+                type=discord.ActivityType.playing, name="zaGadka bot"
             )
         )
         if not self.test:
@@ -61,6 +63,16 @@ class Zagadka(commands.Bot):
         super().run(os.environ.get("ZAGADKA_TOKEN"), reconnect=True)
 
 
+def setup_logging():
+    """Setup logging"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+
 if __name__ == "__main__":
+    setup_logging()
     bot = Zagadka()
     bot.run()
