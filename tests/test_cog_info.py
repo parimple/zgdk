@@ -1,22 +1,23 @@
 """Test functions for client.py cog"""
-import discord.ext.test as dpytest
 import pytest
+from discord.ext import commands
 
 from ..cogs.commands.info import InfoCog
+from .utils import get_command
 
 
-class TestInfoCog:  # pylint: disable=too-few-public-methods
-    """Test functions for client.py cog"""
+@pytest.fixture
+def info_cog(bot: commands.Bot) -> InfoCog:  # pylint: disable=redefined-outer-name
+    """Fixture for the InfoCog"""
+    return InfoCog(bot)
 
-    @staticmethod
-    @pytest.mark.asyncio
-    async def test_client_cog_loaded(bot):
-        """Test if the InfoCog cog is loaded."""
-        assert isinstance(bot.get_cog("InfoCog"), InfoCog)
 
-    @staticmethod
-    @pytest.mark.asyncio
-    async def test_ping(bot):  # pylint: disable=unused-argument
-        """Test the ping command."""
-        await dpytest.message("!ping")
-        assert dpytest.verify().message().contains().content("pong")
+@pytest.mark.asyncio
+async def test_ping_command(
+    info_cog: InfoCog, ctx: commands.Context
+):  # pylint: disable=redefined-outer-name
+    """Test the ping command."""
+    ping_command = get_command(info_cog, "ping")
+    await ping_command.callback(info_cog, ctx)
+
+    ctx.send.assert_called_once_with("pong")
