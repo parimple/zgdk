@@ -21,7 +21,7 @@ class InfoCog(commands.Cog):
     @commands.command(name="ping", description="Sends Pong!")
     async def ping(self, ctx: commands.Context):
         """Sends Pong! when ping is used as a command."""
-        await ctx.send("pong")
+        await ctx.reply("pong")
 
 
 async def setup(bot: commands.Bot):

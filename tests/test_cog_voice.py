@@ -15,6 +15,39 @@ def voice_cog(bot) -> VoiceCog:
 
 
 @pytest.mark.asyncio
+async def test_limit_command(
+    voice_cog: VoiceCog, ctx: commands.Context
+):  # pylint: disable=redefined-outer-name
+    """Test the limit command."""
+    limit_command = get_command(voice_cog, "limit")
+
+    # Test when the user is not in a voice channel
+    ctx.author.voice = None
+    await limit_command.callback(voice_cog, ctx, 5)
+    ctx.reply.assert_called_once_with("Nie jesteś na żadnym kanale głosowym!")
+    ctx.send.reset_mock()
+    ctx.reply.reset_mock()  # Add this line to reset the reply mock
+
+    # Test when the user is in a voice channel
+    voice_channel = MagicMock()
+    voice_channel.edit = AsyncMock()  # Use AsyncMock for edit()
+    ctx.author.voice = MagicMock(channel=voice_channel)
+
+    # Test when max_members is not within the valid range (1 to 99)
+    await limit_command.callback(voice_cog, ctx, 0)
+    ctx.reply.assert_called_once_with("Podaj liczbę członków od 1 do 99.")
+    ctx.reply.reset_mock()  # Reset the reply mock before the final test case
+
+    # Test when max_members is within the valid range (1 to 99)
+    max_members = 5
+    await limit_command.callback(voice_cog, ctx, max_members)
+    voice_channel.edit.assert_called_once_with(user_limit=max_members)
+    ctx.reply.assert_called_once_with(
+        f"Limit członków na kanale {voice_channel} ustawiony na {max_members}."
+    )
+
+
+@pytest.mark.asyncio
 async def test_join_command(
     voice_cog: VoiceCog, ctx: commands.Context
 ):  # pylint: disable=redefined-outer-name
@@ -24,7 +57,7 @@ async def test_join_command(
     # Test when the user is not in a voice channel
     ctx.author.voice = None
     await join_command.callback(voice_cog, ctx)
-    ctx.send.assert_called_once_with("Nie jesteś na żadnym kanale głosowym!")
+    ctx.reply.assert_called_once_with("Nie jesteś na żadnym kanale głosowym!")
     ctx.send.reset_mock()
 
     # Test when the user is in a voice channel
@@ -46,7 +79,7 @@ async def test_leave_command(
     # Test when the bot is not in a voice channel
     ctx.voice_client = None
     await leave_command.callback(voice_cog, ctx)
-    ctx.send.assert_called_once_with("Nie jestem na żadnym kanale głosowym!")
+    ctx.reply.assert_called_once_with("Nie jestem na żadnym kanale głosowym!")
     ctx.send.reset_mock()
 
     # Test when the bot is in a voice channel
