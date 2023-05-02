@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.9"
 services:
   app:
     image: ppyzel/zgdk:0.1
@@ -8,3 +8,17 @@ services:
     ports:
       - 8000:8000
     platform: linux/amd64
+    depends_on:
+      - db
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
