@@ -35,7 +35,7 @@ build_image:
 
 deploy_to_server:
   stage: deploy
-  image: docker:20.10.22
+  image: ubuntu:20.04
   services:
     - docker:20.10.22-dind
   variables:
@@ -44,9 +44,8 @@ deploy_to_server:
     - apt-get update -qq && apt-get install -y openssh-client
     - eval $(ssh-agent -s)
     - cat "$SSH_PRIVATE_KEY" | ssh-add -
-    - ssh -o "StrictHostKeyChecking=no" ubuntu@$SERVER_IP "mkdir -p /opt/zgdk"
   script:
     - scp -o "StrictHostKeyChecking=no" docker-compose.yml ubuntu@$SERVER_IP:/opt/zgdk/
-    - ssh -o "StrictHostKeyChecking=no" ubuntu@$SERVER_IP "cd /opt/zgdk && docker-compose pull && docker-compose down && docker-compose up -d"
+    - ssh -o "StrictHostKeyChecking=no" ubuntu@$SERVER_IP "sudo mkdir -p /opt/zgdk && cd /opt/zgdk && docker-compose pull && docker-compose down && docker-compose up -d"
   only:
     - main
