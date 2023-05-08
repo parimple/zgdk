@@ -63,13 +63,16 @@ class Zagadka(commands.Bot):
 
     async def on_ready(self):
         """On ready event"""
-        async with self.async_session() as session:
-            async with session.begin():
-                await self.base.metadata.create_all(self.engine)
+        logging.info("on_ready started")
+        async with self.engine.begin() as conn:
+            await conn.run_sync(self.base.metadata.create_all)
+        logging.info("create_all completed")
 
         await self.change_presence(
             activity=discord.Activity(type=discord.ActivityType.playing, name="zaGadka bot")
         )
+        logging.info("change_presence completed")
+
         if not self.test:
             await self.load_cogs()
         logging.info("Ready")
