@@ -1,0 +1,5 @@
+[DESIGN]
+# Minimum number of public methods for a class (consider reducing  pylint's noise by
+# raising this to 2 or 3 or more, or by defining your own list of interfaces that must
+# be overridden).
+min-public-methods=0

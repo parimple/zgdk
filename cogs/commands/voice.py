@@ -43,9 +43,7 @@ class VoiceCog(commands.Cog):
 
         voice_channel = ctx.author.voice.channel
         await voice_channel.edit(user_limit=max_members)
-        await ctx.reply(
-            f"Limit członków na kanale {voice_channel} ustawiony na {max_members}."
-        )
+        await ctx.reply(f"Limit członków na kanale {voice_channel} ustawiony na {max_members}.")
 
 
 async def setup(bot):

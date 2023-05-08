@@ -9,7 +9,7 @@ echo "running black..."
 black --check .
 
 echo "running isort..."
-isort --recursive --check-only --skip .venv .
+isort --check-only --skip .venv .
 
 echo "running pylint..."
 pylint datasources cogs tests ./main.py 
