@@ -2,8 +2,11 @@ discord.py==2.1
 PyYAML==6.0
 PyNaCl==1.5.0
 python-dotenv==0.21.0
-SQLAlchemy==1.4.46
-SQLAlchemy-Utils==0.39.0
+
+# database libraries
+SQLAlchemy==2.0.12
+sqlalchemy[asyncio]
+asyncpg
 
 # local unit testing libraries
 pytest

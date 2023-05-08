@@ -61,7 +61,6 @@ class Zagadka(commands.Bot):
                     except (commands.ExtensionError, commands.CommandError) as error:
                         logging.error("Failed to load cog: %s, error: %s", cog, error)
 
-    @commands.Bot.listener()
     async def on_ready(self):
         """On ready event"""
         async with self.async_session() as session:
