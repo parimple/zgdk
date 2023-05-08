@@ -29,11 +29,9 @@ class Zagadka(commands.Bot):
         postgres_user = os.environ.get("POSTGRES_USER")
         postgres_password = os.environ.get("POSTGRES_PASSWORD")
         postgres_db = os.environ.get("POSTGRES_DB")
-        postgres_host = os.environ.get("POSTGRES_HOST")
 
         database_url = (
-            f"postgresql+asyncpg://{postgres_user}:{postgres_password}"
-            f"@{postgres_host}/{postgres_db}"
+            f"postgresql+asyncpg://{postgres_user}:{postgres_password}@db:5432/{postgres_db}"
         )
 
         self.engine = create_async_engine(database_url)
@@ -64,8 +62,10 @@ class Zagadka(commands.Bot):
     async def on_ready(self):
         """On ready event"""
         logging.info("on_ready started")
+
         async with self.engine.begin() as conn:
             await conn.run_sync(self.base.metadata.create_all)
+
         logging.info("create_all completed")
 
         await self.change_presence(
