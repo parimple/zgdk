@@ -1,5 +1,5 @@
 """Models for the datasources package"""
-from sqlalchemy import BigInteger, Column, Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Column, Date, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -80,4 +80,23 @@ class Activity(Base):
         return (
             f"<Activity(member_id={self.member_id}, date={self.date}, "
             f"points={self.points}, activity_type={self.activity_type})>"
+        )
+
+
+class HandledPayment(Base):
+    """HandledPayment Model"""
+
+    __tablename__ = "handled_payments"
+
+    id = Column(BigInteger, primary_key=True)
+    member_id = Column(BigInteger, nullable=True)
+    member = relationship("Member", backref="handled_payments")
+    name = Column(String, nullable=False)
+    amount = Column(Float, nullable=False)
+    paid_at = Column(DateTime, nullable=False)
+
+    def __repr__(self) -> str:
+        return (
+            f"<HandledPayment(id={self.id}, member_id={self.member_id}, "
+            f"name={self.name}, amount={self.amount}, paid_at={self.paid_at})>"
         )
