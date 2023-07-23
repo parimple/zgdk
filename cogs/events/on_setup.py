@@ -16,16 +16,16 @@ class OnSetupEvent(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session = bot.session
-        self.setup_roles.start()
+        self.setup_roles.start() # pylint: disable=no-member
 
-    def cog_unload(self):
-        self.setup_roles.cancel()
+    async def cog_unload(self):
+        self.setup_roles.cancel() # pylint: disable=no-member
 
     @tasks.loop(count=1)  # Run this task only once
     async def setup_roles(self):
         """Setup roles"""
         await self.bot.wait_until_ready()
-        logging.info("Setting up roles")
+        logger.info("Setting up roles")
         guild = self.bot.guild
         role_names = ["$2", "$4", "$6", "$8", "$16", "$32", "$64", "$128"]
         async with self.bot.session() as session:
@@ -42,9 +42,9 @@ class OnSetupEvent(commands.Cog):
                     )
                 # Add role to database
                 await RoleQueries.add_role(session, role.id, role.name, "premium")
-                logger.info(f"Added role {role.name} (ID: {role.id}) to the database")
+                logger.info("Added role %s (ID: %s) to the database", role.name, role.id)
             await session.commit()
-        logging.info("Roles setup complete")
+        logger.info("Roles setup complete")
 
 
 async def setup(bot: commands.Bot):
