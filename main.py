@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from .datasources.models import Base
+from datasources.models import Base
 
 intents = discord.Intents.all()
 

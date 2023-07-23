@@ -5,6 +5,8 @@ echo "checks are running..."
 # echo "running prettier..."
 # prettier . -c
 
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+
 echo "running black..."
 black --check .
 
@@ -18,5 +20,4 @@ echo "running bandit..."
 bandit --recursive cogs datasources ./main.py
 
 echo "running pytest..."
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 pytest --cov=tests/
