@@ -4,11 +4,10 @@ import logging
 from typing import Optional, Sequence
 
 from sqlalchemy import delete, update
-from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from .models import Activity, HandledPayment, Member, MemberRole, Role
+from .models import HandledPayment, Member, MemberRole, Role
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,7 @@ class MemberQueries:
     """Class for Member Queries"""
 
     @staticmethod
-    async def get_or_add_member(
+    async def get_or_add_member(  # pylint: disable=too-many-arguments
         session: AsyncSession,
         member_id: int,
         wallet_balance: int = 0,
@@ -148,7 +147,7 @@ class HandledPaymentQueries:
     """Class for Handled Payment Queries"""
 
     @staticmethod
-    async def add_payment(
+    async def add_payment(  # pylint: disable=too-many-arguments
         session: AsyncSession,
         member_id: Optional[int],
         name: str,

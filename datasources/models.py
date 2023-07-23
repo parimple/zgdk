@@ -4,8 +4,7 @@ from __future__ import annotations
 import datetime
 
 from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
+from sqlalchemy.orm import Mapped, backref, declarative_base, mapped_column, relationship
 
 Base = declarative_base()
 

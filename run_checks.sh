@@ -18,4 +18,5 @@ echo "running bandit..."
 bandit --recursive cogs datasources ./main.py
 
 echo "running pytest..."
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 pytest --cov=tests/

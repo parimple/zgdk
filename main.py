@@ -17,9 +17,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-# from sqlalchemy.orm import declarative_base
-import datasources.models
-from datasources.models import Base
+from .datasources.models import Base
 
 intents = discord.Intents.all()
 
@@ -43,7 +41,13 @@ class Zagadka(commands.Bot):
         postgres_db: str = os.environ.get("POSTGRES_DB", "")
         postgres_port: str = os.environ.get("POSTGRES_PORT", "")
 
-        database_url = f"postgresql+asyncpg://{postgres_user}:{postgres_password}@db:{postgres_port}/{postgres_db}"
+        database_url = (
+            f"postgresql+asyncpg://"
+            f"{postgres_user}:"
+            f"{postgres_password}@db:"
+            f"{postgres_port}/"
+            f"{postgres_db}"
+        )
 
         self.engine = create_async_engine(database_url)
         self.session = async_scoped_session(

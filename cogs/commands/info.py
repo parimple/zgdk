@@ -1,14 +1,14 @@
 """This is a simple example of a cog."""
 
 import logging
-from typing import Any, Optional, Sequence, Union
+from typing import Optional, Sequence
 
 import discord
 from discord.ext import commands
 
-from datasources.models import HandledPayment
-from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
-from utils.timestamp import DiscordTimestamp
+from ...datasources.models import HandledPayment
+from ...datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
+from ...utils.timestamp import DiscordTimestamp
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +40,15 @@ class InfoCog(commands.Cog):
         )
         embed = discord.Embed(title="All Payments")
         for payment in payments:
-            embed.add_field(
-                name=f"Payment ID: {payment.id}",
-                value=f"Member ID: {payment.member_id}\nName: {payment.name}\nAmount: {payment.amount}\nPaid at: {payment.paid_at}\nPayment type: {payment.payment_type}",
-                inline=False,
+            name = f"Payment ID: {payment.id}"
+            value = (
+                f"Member ID: {payment.member_id}\n"
+                f"Name: {payment.name}\n"
+                f"Amount: {payment.amount}\n"
+                f"Paid at: {payment.paid_at}\n"
+                f"Payment type: {payment.payment_type}"
             )
+            embed.add_field(name=name, value=value, inline=False)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="guildinfo", description="Displays the current guild.")
