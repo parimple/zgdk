@@ -37,13 +37,13 @@ class OnPaymentEvent(commands.Cog):
         logger.info("check_payments")
         payments_data = await self.data_provider.get_data()
         logger.info("payments_data: %s", payments_data)
-        # for payment_data in payments_data:
-        #     await self.premium_manager.process_data(payment_data)
-        for i, payment_data in enumerate(payments_data):
-            if i > 10:
-                break
-            logger.info("payment_data %s: %s", i, payment_data)
+        for payment_data in payments_data:
             await self.premium_manager.process_data(payment_data)
+        # for i, payment_data in enumerate(payments_data):
+        #     if i > 10:
+        #         break
+        #     logger.info("payment_data %s: %s", i, payment_data)
+        #     await self.premium_manager.process_data(payment_data)
 
     @check_payments.before_loop
     async def before_check_payments(self):

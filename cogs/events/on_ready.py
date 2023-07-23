@@ -4,8 +4,6 @@ import logging
 
 from discord.ext import commands
 
-from datasources.queries import RoleQueries
-
 logger = logging.getLogger(__name__)
 
 

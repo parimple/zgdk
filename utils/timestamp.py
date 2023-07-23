@@ -17,8 +17,8 @@ class DiscordTimestamp:
     }
 
     @staticmethod
-    def format(dt: datetime.datetime, format: str) -> str:
+    def format(dt: datetime.datetime, frmt: str) -> str:
         """Formats a datetime object to Discord timestamp format."""
-        if format not in DiscordTimestamp.FORMATS:
+        if frmt not in DiscordTimestamp.FORMATS:
             raise ValueError("Invalid format. Choose from 't', 'T', 'd', 'D', 'f', 'F', 'R'.")
         return f"<t:{int(dt.timestamp())}:{format}>"

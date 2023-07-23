@@ -16,10 +16,10 @@ class OnSetupEvent(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session = bot.session
-        self.setup_roles.start() # pylint: disable=no-member
+        self.setup_roles.start()  # pylint: disable=no-member
 
     async def cog_unload(self):
-        self.setup_roles.cancel() # pylint: disable=no-member
+        self.setup_roles.cancel()  # pylint: disable=no-member
 
     @tasks.loop(count=1)  # Run this task only once
     async def setup_roles(self):

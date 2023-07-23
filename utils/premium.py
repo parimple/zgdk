@@ -45,22 +45,46 @@ class PremiumManager:
             31900: "$64",
         }
 
-    async def get_member_id(self, name: str) -> Optional[int]:
+    async def get_banned_member(self, name_or_id: str) -> Optional[discord.User]:
+        """Get banned Member ID"""
+        banned_user = None
+
+        if name_or_id.isdigit():
+            logger.info("get_banned_member: %s is digit", name_or_id)
+            user = await self.guild.fetch_user(int(name_or_id))
+            if user is None:
+                logger.info("User not found by id: %s", name_or_id)
+            else:
+                banned_user = user
+        else:
+            logger.info("get_banned_member: can't fetch user by name: %s", name_or_id)
+
+        if banned_user is not None:
+            # Check if user is banned
+            try:
+                await self.guild.fetch_ban(banned_user)
+                # If the line above doesn't raise an exception, it means the user is banned
+                logger.info("User is banned: %s", banned_user.id)
+                return banned_user
+            except discord.NotFound:
+                # If the user is not banned, fetch_ban() will raise a discord.NotFound exception
+                logger.info("User is not banned: %s", banned_user.id)
+
+        return None
+
+    async def get_member(self, name_or_id: str) -> Optional[discord.Member]:
         """Get Member ID"""
-        member_id = None
-        if name.isdigit():
-            logger.info("get_member_id: %s is digit", name)
-            member_id = int(name)
+        if name_or_id.isdigit():
+            logger.info("get_member_id: %s is digit", name_or_id)
+            member_id = int(name_or_id)
             member = self.guild.get_member(member_id)
             if member is None:
-                logger.info("Member not found by id: %s", name)
+                logger.info("Member not found by id: %s", name_or_id)
             else:
-                return member_id
-        logger.info("get_member_id: %s from guild: %s", name, self.guild)
-        member = self.guild.get_member_named(name)
-        if member:
-            member_id = member.id
-        return member_id
+                return member
+        logger.info("get_member_id: %s from guild: %s", name_or_id, self.guild)
+        member = self.guild.get_member_named(name_or_id)
+        return member
 
     async def _determine_remaining_amount(self, amount, role_name):
         """Determine the remaining amount after subtracting the role price"""
@@ -139,35 +163,27 @@ class PremiumManager:
     async def process_data(self, payment_data: PaymentData) -> None:
         """Process Payment"""
         logger.info("process payment: %s", payment_data)
-        try:
-            member_id = await self.get_member_id(payment_data.name)
-            logger.info("member id: %s", member_id)
-
-            async with self.session() as session:
-                payment = await HandledPaymentQueries.add_payment(
-                    session,
-                    member_id,
-                    payment_data.name,
-                    payment_data.amount,
-                    payment_data.paid_at,
-                    payment_data.payment_type,
-                )
-                logger.info("payment: %s", payment)
-
-                if member_id:
-                    await MemberQueries.get_or_add_member(session, member_id)
-                    await MemberQueries.add_to_wallet_balance(
-                        session, member_id, payment_data.amount
-                    )
-
+        member = await self.get_member(payment_data.name)
+        logger.info("member id: %s", member)
+        async with self.session() as session:
+            payment = await HandledPaymentQueries.add_payment(
+                session,
+                member.id if member else None,
+                payment_data.name,
+                payment_data.amount,
+                payment_data.paid_at,
+                payment_data.payment_type,
+            )
+            logger.info("payment: %s", payment)
+            if member:
+                await MemberQueries.get_or_add_member(session, member.id)
+                await MemberQueries.add_to_wallet_balance(session, member.id, payment_data.amount)
                 await session.commit()
-
-            if not member_id:
-                logger.info("Member not found: %s", payment_data.name)
-        except Exception as err:  # pylint: disable=broad-except
-            logger.error("An error occurred: %s", err)
-        else:
-            logger.info("Transaction committed")
+            else:
+                banned_member = await self.get_banned_member(payment_data.name)
+                if banned_member:
+                    logger.info("unban: %s", banned_member)
+                    await self.guild.unban(banned_member)
 
 
 class DataProvider:
