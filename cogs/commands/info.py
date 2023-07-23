@@ -6,9 +6,9 @@ from typing import Optional, Sequence
 import discord
 from discord.ext import commands
 
-from ...datasources.models import HandledPayment
-from ...datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
-from ...utils.timestamp import DiscordTimestamp
+from datasources.models import HandledPayment
+from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
+from utils.timestamp import DiscordTimestamp
 
 logger = logging.getLogger(__name__)
 
