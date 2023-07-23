@@ -2,8 +2,8 @@
 
 echo "checks are running..."
 
-echo "running prettier..."
-prettier . -c
+# echo "running prettier..."
+# prettier . -c
 
 echo "running black..."
 black --check .

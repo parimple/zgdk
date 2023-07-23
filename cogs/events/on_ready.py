@@ -4,14 +4,17 @@ import logging
 
 from discord.ext import commands
 
+from datasources.queries import RoleQueries
+
 logger = logging.getLogger(__name__)
 
 
 class OnReadyEvent(commands.Cog):
     """Class for the On Ready Discord Event"""
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
+        self.session = bot.session
 
     @commands.Cog.listener()
     async def on_ready(self):

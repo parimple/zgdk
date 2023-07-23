@@ -1,7 +1,11 @@
-"""Models for the datasources package"""
-from sqlalchemy import BigInteger, Column, Date, DateTime, Float, ForeignKey, Integer, String
+"""SQLAlchemy models for the database."""
+from __future__ import annotations
+
+import datetime
+
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
 Base = declarative_base()
 
@@ -13,15 +17,29 @@ class Member(Base):
     """Member Model"""
 
     __tablename__ = "members"
-    id = Column(BigInteger, primary_key=True)
-    first_inviter_id = Column(BigInteger, ForeignKey(MEMBER_ID), nullable=True)
-    current_inviter_id = Column(BigInteger, ForeignKey(MEMBER_ID), nullable=True)
-    joined_at = Column(DateTime, nullable=True)
-    rejoined_at = Column(DateTime, nullable=True)
-    wallet_balance = Column(Integer, nullable=False, default=0)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    first_inviter_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("members.id"), nullable=True
+    )
+    current_inviter_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("members.id"), nullable=True
+    )
+    joined_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
+    rejoined_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
+    wallet_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    first_inviter = relationship("Member", remote_side=[id], backref="initial_invited_members")
-    current_inviter = relationship("Member", remote_side=[id], backref="current_invited_members")
+    first_inviter: Mapped[Member] = relationship(
+        "Member",
+        backref=backref("initial_invited_members"),
+        foreign_keys=[first_inviter_id],
+        remote_side=[id],
+    )
+    current_inviter: Mapped[Member] = relationship(
+        "Member",
+        backref=backref("current_invited_members"),
+        foreign_keys=[current_inviter_id],
+        remote_side=[id],
+    )
 
     def __repr__(self) -> str:
         return f"<Member(id={self.id})>"
@@ -31,9 +49,9 @@ class Role(Base):
     """Role Model"""
 
     __tablename__ = "roles"
-    id = Column(BigInteger, primary_key=True)
-    name = Column(String, nullable=False)
-    role_type = Column(String, nullable=False)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    role_type: Mapped[str] = mapped_column(String, nullable=False)
 
     def __repr__(self) -> str:
         return f"<Role(id={self.id})>"
@@ -43,43 +61,51 @@ class MemberRole(Base):
     """MemberRole Model"""
 
     __tablename__ = "member_roles"
-    member_id = Column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
-    member = relationship("Member", backref="assigned_roles")
-    role_id = Column(BigInteger, ForeignKey(ROLE_ID), primary_key=True)
-    role = relationship("Role", backref="assigned_to_members")
-    expiration_date = Column(DateTime, nullable=True)
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    role_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(ROLE_ID), primary_key=True)
+    expiration_date: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
+
+    member: Mapped[Member] = relationship("Member", backref="assigned_roles")
+    role: Mapped[Role] = relationship("Role", backref="assigned_to_members")
+
+    def __repr__(self) -> str:
+        return f"<MemberRole(member_id={self.member_id}, role_id={self.role_id})>"
 
 
 class ChannelPermission(Base):
     """ChannelPermission Model"""
 
     __tablename__ = "channel_permissions"
-    member_id = Column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
-    member = relationship("Member", foreign_keys=[member_id], backref="channel_permissions")
-    target_id = Column(BigInteger, nullable=False, primary_key=True)  # Role or Member ID
-    permissions_value = Column(BigInteger, nullable=False, default=0)
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    target_id: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, primary_key=True
+    )  # Role or Member ID
+    permissions_value: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+    member: Mapped[list[Member]] = relationship(
+        "Member", foreign_keys=[member_id], backref="channel_permissions"
+    )
 
     def __repr__(self) -> str:
-        return (
-            f"<ChannelPermission(member_id={self.member_id}, "
-            f"target_id={self.target_id}, permissions_value={self.permissions_value})>"
-        )
+        return f"<ChannelPermission(member_id={self.member_id}, target_id={self.target_id})>"
 
 
 class Activity(Base):
     """Activity Model"""
 
     __tablename__ = "activity"
-    member_id = Column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
-    member = relationship("Member", backref="activities")
-    date = Column(Date, primary_key=True)
-    points = Column(Integer, nullable=False, default=0)
-    activity_type = Column(String, primary_key=True)  # 'text', 'voice', 'bonus'
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    date: Mapped[datetime.date] = mapped_column(Date, nullable=False, primary_key=True)
+    points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    activity_type: Mapped[str] = mapped_column(
+        String, nullable=False, primary_key=True
+    )  # 'text', 'voice', 'bonus'
+
+    member: Mapped[list[Member]] = relationship("Member", backref="activities")
 
     def __repr__(self) -> str:
         return (
-            f"<Activity(member_id={self.member_id}, date={self.date}, "
-            f"points={self.points}, activity_type={self.activity_type})>"
+            f"<Activity(member_id={self.member_id}, date={self.date}, type={self.activity_type})>"
         )
 
 
@@ -87,16 +113,12 @@ class HandledPayment(Base):
     """HandledPayment Model"""
 
     __tablename__ = "handled_payments"
-
-    id = Column(BigInteger, primary_key=True)
-    member_id = Column(BigInteger, nullable=True)
-    member = relationship("Member", backref="handled_payments")
-    name = Column(String, nullable=False)
-    amount = Column(Float, nullable=False)
-    paid_at = Column(DateTime, nullable=False)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    member_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    paid_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    payment_type: Mapped[str] = mapped_column(String, nullable=False)
 
     def __repr__(self) -> str:
-        return (
-            f"<HandledPayment(id={self.id}, member_id={self.member_id}, "
-            f"name={self.name}, amount={self.amount}, paid_at={self.paid_at})>"
-        )
+        return f"<HandledPayment(id={self.id})>"
