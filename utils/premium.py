@@ -9,7 +9,7 @@ from typing import Optional
 import discord
 import httpx
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright # type: ignore
+from playwright.async_api import async_playwright  # type: ignore
 
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
 
