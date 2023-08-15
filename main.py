@@ -4,7 +4,7 @@
 import asyncio
 import logging
 import os
-from typing import Union
+from typing import Optional
 
 import discord
 import yaml
@@ -25,6 +25,7 @@ with open("config.yml", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 
+# pylint: disable=too-many-instance-attributes
 class Zagadka(commands.Bot):
     """Main class for Zagadka bot"""
 
@@ -34,7 +35,8 @@ class Zagadka(commands.Bot):
         self.test: bool = kwargs.get("test", False)
         self.config: dict = config
         self.guild_id: int = config.get("guild_id")
-        self.guild: Union[None, discord.Guild] = None
+        self.guild: Optional[discord.Guild] = None
+        self.donate_url: str = config.get("donate_url", "")
 
         postgres_user: str = os.environ.get("POSTGRES_USER", "")
         postgres_password: str = os.environ.get("POSTGRES_PASSWORD", "")
@@ -105,6 +107,9 @@ class Zagadka(commands.Bot):
 
         if not self.test:
             await self.load_cogs()
+        # await self.tree.sync(guild=guild)
+        # await self.tree.sync()
+        # await self.app_commands.sync(guild=self.guild_id)
         logging.info("Ready")
 
     def run(self):

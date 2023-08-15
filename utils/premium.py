@@ -11,7 +11,7 @@ import httpx
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright  # pylint: disable=import-error
 
-from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
+from datasources.queries import HandledPaymentQueries, MemberQueries
 
 TIPO_API_URL = "https://tipo.live/api/v2/payments?token="
 TIPPLY_API_URL = (
@@ -35,40 +35,22 @@ class PremiumManager:
     def __init__(self, session, guild):
         self.session = session
         self.guild = guild
-        self.role_price_map = {
-            900: "$2",
-            1900: "$4",
-            2900: "$6",
-            3900: "$8",
-            7900: "$16",
-            15900: "$32",
-            31900: "$64",
-        }
 
     async def get_banned_member(self, name_or_id: str) -> Optional[discord.User]:
         """Get banned Member ID"""
-        banned_user = None
-
-        if name_or_id.isdigit():
-            logger.info("get_banned_member: %s is digit", name_or_id)
-            user = await self.guild.fetch_user(int(name_or_id))
-            if user is None:
-                logger.info("User not found by id: %s", name_or_id)
-            else:
-                banned_user = user
-        else:
+        if not name_or_id.isdigit():
             logger.info("get_banned_member: can't fetch user by name: %s", name_or_id)
+            return None
 
-        if banned_user is not None:
-            # Check if user is banned
-            try:
-                await self.guild.fetch_ban(banned_user)
-                # If the line above doesn't raise an exception, it means the user is banned
-                logger.info("User is banned: %s", banned_user.id)
-                return banned_user
-            except discord.NotFound:
-                # If the user is not banned, fetch_ban() will raise a discord.NotFound exception
-                logger.info("User is not banned: %s", banned_user.id)
+        user_id = int(name_or_id)
+        try:
+            ban_entry = await self.guild.fetch_ban(discord.Object(id=user_id))
+            if ban_entry:
+                logger.info("User is banned: %s", ban_entry.user.id)
+                return ban_entry.user
+        except discord.NotFound:
+            # If the user is not banned, fetch_ban() will raise a discord.NotFound exception
+            logger.info("User is not banned: %s", user_id)
 
         return None
 
@@ -86,79 +68,24 @@ class PremiumManager:
         member = self.guild.get_member_named(name_or_id)
         return member
 
-    async def _determine_remaining_amount(self, amount, role_name):
-        """Determine the remaining amount after subtracting the role price"""
-        if role_name:
-            for price, name in self.role_price_map.items():
-                if name == role_name:
-                    return amount - price
-        return amount
-
-    async def _assign_role_to_db(self, session, member_id, role_name):
-        """Assign role to the member in the database"""
-        role_id = None
-        if role_name:
-            role = await RoleQueries.get_role_by_name(session, role_name)
-            if role:
-                role_id = role.id
-                premium_role = await RoleQueries.get_premium_role(session, member_id)
-                if premium_role and premium_role.role.role_type == "premium":
-                    role_value = await self._get_role_value(role_name)
-                    premium_role_value = await self._get_role_value(premium_role.role.name)
-                    if (premium_role.expiration_date - datetime.now()).days <= 1:
-                        # Add to wallet instead of assigning the role
-                        logger.info(
-                            "Added to wallet of member %s (multiple pqyments in 1 day)", member_id
-                        )
-                        return None
-                    if role_value > premium_role_value:
-                        # Delete old role and assign new role
-                        session.delete(premium_role)
-                        logger.info(
-                            "Deleted old role and assigned new role to member %s", member_id
-                        )
-                        session.add(
-                            RoleQueries.add_role_to_member(session, member_id, role_id, 30, "days")
-                        )
-                        return role_id
-        return None
-
-    async def _determine_role(self, amount):
-        """Determine the role based on the payment amount"""
-        sorted_role_prices = sorted(self.role_price_map.keys(), reverse=True)
-        for price in sorted_role_prices:
-            if amount >= price:
-                return self.role_price_map[price]
-        return None
-
-    async def _get_role_value(self, role_name):
-        """Get the value of the role"""
-        for price, name in self.role_price_map.items():
-            if name == role_name:
-                return price
-        return 0
-
-    async def _assign_role_to_discord(self, member_id, role_id):
-        """Assign role to the member on Discord server"""
-        discord_member = self.guild.get_member(member_id)
-        if discord_member and role_id:
-            discord_role = discord.utils.get(self.guild.roles, id=role_id)
-            if discord_role:
-                # Uncomment the line below when you're ready to use this in production
-                # await discord_member.add_roles(discord_role)
-                logger.info("Added role %s to member %s on Discord", discord_role.name, member_id)
-
-    async def _remove_role_from_discord(self, member_id, role_id):
-        """Remove role from the member on Discord server"""
-        discord_member = self.guild.get_member(member_id)
-        if discord_member and role_id:
-            discord_role = discord.utils.get(self.guild.roles, id=role_id)
-            if discord_role:
-                # Uncomment the line below when you're ready to use this in production
-                # await discord_member.remove_roles(discord_role)
-                logger.info(
-                    "Removed role %s from member %s on Discord", discord_role.name, member_id
-                )
+    @staticmethod
+    def add_premium_roles_to_embed(ctx, embed, premium_roles):
+        """Add premium roles to the provided embed."""
+        role_ids = [role.role_id for role in premium_roles]
+        expiration_dates = [
+            (
+                discord.utils.format_dt(role.expiration_date, "D"),
+                discord.utils.format_dt(role.expiration_date, "R"),
+            )
+            for role in premium_roles
+        ]
+        for role_id, (formatted_date, relative_date) in zip(role_ids, expiration_dates):
+            role_name = ctx.guild.get_role(role_id).name
+            embed.add_field(
+                name=f"Aktualna rola: {role_name}",
+                value=f"Do: {formatted_date} ({relative_date})",
+                inline=False,
+            )
 
     async def process_data(self, payment_data: PaymentData) -> None:
         """Process Payment"""
@@ -178,12 +105,12 @@ class PremiumManager:
             if member:
                 await MemberQueries.get_or_add_member(session, member.id)
                 await MemberQueries.add_to_wallet_balance(session, member.id, payment_data.amount)
-                await session.commit()
             else:
                 banned_member = await self.get_banned_member(payment_data.name)
                 if banned_member:
                     logger.info("unban: %s", banned_member)
-                    await self.guild.unban(banned_member)
+                    # await self.guild.unban(banned_member)
+            await session.commit()
 
 
 class DataProvider:
@@ -240,7 +167,7 @@ class TipplyDataProvider(DataProvider):
                 name = div.find("span", {"data-element": "nickname"}).text
                 amount_str = div.find("span", {"data-element": "price"}).text.replace(",", ".")
                 amount_str = amount_str.replace(" zł", "")
-                amount = int(float(amount_str) * 100)
+                amount = int(round(float(amount_str), 2) * 100)
                 payment_time = datetime.now()
 
                 payment_data = PaymentData(name, amount, payment_time, self.payment_type)
@@ -256,7 +183,7 @@ class TipplyDataProvider(DataProvider):
 
         # Get the 10 last handled payments of type "tipply"
         last_handled_payments = await HandledPaymentQueries.get_last_payments(
-            self.db_session, 10, self.payment_type
+            self.db_session, offset=0, limit=10, payment_type=self.payment_type
         )
         logger.info("last_handled_payments: %s", last_handled_payments)
 

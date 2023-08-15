@@ -10,6 +10,7 @@ class VoiceCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command()
+    @commands.has_permissions(administrator=True)
     async def join(self, ctx):
         """Join the voice channel the user is in."""
         if ctx.author.voice is None:
@@ -23,6 +24,7 @@ class VoiceCog(commands.Cog):
             await ctx.voice_client.move_to(voice_channel)
 
     @commands.hybrid_command()
+    @commands.has_permissions(administrator=True)
     async def leave(self, ctx):
         """Leave the voice channel."""
         if ctx.voice_client is not None:
@@ -31,6 +33,7 @@ class VoiceCog(commands.Cog):
             await ctx.reply("Nie jestem na żadnym kanale głosowym!")
 
     @commands.hybrid_command()
+    @commands.has_permissions(administrator=True)
     async def limit(self, ctx, max_members: int):
         """Change the maximum number of members that can join the current voice channel."""
         if ctx.author.voice is None:

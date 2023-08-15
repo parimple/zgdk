@@ -1,11 +1,12 @@
 """Queries for the database"""
-import datetime
 import logging
+from datetime import datetime, timedelta
 from typing import Optional, Sequence
 
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import joinedload
 
 from .models import HandledPayment, Member, MemberRole, Role
 
@@ -22,8 +23,8 @@ class MemberQueries:
         wallet_balance: int = 0,
         first_inviter_id: Optional[int] = None,
         current_inviter_id: Optional[int] = None,
-        joined_at: Optional[datetime.datetime] = None,
-        rejoined_at: Optional[datetime.datetime] = None,
+        joined_at: Optional[datetime] = None,
+        rejoined_at: Optional[datetime] = None,
     ) -> Member:
         """Get a Member by ID, or add a new one if it doesn't exist"""
         result = await session.execute(select(Member).where(Member.id == member_id))
@@ -65,15 +66,13 @@ class RoleQueries:
 
     @staticmethod
     async def add_role_to_member(
-        session: AsyncSession, member_id: int, role_id: int, duration: int = 30, unit: str = "days"
+        session: AsyncSession,
+        member_id: int,
+        role_id: int,
+        duration: timedelta = timedelta(days=30),
     ):
         """Add a role to a member with an expiration date"""
-        if unit == "minutes":
-            expiration_date = datetime.datetime.now() + datetime.timedelta(minutes=duration)
-        elif unit == "hours":
-            expiration_date = datetime.datetime.now() + datetime.timedelta(hours=duration)
-        else:  # default to days if unit is not recognized
-            expiration_date = datetime.datetime.now() + datetime.timedelta(days=duration)
+        expiration_date = datetime.now() + duration
         member_role = MemberRole(
             member_id=member_id, role_id=role_id, expiration_date=expiration_date
         )
@@ -111,12 +110,17 @@ class RoleQueries:
     @staticmethod
     async def get_member_premium_roles(session: AsyncSession, member_id: int):
         """Get all premium roles of a member"""
+        logger.info("Trying to fetch premium roles for member_id: %s", member_id)
         result = await session.execute(
             select(MemberRole)
+            .options(joinedload(MemberRole.role))
             .join(Role)
             .where((MemberRole.member_id == member_id) & (Role.role_type == "premium"))
         )
-        return result.scalars().all()
+
+        roles = result.scalars().all()
+        logger.info("Fetched premium roles: %s", roles)
+        return roles
 
     @staticmethod
     async def delete_member_role(session: AsyncSession, member_id: int, role_id: int):
@@ -137,10 +141,40 @@ class RoleQueries:
             .where(
                 (MemberRole.member_id == member_id)
                 & (Role.role_type == "premium")
-                & (MemberRole.expiration_date >= datetime.datetime.now())
+                & (MemberRole.expiration_date >= datetime.now())
             )
         )
         return result.scalars().first()
+
+    @staticmethod
+    async def get_role_for_member(session: AsyncSession, member_id: int, role_id: int):
+        """Check if a member already has the role."""
+        result = await session.execute(
+            select(MemberRole).where(
+                (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
+            )
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    async def update_role_expiration_date(
+        session: AsyncSession, member_id: int, role_id: int, duration: timedelta
+    ):
+        """Update the expiration date of the role for the member."""
+        current_expiration = (
+            await session.execute(
+                select(MemberRole.expiration_date).where(
+                    (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
+                )
+            )
+        ).scalar_one()
+        new_expiration_date = current_expiration + duration
+        await session.execute(
+            update(MemberRole)
+            .where((MemberRole.member_id == member_id) & (MemberRole.role_id == role_id))
+            .values(expiration_date=new_expiration_date)
+        )
+        await session.commit()
 
 
 class HandledPaymentQueries:
@@ -152,7 +186,7 @@ class HandledPaymentQueries:
         member_id: Optional[int],
         name: str,
         amount: int,
-        paid_at: datetime.datetime,
+        paid_at: datetime,
         payment_type: str,
     ) -> HandledPayment:
         """Add Payment"""
@@ -170,14 +204,14 @@ class HandledPaymentQueries:
 
     @staticmethod
     async def get_last_payments(
-        session: AsyncSession, limit: int = 10, payment_type: Optional[str] = None
+        session: AsyncSession, offset: int = 0, limit: int = 10, payment_type: Optional[str] = None
     ) -> Sequence[HandledPayment]:
         """Get last 'limit' payments of specific type. If payment_type is None, return all types"""
         logger.info("get_last_payments")
         query = select(HandledPayment)
         if payment_type is not None:
             query = query.where(HandledPayment.payment_type == payment_type)
-        query = query.order_by(HandledPayment.id.desc()).limit(limit)
+        query = query.order_by(HandledPayment.id.desc()).offset(offset).limit(limit)
         result = await session.execute(query)
         return result.scalars().all()
 
@@ -192,3 +226,8 @@ class HandledPaymentQueries:
             payment.member_id = member_id
         else:
             logger.error("Payment with id %s not found", payment_id)
+
+    @staticmethod
+    async def get_payment_by_id(session: AsyncSession, payment_id: int) -> Optional[HandledPayment]:
+        """Fetch a payment by its ID."""
+        return await session.get(HandledPayment, payment_id)
