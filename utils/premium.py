@@ -105,11 +105,13 @@ class PremiumManager:
             if member:
                 await MemberQueries.get_or_add_member(session, member.id)
                 await MemberQueries.add_to_wallet_balance(session, member.id, payment_data.amount)
+                logger.info("add_to_wallet_balance: %s", payment_data.amount)
             else:
                 banned_member = await self.get_banned_member(payment_data.name)
                 if banned_member:
                     logger.info("unban: %s", banned_member)
                     # await self.guild.unban(banned_member)
+            logger.info("commit session")
             await session.commit()
 
 

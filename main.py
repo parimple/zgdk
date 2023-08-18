@@ -85,8 +85,8 @@ class Zagadka(commands.Bot):
 
         async with self.engine.begin() as conn:
             table_names = self.base.metadata.tables.keys()
-            logging.info("Dropping tables: %s", ", ".join(table_names))
-            await conn.run_sync(self.base.metadata.drop_all)
+            logging.info("Creating tables: %s", ", ".join(table_names))
+            # await conn.run_sync(self.base.metadata.drop_all)
             await conn.run_sync(self.base.metadata.create_all)
 
         logging.info("Database create_all completed")
@@ -107,9 +107,6 @@ class Zagadka(commands.Bot):
 
         if not self.test:
             await self.load_cogs()
-        # await self.tree.sync(guild=guild)
-        # await self.tree.sync()
-        # await self.app_commands.sync(guild=self.guild_id)
         logging.info("Ready")
 
     def run(self):
