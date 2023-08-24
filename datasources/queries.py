@@ -100,6 +100,12 @@ class RoleQueries:
         return result.scalars().first()
 
     @staticmethod
+    async def get_role_by_id(session: AsyncSession, role_id: int):
+        """Get role by ID"""
+        result = await session.execute(select(Role).where(Role.id == role_id))
+        return result.scalars().first()
+
+    @staticmethod
     async def get_member_roles(session: AsyncSession, member_id: int):
         """Get all roles of a member"""
         result = await session.execute(

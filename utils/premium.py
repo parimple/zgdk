@@ -13,14 +13,11 @@ from playwright.async_api import async_playwright  # pylint: disable=import-erro
 
 from datasources.queries import HandledPaymentQueries, MemberQueries
 
-TIPO_API_URL = "https://tipo.live/api/v2/payments?token="
 TIPPLY_API_URL = (
     "https://widgets.tipply.pl/LATEST_MESSAGES/"
     "c86c2291-6d68-4ce7-b54c-e13330f0f6c2/"
     "fb60faaf-197d-4dfb-9f2b-cce6edb00793"
 )
-TOKEN = os.environ.get("TIPO_API_TOKEN")
-
 logger = logging.getLogger(__name__)
 
 PaymentData = namedtuple(

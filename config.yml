@@ -2,3 +2,7 @@ prefix: ","
 description: "Hello, my name is zaGadka"
 guild_id: 960665311701528596
 donate_url: "https://tipply.pl/u/zagadka"
+
+channels:
+  on_join: 1105588284555546634
+  lounge: 1143990867946913845

@@ -5,7 +5,7 @@ import logging
 import discord
 from discord.ext import commands, tasks
 
-from datasources.queries import RoleQueries
+from datasources.queries import MemberQueries, RoleQueries
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,11 @@ class OnSetupEvent(commands.Cog):
         self.bot = bot
         self.session = bot.session
         self.setup_roles.start()  # pylint: disable=no-member
+        self.setup_unknown_inviter.start()  # pylint: disable=no-member
 
     async def cog_unload(self):
         self.setup_roles.cancel()  # pylint: disable=no-member
+        self.setup_unknown_inviter.cancel()  # pylint: disable=no-member
 
     async def ensure_roles_in_db_and_guild(self, role_names: list[str], role_type: str):
         """Utility function to ensure roles exist in both database and guild"""
@@ -33,6 +35,12 @@ class OnSetupEvent(commands.Cog):
                         name=name,
                         mentionable=False,  # Allow anyone to mention this role
                     )
+                # Check if role with given ID already exists in database
+                existing_role = await RoleQueries.get_role_by_id(session, role.id)
+                if existing_role:
+                    logger.info("Role with ID %s already exists in database", role.id)
+                    continue
+
                 # Add role to database
                 await RoleQueries.add_role(session, role.id, role.name, role_type)
                 logger.info(
@@ -58,6 +66,15 @@ class OnSetupEvent(commands.Cog):
         await self.ensure_roles_in_db_and_guild(premium_role_names, "premium")
 
         logger.info("Roles setup complete")
+
+    @tasks.loop(count=1)
+    async def setup_unknown_inviter(self):
+        """Create a special entry for unknown invites."""
+        async with self.session() as session:
+            unknown_inviter_id = self.bot.guild_id
+            await MemberQueries.get_or_add_member(session, unknown_inviter_id)
+            await session.commit()
+            logger.info("Unknown Inviter is set")
 
 
 async def setup(bot: commands.Bot):

@@ -4,7 +4,7 @@
 import asyncio
 import logging
 import os
-from typing import Optional
+from typing import Any, Optional
 
 import discord
 import yaml
@@ -33,10 +33,14 @@ class Zagadka(commands.Bot):
         load_dotenv()
 
         self.test: bool = kwargs.get("test", False)
-        self.config: dict = config
+        self.config: dict[str, Any] = config
+
         self.guild_id: int = config.get("guild_id")
-        self.guild: Optional[discord.Guild] = None
         self.donate_url: str = config.get("donate_url", "")
+        self.channels: dict[str, int] = config.get("channels", {})
+
+        self.guild: Optional[discord.Guild] = None
+        self.invites: dict[str, discord.Invite] = {}
 
         postgres_user: str = os.environ.get("POSTGRES_USER", "")
         postgres_password: str = os.environ.get("POSTGRES_PASSWORD", "")

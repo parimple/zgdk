@@ -1,4 +1,4 @@
-"""Tipo Payments Cog"""
+"""On Payments Event"""
 
 import asyncio
 import logging
@@ -11,7 +11,6 @@ from utils import PremiumManager, TipplyDataProvider
 logger = logging.getLogger(__name__)
 
 
-TIPO_API_URL = "https://tipo.live/api/v2/payments?token="
 TOKEN = os.environ.get("TIPO_API_TOKEN")
 
 
