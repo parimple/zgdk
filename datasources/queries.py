@@ -249,7 +249,8 @@ class ChannelPermissionQueries:
         target_id: int,
         allow_permissions_value: int,
         deny_permissions_value: int,
-    ):
+    ):  # pylint: disable=too-many-arguments
+        """Add or update channel permissions for a specific member or role."""
         result = await session.execute(
             select(ChannelPermission).where(
                 ChannelPermission.member_id == member_id, ChannelPermission.target_id == target_id

@@ -1,7 +1,6 @@
 """Module for managing premium payments and wallet"""
 import json
 import logging
-import os
 from collections import namedtuple
 from datetime import datetime, timedelta
 from typing import Optional

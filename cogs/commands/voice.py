@@ -24,7 +24,7 @@ class VoiceCog(commands.Cog):
         allow_permissions_value: Permissions,
         deny_permissions_value: Permissions,
         update_db: Optional[Literal["+", "-"]],
-    ):
+    ):  # pylint: disable=too-many-arguments
         """Update the permission in the database."""
         if update_db is None:
             return
@@ -53,9 +53,9 @@ class VoiceCog(commands.Cog):
                 )
                 current_value = getattr(default_perms, permission_flag, None)
             return False if current_value is None else not current_value
-        elif value == "+":
+        if value == "+":
             return True
-        elif value == "-":
+        if value == "-":
             return False
 
     async def update_channel_and_db(self, ctx, target, current_perms, update_db):
@@ -78,7 +78,10 @@ class VoiceCog(commands.Cog):
                 update_db,
             )
 
-    async def move_to_afk_if_needed(self, ctx, target, target_channel, permission_flag, value):
+    async def move_to_afk_if_needed(
+        self, ctx, target, target_channel, permission_flag, value
+    ):  # pylint: disable=too-many-arguments
+        """Move the target to the AFK channel if needed."""
         afk_channel_id = self.bot.config["channels_voice"]["afk"]
         afk_channel = ctx.guild.get_channel(afk_channel_id)
 
@@ -98,7 +101,8 @@ class VoiceCog(commands.Cog):
         permission_flag: str = "",
         value: Optional[Literal["+", "-"]] = None,
         update_db: Optional[Literal["+", "-"]] = None,
-    ):
+    ):  # pylint: disable=too-many-arguments
+        """Modify the channel permission."""
         current_channel = ctx.author.voice.channel
         current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
         value = await self.determine_new_permission_value(
@@ -127,6 +131,7 @@ class VoiceCog(commands.Cog):
         can_view: Optional[Literal["+", "-"]] = None,
         update_db: Optional[Literal["+", "-"]] = None,
     ):
+        """Set the view permission for the target."""
         await self.modify_channel_permission(ctx, target, "view_channel", can_view, update_db)
 
     @commands.hybrid_command(aliases=["c"])
@@ -143,6 +148,7 @@ class VoiceCog(commands.Cog):
         can_connect: Optional[Literal["+", "-"]] = None,
         update_db: Optional[Literal["+", "-"]] = None,
     ):
+        """Set the connect permission for the target."""
         await self.modify_channel_permission(ctx, target, "connect", can_connect, update_db)
 
     @commands.hybrid_command(aliases=["s"])
@@ -154,6 +160,7 @@ class VoiceCog(commands.Cog):
         can_speak: Optional[Literal["+", "-"]] = None,
         update_db: Optional[Literal["+", "-"]] = None,
     ):
+        """Set the speak permission for the target."""
         await self.modify_channel_permission(ctx, target, "speak", can_speak, update_db)
 
     @commands.hybrid_command()
