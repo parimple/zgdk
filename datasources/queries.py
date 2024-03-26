@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
-from .models import HandledPayment, Member, MemberRole, Role
+from .models import ChannelPermission, HandledPayment, Member, MemberRole, Role
 
 logger = logging.getLogger(__name__)
 
@@ -237,3 +237,80 @@ class HandledPaymentQueries:
     async def get_payment_by_id(session: AsyncSession, payment_id: int) -> Optional[HandledPayment]:
         """Fetch a payment by its ID."""
         return await session.get(HandledPayment, payment_id)
+
+
+class ChannelPermissionQueries:
+    """Class for Channel Permission Queries"""
+
+    @staticmethod
+    async def add_or_update_permission(
+        session: AsyncSession,
+        member_id: int,
+        target_id: int,
+        allow_permissions_value: int,
+        deny_permissions_value: int,
+    ):
+        result = await session.execute(
+            select(ChannelPermission).where(
+                ChannelPermission.member_id == member_id, ChannelPermission.target_id == target_id
+            )
+        )
+        permission = result.scalars().first()
+
+        if permission is None:
+            permission = ChannelPermission(
+                member_id=member_id,
+                target_id=target_id,
+                allow_permissions_value=allow_permissions_value,
+                deny_permissions_value=deny_permissions_value,
+            )
+            session.add(permission)
+        else:
+            # Remove overlapping permissions in both sets
+            permission.allow_permissions_value &= ~deny_permissions_value
+            permission.deny_permissions_value &= ~allow_permissions_value
+
+            # Update existing permissions
+            permission.allow_permissions_value |= allow_permissions_value
+            permission.deny_permissions_value |= deny_permissions_value
+
+    @staticmethod
+    async def remove_permission(session: AsyncSession, member_id: int, target_id: int):
+        """Remove channel permissions for a specific member or role."""
+        await session.execute(
+            delete(ChannelPermission).where(
+                ChannelPermission.member_id == member_id, ChannelPermission.target_id == target_id
+            )
+        )
+
+    @staticmethod
+    async def get_permission(
+        session: AsyncSession, member_id: int, target_id: int
+    ) -> Optional[ChannelPermission]:
+        """Get channel permissions for a specific member or role."""
+        result = await session.execute(
+            select(ChannelPermission).where(
+                ChannelPermission.member_id == member_id, ChannelPermission.target_id == target_id
+            )
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    async def get_permissions_for_target(
+        session: AsyncSession, target_id: int
+    ) -> list[ChannelPermission]:
+        """Get all channel permissions for a specific target (member or role)."""
+        result = await session.execute(
+            select(ChannelPermission).where(ChannelPermission.target_id == target_id)
+        )
+        return result.scalars().all()
+
+    @staticmethod
+    async def get_permissions_for_member(
+        session: AsyncSession, member_id: int
+    ) -> list[ChannelPermission]:
+        """Get all channel permissions across different channels for a specific member."""
+        result = await session.execute(
+            select(ChannelPermission).where(ChannelPermission.member_id == member_id)
+        )
+        return result.scalars().all()

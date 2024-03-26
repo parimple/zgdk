@@ -55,7 +55,14 @@ class Zagadka(commands.Bot):
             f"{postgres_db}"
         )
 
-        self.engine = create_async_engine(database_url)
+        self.engine = create_async_engine(
+            database_url,
+            pool_size=40,
+            max_overflow=80,
+            pool_timeout=10,
+            pool_recycle=1200,
+            pool_pre_ping=True,
+        )
         self.session = async_scoped_session(
             async_sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession),
             scopefunc=asyncio.current_task,

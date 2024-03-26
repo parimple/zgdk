@@ -79,7 +79,8 @@ class ChannelPermission(Base):
     target_id: Mapped[int] = mapped_column(
         BigInteger, nullable=False, primary_key=True
     )  # Role or Member ID
-    permissions_value: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    allow_permissions_value: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    deny_permissions_value: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
     member: Mapped[list[Member]] = relationship(
         "Member", foreign_keys=[member_id], backref="channel_permissions"

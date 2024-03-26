@@ -88,9 +88,9 @@ class OnMemberJoinEvent(commands.Cog):
             # Commit the changes to the database
             await session.commit()
 
-        logger.info("Member %s joined using invite %s from %s", member.id, invite.code, inviter_id)
+        # logger.info("Member %s joined using invite %s from %s", member.id, invite.code, inviter_id
         await self.channel.send(
-            f"{invite.inviter.mention} zaprosił {member.mention} {member.display_name}. "
+            f"{member.mention} {member.display_name} zaproszony przez {invite.inviter.mention} "
             f"Kod: {invite.code}, Użycia: {invite.uses}",
             allowed_mentions=AllowedMentions(users=False),
         )
@@ -110,7 +110,7 @@ class OnMemberJoinEvent(commands.Cog):
             await session.commit()
 
         await self.channel.send(
-            f"{self.bot.user.mention} zaprosił {member.mention} {member.display_name}. "
+            f"{member.mention} {member.display_name} zaproszony przez {self.bot.user.mention} "
             f"Kod: {self.guild.vanity_url_code}",
             allowed_mentions=AllowedMentions(users=False),
         )
@@ -124,7 +124,7 @@ class OnMemberJoinEvent(commands.Cog):
         """
         # Add the new invite to the invites dictionary
         self.invites[invite.id] = invite
-        logger.info("Invite %s created", invite.code)
+        # logger.info("Invite %s created", invite.code)
 
     @commands.Cog.listener()
     async def on_invite_delete(self, invite):
