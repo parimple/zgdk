@@ -191,23 +191,26 @@ class RoleShopView(discord.ui.View):
                 style=discord.ButtonStyle.primary,
                 disabled=self.balance < self.role_price_map[role_symbol],
             )
-            button.callback = self.create_button_callback(role_id)
+            button.callback = self.create_button_callback(role_symbol)
             self.add_item(button)
 
-        switch_button = discord.ui.Button(
-            label="Przełącz na stronę rocznych cen", style=discord.ButtonStyle.secondary
-        )
-        switch_button.callback = self.switch_page_callback
-        self.add_item(switch_button)
+        if page == 1:
+            next_button = discord.ui.Button(label="➡️", style=discord.ButtonStyle.secondary)
+            next_button.callback = self.next_page
+            self.add_item(next_button)
+        else:
+            previous_button = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary)
+            previous_button.callback = self.previous_page
+            self.add_item(previous_button)
 
-    def create_button_callback(self, role_id):
+    def create_button_callback(self, role_symbol):
         async def button_callback(interaction: discord.Interaction):
-            await self.buy_role(interaction, role_id)
+            await self.buy_role(interaction, role_symbol)
 
         return button_callback
 
-    async def switch_page_callback(self, interaction: discord.Interaction):
-        self.page = 2 if self.page == 1 else 1
+    async def next_page(self, interaction: discord.Interaction):
+        self.page = 2
         db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
         await self.session.commit()
         balance = db_member.wallet_balance
@@ -218,8 +221,17 @@ class RoleShopView(discord.ui.View):
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
-    async def get_affordable_roles(self, balance):
-        return [role_name for role_name, price in self.role_price_map.items() if price <= balance]
+    async def previous_page(self, interaction: discord.Interaction):
+        self.page = 1
+        db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
+        await self.session.commit()
+        balance = db_member.wallet_balance
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
+        embed = create_shop_embed(self.ctx, balance, self.role_price_map, premium_roles, self.page)
+        view = RoleShopView(
+            self.ctx, self.bot, self.bot.config["premium_roles"], balance, self.page
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
 
     async def generate_embed(self):
         """Generate the embed for the role shop."""
@@ -229,17 +241,18 @@ class RoleShopView(discord.ui.View):
         premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
         return create_shop_embed(self.ctx, balance, self.role_price_map, premium_roles, self.page)
 
-    async def buy_role(self, interaction: discord.Interaction, role_id: int):
+    async def buy_role(self, interaction: discord.Interaction, role_symbol: str):
         """Buy a role."""
         if self.guild is None or interaction.user.id != self.ctx.author.id:
             return
 
-        role_symbol = next((key for key, value in self.role_ids.items() if value == role_id), None)
-        if role_symbol is None:
-            await interaction.response.send_message(f"Rola o ID {role_id} nie została znaleziona.")
-            return
-
+        role_id = self.role_ids[role_symbol]
         role = discord.utils.get(self.guild.roles, id=role_id)
+        price = (
+            self.role_price_map[role_symbol]
+            if self.page == 1
+            else self.role_price_map[role_symbol] * 10
+        )
 
         member = self.ctx.author
         if isinstance(member, discord.User):
@@ -250,7 +263,6 @@ class RoleShopView(discord.ui.View):
 
         async with self.session() as session:
             db_member = await MemberQueries.get_or_add_member(session, member.id)
-
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
 
             if premium_roles:
