@@ -1,4 +1,4 @@
-""" Info cog. """
+"""Info cog."""
 
 import logging
 from datetime import datetime, timezone
@@ -9,6 +9,7 @@ from discord.ext import commands
 
 from datasources.queries import MemberQueries, RoleQueries
 from utils.premium import PremiumManager
+from utils.refund import calculate_refund
 
 CURRENCY_UNIT = "G"
 
@@ -98,76 +99,102 @@ class InfoCog(commands.Cog):
         if member.banner:
             embed.set_image(url=member.banner.url)
 
-        view = ProfileView(ctx, self.bot, premium_roles)
+        view = ProfileView(self.bot, member, premium_roles)
         await ctx.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="roles", description="Lists all roles in the database")
+    @commands.has_permissions(administrator=True)
+    async def all_roles(self, ctx: commands.Context):
+        """Fetch and display all roles in the database."""
+        roles = await RoleQueries.get_all_roles(self.session)
+        embed = discord.Embed(title="All Roles")
+        for role in roles:
+            embed.add_field(
+                name=f"Role ID: {role.id}",
+                value=f"Role Name: {role.name}\nRole Type: {role.role_type}",
+                inline=False,
+            )
+        await ctx.send(embed=embed)
 
 
 class ProfileView(discord.ui.View):
     """Profile view."""
 
-    def __init__(self, ctx: commands.Context, bot, premium_roles):
+    def __init__(self, bot, member: discord.Member, premium_roles):
         super().__init__()
-        self.ctx = ctx
         self.bot = bot
-        self.session = bot.session
+        self.member = member
         self.premium_roles = premium_roles
-
-        if premium_roles:
-            self.add_item(SellRoleButton(ctx, bot, premium_roles[0]))
-        else:
-            sell_button = discord.ui.Button(
-                label="Sprzedaj rolę", style=discord.ButtonStyle.danger, disabled=True
+        self.add_item(
+            BuyRoleButton(
+                bot=self.bot,
+                member=self.member,
+                label="Kup rolę",
+                style=discord.ButtonStyle.success,
             )
-            self.add_item(sell_button)
+        )
+        self.add_item(
+            SellRoleButton(
+                bot=self.bot,
+                premium_roles=premium_roles,
+                label="Sprzedaj rolę",
+                style=discord.ButtonStyle.danger,
+                disabled=not bool(premium_roles),
+            )
+        )
 
-    @discord.ui.button(label="Kup rolę", style=discord.ButtonStyle.primary)
-    async def shop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Redirect to the shop."""
-        await interaction.response.send_message("Przekierowanie do sklepu...", ephemeral=True)
-        shop_cog = self.bot.get_cog("ShopCog")
-        await shop_cog.shop(self.ctx)
+
+class BuyRoleButton(discord.ui.Button):
+    """Button to buy a role."""
+
+    def __init__(self, bot, member, **kwargs):
+        super().__init__(**kwargs)
+        self.bot = bot
+        self.member = member
+
+    async def callback(self, interaction: discord.Interaction):
+        ctx = await self.bot.get_context(interaction.message)
+        ctx.author = self.member
+        await ctx.invoke(self.bot.get_command("shop"))
 
 
 class SellRoleButton(discord.ui.Button):
     """Button to sell a role."""
 
-    def __init__(self, ctx: commands.Context, bot, member_role):
-        super().__init__(label="Sprzedaj rolę", style=discord.ButtonStyle.danger)
-        self.ctx = ctx
+    def __init__(self, bot, premium_roles, **kwargs):
+        super().__init__(**kwargs)
         self.bot = bot
-        self.member_role = member_role
-        self.session = bot.session
+        self.premium_roles = premium_roles
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Sprzedaję rolę...", ephemeral=True)
+        member = interaction.user
+        role_price_map = {role["name"]: role["price"] for role in self.bot.config["premium_roles"]}
+        last_role = self.premium_roles[0]
+        role_price = role_price_map.get(last_role.role.name)
 
-        async with self.session() as session:
-            # Remove the role from the member
-            member = self.ctx.author
-            role = discord.utils.get(self.bot.guild.roles, id=self.member_role.role_id)
-            if role:
-                await member.remove_roles(role)
+        if not role_price:
+            await interaction.response.send_message("Nie można znaleźć ceny dla tej roli.")
+            return
 
-            # Calculate the refund amount
-            now = datetime.now(timezone.utc)
-            expiration_date = self.member_role.expiration_date.replace(tzinfo=timezone.utc)
-            remaining_days = (expiration_date - now).days
+        refund_amount = calculate_refund(last_role.expiration_date, role_price)
 
-            # Get the role price from the config
-            role_price_map = {
-                role["symbol"]: role["price"] for role in self.bot.config["premium_roles"]
-            }
-            role_price = role_price_map.get(role.name, 0)
-            refund_amount = int(((remaining_days / 30) * (role_price / 2)))
+        async with self.bot.session() as session:
+            try:
+                db_member = await MemberQueries.get_or_add_member(session, member.id)
+                await RoleQueries.delete_member_role(session, member.id, last_role.role.id)
+                await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
+                await session.commit()
 
-            # Update the member's wallet balance
-            await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
-            await RoleQueries.delete_member_role(session, member.id, self.member_role.role_id)
-            await session.commit()
+                await member.remove_roles(last_role.role)
 
-        await interaction.followup.send(
-            f"Rola została sprzedana. Zwrot: {refund_amount}{CURRENCY_UNIT}", ephemeral=True
-        )
+                await interaction.response.send_message(
+                    f"Sprzedano rolę {last_role.role.name} za {refund_amount}{CURRENCY_UNIT}. Kwota zwrotu została dodana do twojego salda."
+                )
+            except Exception as e:
+                logger.error("Error while selling role: %s", e, exc_info=True)
+                await interaction.response.send_message(
+                    "Wystąpił błąd podczas sprzedawania roli. Proszę spróbować ponownie później."
+                )
 
 
 async def setup(bot: commands.Bot):
