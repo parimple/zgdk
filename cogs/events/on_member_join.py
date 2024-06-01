@@ -1,7 +1,7 @@
 """On Member Join Event"""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from discord import AllowedMentions
 from discord.ext import commands
@@ -79,11 +79,11 @@ class OnMemberJoinEvent(commands.Cog):
             db_member = await MemberQueries.get_or_add_member(session, member.id)
             if db_member.first_inviter_id is None or db_member.first_inviter_id == self.guild.id:
                 db_member.first_inviter_id = inviter_id
-                db_member.joined_at = datetime.utcnow()
+                db_member.joined_at = datetime.now(timezone.utc)
 
             # Update the current_inviter_id and rejoined_at fields
             db_member.current_inviter_id = inviter_id
-            db_member.rejoined_at = datetime.utcnow()
+            db_member.rejoined_at = datetime.now(timezone.utc)
 
             # Commit the changes to the database
             await session.commit()
