@@ -1,6 +1,6 @@
 """Queries for the database"""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Sequence
 
 from sqlalchemy import delete, update
@@ -72,7 +72,7 @@ class RoleQueries:
         duration: timedelta = timedelta(days=30),
     ):
         """Add a role to a member with an expiration date"""
-        expiration_date = datetime.now() + duration
+        expiration_date = datetime.now(timezone.utc) + duration
         member_role = MemberRole(
             member_id=member_id, role_id=role_id, expiration_date=expiration_date
         )
@@ -147,7 +147,7 @@ class RoleQueries:
             .where(
                 (MemberRole.member_id == member_id)
                 & (Role.role_type == "premium")
-                & (MemberRole.expiration_date >= datetime.now())
+                & (MemberRole.expiration_date >= datetime.now(timezone.utc))
             )
         )
         return result.scalars().first()
