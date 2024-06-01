@@ -34,7 +34,7 @@ class ShopCog(commands.Cog):
             "User %s requested shop. Balance: %s, %s", ctx.author.id, balance, premium_roles
         )
         view = RoleShopView(ctx, self.bot, self.bot.config["premium_roles"], balance, page=1)
-        embed = create_shop_embed(ctx, balance, view.role_price_map, premium_roles, page=1)
+        embed = await create_shop_embed(ctx, balance, view.role_price_map, premium_roles, page=1)
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
     @commands.command(name="add", description="Dodaje środki do portfela użytkownika.")
@@ -215,7 +215,9 @@ class RoleShopView(discord.ui.View):
         await self.session.commit()
         balance = db_member.wallet_balance
         premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
-        embed = create_shop_embed(self.ctx, balance, self.role_price_map, premium_roles, self.page)
+        embed = await create_shop_embed(
+            self.ctx, balance, self.role_price_map, premium_roles, self.page
+        )
         view = RoleShopView(
             self.ctx, self.bot, self.bot.config["premium_roles"], balance, self.page
         )
@@ -227,7 +229,9 @@ class RoleShopView(discord.ui.View):
         await self.session.commit()
         balance = db_member.wallet_balance
         premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
-        embed = create_shop_embed(self.ctx, balance, self.role_price_map, premium_roles, self.page)
+        embed = await create_shop_embed(
+            self.ctx, balance, self.role_price_map, premium_roles, self.page
+        )
         view = RoleShopView(
             self.ctx, self.bot, self.bot.config["premium_roles"], balance, self.page
         )
@@ -239,7 +243,9 @@ class RoleShopView(discord.ui.View):
         await self.session.commit()
         balance = db_member.wallet_balance
         premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
-        return create_shop_embed(self.ctx, balance, self.role_price_map, premium_roles, self.page)
+        return await create_shop_embed(
+            self.ctx, balance, self.role_price_map, premium_roles, self.page
+        )
 
     async def buy_role(self, interaction: discord.Interaction, role_symbol: str):
         """Buy a role."""
@@ -338,21 +344,23 @@ class RoleShopView(discord.ui.View):
             await interaction.message.edit(embed=embed)
 
 
-def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
+async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
     """Create the shop embed."""
     logger.info("Starting the creation of the shop embed for user %s", ctx.author.id)
+
+    color = ctx.author.color if ctx.author.color.value else discord.Color.blue()
 
     if page == 1:
         embed = discord.Embed(
             title="Sklep z rolami",
             description="Aby zakupić rangę, kliknij przycisk odpowiadający jej cenie.\nZa każde 10 zł jest 1000G.",
-            color=discord.Color.blue(),
+            color=color,
         )
     else:
         embed = discord.Embed(
             title="Sklep z rolami - ceny na rok",
             description="Za zakup na rok płacisz tylko za 10 miesięcy, 2 miesiące są gratis.\nZa każde 10 zł jest 1000G.",
-            color=discord.Color.blue(),
+            color=color,
         )
 
     embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
