@@ -23,16 +23,18 @@ class OnSetupEvent(commands.Cog):
         self.setup_roles.cancel()  # pylint: disable=no-member
         self.setup_unknown_inviter.cancel()  # pylint: disable=no-member
 
-    async def ensure_roles_in_db_and_guild(self, role_names: list[str], role_type: str):
+    async def ensure_roles_in_db_and_guild(self, roles: list[dict]):
         """Utility function to ensure roles exist in both database and guild"""
         guild = self.bot.guild
         async with self.bot.session() as session:
-            for name in role_names:
-                role = discord.utils.get(guild.roles, name=name)
+            for role_info in roles:
+                role_name = role_info["symbol"]
+                role_price = role_info["price"]
+                role = discord.utils.get(guild.roles, name=role_name)
                 if not role:
                     # Create a new role with the given name
                     role = await guild.create_role(
-                        name=name,
+                        name=role_name,
                         mentionable=False,  # Allow anyone to mention this role
                     )
                 # Check if role with given ID already exists in database
@@ -42,12 +44,11 @@ class OnSetupEvent(commands.Cog):
                     continue
 
                 # Add role to database
-                await RoleQueries.add_role(session, role.id, role.name, role_type)
+                await RoleQueries.add_role(session, role.id, role.name, "premium")
                 logger.info(
-                    "Ensured role %s (ID: %s) with type %s in database and guild",
+                    "Ensured role %s (ID: %s) with type premium in database and guild",
                     role.name,
                     role.id,
-                    role_type,
                 )
             await session.commit()
 
@@ -57,13 +58,9 @@ class OnSetupEvent(commands.Cog):
         await self.bot.wait_until_ready()
         logger.info("Setting up roles")
 
-        # Rank roles
-        rank_role_names = [str(i) for i in range(1, 101)]
-        await self.ensure_roles_in_db_and_guild(rank_role_names, "rank")
-
         # Premium roles
-        premium_role_names = ["$2", "$4", "$6", "$8", "$16", "$32", "$64", "$128", "$256"]
-        await self.ensure_roles_in_db_and_guild(premium_role_names, "premium")
+        premium_roles = self.bot.config["premium_roles"]
+        await self.ensure_roles_in_db_and_guild(premium_roles)
 
         logger.info("Roles setup complete")
 

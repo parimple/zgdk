@@ -1,11 +1,13 @@
+""" Shop cog. """
+
 import logging
 from datetime import datetime, timedelta
 
 import discord
-import yaml
 from discord.ext import commands
 
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
+from main import Zagadka
 from utils.premium import PaymentData, PremiumManager
 
 CURRENCY_UNIT = "G"
@@ -19,15 +21,6 @@ class ShopCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session = bot.session
-        with open("config.yml", "r") as config_file:
-            self.config = yaml.safe_load(config_file)
-        self.role_price_map = {
-            role["symbol"]: role["price"] for role in self.config["premium_roles"]
-        }
-        self.inverse_role_price_map = {
-            role["price"]: role["symbol"] for role in self.config["premium_roles"]
-        }
-        self.role_symbols = {role["id"]: role["symbol"] for role in self.config["premium_roles"]}
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
     @commands.has_permissions(administrator=True)
@@ -40,10 +33,8 @@ class ShopCog(commands.Cog):
         logger.info(
             "User %s requested shop. Balance: %s, %s", ctx.author.id, balance, premium_roles
         )
-        view = RoleShopView(
-            ctx, self.bot, self.role_price_map, self.inverse_role_price_map, self.role_symbols
-        )
-        embed = create_shop_embed(ctx, balance, self.role_price_map, premium_roles)
+        view = RoleShopView(ctx, self.bot, self.bot.config["premium_roles"])
+        embed = create_shop_embed(ctx, balance, view.role_price_map, premium_roles)
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
     @commands.command(name="add", description="Dodaje środki do portfela użytkownika.")
@@ -100,7 +91,7 @@ class ShopCog(commands.Cog):
                 # Send a DM to the user
                 try:
                     await user.send(msg1)
-                    await user.send(f"`{user.id}`")
+                    await user.send(f"```{user.id}```")
                 except discord.Forbidden:
                     await ctx.send(msg2)
             else:
@@ -178,20 +169,22 @@ class PaymentsView(discord.ui.View):
 class RoleShopView(discord.ui.View):
     """Role shop view."""
 
-    def __init__(
-        self, ctx: commands.Context, bot, role_price_map, inverse_role_price_map, role_symbols
-    ):
+    def __init__(self, ctx: commands.Context, bot: Zagadka, premium_roles):
         super().__init__()
         self.ctx = ctx
         self.guild = bot.guild
         self.bot = bot
         self.session = bot.session
-        self.role_price_map = role_price_map
-        self.inverse_role_price_map = inverse_role_price_map
-        self.role_symbols = role_symbols
+        self.role_price_map = {role["symbol"]: role["price"] for role in premium_roles}
+        self.inverse_role_price_map = {role["symbol"]: role["price"] for role in premium_roles}
+        self.role_ids = {
+            role["symbol"]: discord.utils.get(self.guild.roles, name=role["symbol"]).id
+            for role in premium_roles
+        }
+        self.config = bot.config
 
-        for role_id, symbol in role_symbols.items():
-            button = discord.ui.Button(label=symbol, style=discord.ButtonStyle.primary)
+        for role_symbol, role_id in self.role_ids.items():
+            button = discord.ui.Button(label=role_symbol, style=discord.ButtonStyle.primary)
             button.callback = self.create_button_callback(role_id)
             self.add_item(button)
 
@@ -217,13 +210,13 @@ class RoleShopView(discord.ui.View):
         if self.guild is None or interaction.user.id != self.ctx.author.id:
             return
 
-        role_name = self.role_symbols[role_id]
-        price = self.role_price_map[role_name]
+        role_symbol = next(symbol for symbol, rid in self.role_ids.items() if rid == role_id)
+        price = self.role_price_map[role_symbol]
 
-        role = discord.utils.get(self.guild.roles, name=role_name)
+        role = discord.utils.get(self.guild.roles, id=role_id)
 
         if role is None:
-            await interaction.response.send_message(f"Rola {role_name} nie została znaleziona.")
+            await interaction.response.send_message(f"Rola {role_symbol} nie została znaleziona.")
             return
 
         member = self.ctx.author
@@ -236,19 +229,23 @@ class RoleShopView(discord.ui.View):
         async with self.session() as session:
             db_member = await MemberQueries.get_or_add_member(session, member.id)
 
-            # Fetch all premium roles of the user
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
 
-            # If user has a premium role, calculate the price difference
             if premium_roles:
-                last_role_price = self.inverse_role_price_map[premium_roles[0].role.name]
-                # Check if the user is trying to buy a lower-priced role
+                last_role = premium_roles[0]
+                last_role_price = self.inverse_role_price_map.get(last_role.role.name)
+
+                if last_role_price is None:
+                    await interaction.response.send_message(
+                        "Nie można znaleźć ceny poprzedniej roli użytkownika."
+                    )
+                    return
+
                 if price < last_role_price:
                     await interaction.response.send_message(
                         "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
                     )
                     return
-
                 difference = price - last_role_price
             else:
                 difference = price
@@ -257,20 +254,16 @@ class RoleShopView(discord.ui.View):
                 await interaction.response.send_message("Nie masz wystarczająco dużo pieniędzy.")
                 return
 
-            # If the user has another premium role within the last 24h,
-            # check if it's the same role or a different one
             if premium_roles:
                 existing_role = premium_roles[0].role
 
-                # If the user is repurchasing the same role they already have
                 if existing_role.id == role.id:
                     await RoleQueries.update_role_expiration_date(
                         session, member.id, role.id, timedelta(days=31)
                     )
-                    msg = f"Przedłużyłeś rolę {role_name} o kolejne 31 dni."
-                    difference = price  # Set the difference to the full price of the role
+                    msg = f"Przedłużyłeś rolę {role_symbol} o kolejne 31 dni."
+                    difference = price
 
-                # If the user is upgrading their role
                 else:
                     await member.remove_roles(existing_role)
                     await RoleQueries.delete_member_role(session, member.id, existing_role.id)
@@ -278,15 +271,14 @@ class RoleShopView(discord.ui.View):
                     await RoleQueries.add_role_to_member(
                         session, member.id, role.id, timedelta(days=30)
                     )
-                    msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_name}."
+                    msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_symbol}."
 
-            # If the user doesn't have the role, set the appropriate message.
             else:
                 await member.add_roles(role)
                 await RoleQueries.add_role_to_member(
                     session, member.id, role.id, timedelta(days=30)
                 )
-                msg = f"Zakupiłeś rolę {role_name}."
+                msg = f"Zakupiłeś rolę {role_symbol}."
 
             await MemberQueries.add_to_wallet_balance(session, member.id, -difference)
             await session.commit()
@@ -310,14 +302,8 @@ def create_shop_embed(ctx, balance, role_price_map, premium_roles):
         logger.info("Handling premium roles for user %s", ctx.author.id)
         PremiumManager.add_premium_roles_to_embed(ctx, embed, premium_roles)
 
-    embed.add_field(
-        name="Zakup rangi",
-        value="Aby zakupić rangę, kliknij przycisk odpowiadający jej symbolowi.",
-        inline=False,
-    )
-
-    for symbol, price in role_price_map.items():
-        embed.add_field(name=symbol, value=f"{price}{CURRENCY_UNIT}", inline=True)
+    for role_symbol, price in role_price_map.items():
+        embed.add_field(name=role_symbol, value=f"{price}{CURRENCY_UNIT}", inline=True)
 
     logger.info("Added role price map to embed for user %s", ctx.author.id)
 

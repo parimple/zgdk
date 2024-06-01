@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-"""Main file for Zagadka bot"""
+"""
+Main file for Zagadka bot.
+"""
 
 import asyncio
 import logging
@@ -21,15 +23,16 @@ from datasources.models import Base
 
 intents = discord.Intents.all()
 
-with open("config.yml", encoding="utf-8") as f:
-    config = yaml.safe_load(f)
+
+def load_config():
+    with open("config.yml", encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
 
-# pylint: disable=too-many-instance-attributes
 class Zagadka(commands.Bot):
     """Main class for Zagadka bot"""
 
-    def __init__(self, **kwargs):
+    def __init__(self, config, **kwargs):
         load_dotenv()
 
         self.test: bool = kwargs.get("test", False)
@@ -97,7 +100,7 @@ class Zagadka(commands.Bot):
         async with self.engine.begin() as conn:
             table_names = self.base.metadata.tables.keys()
             logging.info("Creating tables: %s", ", ".join(table_names))
-            # await conn.run_sync(self.base.metadata.drop_all)
+            await conn.run_sync(self.base.metadata.drop_all)
             await conn.run_sync(self.base.metadata.create_all)
 
         logging.info("Database create_all completed")
@@ -141,5 +144,6 @@ def setup_logging():
 
 if __name__ == "__main__":
     setup_logging()
-    bot = Zagadka()
+    config = load_config()
+    bot = Zagadka(config=config)
     bot.run()
