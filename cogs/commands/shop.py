@@ -1,17 +1,14 @@
-""" Shop cog. """
-
 import logging
 from datetime import datetime, timedelta
 
 import discord
+import yaml
 from discord.ext import commands
 
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
-from main import Zagadka
 from utils.premium import PaymentData, PremiumManager
 
 CURRENCY_UNIT = "G"
-
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +19,15 @@ class ShopCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session = bot.session
+        with open("config.yml", "r") as config_file:
+            self.config = yaml.safe_load(config_file)
+        self.role_price_map = {
+            role["symbol"]: role["price"] for role in self.config["premium_roles"]
+        }
+        self.inverse_role_price_map = {
+            role["price"]: role["symbol"] for role in self.config["premium_roles"]
+        }
+        self.role_symbols = {role["id"]: role["symbol"] for role in self.config["premium_roles"]}
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
     @commands.has_permissions(administrator=True)
@@ -34,8 +40,10 @@ class ShopCog(commands.Cog):
         logger.info(
             "User %s requested shop. Balance: %s, %s", ctx.author.id, balance, premium_roles
         )
-        view = RoleShopView(ctx, self.bot)
-        embed = create_shop_embed(ctx, balance, view.role_price_map, premium_roles)
+        view = RoleShopView(
+            ctx, self.bot, self.role_price_map, self.inverse_role_price_map, self.role_symbols
+        )
+        embed = create_shop_embed(ctx, balance, self.role_price_map, premium_roles)
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
     @commands.command(name="add", description="Dodaje środki do portfela użytkownika.")
@@ -170,25 +178,31 @@ class PaymentsView(discord.ui.View):
 class RoleShopView(discord.ui.View):
     """Role shop view."""
 
-    def __init__(self, ctx: commands.Context, bot: Zagadka):
+    def __init__(
+        self, ctx: commands.Context, bot, role_price_map, inverse_role_price_map, role_symbols
+    ):
         super().__init__()
         self.ctx = ctx
         self.guild = bot.guild
         self.bot = bot
         self.session = bot.session
-        self.role_price_map = {
-            999: "$2",
-            1999: "$4",
-            2999: "$6",
-            3999: "$8",
-            7999: "$16",
-            15999: "$32",
-            31999: "$64",
-            63999: "$128",
-            127999: "$256",
-        }
-        # Create an inverse map for reverse lookup
-        self.inverse_role_price_map = {v: k for k, v in self.role_price_map.items()}
+        self.role_price_map = role_price_map
+        self.inverse_role_price_map = inverse_role_price_map
+        self.role_symbols = role_symbols
+
+        for role_id, symbol in role_symbols.items():
+            button = discord.ui.Button(label=symbol, style=discord.ButtonStyle.primary)
+            button.callback = self.create_button_callback(role_id)
+            self.add_item(button)
+
+    def create_button_callback(self, role_id):
+        async def button_callback(interaction: discord.Interaction):
+            await self.buy_role(interaction, role_id)
+
+        return button_callback
+
+    async def get_affordable_roles(self, balance):
+        return [role_name for role_name, price in self.role_price_map.items() if price <= balance]
 
     async def generate_embed(self):
         """Generate the embed for the role shop."""
@@ -198,13 +212,14 @@ class RoleShopView(discord.ui.View):
         premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
         return create_shop_embed(self.ctx, balance, self.role_price_map, premium_roles)
 
-    async def buy_role(self, interaction: discord.Interaction, price: int):
+    async def buy_role(self, interaction: discord.Interaction, role_id):
         """Buy a role."""
         if self.guild is None or interaction.user.id != self.ctx.author.id:
             return
 
-        # Get the role based on the price
-        role_name = self.role_price_map[price]
+        role_name = self.role_symbols[role_id]
+        price = self.role_price_map[role_name]
+
         role = discord.utils.get(self.guild.roles, name=role_name)
 
         if role is None:
@@ -233,6 +248,7 @@ class RoleShopView(discord.ui.View):
                         "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
                     )
                     return
+
                 difference = price - last_role_price
             else:
                 difference = price
@@ -278,69 +294,6 @@ class RoleShopView(discord.ui.View):
             embed = await self.generate_embed()
             await interaction.message.edit(embed=embed)
 
-    @discord.ui.button(label="$2", style=discord.ButtonStyle.primary)
-    async def button_2(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
-        """Buy a role."""
-        await self.buy_role(interaction, 999)
-
-    @discord.ui.button(label="$4", style=discord.ButtonStyle.primary)
-    async def button_4(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
-        """Buy a role."""
-        await self.buy_role(interaction, 1999)
-
-    @discord.ui.button(label="$6", style=discord.ButtonStyle.primary)
-    async def button_6(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
-        """Buy a role."""
-        await self.buy_role(interaction, 2999)
-
-    @discord.ui.button(label="$8", style=discord.ButtonStyle.primary)
-    async def button_8(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
-        """Buy a role."""
-        await self.buy_role(interaction, 3999)
-
-    @discord.ui.button(label="$16", style=discord.ButtonStyle.primary)
-    async def button_16(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
-        """Buy a role."""
-        await self.buy_role(interaction, 7999)
-
-    @discord.ui.button(label="$32", style=discord.ButtonStyle.primary)
-    async def button_32(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
-        """Buy a role."""
-        await self.buy_role(interaction, 15999)
-
-    @discord.ui.button(label="$64", style=discord.ButtonStyle.primary)
-    async def button_64(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
-        """Buy a role."""
-        await self.buy_role(interaction, 31999)
-
-    @discord.ui.button(label="$128", style=discord.ButtonStyle.primary)
-    async def button_128(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
-        """Buy a role."""
-        await self.buy_role(interaction, 63999)
-
-    @discord.ui.button(label="$256", style=discord.ButtonStyle.primary)
-    async def button_256(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
-        """Buy a role."""
-        await self.buy_role(interaction, 127999)
-
 
 def create_shop_embed(ctx, balance, role_price_map, premium_roles):
     """Create the shop embed."""
@@ -357,8 +310,14 @@ def create_shop_embed(ctx, balance, role_price_map, premium_roles):
         logger.info("Handling premium roles for user %s", ctx.author.id)
         PremiumManager.add_premium_roles_to_embed(ctx, embed, premium_roles)
 
-    for price, role_name in role_price_map.items():
-        embed.add_field(name=role_name, value=f"{price}{CURRENCY_UNIT}", inline=True)
+    embed.add_field(
+        name="Zakup rangi",
+        value="Aby zakupić rangę, kliknij przycisk odpowiadający jej symbolowi.",
+        inline=False,
+    )
+
+    for symbol, price in role_price_map.items():
+        embed.add_field(name=symbol, value=f"{price}{CURRENCY_UNIT}", inline=True)
 
     logger.info("Added role price map to embed for user %s", ctx.author.id)
 

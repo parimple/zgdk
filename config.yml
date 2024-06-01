@@ -27,3 +27,32 @@ roles:
   stream_off: 960665311760248873
   send_messages_off: 960665311953174559
   attach_files_off: 960665311953174558
+
+premium_roles:
+  - id: premium_1
+    symbol: "★1"
+    price: 1499
+  - id: premium_2
+    symbol: "★2"
+    price: 2499
+  - id: premium_3
+    symbol: "★3"
+    price: 4499
+  - id: premium_4
+    symbol: "★4"
+    price: 8499
+  - id: premium_5
+    symbol: "★5"
+    price: 15999
+  - id: premium_6
+    symbol: "★6"
+    price: 31999
+  - id: premium_7
+    symbol: "★7"
+    price: 63999
+  - id: premium_8
+    symbol: "★8"
+    price: 127999
+  - id: premium_9
+    symbol: "★9"
+    price: 255999
