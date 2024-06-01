@@ -29,21 +29,21 @@ roles:
   attach_files_off: 960665311953174558
 
 premium_roles:
-  - symbol: "★1"
+  - name: "★1"
     price: 1499
-  - symbol: "★2"
+  - name: "★2"
     price: 2499
-  - symbol: "★3"
+  - name: "★3"
     price: 4499
-  - symbol: "★4"
+  - name: "★4"
     price: 8499
-  - symbol: "★5"
+  - name: "★5"
     price: 15999
-  - symbol: "★6"
+  - name: "★6"
     price: 31999
-  - symbol: "★7"
+  - name: "★7"
     price: 63999
-  - symbol: "★8"
+  - name: "★8"
     price: 127999
-  - symbol: "★9"
+  - name: "★9"
     price: 9999999999999
