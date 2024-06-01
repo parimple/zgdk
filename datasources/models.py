@@ -23,8 +23,8 @@ class Member(Base):
     current_inviter_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("members.id"), nullable=True
     )
-    joined_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
-    rejoined_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
+    joined_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejoined_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     wallet_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     first_inviter: Mapped[Member] = relationship(
@@ -62,7 +62,9 @@ class MemberRole(Base):
     __tablename__ = "member_roles"
     member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
     role_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(ROLE_ID), primary_key=True)
-    expiration_date: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
+    expiration_date: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     member: Mapped[Member] = relationship("Member", backref="assigned_roles")
     role: Mapped[Role] = relationship("Role", backref="assigned_to_members")
@@ -117,7 +119,7 @@ class HandledPayment(Base):
     member_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
-    paid_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    paid_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payment_type: Mapped[str] = mapped_column(String, nullable=False)
 
     def __repr__(self) -> str:
