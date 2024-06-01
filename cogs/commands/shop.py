@@ -1,7 +1,7 @@
 """ Shop cog. """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import discord
 from discord.ext import commands
@@ -9,6 +9,7 @@ from discord.ext import commands
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
 from main import Zagadka
 from utils.premium import PaymentData, PremiumManager
+from utils.refund import calculate_refund
 
 CURRENCY_UNIT = "G"
 
@@ -44,7 +45,7 @@ class ShopCog(commands.Cog):
         payment_data = PaymentData(
             name=ctx.author.display_name,
             amount=amount,
-            paid_at=datetime.now(),
+            paid_at=datetime.now(timezone.utc),
             payment_type="command",
         )
 
@@ -177,21 +178,20 @@ class RoleShopView(discord.ui.View):
         self.session = bot.session
         self.balance = balance
         self.page = page
-        self.role_price_map = {role["symbol"]: role["price"] for role in premium_roles}
-        self.inverse_role_price_map = {role["symbol"]: role["price"] for role in premium_roles}
+        self.role_price_map = {role["name"]: role["price"] for role in premium_roles}
         self.role_ids = {
-            role["symbol"]: discord.utils.get(self.guild.roles, name=role["symbol"]).id
+            role["name"]: discord.utils.get(self.guild.roles, name=role["name"]).id
             for role in premium_roles
         }
         self.config = bot.config
 
-        for role_symbol, role_id in self.role_ids.items():
+        for role_name, role_id in self.role_ids.items():
             button = discord.ui.Button(
-                label=role_symbol,
+                label=role_name,
                 style=discord.ButtonStyle.primary,
-                disabled=self.balance < self.role_price_map[role_symbol],
+                disabled=self.balance < self.role_price_map[role_name],
             )
-            button.callback = self.create_button_callback(role_symbol)
+            button.callback = self.create_button_callback(role_name)
             self.add_item(button)
 
         if page == 1:
@@ -203,9 +203,9 @@ class RoleShopView(discord.ui.View):
             previous_button.callback = self.previous_page
             self.add_item(previous_button)
 
-    def create_button_callback(self, role_symbol):
+    def create_button_callback(self, role_name):
         async def button_callback(interaction: discord.Interaction):
-            await self.buy_role(interaction, role_symbol)
+            await self.buy_role(interaction, role_name)
 
         return button_callback
 
@@ -247,17 +247,17 @@ class RoleShopView(discord.ui.View):
             self.ctx, balance, self.role_price_map, premium_roles, self.page
         )
 
-    async def buy_role(self, interaction: discord.Interaction, role_symbol: str):
+    async def buy_role(self, interaction: discord.Interaction, role_name: str):
         """Buy a role."""
         if self.guild is None or interaction.user.id != self.ctx.author.id:
             return
 
-        role_id = self.role_ids[role_symbol]
+        role_id = self.role_ids[role_name]
         role = discord.utils.get(self.guild.roles, id=role_id)
         price = (
-            self.role_price_map[role_symbol]
+            self.role_price_map[role_name]
             if self.page == 1
-            else self.role_price_map[role_symbol] * 10
+            else self.role_price_map[role_name] * 10
         )
 
         member = self.ctx.author
@@ -273,7 +273,7 @@ class RoleShopView(discord.ui.View):
 
             if premium_roles:
                 last_role = premium_roles[0]
-                last_role_price = self.inverse_role_price_map.get(last_role.role.name)
+                last_role_price = self.role_price_map.get(last_role.role.name)
 
                 if last_role_price is None:
                     await interaction.response.send_message(
@@ -286,9 +286,14 @@ class RoleShopView(discord.ui.View):
                         "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
                     )
                     return
-                difference = price - last_role_price
+
+                # Calculate refund for the remaining time of the current role
+                refund_amount = calculate_refund(last_role.expiration_date, last_role_price)
+                difference = price - refund_amount
+                msg_refund = f" Część kwoty została zwrócona za poprzednią rangę ({refund_amount}{CURRENCY_UNIT})."
             else:
                 difference = price
+                msg_refund = ""
 
             if db_member.wallet_balance < difference:
                 await interaction.response.send_message("Nie masz wystarczająco dużo pieniędzy.")
@@ -302,12 +307,12 @@ class RoleShopView(discord.ui.View):
                         await RoleQueries.update_role_expiration_date(
                             session, member.id, role.id, timedelta(days=31)
                         )
-                        msg = f"Przedłużyłeś rolę {role_symbol} o kolejne 31 dni."
+                        msg = f"Przedłużyłeś rolę {role_name} o kolejne 31 dni."
                     else:
                         await RoleQueries.update_role_expiration_date(
                             session, member.id, role.id, timedelta(days=365)
                         )
-                        msg = f"Przedłużyłeś rolę {role_symbol} o kolejne 12 miesięcy."
+                        msg = f"Przedłużyłeś rolę {role_name} o kolejne 12 miesięcy."
                     difference = price
 
                 else:
@@ -318,12 +323,12 @@ class RoleShopView(discord.ui.View):
                         await RoleQueries.add_role_to_member(
                             session, member.id, role.id, timedelta(days=30)
                         )
-                        msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_symbol}."
+                        msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_name}.{msg_refund}"
                     else:
                         await RoleQueries.add_role_to_member(
                             session, member.id, role.id, timedelta(days=365)
                         )
-                        msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_symbol} na 12 miesięcy."
+                        msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_name} na 12 miesięcy.{msg_refund}"
 
             else:
                 await member.add_roles(role)
@@ -335,7 +340,7 @@ class RoleShopView(discord.ui.View):
                     await RoleQueries.add_role_to_member(
                         session, member.id, role.id, timedelta(days=365)
                     )
-                msg = f"Zakupiłeś rolę {role_symbol}."
+                msg = f"Zakupiłeś rolę {role_name}.{msg_refund}"
 
             await MemberQueries.add_to_wallet_balance(session, member.id, -difference)
             await session.commit()
@@ -373,12 +378,12 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
         logger.info("Handling premium roles for user %s", ctx.author.id)
         PremiumManager.add_premium_roles_to_embed(ctx, embed, premium_roles)
 
-    for role_symbol, price in role_price_map.items():
+    for role_name, price in role_price_map.items():
         if page == 1:
-            embed.add_field(name=role_symbol, value=f"{price}{CURRENCY_UNIT}", inline=True)
+            embed.add_field(name=role_name, value=f"{price}{CURRENCY_UNIT}", inline=True)
         else:
             annual_price = price * 10
-            embed.add_field(name=role_symbol, value=f"{annual_price}{CURRENCY_UNIT}", inline=True)
+            embed.add_field(name=role_name, value=f"{annual_price}{CURRENCY_UNIT}", inline=True)
 
     logger.info("Added role price map to embed for user %s", ctx.author.id)
 
