@@ -100,7 +100,7 @@ class Zagadka(commands.Bot):
         async with self.engine.begin() as conn:
             table_names = self.base.metadata.tables.keys()
             logging.info("Creating tables: %s", ", ".join(table_names))
-            await conn.run_sync(self.base.metadata.drop_all)
+            # await conn.run_sync(self.base.metadata.drop_all)
             await conn.run_sync(self.base.metadata.create_all)
 
         logging.info("Database create_all completed")
