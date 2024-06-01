@@ -28,7 +28,7 @@ class OnSetupEvent(commands.Cog):
         guild = self.bot.guild
         async with self.bot.session() as session:
             for role_info in roles:
-                role_name = role_info["symbol"]
+                role_name = role_info["name"]
                 # role_price = role_info["price"]
                 role = discord.utils.get(guild.roles, name=role_name)
                 if not role:
