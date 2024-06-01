@@ -16,9 +16,13 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         self.bot = bot
         self.session = bot.session
         self.guild = bot.get_guild(self.bot.config["guild_id"])
-        self.stream_off = self.guild.get_role(self.bot.config["roles"]["stream_off"])
-        self.send_messages_off = self.guild.get_role(self.bot.config["roles"]["send_messages_off"])
-        self.attach_files_off = self.guild.get_role(self.bot.config["roles"]["attach_files_off"])
+
+        # Adjusting for new config structure
+        self.mute_roles = {
+            role["description"]: self.guild.get_role(role["id"])
+            for role in self.bot.config["mute_roles"]
+        }
+
         self.channels_create = self.bot.config["channels_create"]
 
     @commands.Cog.listener()
@@ -78,9 +82,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         """
         channel_name = member.display_name
         permission_overwrites = {
-            self.stream_off: discord.PermissionOverwrite(stream=False),
-            self.send_messages_off: discord.PermissionOverwrite(send_messages=False),
-            self.attach_files_off: discord.PermissionOverwrite(
+            self.mute_roles["stream_off"]: discord.PermissionOverwrite(stream=False),
+            self.mute_roles["send_messages_off"]: discord.PermissionOverwrite(send_messages=False),
+            self.mute_roles["attach_files_off"]: discord.PermissionOverwrite(
                 attach_files=False, embed_links=False, external_emojis=False
             ),
             member: discord.PermissionOverwrite(view_channel=True, connect=True, speak=True),

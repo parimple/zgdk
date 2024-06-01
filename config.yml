@@ -23,11 +23,6 @@ channels_create:
   - 960665313895133204
   - 960665313895133209
 
-roles:
-  stream_off: 960665311760248873
-  send_messages_off: 960665311953174559
-  attach_files_off: 960665311953174558
-
 premium_roles:
   - name: "★1"
     price: 1499
@@ -47,3 +42,14 @@ premium_roles:
     price: 127999
   - name: "★9"
     price: 9999999999999
+
+mute_roles:
+  - id: 960665311760248873
+    name: "⚠︎"
+    description: "stream_off"
+  - id: 960665311953174559
+    name: "⌀"
+    description: "send_messages_off"
+  - id: 960665311953174558
+    name: "☢︎"
+    description: "attach_files_off"

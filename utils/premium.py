@@ -2,7 +2,7 @@
 import json
 import logging
 from collections import namedtuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import discord
@@ -166,7 +166,7 @@ class TipplyDataProvider(DataProvider):
                 amount_str = div.find("span", {"data-element": "price"}).text.replace(",", ".")
                 amount_str = amount_str.replace(" zł", "")
                 amount = int(round(float(amount_str), 2) * 100)
-                payment_time = datetime.now()
+                payment_time = datetime.now(timezone.utc)
 
                 payment_data = PaymentData(name, amount, payment_time, self.payment_type)
                 payments.append(payment_data)
@@ -202,7 +202,7 @@ class TipplyDataProvider(DataProvider):
             new_payments = all_payments
 
         # Transform back to PaymentData
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
         payment_data_list = []
         for i, (name, amount) in enumerate(new_payments[::-1]):
             payment_time = current_time + timedelta(seconds=i)

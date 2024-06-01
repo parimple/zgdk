@@ -1,5 +1,4 @@
-""" Shop cog. """
-
+""" Shop cog for the Zagadka bot. """
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -183,7 +182,7 @@ class RoleShopView(discord.ui.View):
             role["name"]: discord.utils.get(self.guild.roles, name=role["name"]).id
             for role in premium_roles
         }
-        self.config = bot.config
+        self.mute_roles = {role["name"]: role for role in self.bot.config["mute_roles"]}
 
         for role_name, role_id in self.role_ids.items():
             button = discord.ui.Button(
@@ -271,6 +270,13 @@ class RoleShopView(discord.ui.View):
             db_member = await MemberQueries.get_or_add_member(session, member.id)
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
 
+            # Check for mute roles
+            has_mute_roles = any(
+                role
+                for role in self.mute_roles.values()
+                if role["id"] in [r.id for r in member.roles]
+            )
+
             if premium_roles:
                 last_role = premium_roles[0]
                 last_role_price = self.role_price_map.get(last_role.role.name)
@@ -282,9 +288,16 @@ class RoleShopView(discord.ui.View):
                     return
 
                 if price < last_role_price:
-                    await interaction.response.send_message(
-                        "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
-                    )
+                    # If user has mute roles and buying the lowest rank
+                    if role_name == "★1" and has_mute_roles:
+                        await self.remove_mute_roles(member)
+                        await interaction.response.send_message(
+                            "Usunięto mutujące role z powodu zakupu najniższej rangi."
+                        )
+                    else:
+                        await interaction.response.send_message(
+                            "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
+                        )
                     return
 
                 # Calculate refund for the remaining time of the current role
@@ -347,6 +360,19 @@ class RoleShopView(discord.ui.View):
             await interaction.response.send_message(msg)
             embed = await self.generate_embed()
             await interaction.message.edit(embed=embed)
+
+    async def remove_mute_roles(self, member: discord.Member):
+        """Remove all mute roles from the member and notify them."""
+        roles_to_remove = [
+            self.guild.get_role(role["id"])
+            for role in self.mute_roles.values()
+            if self.guild.get_role(role["id"]) in member.roles
+        ]
+        if roles_to_remove:
+            await member.remove_roles(*roles_to_remove)
+            await member.send(
+                f"Usunięto następujące role mutujące: {', '.join([role.name for role in roles_to_remove])}"
+            )
 
 
 async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
