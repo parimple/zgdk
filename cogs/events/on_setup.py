@@ -23,13 +23,12 @@ class OnSetupEvent(commands.Cog):
         self.setup_roles.cancel()  # pylint: disable=no-member
         self.setup_unknown_inviter.cancel()  # pylint: disable=no-member
 
-    async def ensure_roles_in_db_and_guild(self, roles: list[dict]):
+    async def ensure_roles_in_db_and_guild(self, roles: list[dict], role_type: str):
         """Utility function to ensure roles exist in both database and guild"""
         guild = self.bot.guild
         async with self.bot.session() as session:
             for role_info in roles:
                 role_name = role_info["name"]
-                # role_price = role_info["price"]
                 role = discord.utils.get(guild.roles, name=role_name)
                 if not role:
                     # Create a new role with the given name
@@ -44,11 +43,12 @@ class OnSetupEvent(commands.Cog):
                     continue
 
                 # Add role to database
-                await RoleQueries.add_role(session, role.id, role.name, "premium")
+                await RoleQueries.add_role(session, role.id, role.name, role_type)
                 logger.info(
-                    "Ensured role %s (ID: %s) with type premium in database and guild",
+                    "Ensured role %s (ID: %s) with type %s in database and guild",
                     role.name,
                     role.id,
+                    role_type,
                 )
             await session.commit()
 
@@ -60,7 +60,15 @@ class OnSetupEvent(commands.Cog):
 
         # Premium roles
         premium_roles = self.bot.config["premium_roles"]
-        await self.ensure_roles_in_db_and_guild(premium_roles)
+        await self.ensure_roles_in_db_and_guild(premium_roles, "premium")
+
+        # Ranking roles
+        rank_role_names = [{"name": str(i)} for i in range(1, 101)]
+        await self.ensure_roles_in_db_and_guild(rank_role_names, "rank")
+
+        # Mute roles
+        mute_roles = self.bot.config["mute_roles"]
+        await self.ensure_roles_in_db_and_guild(mute_roles, "mute")
 
         logger.info("Roles setup complete")
 
