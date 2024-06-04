@@ -1,6 +1,7 @@
 """Module for managing premium payments and wallet"""
 import json
 import logging
+import re
 from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -32,36 +33,53 @@ class PremiumManager:
         self.session = session
         self.guild = guild
 
-    async def get_banned_member(self, name_or_id: str) -> Optional[discord.User]:
-        """Get banned Member ID"""
-        if not name_or_id.isdigit():
-            logger.info("get_banned_member: can't fetch user by name: %s", name_or_id)
-            return None
+    def extract_id(self, text: str) -> Optional[int]:
+        """Extract ID from various formats"""
+        match = re.search(r"\b\d{17,19}\b", text)
+        return int(match.group()) if match else None
 
-        user_id = int(name_or_id)
-        try:
-            ban_entry = await self.guild.fetch_ban(discord.Object(id=user_id))
-            if ban_entry:
-                logger.info("User is banned: %s", ban_entry.user.id)
-                return ban_entry.user
-        except discord.NotFound:
-            logger.info("User is not banned: %s", user_id)
+    async def get_banned_member(self, name_or_id: str) -> Optional[discord.User]:
+        """Get banned Member by ID or exact name"""
+        user_id = self.extract_id(name_or_id)
+        if user_id:
+            try:
+                ban_entry = await self.guild.fetch_ban(discord.Object(id=user_id))
+                if ban_entry:
+                    logger.info("User is banned by ID: %s", ban_entry.user.id)
+                    return ban_entry.user
+            except discord.NotFound:
+                logger.info("User is not banned by ID: %s", user_id)
+        else:
+            bans = await self.guild.bans()
+            for ban_entry in bans:
+                if name_or_id.lower() == ban_entry.user.name.lower():
+                    logger.info("Banned user found by exact name: %s", ban_entry.user.id)
+                    return ban_entry.user
 
         return None
 
     async def get_member(self, name_or_id: str) -> Optional[discord.Member]:
-        """Get Member ID"""
-        if name_or_id.isdigit():
-            logger.info("get_member_id: %s is digit", name_or_id)
-            member_id = int(name_or_id)
-            member = self.guild.get_member(member_id)
-            if member is None:
-                logger.info("Member not found by id: %s", name_or_id)
-            else:
+        """Get Member by ID or Username"""
+        # Try to extract an ID
+        user_id = self.extract_id(name_or_id)
+        if user_id:
+            logger.info("get_member_id: %s is digit", user_id)
+            member = self.guild.get_member(user_id)
+            if member:
                 return member
+
+        # Try to get member by exact name or display name
         logger.info("get_member_id: %s from guild: %s", name_or_id, self.guild)
         member = self.guild.get_member_named(name_or_id)
-        return member
+        if member:
+            return member
+
+        # Try to search for partial match in display name or username
+        for m in self.guild.members:
+            if name_or_id.lower() in m.display_name.lower() or name_or_id.lower() in m.name.lower():
+                return m
+
+        return None
 
     @staticmethod
     def add_premium_roles_to_embed(ctx, embed, premium_roles):
@@ -85,28 +103,35 @@ class PremiumManager:
     async def process_data(self, payment_data: PaymentData) -> None:
         """Process Payment"""
         logger.info("process payment: %s", payment_data)
-        member = await self.get_member(payment_data.name)
-        logger.info("member id: %s", member)
         async with self.session() as session:
-            payment = await HandledPaymentQueries.add_payment(
-                session,
-                member.id if member else None,
-                payment_data.name,
-                payment_data.amount,
-                payment_data.paid_at,
-                payment_data.payment_type,
-            )
-            logger.info("payment: %s", payment)
-            if member:
-                await MemberQueries.get_or_add_member(session, member.id)
-                await MemberQueries.add_to_wallet_balance(session, member.id, payment_data.amount)
-                logger.info("add_to_wallet_balance: %s", payment_data.amount)
+            # First, try to find the banned member
+            banned_member = await self.get_banned_member(payment_data.name)
+            if banned_member:
+                logger.info("unban: %s", banned_member)
+                await self.guild.unban(banned_member)
+                await self.notify_unban(banned_member)
             else:
-                banned_member = await self.get_banned_member(payment_data.name)
-                if banned_member:
-                    logger.info("unban: %s", banned_member)
-                    await self.guild.unban(banned_member)
-                    await self.notify_unban(banned_member)
+                # If not banned, find the member in the guild
+                member = await self.get_member(payment_data.name)
+                if member:
+                    logger.info("member id: %s", member)
+                    payment = await HandledPaymentQueries.add_payment(
+                        session,
+                        member.id,
+                        payment_data.name,
+                        payment_data.amount,
+                        payment_data.paid_at,
+                        payment_data.payment_type,
+                    )
+                    logger.info("payment: %s", payment)
+                    await MemberQueries.get_or_add_member(session, member.id)
+                    await MemberQueries.add_to_wallet_balance(
+                        session, member.id, payment_data.amount
+                    )
+                    logger.info("add_to_wallet_balance: %s", payment_data.amount)
+                else:
+                    logger.warning("Member not found for payment: %s", payment_data.name)
+                    await self.notify_member_not_found(payment_data.name)
             logger.info("commit session")
             await session.commit()
 
@@ -119,6 +144,18 @@ class PremiumManager:
                 title="Użytkownik odbanowany",
                 description=f"Użytkownik {member.mention} został odbanowany.",
                 color=discord.Color.green(),
+            )
+            await channel.send(embed=embed)
+
+    async def notify_member_not_found(self, name: str):
+        """Send notification about member not found"""
+        channel_id = self.guild.config["channels"]["donation"]
+        channel = self.guild.get_channel(channel_id)
+        if channel:
+            embed = discord.Embed(
+                title="Użytkownik nie znaleziony",
+                description=f"Nie znaleziono użytkownika o nazwie: {name}",
+                color=discord.Color.red(),
             )
             await channel.send(embed=embed)
 
