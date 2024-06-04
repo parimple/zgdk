@@ -195,14 +195,14 @@ class TipplyDataProvider(DataProvider):
         last_handled_payments = await HandledPaymentQueries.get_last_payments(
             self.db_session, offset=0, limit=10, payment_type=self.payment_type
         )
-        logger.info("last_handled_payments: %s", last_handled_payments)
+        logger.info("last_handled_payments: %s", last_handled_payments[:3])
 
         # Transform both lists to contain only (name, amount) tuples
         all_payments = [(payment.name, payment.amount) for payment in all_payments]
         last_handled_payments = [
             (payment.name, payment.amount) for payment in last_handled_payments
         ]
-        logger.info("all_payments: %s", all_payments)
+        logger.info("all_payments: %s", all_payments[:3])
 
         # Iterate over the fetched payments from newest to oldest
         for i in range(len(all_payments) - 10, -1, -1):

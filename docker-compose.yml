@@ -25,6 +25,8 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./pg_log:/var/lib/postgresql/data/pg_log
+    command: ["postgres", "-c", "logging_collector=on", "-c", "log_min_messages=warning", "-c", "log_directory=pg_log", "-c", "log_filename=postgresql-%Y-%m-%d.log"]
 
 volumes:
   db-data:
