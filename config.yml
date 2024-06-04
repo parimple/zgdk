@@ -7,6 +7,10 @@ owner_id: 956602391891947592
 channels:
   on_join: 1105588284555546634
   lounge: 1143990867946913845
+  donation: 960665312200626201
+
+gifs:
+  donation: "https://media1.tenor.com/m/tn_MOQB9pV4AAAAd/tony-tonylife.gif"
 
 channels_voice:
   afk: 1052997299233636402

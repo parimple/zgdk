@@ -45,7 +45,6 @@ class PremiumManager:
                 logger.info("User is banned: %s", ban_entry.user.id)
                 return ban_entry.user
         except discord.NotFound:
-            # If the user is not banned, fetch_ban() will raise a discord.NotFound exception
             logger.info("User is not banned: %s", user_id)
 
         return None
@@ -106,9 +105,22 @@ class PremiumManager:
                 banned_member = await self.get_banned_member(payment_data.name)
                 if banned_member:
                     logger.info("unban: %s", banned_member)
-                    # await self.guild.unban(banned_member)
+                    await self.guild.unban(banned_member)
+                    await self.notify_unban(banned_member)
             logger.info("commit session")
             await session.commit()
+
+    async def notify_unban(self, member):
+        """Send notification about unban"""
+        channel_id = self.guild.config["channels"]["donation"]
+        channel = self.guild.get_channel(channel_id)
+        if channel:
+            embed = discord.Embed(
+                title="Użytkownik odbanowany",
+                description=f"Użytkownik {member.mention} został odbanowany.",
+                color=discord.Color.green(),
+            )
+            await channel.send(embed=embed)
 
 
 class DataProvider:
