@@ -129,6 +129,36 @@ class RoleQueries:
         return roles
 
     @staticmethod
+    async def get_expiring_roles(
+        session: AsyncSession, reminder_time: datetime, role_type: Optional[str] = None
+    ):
+        """Get roles expiring within the next 24 hours"""
+        query = (
+            select(MemberRole)
+            .options(joinedload(MemberRole.role))
+            .where(MemberRole.expiration_date <= reminder_time)
+        )
+        if role_type:
+            query = query.where(Role.role_type == role_type)
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @staticmethod
+    async def get_expired_roles(
+        session: AsyncSession, current_time: datetime, role_type: Optional[str] = None
+    ):
+        """Get roles that have already expired"""
+        query = (
+            select(MemberRole)
+            .options(joinedload(MemberRole.role))
+            .where(MemberRole.expiration_date <= current_time)
+        )
+        if role_type:
+            query = query.where(Role.role_type == role_type)
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @staticmethod
     async def delete_member_role(session: AsyncSession, member_id: int, role_id: int):
         """Delete a role of a member"""
         await session.execute(
