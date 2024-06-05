@@ -431,7 +431,7 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
 
     logger.info("Added role price map to embed for user %s", ctx.author.id)
 
-    embed.set_footer(text=f"Twoje ID: {ctx.author.id}")
+    embed.set_footer(text=f"Twoje ID: {ctx.author.id} wklej w polu (Wpisz swój nick)")
 
     logger.info("Created shop embed for user %s", ctx.author.id)
     return embed
