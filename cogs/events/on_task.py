@@ -20,6 +20,7 @@ class OnTaskEvent(commands.Cog):
         self.bot = bot
         self.session = bot.session
         self.last_notified = {}  # Store the last notification time for each member
+        self.role_removed_notified = {}  # Store the notification status for removed roles
         self.check_premium_expiry.start()  # pylint: disable=no-member
         self.remove_expired_roles.start()  # pylint: disable=no-member
 
@@ -43,23 +44,25 @@ class OnTaskEvent(commands.Cog):
     async def notify_premium_expiry(self, member, role):
         """Notify user about expiring premium membership"""
         try:
+            expiration_date = role.expiration_date
+            expiration_str = discord.utils.format_dt(expiration_date, "R")
             await member.send(
-                f"Twoja rola premium {role.role.name} wygaśnie za 24 godziny. "
+                f"Twoja rola premium {role.role.name} wygaśnie {expiration_str}. "
                 f"Zasil swoje konto, aby ją przedłużyć: {self.bot.config['donate_url']}\n"
                 "Wpisując **TYLKO** swoje id w polu - Twój nick."
             )
             await member.send(f"```{member.id}```")
         except discord.Forbidden:
             logger.warning("Could not send DM to %s (%d).", member.display_name, member.id)
-            await self.notify_in_channel(member)
+            await self.notify_in_channel(member, expiration_str)
 
-    async def notify_in_channel(self, member):
+    async def notify_in_channel(self, member, expiration_str):
         """Notify in the channel if DM cannot be sent"""
         channel_id = self.bot.config["channels"]["donation"]
         channel = self.bot.get_channel(channel_id)
         if channel:
             await channel.send(
-                f"{member.mention}, Twoja rola premium wygaśnie za 24 godziny, "
+                f"{member.mention}, Twoja rola premium wygaśnie {expiration_str}, "
                 f"ale nie mogłem wysłać do Ciebie wiadomości prywatnej. "
                 f"Zasil swoje konto, aby ją przedłużyć: {self.bot.config['donate_url']}\n"
                 "Wpisując **TYLKO** swoje id w polu - Twój nick."
@@ -75,8 +78,15 @@ class OnTaskEvent(commands.Cog):
             for role in expired_roles:
                 member = self.bot.guild.get_member(role.member_id)
                 if member:
-                    await self.notify_premium_removal(member, role)
+                    if not self.role_removed_notified.get((member.id, role.role_id)):
+                        await self.notify_premium_removal(member, role)
+                        self.role_removed_notified[(member.id, role.role_id)] = True
                     await self.remove_premium_role(member, role)
+                    # Reset notification states after role is removed
+                    if (member.id, role.role_id) in self.last_notified:
+                        del self.last_notified[(member.id, role.role_id)]
+                    if (member.id, role.role_id) in self.role_removed_notified:
+                        del self.role_removed_notified[(member.id, role.role_id)]
 
     async def notify_premium_removal(self, member, role):
         """Notify user about removed premium membership"""
@@ -89,7 +99,7 @@ class OnTaskEvent(commands.Cog):
             await member.send(f"```{member.id}```")
         except discord.Forbidden:
             logger.warning("Could not send DM to %s (%d).", member.display_name, member.id)
-            await self.notify_in_channel(member)
+            await self.notify_in_channel(member, "już wygasła")
 
     async def remove_premium_role(self, member, role):
         """Remove the expired premium role from the user"""

@@ -169,7 +169,7 @@ class PaymentsView(discord.ui.View):
 class RoleShopView(discord.ui.View):
     """Role shop view."""
 
-    def __init__(self, ctx: commands.Context, bot: Zagadka, premium_roles, balance, page=1):
+    def __init__(self, ctx: commands.Context, bot: Zagadka, premium_roles=[], balance=0, page=1):
         super().__init__()
         self.ctx = ctx
         self.guild = bot.guild
@@ -481,8 +481,9 @@ class RoleDescriptionView(discord.ui.View):
 
     async def go_to_shop(self, interaction: discord.Interaction):
         view = RoleShopView(self.ctx, self.bot, self.premium_roles, self.balance, page=1)
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
         embed = await create_shop_embed(
-            self.ctx, self.balance, view.role_price_map, self.premium_roles, page=1
+            self.ctx, self.balance, view.role_price_map, premium_roles, page=1
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
