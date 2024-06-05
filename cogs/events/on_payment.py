@@ -4,10 +4,12 @@ On Payments Event Cog
 
 import logging
 import os
+from datetime import timedelta
 
 import discord
 from discord.ext import commands, tasks
 
+from datasources.queries import RoleQueries
 from utils.premium import PremiumManager, TipplyDataProvider
 
 logger = logging.getLogger(__name__)
@@ -70,12 +72,15 @@ class OnPaymentEvent(commands.Cog):
             logger.error("Member not found: %s", payment_data.name)
             return
 
+        await self.assign_temporary_roles(member, amount_g)
+        await self.remove_mute_roles(member)
+
         owner_id = self.bot.config.get("owner_id")
         owner = self.guild.get_member(owner_id)
 
         embed = discord.Embed(
             title="Gratulacje!",
-            description=f"{member.mention}, Twoje konto zostało pomyślnie zasilone o {amount_g:.2f}{CURRENCY_UNIT}!",
+            description=f"Twoje konto zostało pomyślnie zasilone o {amount_g}{CURRENCY_UNIT}!",
             color=discord.Color.green(),
         )
         embed.set_image(url=self.bot.config["gifs"]["donation"])
@@ -97,9 +102,40 @@ class OnPaymentEvent(commands.Cog):
             )
         )
 
-        message = await channel.send(embed=embed, view=view)
+        message = await channel.send(content=f"{member.mention}", embed=embed, view=view)
         if owner:
             await message.reply(f"{owner.mention}")
+
+    async def assign_temporary_roles(self, member, amount_g):
+        """Assign all applicable temporary roles based on donation amount"""
+        roles_tiers = [
+            (63999, "$128"),
+            (31999, "$64"),
+            (15999, "$32"),
+            (8499, "$16"),
+            (4499, "$8"),
+            (2499, "$4"),
+            (1499, "$2"),
+        ]
+
+        async with self.session() as session:
+            for amount, role_name in roles_tiers:
+                if amount_g >= amount:
+                    role = discord.utils.get(self.guild.roles, name=role_name)
+                    if role and role not in member.roles:
+                        await member.add_roles(role)
+                        await RoleQueries.add_role_to_member(
+                            session, member.id, role.id, duration=timedelta(days=30)
+                        )
+
+    async def remove_mute_roles(self, member):
+        """Remove mute roles from a member if they have any temporary roles assigned"""
+        mute_roles_names = [role["name"] for role in self.bot.config["mute_roles"]]
+        roles_to_remove = [role for role in member.roles if role.name in mute_roles_names]
+
+        if roles_to_remove:
+            await member.remove_roles(*roles_to_remove)
+            logger.info("Removed mute roles from %s", member.display_name)
 
 
 class BuyRoleButton(discord.ui.Button):

@@ -1,4 +1,6 @@
-"""On Ready Event"""
+"""
+On Setup Event
+"""
 
 import logging
 
@@ -11,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class OnSetupEvent(commands.Cog):
-    """Class for the On Ready Discord Event"""
+    """Class for the On Setup Discord Event"""
 
     def __init__(self, bot):
         self.bot = bot
@@ -69,6 +71,18 @@ class OnSetupEvent(commands.Cog):
         # Mute roles
         mute_roles = self.bot.config["mute_roles"]
         await self.ensure_roles_in_db_and_guild(mute_roles, "mute")
+
+        # Temporary roles for donations
+        temporary_roles = [
+            {"name": "$128"},
+            {"name": "$64"},
+            {"name": "$32"},
+            {"name": "$16"},
+            {"name": "$8"},
+            {"name": "$4"},
+            {"name": "$2"},
+        ]
+        await self.ensure_roles_in_db_and_guild(temporary_roles, "temporary")
 
         logger.info("Roles setup complete")
 
