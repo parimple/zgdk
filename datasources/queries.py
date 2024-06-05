@@ -109,7 +109,9 @@ class RoleQueries:
     async def get_member_roles(session: AsyncSession, member_id: int):
         """Get all roles of a member"""
         result = await session.execute(
-            select(MemberRole).join(Role).where(MemberRole.member_id == member_id)
+            select(MemberRole)
+            .options(joinedload(MemberRole.role))
+            .where(MemberRole.member_id == member_id)
         )
         return result.scalars().all()
 
@@ -120,7 +122,7 @@ class RoleQueries:
         result = await session.execute(
             select(MemberRole)
             .options(joinedload(MemberRole.role))
-            .join(Role)
+            .join(Role, MemberRole.role_id == Role.id)
             .where((MemberRole.member_id == member_id) & (Role.role_type == "premium"))
         )
 
@@ -173,7 +175,7 @@ class RoleQueries:
         """Get the active premium role of a member"""
         result = await session.execute(
             select(MemberRole)
-            .join(Role)
+            .join(Role, MemberRole.role_id == Role.id)
             .where(
                 (MemberRole.member_id == member_id)
                 & (Role.role_type == "premium")
@@ -283,7 +285,8 @@ class ChannelPermissionQueries:
         """Add or update channel permissions for a specific member or role."""
         result = await session.execute(
             select(ChannelPermission).where(
-                ChannelPermission.member_id == member_id, ChannelPermission.target_id == target_id
+                (ChannelPermission.member_id == member_id)
+                & (ChannelPermission.target_id == target_id)
             )
         )
         permission = result.scalars().first()
@@ -310,7 +313,8 @@ class ChannelPermissionQueries:
         """Remove channel permissions for a specific member or role."""
         await session.execute(
             delete(ChannelPermission).where(
-                ChannelPermission.member_id == member_id, ChannelPermission.target_id == target_id
+                (ChannelPermission.member_id == member_id)
+                & (ChannelPermission.target_id == target_id)
             )
         )
 
@@ -321,7 +325,8 @@ class ChannelPermissionQueries:
         """Get channel permissions for a specific member or role."""
         result = await session.execute(
             select(ChannelPermission).where(
-                ChannelPermission.member_id == member_id, ChannelPermission.target_id == target_id
+                (ChannelPermission.member_id == member_id)
+                & (ChannelPermission.target_id == target_id)
             )
         )
         return result.scalars().first()

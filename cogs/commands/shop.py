@@ -202,17 +202,27 @@ class RoleShopView(discord.ui.View):
             previous_button.callback = self.previous_page
             self.add_item(previous_button)
 
-        self.add_item(
-            discord.ui.Button(
-                label="Doładuj konto",
-                style=discord.ButtonStyle.link,
-                url=self.bot.config["donate_url"],
+        # Add description button
+        description_button = discord.ui.Button(label="Opis ról", style=discord.ButtonStyle.primary)
+        description_button.callback = self.show_role_description
+        self.add_item(description_button)
+
+        # Check if donate_url exists in config
+        donate_url = self.bot.config.get("donate_url")
+        if donate_url:
+            self.add_item(
+                discord.ui.Button(
+                    label="Doładuj konto",
+                    style=discord.ButtonStyle.link,
+                    url=donate_url,
+                )
             )
-        )
 
     def create_button_callback(self, role_name):
         async def button_callback(interaction: discord.Interaction):
-            await self.buy_role(interaction, role_name)
+            ctx = await self.bot.get_context(interaction.message)
+            ctx.author = self.ctx.author
+            await ctx.invoke(self.bot.get_command("buy_role"), role_name=role_name)
 
         return button_callback
 
@@ -242,6 +252,13 @@ class RoleShopView(discord.ui.View):
         view = RoleShopView(
             self.ctx, self.bot, self.bot.config["premium_roles"], balance, self.page
         )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    async def show_role_description(self, interaction: discord.Interaction):
+        embed = await create_role_description_embed(
+            self.ctx, self.page, self.bot.config["premium_roles"]
+        )
+        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.bot.config["premium_roles"])
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def generate_embed(self):
@@ -383,11 +400,82 @@ class RoleShopView(discord.ui.View):
             )
 
 
+class BuyRoleButton(discord.ui.Button):
+    """Button to buy a role."""
+
+    def __init__(self, bot, member, role_name, **kwargs):
+        super().__init__(**kwargs)
+        self.bot = bot
+        self.member = member
+        self.role_name = role_name
+
+    async def callback(self, interaction: discord.Interaction):
+        ctx = await self.bot.get_context(interaction.message)
+        ctx.author = self.member
+        await ctx.invoke(self.bot.get_command("buy_role"), role_name=self.role_name)
+
+
+class RoleDescriptionView(discord.ui.View):
+    """Role description view."""
+
+    def __init__(self, ctx: commands.Context, bot: Zagadka, page=1, premium_roles=[]):
+        super().__init__()
+        self.ctx = ctx
+        self.bot = bot
+        self.session = bot.session
+        self.page = page
+        self.premium_roles = premium_roles
+
+        # Add buttons
+        previous_button = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary)
+        previous_button.callback = self.previous_page
+        self.add_item(previous_button)
+
+        buy_button = BuyRoleButton(
+            bot,
+            ctx.author,
+            premium_roles[page - 1]["name"],
+            label="Kup rangę",
+            style=discord.ButtonStyle.primary,
+        )
+        self.add_item(buy_button)
+
+        self.add_item(
+            discord.ui.Button(
+                label="Do sklepu", style=discord.ButtonStyle.primary, custom_id="go_to_shop"
+            )
+        )
+
+        self.add_item(
+            discord.ui.Button(
+                label="Doładuj konto",
+                style=discord.ButtonStyle.link,
+                url=self.bot.config["donate_url"],
+            )
+        )
+
+        next_button = discord.ui.Button(label="➡️", style=discord.ButtonStyle.secondary)
+        next_button.callback = self.next_page
+        self.add_item(next_button)
+
+    async def next_page(self, interaction: discord.Interaction):
+        self.page = (self.page % len(self.premium_roles)) + 1
+        embed = await create_role_description_embed(self.ctx, self.page, self.premium_roles)
+        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.premium_roles)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    async def previous_page(self, interaction: discord.Interaction):
+        self.page = (self.page - 2) % len(self.premium_roles) + 1
+        embed = await create_role_description_embed(self.ctx, self.page, self.premium_roles)
+        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.premium_roles)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
 async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
     """Create the shop embed."""
     logger.info("Starting the creation of the shop embed for user %s", ctx.author.id)
 
-    color = ctx.author.color if ctx.author.color.value else discord.Color.blue()
+    color = discord.Color.blurple()
 
     if page == 1:
         embed = discord.Embed(
@@ -434,6 +522,86 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
     embed.set_footer(text=f"Twoje ID: {ctx.author.id} wklej w polu (Wpisz swój nick)")
 
     logger.info("Created shop embed for user %s", ctx.author.id)
+    return embed
+
+
+async def create_role_description_embed(ctx, page, premium_roles):
+    """Create the role description embed."""
+    descriptions = {
+        "★1": (
+            "Jeśli masz bana to ta opcja tylko odbanowuje Cię z serwera, bez poniższych opcji!\n"
+            "Usunięcie wszystkich mutów\n"
+            "Czarny kolor nicku\n"
+            "Możliwość wyrzucania osób z kanałów (np ?connect - id)\n"
+            'Możliwość tworzenia kanałów #"___________@PREM___________"\n'
+            "Ranga wspierającego\n"
+            "Emotki i stickery z każdego serwera\n"
+            "25% więcej punktów dodawanych do aktywności"
+        ),
+        "★2": (
+            "Wszystko co niżej\n"
+            "Wybór jednego z 16 milionów kolorów nicku (np ?color ff00ff)\n"
+            "Dodatkowe 25% więcej punktów do aktywności (razem 50%)"
+        ),
+        "★3": (
+            "Wszystko co niżej\n"
+            "Kolor Twojego nicku zmienia barwy!\n"
+            "Dodatkowe 25% więcej punktów do aktywności (razem 75%)\n"
+            "Masz opcję założenia klanu (8 osób) z własną rangą i kanałem tekstowym ?team + id"
+        ),
+        "★4": (
+            "Wszystko co niżej\n"
+            "Lądujesz na samej górze listy użytkowników\n"
+            'Dostajesz możliwość tworzenia kanałów głosowych #"___________@VIP_____________"\n'
+            "Dodatkowe 25% więcej punktów do aktywności (razem 100%)\n"
+            "Twój klan może mieć nawet 16 członków"
+        ),
+        "★5": (
+            "Wszystko co niżej\n"
+            "Lądujesz jeszcze wyżej na liście użytkowników\n"
+            'Dostajesz możliwość tworzenia kanałów głosowych #"___________@VIP+____________" NAD lounge¹\n'
+            "Dodatkowe 100% więcej punktów do aktywności (razem 200%)\n"
+            "Twój klan może mieć nawet 24 członków"
+        ),
+        "★6": (
+            "Wszystko co niżej\n"
+            "Dodatkowe 100% więcej punktów do aktywności (razem 300%)\n"
+            "Twój klan może mieć nawet 32 członków\n"
+            "Możesz zmieniać kolor klanu (wszystkie 32 osoby otrzymują ten sam kolor nicku) ?teamcolor pink"
+        ),
+        "★7": (
+            "Wszystko co niżej\n"
+            "Możesz wybrać ikonkę roli klanu dla wszystkich członków (1 raz)\n"
+            "Dodatkowe 100% więcej punktów do aktywności (razem 400%)\n"
+            "Twój klan może mieć nawet 40 członków"
+        ),
+        "★8": (
+            "Wszystko co niżej\n"
+            "Lądujesz nad botem @zaGadka na liście użytkowników\n"
+            "Dodatkowe 100% więcej punktów do aktywności (razem 500%)\n"
+            "Twój klan może mieć nawet 48 członków"
+        ),
+        "★9": (
+            "Wszystko co niżej\n"
+            "Dodatkowe 200% więcej punktów do aktywności (razem 700%)\n"
+            "Twój klan może mieć nawet 64 członków"
+        ),
+    }
+
+    role_name = premium_roles[page - 1]["name"]
+    price = premium_roles[page - 1]["price"]
+    description = descriptions[role_name]
+
+    db_member = await MemberQueries.get_or_add_member(ctx.bot.session, ctx.author.id)
+    balance = db_member.wallet_balance
+    balance_in_pln = (price - balance) / 10
+
+    embed = discord.Embed(
+        title=f"Opis roli {role_name}",
+        description=f"{description}\n\nCena: {price}{CURRENCY_UNIT}\nTwój stan konta: {balance}{CURRENCY_UNIT}\nPotrzebujesz jeszcze: {balance_in_pln:.2f} zł",
+        color=discord.Color.blurple(),
+    )
+
     return embed
 
 
