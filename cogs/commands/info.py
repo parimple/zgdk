@@ -141,6 +141,13 @@ class ProfileView(discord.ui.View):
                 disabled=not bool(premium_roles),
             )
         )
+        self.add_item(
+            discord.ui.Button(
+                label="Doładuj konto",
+                style=discord.ButtonStyle.link,
+                url=self.bot.config["donate_url"],
+            )
+        )
 
 
 class BuyRoleButton(discord.ui.Button):
