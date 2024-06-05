@@ -125,7 +125,7 @@ class OnPaymentEvent(commands.Cog):
                     if role and role not in member.roles:
                         await member.add_roles(role)
                         await RoleQueries.add_role_to_member(
-                            session, member.id, role.id, duration=timedelta(days=30)
+                            session, member.id, role.id, timedelta(days=30)
                         )
 
     async def remove_mute_roles(self, member):
