@@ -202,6 +202,14 @@ class RoleShopView(discord.ui.View):
             previous_button.callback = self.previous_page
             self.add_item(previous_button)
 
+        self.add_item(
+            discord.ui.Button(
+                label="Doładuj konto",
+                style=discord.ButtonStyle.link,
+                url=self.bot.config["donate_url"],
+            )
+        )
+
     def create_button_callback(self, role_name):
         async def button_callback(interaction: discord.Interaction):
             await self.buy_role(interaction, role_name)
@@ -384,13 +392,23 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
     if page == 1:
         embed = discord.Embed(
             title="Sklep z rolami",
-            description="Aby zakupić rangę, kliknij przycisk odpowiadający jej cenie.\nZa każde 10 zł jest 1000G.",
+            description=(
+                "Aby zakupić rangę, kliknij przycisk odpowiadający jej cenie.\n"
+                "Za każde 10 zł jest 1000G.\n"
+                "Kupno rangi ★1 jest równoznaczne ze zdjęciem wszystkich mutów na serwerze.\n"
+                "Kupno wyższej rangi lub przedłużenie również zdejmie muty."
+            ),
             color=color,
         )
     else:
         embed = discord.Embed(
             title="Sklep z rolami - ceny na rok",
-            description="Za zakup na rok płacisz tylko za 10 miesięcy, 2 miesiące są gratis.\nZa każde 10 zł jest 1000G.",
+            description=(
+                "Za zakup na rok płacisz tylko za 10 miesięcy, 2 miesiące są gratis.\n"
+                "Za każde 10 zł jest 1000G.\n"
+                "Kupno rangi ★1 jest równoznaczne ze zdjęciem wszystkich mutów na serwerze.\n"
+                "Kupno wyższej rangi lub przedłużenie również zdejmie muty."
+            ),
             color=color,
         )
 
@@ -413,7 +431,6 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
 
     logger.info("Added role price map to embed for user %s", ctx.author.id)
 
-    embed.add_field(name="Zakup środków", value="https://tipply.pl/u/zagadka", inline=False)
     embed.set_footer(text=f"Twoje ID: {ctx.author.id}")
 
     logger.info("Created shop embed for user %s", ctx.author.id)
