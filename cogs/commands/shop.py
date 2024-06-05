@@ -1,4 +1,4 @@
-""" Shop cog for the Zagadka bot. """
+"""Shop cog for the Zagadka bot."""
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -255,10 +255,15 @@ class RoleShopView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def show_role_description(self, interaction: discord.Interaction):
+        db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
+        await self.session.commit()
+        balance = db_member.wallet_balance
         embed = await create_role_description_embed(
-            self.ctx, self.page, self.bot.config["premium_roles"]
+            self.ctx, self.page, self.bot.config["premium_roles"], balance
         )
-        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.bot.config["premium_roles"])
+        view = RoleDescriptionView(
+            self.ctx, self.bot, self.page, self.bot.config["premium_roles"], balance
+        )
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def generate_embed(self):
@@ -412,19 +417,20 @@ class BuyRoleButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         ctx = await self.bot.get_context(interaction.message)
         ctx.author = self.member
-        await ctx.invoke(self.bot.get_command("buy_role"), role_name=self.role_name)
+        await ctx.invoke(self.bot.get_command("shop"), role_name=self.role_name)
 
 
 class RoleDescriptionView(discord.ui.View):
     """Role description view."""
 
-    def __init__(self, ctx: commands.Context, bot: Zagadka, page=1, premium_roles=[]):
+    def __init__(self, ctx: commands.Context, bot: Zagadka, page=1, premium_roles=[], balance=0):
         super().__init__()
         self.ctx = ctx
         self.bot = bot
         self.session = bot.session
         self.page = page
         self.premium_roles = premium_roles
+        self.balance = balance
 
         # Add buttons
         previous_button = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary)
@@ -437,14 +443,16 @@ class RoleDescriptionView(discord.ui.View):
             premium_roles[page - 1]["name"],
             label="Kup rangę",
             style=discord.ButtonStyle.primary,
+            disabled=premium_roles[page - 1]["price"] > balance,
         )
         self.add_item(buy_button)
 
-        self.add_item(
-            discord.ui.Button(
-                label="Do sklepu", style=discord.ButtonStyle.primary, custom_id="go_to_shop"
-            )
+        shop_button = discord.ui.Button(
+            label="Do sklepu",
+            style=discord.ButtonStyle.primary,
         )
+        shop_button.callback = self.go_to_shop
+        self.add_item(shop_button)
 
         self.add_item(
             discord.ui.Button(
@@ -460,14 +468,30 @@ class RoleDescriptionView(discord.ui.View):
 
     async def next_page(self, interaction: discord.Interaction):
         self.page = (self.page % len(self.premium_roles)) + 1
-        embed = await create_role_description_embed(self.ctx, self.page, self.premium_roles)
-        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.premium_roles)
+        embed = await create_role_description_embed(
+            self.ctx, self.page, self.premium_roles, self.balance
+        )
+        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.premium_roles, self.balance)
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def previous_page(self, interaction: discord.Interaction):
         self.page = (self.page - 2) % len(self.premium_roles) + 1
-        embed = await create_role_description_embed(self.ctx, self.page, self.premium_roles)
-        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.premium_roles)
+        embed = await create_role_description_embed(
+            self.ctx, self.page, self.premium_roles, self.balance
+        )
+        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.premium_roles, self.balance)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    async def go_to_shop(self, interaction: discord.Interaction):
+        """Go back to the shop view."""
+        db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
+        await self.session.commit()
+        balance = db_member.wallet_balance
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
+        view = RoleShopView(self.ctx, self.bot, self.premium_roles, balance, page=1)
+        embed = await create_shop_embed(
+            self.ctx, balance, view.role_price_map, premium_roles, page=1
+        )
         await interaction.response.edit_message(embed=embed, view=view)
 
 
@@ -525,7 +549,7 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
     return embed
 
 
-async def create_role_description_embed(ctx, page, premium_roles):
+async def create_role_description_embed(ctx, page, premium_roles, balance):
     """Create the role description embed."""
     descriptions = {
         "★1": (
@@ -592,13 +616,13 @@ async def create_role_description_embed(ctx, page, premium_roles):
     price = premium_roles[page - 1]["price"]
     description = descriptions[role_name]
 
-    db_member = await MemberQueries.get_or_add_member(ctx.bot.session, ctx.author.id)
-    balance = db_member.wallet_balance
-    balance_in_pln = (price - balance) / 10
+    balance_in_pln = (price - balance) / 10 if price > balance else 0
 
     embed = discord.Embed(
         title=f"Opis roli {role_name}",
-        description=f"{description}\n\nCena: {price}{CURRENCY_UNIT}\nTwój stan konta: {balance}{CURRENCY_UNIT}\nPotrzebujesz jeszcze: {balance_in_pln:.2f} zł",
+        description=f"{description}\n\nCena: {price}{CURRENCY_UNIT}\nTwój stan konta: {balance}{CURRENCY_UNIT}\nPotrzebujesz jeszcze: {balance_in_pln:.2f} zł"
+        if balance_in_pln > 0
+        else f"{description}\n\nCena: {price}{CURRENCY_UNIT}\nTwój stan konta: {balance}{CURRENCY_UNIT}",
         color=discord.Color.blurple(),
     )
 
