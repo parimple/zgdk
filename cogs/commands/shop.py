@@ -220,7 +220,9 @@ class RoleShopView(discord.ui.View):
 
     def create_button_callback(self, role_name):
         async def button_callback(interaction: discord.Interaction):
-            await self.buy_role(interaction, role_name)
+            # Determine duration_days based on page
+            duration_days = 365 if self.page != 1 else 30
+            await self.handle_buy_role(interaction, role_name, self.ctx.author, duration_days)
 
         return button_callback
 
@@ -264,26 +266,16 @@ class RoleShopView(discord.ui.View):
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
-    async def generate_embed(self):
-        """Generate the embed for the role shop."""
-        db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
-        await self.session.commit()
-        balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
-        return await create_shop_embed(
-            self.ctx, balance, self.role_price_map, premium_roles, self.page
-        )
-
-    async def buy_role(self, interaction: discord.Interaction, role_name: str):
-        """Buy a role."""
-        if self.guild is None or interaction.user.id != self.ctx.author.id:
-            return
-
+    async def handle_buy_role(self, interaction, role_name, member, duration_days=30):
+        """Common method to handle buying roles with given duration."""
         role_id = self.role_ids[role_name]
         role = discord.utils.get(self.guild.roles, id=role_id)
         price = self.role_price_map[role_name]
 
-        member = self.ctx.author
+        # Adjust price and duration if purchasing for a year
+        if duration_days == 365:
+            price *= 10
+
         if isinstance(member, discord.User):
             member = self.guild.get_member(member.id)
             if member is None:
@@ -340,43 +332,27 @@ class RoleShopView(discord.ui.View):
                 existing_role = premium_roles[0].role
 
                 if existing_role.id == role.id:
-                    if self.page == 1:
-                        await RoleQueries.update_role_expiration_date(
-                            session, member.id, role.id, timedelta(days=31)
-                        )
-                        msg = f"Przedłużyłeś rolę {role_name} o kolejne 31 dni."
-                    else:
-                        await RoleQueries.update_role_expiration_date(
-                            session, member.id, role.id, timedelta(days=365)
-                        )
-                        msg = f"Przedłużyłeś rolę {role_name} o kolejne 12 miesięcy."
+                    # Extend role by 31 days for monthly renewal or 365 days for yearly renewal
+                    extend_days = 31 if duration_days == 30 else 365
+                    await RoleQueries.update_role_expiration_date(
+                        session, member.id, role.id, timedelta(days=extend_days)
+                    )
+                    msg = f"Przedłużyłeś rolę {role_name} o kolejne {extend_days} dni."
                     difference = price
-
                 else:
                     await member.remove_roles(existing_role)
                     await RoleQueries.delete_member_role(session, member.id, existing_role.id)
                     await member.add_roles(role)
-                    if self.page == 1:
-                        await RoleQueries.add_role_to_member(
-                            session, member.id, role.id, timedelta(days=30)
-                        )
-                        msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_name}.{msg_refund}"
-                    else:
-                        await RoleQueries.add_role_to_member(
-                            session, member.id, role.id, timedelta(days=365)
-                        )
-                        msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_name} na 12 miesięcy.{msg_refund}"
+                    await RoleQueries.add_role_to_member(
+                        session, member.id, role.id, timedelta(days=duration_days)
+                    )
+                    msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_name} na {duration_days} dni.{msg_refund}"
 
             else:
                 await member.add_roles(role)
-                if self.page == 1:
-                    await RoleQueries.add_role_to_member(
-                        session, member.id, role.id, timedelta(days=30)
-                    )
-                else:
-                    await RoleQueries.add_role_to_member(
-                        session, member.id, role.id, timedelta(days=365)
-                    )
+                await RoleQueries.add_role_to_member(
+                    session, member.id, role.id, timedelta(days=duration_days)
+                )
                 msg = f"Zakupiłeś rolę {role_name}.{msg_refund}"
 
             await MemberQueries.add_to_wallet_balance(session, member.id, -difference)
@@ -397,6 +373,16 @@ class RoleShopView(discord.ui.View):
             await member.send(
                 f"Usunięto następujące role mutujące: {', '.join([role.name for role in roles_to_remove])}"
             )
+
+    async def generate_embed(self):
+        """Generate the embed for the role shop."""
+        db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
+        await self.session.commit()
+        balance = db_member.wallet_balance
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
+        return await create_shop_embed(
+            self.ctx, balance, self.role_price_map, premium_roles, self.page
+        )
 
 
 class BuyRoleButton(discord.ui.Button):
@@ -431,14 +417,12 @@ class RoleDescriptionView(discord.ui.View):
         previous_button.callback = self.previous_page
         self.add_item(previous_button)
 
-        buy_button = BuyRoleButton(
-            bot,
-            ctx.author,
-            premium_roles[page - 1]["name"],
+        buy_button = discord.ui.Button(
             label="Kup rangę",
             style=discord.ButtonStyle.primary,
             disabled=premium_roles[page - 1]["price"] > balance,
         )
+        buy_button.callback = self.buy_role
         self.add_item(buy_button)
 
         go_to_shop_button = discord.ui.Button(label="Do sklepu", style=discord.ButtonStyle.primary)
@@ -472,6 +456,16 @@ class RoleDescriptionView(discord.ui.View):
         )
         view = RoleDescriptionView(self.ctx, self.bot, self.page, self.premium_roles, self.balance)
         await interaction.response.edit_message(embed=embed, view=view)
+
+    async def buy_role(self, interaction: discord.Interaction):
+        """Buy a role from description."""
+        role_name = self.premium_roles[self.page - 1]["name"]
+        role_shop_view = RoleShopView(
+            self.ctx, self.bot, self.premium_roles, self.balance, self.page
+        )
+        await role_shop_view.handle_buy_role(
+            interaction, role_name, self.ctx.author, duration_days=30
+        )
 
     async def go_to_shop(self, interaction: discord.Interaction):
         view = RoleShopView(self.ctx, self.bot, self.premium_roles, self.balance, page=1)
