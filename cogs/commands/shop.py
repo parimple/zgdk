@@ -220,9 +220,7 @@ class RoleShopView(discord.ui.View):
 
     def create_button_callback(self, role_name):
         async def button_callback(interaction: discord.Interaction):
-            ctx = await self.bot.get_context(interaction.message)
-            ctx.author = self.ctx.author
-            await ctx.invoke(self.bot.get_command("buy_role"), role_name=role_name)
+            await self.buy_role(interaction, role_name)
 
         return button_callback
 
@@ -283,11 +281,7 @@ class RoleShopView(discord.ui.View):
 
         role_id = self.role_ids[role_name]
         role = discord.utils.get(self.guild.roles, id=role_id)
-        price = (
-            self.role_price_map[role_name]
-            if self.page == 1
-            else self.role_price_map[role_name] * 10
-        )
+        price = self.role_price_map[role_name]
 
         member = self.ctx.author
         if isinstance(member, discord.User):
