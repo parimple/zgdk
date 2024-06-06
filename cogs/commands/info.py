@@ -98,7 +98,7 @@ class InfoCog(commands.Cog):
         if member.banner:
             embed.set_image(url=member.banner.url)
 
-        view = ProfileView(self.bot, member, premium_roles)
+        view = ProfileView(self.bot, member, premium_roles, ctx.author)
         await ctx.send(embed=embed, view=view)
 
     @commands.hybrid_command(name="roles", description="Lists all roles in the database")
@@ -119,15 +119,17 @@ class InfoCog(commands.Cog):
 class ProfileView(discord.ui.View):
     """Profile view."""
 
-    def __init__(self, bot, member: discord.Member, premium_roles):
+    def __init__(self, bot, member: discord.Member, premium_roles, viewer: discord.Member):
         super().__init__()
         self.bot = bot
         self.member = member
         self.premium_roles = premium_roles
+        self.viewer = viewer
         self.add_item(
             BuyRoleButton(
                 bot=self.bot,
                 member=self.member,
+                viewer=self.viewer,
                 label="Sklep z rangami",
                 style=discord.ButtonStyle.success,
             )
@@ -138,7 +140,7 @@ class ProfileView(discord.ui.View):
                 premium_roles=premium_roles,
                 label="Sprzedaj rolę",
                 style=discord.ButtonStyle.danger,
-                disabled=not bool(premium_roles),
+                disabled=not bool(premium_roles) or self.viewer != self.member,
             )
         )
         self.add_item(
@@ -153,15 +155,16 @@ class ProfileView(discord.ui.View):
 class BuyRoleButton(discord.ui.Button):
     """Button to buy a role."""
 
-    def __init__(self, bot, member, **kwargs):
+    def __init__(self, bot, member, viewer, **kwargs):
         super().__init__(**kwargs)
         self.bot = bot
         self.member = member
+        self.viewer = viewer
 
     async def callback(self, interaction: discord.Interaction):
         ctx = await self.bot.get_context(interaction.message)
-        ctx.author = self.member
-        await ctx.invoke(self.bot.get_command("shop"))
+        ctx.author = self.viewer
+        await ctx.invoke(self.bot.get_command("shop"), member=self.member)
 
 
 class SellRoleButton(discord.ui.Button):

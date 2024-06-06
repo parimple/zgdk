@@ -1,6 +1,7 @@
 """Shop cog for the Zagadka bot."""
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import discord
 from discord.ext import commands
@@ -24,8 +25,16 @@ class ShopCog(commands.Cog):
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
     @commands.has_permissions(administrator=True)
-    async def shop(self, ctx: commands.Context):
+    async def shop(self, ctx: commands.Context, member: Optional[discord.Member] = None):
         """Display the shop with all available roles."""
+        if not member:
+            member = ctx.author
+
+        if not isinstance(member, discord.Member):
+            member = self.bot.guild.get_member(member.id)
+            if not member:
+                raise commands.UserInputError("Nie można znaleźć członka na tym serwerze.")
+
         db_member = await MemberQueries.get_or_add_member(self.session, ctx.author.id)
         await self.session.commit()
         balance = db_member.wallet_balance
@@ -33,8 +42,24 @@ class ShopCog(commands.Cog):
         logger.info(
             "User %s requested shop. Balance: %s, %s", ctx.author.id, balance, premium_roles
         )
-        view = RoleShopView(ctx, self.bot, self.bot.config["premium_roles"], balance, page=1)
-        embed = await create_shop_embed(ctx, balance, view.role_price_map, premium_roles, page=1)
+        view = RoleShopView(
+            ctx,
+            self.bot,
+            self.bot.config["premium_roles"],
+            balance,
+            page=1,
+            viewer=ctx.author,
+            member=member,
+        )
+        embed = await create_shop_embed(
+            ctx,
+            balance,
+            view.role_price_map,
+            premium_roles,
+            page=1,
+            viewer=ctx.author,
+            member=member,
+        )
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
     @commands.command(name="add", description="Dodaje środki do portfela użytkownika.")
@@ -170,7 +195,16 @@ class RoleShopView(discord.ui.View):
     """View for displaying and handling the purchase of roles in the shop."""
 
     # pylint: disable=too-many-arguments
-    def __init__(self, ctx: commands.Context, bot: Zagadka, premium_roles=None, balance=0, page=1):
+    def __init__(
+        self,
+        ctx: commands.Context,
+        bot: Zagadka,
+        premium_roles=None,
+        balance=0,
+        page=1,
+        viewer: discord.Member = None,
+        member: discord.Member = None,
+    ):
         super().__init__()
         self.ctx = ctx
         self.guild = bot.guild
@@ -184,6 +218,8 @@ class RoleShopView(discord.ui.View):
             for role in premium_roles
         }
         self.mute_roles = {role["name"]: role for role in self.bot.config["mute_roles"]}
+        self.viewer = viewer
+        self.member = member
 
         for role_name, _ in self.role_ids.items():
             button = discord.ui.Button(
@@ -225,51 +261,81 @@ class RoleShopView(discord.ui.View):
         async def button_callback(interaction: discord.Interaction):
             # Determine duration_days based on page
             duration_days = 365 if self.page != 1 else 30
-            await self.handle_buy_role(interaction, role_name, self.ctx.author, duration_days)
+            await self.handle_buy_role(interaction, role_name, self.member, duration_days)
 
         return button_callback
 
     async def next_page(self, interaction: discord.Interaction):
         """Go to the next page in the role shop."""
         self.page = 2
-        db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
+        db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
         await self.session.commit()
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.viewer.id)
         embed = await create_shop_embed(
-            self.ctx, balance, self.role_price_map, premium_roles, self.page
+            self.ctx,
+            balance,
+            self.role_price_map,
+            premium_roles,
+            self.page,
+            self.viewer,
+            self.member,
         )
         view = RoleShopView(
-            self.ctx, self.bot, self.bot.config["premium_roles"], balance, self.page
+            self.ctx,
+            self.bot,
+            self.bot.config["premium_roles"],
+            balance,
+            self.page,
+            self.viewer,
+            self.member,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def previous_page(self, interaction: discord.Interaction):
         """Go to the previous page in the role shop."""
         self.page = 1
-        db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
+        db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
         await self.session.commit()
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.viewer.id)
         embed = await create_shop_embed(
-            self.ctx, balance, self.role_price_map, premium_roles, self.page
+            self.ctx,
+            balance,
+            self.role_price_map,
+            premium_roles,
+            self.page,
+            self.viewer,
+            self.member,
         )
         view = RoleShopView(
-            self.ctx, self.bot, self.bot.config["premium_roles"], balance, self.page
+            self.ctx,
+            self.bot,
+            self.bot.config["premium_roles"],
+            balance,
+            self.page,
+            self.viewer,
+            self.member,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def show_role_description(self, interaction: discord.Interaction):
         """Show the description of the role."""
         # Add your code here
-        db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
+        db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
         await self.session.commit()
         balance = db_member.wallet_balance
         embed = await create_role_description_embed(
-            self.ctx, self.page, self.bot.config["premium_roles"], balance
+            self.ctx, self.page, self.bot.config["premium_roles"], balance, self.viewer, self.member
         )
         view = RoleDescriptionView(
-            self.ctx, self.bot, self.page, self.bot.config["premium_roles"], balance
+            self.ctx,
+            self.bot,
+            self.page,
+            self.bot.config["premium_roles"],
+            balance,
+            self.viewer,
+            self.member,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -290,7 +356,7 @@ class RoleShopView(discord.ui.View):
                 return
 
         async with self.session() as session:
-            db_member = await MemberQueries.get_or_add_member(session, member.id)
+            db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
 
             # Check for mute roles
@@ -368,7 +434,7 @@ class RoleShopView(discord.ui.View):
                 )
                 msg = f"Zakupiłeś rolę {role_name}.{msg_refund}"
 
-            await MemberQueries.add_to_wallet_balance(session, member.id, -difference)
+            await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -difference)
             await session.commit()
             await interaction.response.send_message(msg)
             embed = await self.generate_embed()
@@ -389,12 +455,18 @@ class RoleShopView(discord.ui.View):
 
     async def generate_embed(self):
         """Generate the embed for the role shop."""
-        db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
+        db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
         await self.session.commit()
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.viewer.id)
         return await create_shop_embed(
-            self.ctx, balance, self.role_price_map, premium_roles, self.page
+            self.ctx,
+            balance,
+            self.role_price_map,
+            premium_roles,
+            self.page,
+            self.viewer,
+            self.member,
         )
 
 
@@ -417,7 +489,16 @@ class RoleDescriptionView(discord.ui.View):
     """Role description view for displaying and handling role purchases."""
 
     # pylint: disable=too-many-arguments
-    def __init__(self, ctx: commands.Context, bot: Zagadka, page=1, premium_roles=None, balance=0):
+    def __init__(
+        self,
+        ctx: commands.Context,
+        bot: Zagadka,
+        page=1,
+        premium_roles=None,
+        balance=0,
+        viewer: discord.Member = None,
+        member: discord.Member = None,
+    ):
         super().__init__()
         self.ctx = ctx
         self.bot = bot
@@ -425,6 +506,8 @@ class RoleDescriptionView(discord.ui.View):
         self.page = page
         self.premium_roles = premium_roles or []
         self.balance = balance
+        self.viewer = viewer
+        self.member = member
 
         # Add buttons
         previous_button = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary)
@@ -459,25 +542,47 @@ class RoleDescriptionView(discord.ui.View):
         """Go to the next page in the role shop view."""
         self.page = (self.page % len(self.premium_roles)) + 1
         embed = await create_role_description_embed(
-            self.ctx, self.page, self.premium_roles, self.balance
+            self.ctx, self.page, self.premium_roles, self.balance, self.viewer, self.member
         )
-        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.premium_roles, self.balance)
+        view = RoleDescriptionView(
+            self.ctx,
+            self.bot,
+            self.page,
+            self.premium_roles,
+            self.balance,
+            self.viewer,
+            self.member,
+        )
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def previous_page(self, interaction: discord.Interaction):
         """Go to the previous page in the role description view."""
         self.page = (self.page - 2) % len(self.premium_roles) + 1
         embed = await create_role_description_embed(
-            self.ctx, self.page, self.premium_roles, self.balance
+            self.ctx, self.page, self.premium_roles, self.balance, self.viewer, self.member
         )
-        view = RoleDescriptionView(self.ctx, self.bot, self.page, self.premium_roles, self.balance)
+        view = RoleDescriptionView(
+            self.ctx,
+            self.bot,
+            self.page,
+            self.premium_roles,
+            self.balance,
+            self.viewer,
+            self.member,
+        )
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def buy_role(self, interaction: discord.Interaction):
         """Buy a role from description."""
         role_name = self.premium_roles[self.page - 1]["name"]
         role_shop_view = RoleShopView(
-            self.ctx, self.bot, self.premium_roles, self.balance, self.page
+            self.ctx,
+            self.bot,
+            self.premium_roles,
+            self.balance,
+            self.page,
+            self.viewer,
+            self.member,
         )
         await role_shop_view.handle_buy_role(
             interaction, role_name, self.ctx.author, duration_days=30
@@ -485,15 +590,29 @@ class RoleDescriptionView(discord.ui.View):
 
     async def go_to_shop(self, interaction: discord.Interaction):
         """Go to the role shop view."""
-        view = RoleShopView(self.ctx, self.bot, self.premium_roles, self.balance, page=1)
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
+        view = RoleShopView(
+            self.ctx,
+            self.bot,
+            self.premium_roles,
+            self.balance,
+            page=1,
+            viewer=self.viewer,
+            member=self.member,
+        )
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.viewer.id)
         embed = await create_shop_embed(
-            self.ctx, self.balance, view.role_price_map, premium_roles, page=1
+            self.ctx,
+            self.balance,
+            view.role_price_map,
+            premium_roles,
+            page=1,
+            viewer=self.viewer,
+            member=self.member,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
 
-async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
+async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, viewer, member):
     """Create the shop embed."""
     logger.info("Starting the creation of the shop embed for user %s", ctx.author.id)
 
@@ -539,6 +658,17 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
             annual_price = price * 10
             embed.add_field(name=role_name, value=f"{annual_price}{CURRENCY_UNIT}", inline=True)
 
+    if viewer != member:
+        embed.add_field(
+            name="Informacja",
+            value="Kupujesz rolę dla innego użytkownika, kwota będzie pobrana z twojego konta.",
+            inline=False,
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(text=f"Rolę kupujesz dla: {member.display_name} ({member.id})")
+    else:
+        embed.set_thumbnail(url=viewer.display_avatar.url)
+
     logger.info("Added role price map to embed for user %s", ctx.author.id)
 
     embed.set_footer(text=f"Twoje ID: {ctx.author.id} wklej w polu (Wpisz swój nick)")
@@ -548,7 +678,7 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
 
 
 # pylint: disable=unused-argument
-async def create_role_description_embed(ctx, page, premium_roles, balance):
+async def create_role_description_embed(ctx, page, premium_roles, balance, viewer, member):
     """Create the role description embed."""
     descriptions = {
         "★1": (
@@ -634,6 +764,17 @@ async def create_role_description_embed(ctx, page, premium_roles, balance):
         ),
         color=discord.Color.blurple(),
     )
+
+    if viewer != member:
+        embed.add_field(
+            name="Informacja",
+            value="Kupujesz rolę dla innego użytkownika, kwota będzie pobrana z twojego konta.",
+            inline=False,
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(text=f"Rolę kupujesz dla: {member.display_name} ({member.id})")
+    else:
+        embed.set_thumbnail(url=viewer.display_avatar.url)
 
     return embed
 

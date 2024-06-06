@@ -80,7 +80,7 @@ class OnPaymentEvent(commands.Cog):
 
         embed = discord.Embed(
             title="Gratulacje!",
-            description=f"Twoje konto zostało pomyślnie zasilone o {amount_g}{CURRENCY_UNIT}!",
+            description=f"Twoje konto zostało pomyślnie zasilone {amount_g}{CURRENCY_UNIT}!",
             color=discord.Color.green(),
         )
         embed.set_image(url=self.bot.config["gifs"]["donation"])
