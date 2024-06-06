@@ -50,7 +50,7 @@ class PremiumManager:
             except discord.NotFound:
                 logger.info("User is not banned by ID: %s", user_id)
         else:
-            async for ban_entry in self.guild.bans():
+            async for ban_entry in self.guild.bans(limit=None):
                 if name_or_id.lower() == ban_entry.user.name.lower():
                     logger.info("Banned user found by exact name: %s", ban_entry.user.id)
                     return ban_entry.user
