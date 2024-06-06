@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class ShopCog(commands.Cog):
-    """Shop cog."""
+    """Shop cog for managing the purchase and assignment of roles."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -101,7 +101,6 @@ class ShopCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def all_payments(self, ctx: commands.Context):
         """Fetch and display the initial set of payments."""
-
         payments = await HandledPaymentQueries.get_last_payments(self.session, limit=10)
         embed = discord.Embed(title="Wszystkie płatności")
         for payment in payments:
@@ -120,7 +119,7 @@ class ShopCog(commands.Cog):
 
 
 class PaymentsView(discord.ui.View):
-    """Payments view."""
+    """View for navigating through payment history."""
 
     def __init__(self, ctx: commands.Context, bot):
         super().__init__()
@@ -166,10 +165,12 @@ class PaymentsView(discord.ui.View):
         await self.display_payments(interaction)
 
 
+# pylint: disable=too-many-instance-attributes
 class RoleShopView(discord.ui.View):
-    """Role shop view."""
+    """View for displaying and handling the purchase of roles in the shop."""
 
-    def __init__(self, ctx: commands.Context, bot: Zagadka, premium_roles=[], balance=0, page=1):
+    # pylint: disable=too-many-arguments
+    def __init__(self, ctx: commands.Context, bot: Zagadka, premium_roles=None, balance=0, page=1):
         super().__init__()
         self.ctx = ctx
         self.guild = bot.guild
@@ -184,7 +185,7 @@ class RoleShopView(discord.ui.View):
         }
         self.mute_roles = {role["name"]: role for role in self.bot.config["mute_roles"]}
 
-        for role_name, role_id in self.role_ids.items():
+        for role_name, _ in self.role_ids.items():
             button = discord.ui.Button(
                 label=role_name,
                 style=discord.ButtonStyle.primary,
@@ -219,6 +220,8 @@ class RoleShopView(discord.ui.View):
             )
 
     def create_button_callback(self, role_name):
+        """Create a button callback for the specified role name."""
+
         async def button_callback(interaction: discord.Interaction):
             # Determine duration_days based on page
             duration_days = 365 if self.page != 1 else 30
@@ -227,6 +230,7 @@ class RoleShopView(discord.ui.View):
         return button_callback
 
     async def next_page(self, interaction: discord.Interaction):
+        """Go to the next page in the role shop."""
         self.page = 2
         db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
         await self.session.commit()
@@ -241,6 +245,7 @@ class RoleShopView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def previous_page(self, interaction: discord.Interaction):
+        """Go to the previous page in the role shop."""
         self.page = 1
         db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
         await self.session.commit()
@@ -255,6 +260,8 @@ class RoleShopView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def show_role_description(self, interaction: discord.Interaction):
+        """Show the description of the role."""
+        # Add your code here
         db_member = await MemberQueries.get_or_add_member(self.session, self.ctx.author.id)
         await self.session.commit()
         balance = db_member.wallet_balance
@@ -319,7 +326,10 @@ class RoleShopView(discord.ui.View):
                 # Calculate refund for the remaining time of the current role
                 refund_amount = calculate_refund(last_role.expiration_date, last_role_price)
                 difference = price - refund_amount
-                msg_refund = f" Część kwoty została zwrócona za poprzednią rangę ({refund_amount}{CURRENCY_UNIT})."
+                msg_refund = (
+                    f" Część kwoty została zwrócona za poprzednią rangę "
+                    f"({refund_amount}{CURRENCY_UNIT})."
+                )
             else:
                 difference = price
                 msg_refund = ""
@@ -346,7 +356,10 @@ class RoleShopView(discord.ui.View):
                     await RoleQueries.add_role_to_member(
                         session, member.id, role.id, timedelta(days=duration_days)
                     )
-                    msg = f"Uaktualniono twoją rolę z {existing_role.name} do {role_name} na {duration_days} dni.{msg_refund}"
+                    msg = (
+                        f"Uaktualniono twoją rolę z {existing_role.name} do {role_name} na "
+                        f"{duration_days} dni.{msg_refund}"
+                    )
 
             else:
                 await member.add_roles(role)
@@ -370,9 +383,9 @@ class RoleShopView(discord.ui.View):
         ]
         if roles_to_remove:
             await member.remove_roles(*roles_to_remove)
-            await member.send(
-                f"Usunięto następujące role mutujące: {', '.join([role.name for role in roles_to_remove])}"
-            )
+            roles_removed = [role.name for role in roles_to_remove]
+            message = f"Usunięto następujące role mutujące: {', '.join(roles_removed)}"
+            await member.send(message)
 
     async def generate_embed(self):
         """Generate the embed for the role shop."""
@@ -401,15 +414,16 @@ class BuyRoleButton(discord.ui.Button):
 
 
 class RoleDescriptionView(discord.ui.View):
-    """Role description view."""
+    """Role description view for displaying and handling role purchases."""
 
-    def __init__(self, ctx: commands.Context, bot: Zagadka, page=1, premium_roles=[], balance=0):
+    # pylint: disable=too-many-arguments
+    def __init__(self, ctx: commands.Context, bot: Zagadka, page=1, premium_roles=None, balance=0):
         super().__init__()
         self.ctx = ctx
         self.bot = bot
         self.session = bot.session
         self.page = page
-        self.premium_roles = premium_roles
+        self.premium_roles = premium_roles or []
         self.balance = balance
 
         # Add buttons
@@ -442,6 +456,7 @@ class RoleDescriptionView(discord.ui.View):
         self.add_item(next_button)
 
     async def next_page(self, interaction: discord.Interaction):
+        """Go to the next page in the role shop view."""
         self.page = (self.page % len(self.premium_roles)) + 1
         embed = await create_role_description_embed(
             self.ctx, self.page, self.premium_roles, self.balance
@@ -450,6 +465,7 @@ class RoleDescriptionView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def previous_page(self, interaction: discord.Interaction):
+        """Go to the previous page in the role description view."""
         self.page = (self.page - 2) % len(self.premium_roles) + 1
         embed = await create_role_description_embed(
             self.ctx, self.page, self.premium_roles, self.balance
@@ -468,6 +484,7 @@ class RoleDescriptionView(discord.ui.View):
         )
 
     async def go_to_shop(self, interaction: discord.Interaction):
+        """Go to the role shop view."""
         view = RoleShopView(self.ctx, self.bot, self.premium_roles, self.balance, page=1)
         premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.ctx.author.id)
         embed = await create_shop_embed(
@@ -530,6 +547,7 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page):
     return embed
 
 
+# pylint: disable=unused-argument
 async def create_role_description_embed(ctx, page, premium_roles, balance):
     """Create the role description embed."""
     descriptions = {
@@ -538,7 +556,7 @@ async def create_role_description_embed(ctx, page, premium_roles, balance):
             "Usunięcie wszystkich mutów\n"
             "Czarny kolor nicku\n"
             "Możliwość wyrzucania osób z kanałów (np ?connect - id)\n"
-            'Możliwość tworzenia kanałów #"___________@PREM___________"\n'
+            'Możliwość tworzenia kanałów #"@PREM"\n'
             "Ranga wspierającego\n"
             "Emotki i stickery z każdego serwera\n"
             "25% więcej punktów dodawanych do aktywności"
@@ -557,14 +575,14 @@ async def create_role_description_embed(ctx, page, premium_roles, balance):
         "★4": (
             "Wszystko co niżej\n"
             "Lądujesz na samej górze listy użytkowników\n"
-            'Dostajesz możliwość tworzenia kanałów głosowych #"___________@VIP_____________"\n'
+            'Dostajesz możliwość tworzenia kanałów głosowych #"@VIP"\n'
             "Dodatkowe 25% więcej punktów do aktywności (razem 100%)\n"
             "Twój klan może mieć nawet 16 członków"
         ),
         "★5": (
             "Wszystko co niżej\n"
             "Lądujesz jeszcze wyżej na liście użytkowników\n"
-            'Dostajesz możliwość tworzenia kanałów głosowych #"___________@VIP+____________" NAD lounge¹\n'
+            'Dostajesz możliwość tworzenia kanałów głosowych #"@VIP+" NAD lounge¹\n'
             "Dodatkowe 100% więcej punktów do aktywności (razem 200%)\n"
             "Twój klan może mieć nawet 24 członków"
         ),
@@ -572,7 +590,8 @@ async def create_role_description_embed(ctx, page, premium_roles, balance):
             "Wszystko co niżej\n"
             "Dodatkowe 100% więcej punktów do aktywności (razem 300%)\n"
             "Twój klan może mieć nawet 32 członków\n"
-            "Możesz zmieniać kolor klanu (wszystkie 32 osoby otrzymują ten sam kolor nicku) ?teamcolor pink"
+            "Możesz zmieniać kolor klanu (wszystkie 32 osoby otrzymują ten sam kolor nicku) "
+            + "?teamcolor pink"
         ),
         "★7": (
             "Wszystko co niżej\n"
@@ -601,9 +620,18 @@ async def create_role_description_embed(ctx, page, premium_roles, balance):
 
     embed = discord.Embed(
         title=f"Opis roli {role_name}",
-        description=f"{description}\n\nCena: {price}{CURRENCY_UNIT}\nTwój stan konta: {balance}{CURRENCY_UNIT}\nDopłać: {balance_in_pln:.2f} zł aby kupić rangę"
+        description=(
+            f"{description}\n\n"
+            f"Cena: {price}{CURRENCY_UNIT}\n"
+            f"Twój stan konta: {balance}{CURRENCY_UNIT}\n"
+            f"Dopłać: {balance_in_pln:.2f} zł aby kupić rangę"
+        )
         if balance_in_pln > 0
-        else f"{description}\n\nCena: {price}{CURRENCY_UNIT}\nTwój stan konta: {balance}{CURRENCY_UNIT}",
+        else (
+            f"{description}\n\n"
+            f"Cena: {price}{CURRENCY_UNIT}\n"
+            f"Twój stan konta: {balance}{CURRENCY_UNIT}"
+        ),
         color=discord.Color.blurple(),
     )
 
@@ -611,5 +639,5 @@ async def create_role_description_embed(ctx, page, premium_roles, balance):
 
 
 async def setup(bot: commands.Bot):
-    """This function is called when the cog is loaded."""
+    """Setup function for ShopCog."""
     await bot.add_cog(ShopCog(bot))

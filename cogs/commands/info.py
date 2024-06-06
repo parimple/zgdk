@@ -128,7 +128,7 @@ class ProfileView(discord.ui.View):
             BuyRoleButton(
                 bot=self.bot,
                 member=self.member,
-                label="Kup rolę",
+                label="Sklep z rangami",
                 style=discord.ButtonStyle.success,
             )
         )
@@ -186,7 +186,7 @@ class SellRoleButton(discord.ui.Button):
 
         async with self.bot.session() as session:
             try:
-                db_member = await MemberQueries.get_or_add_member(session, member.id)
+                await MemberQueries.get_or_add_member(session, member.id)
                 await RoleQueries.delete_member_role(session, member.id, last_role.role.id)
                 await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
                 await session.commit()
@@ -194,10 +194,11 @@ class SellRoleButton(discord.ui.Button):
                 await member.remove_roles(last_role.role)
 
                 await interaction.response.send_message(
-                    f"Sprzedano rolę {last_role.role.name} za {refund_amount}{CURRENCY_UNIT}. Kwota zwrotu została dodana do twojego salda."
+                    f"Sprzedano rolę {last_role.role.name} za {refund_amount}{CURRENCY_UNIT}. "
+                    f"Kwota zwrotu została dodana do twojego salda."
                 )
-            except Exception as e:
-                logger.error("Error while selling role: %s", e, exc_info=True)
+            except discord.DiscordException as error:
+                logger.error("Error while selling role: %s", error, exc_info=True)
                 await interaction.response.send_message(
                     "Wystąpił błąd podczas sprzedawania roli. Proszę spróbować ponownie później."
                 )
