@@ -38,7 +38,7 @@ class ShopCog(commands.Cog):
         db_member = await MemberQueries.get_or_add_member(self.session, ctx.author.id)
         await self.session.commit()
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, ctx.author.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, member.id)
         logger.info(
             "User %s requested shop. Balance: %s, %s", ctx.author.id, balance, premium_roles
         )
@@ -271,7 +271,7 @@ class RoleShopView(discord.ui.View):
         db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
         await self.session.commit()
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.viewer.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.member.id)
         embed = await create_shop_embed(
             self.ctx,
             balance,
@@ -298,7 +298,7 @@ class RoleShopView(discord.ui.View):
         db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
         await self.session.commit()
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.viewer.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.member.id)
         embed = await create_shop_embed(
             self.ctx,
             balance,
@@ -356,7 +356,8 @@ class RoleShopView(discord.ui.View):
                 return
 
         async with self.session() as session:
-            db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
+            db_viewer = await MemberQueries.get_or_add_member(session, self.viewer.id)
+            db_member = await MemberQueries.get_or_add_member(session, member.id)
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
 
             # Check for mute roles
@@ -400,7 +401,7 @@ class RoleShopView(discord.ui.View):
                 difference = price
                 msg_refund = ""
 
-            if db_member.wallet_balance < difference:
+            if db_viewer.wallet_balance < difference:
                 await interaction.response.send_message("Nie masz wystarczająco dużo pieniędzy.")
                 return
 
@@ -423,16 +424,16 @@ class RoleShopView(discord.ui.View):
                         session, member.id, role.id, timedelta(days=duration_days)
                     )
                     msg = (
-                        f"Uaktualniono twoją rolę z {existing_role.name} do {role_name} na "
+                        f"Uaktualniono rolę {member.display_name} z {existing_role.name} do {role_name} na "
                         f"{duration_days} dni.{msg_refund}"
                     )
-
+                    await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
             else:
                 await member.add_roles(role)
                 await RoleQueries.add_role_to_member(
                     session, member.id, role.id, timedelta(days=duration_days)
                 )
-                msg = f"Zakupiłeś rolę {role_name}.{msg_refund}"
+                msg = f"Zakupiłeś rolę {role_name} dla {member.display_name}.{msg_refund}"
 
             await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -difference)
             await session.commit()
@@ -458,7 +459,7 @@ class RoleShopView(discord.ui.View):
         db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
         await self.session.commit()
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.viewer.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.member.id)
         return await create_shop_embed(
             self.ctx,
             balance,
@@ -599,7 +600,7 @@ class RoleDescriptionView(discord.ui.View):
             viewer=self.viewer,
             member=self.member,
         )
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.viewer.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.member.id)
         embed = await create_shop_embed(
             self.ctx,
             self.balance,
@@ -650,6 +651,12 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, v
     if premium_roles:
         logger.info("Handling premium roles for user %s", ctx.author.id)
         PremiumManager.add_premium_roles_to_embed(ctx, embed, premium_roles)
+
+    current_role = "Brak"
+    if premium_roles:
+        current_role = premium_roles[0].role.name
+
+    embed.add_field(name="Aktualna rola", value=current_role, inline=False)
 
     for role_name, price in role_price_map.items():
         if page == 1:
