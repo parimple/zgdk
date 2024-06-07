@@ -190,11 +190,9 @@ class PaymentsView(discord.ui.View):
         await self.display_payments(interaction)
 
 
-# pylint: disable=too-many-instance-attributes
 class RoleShopView(discord.ui.View):
     """View for displaying and handling the purchase of roles in the shop."""
 
-    # pylint: disable=too-many-arguments
     def __init__(
         self,
         ctx: commands.Context,
@@ -239,12 +237,10 @@ class RoleShopView(discord.ui.View):
             previous_button.callback = self.previous_page
             self.add_item(previous_button)
 
-        # Add description button
         description_button = discord.ui.Button(label="Opis ról", style=discord.ButtonStyle.primary)
         description_button.callback = self.show_role_description
         self.add_item(description_button)
 
-        # Check if donate_url exists in config
         donate_url = self.bot.config.get("donate_url")
         if donate_url:
             self.add_item(
@@ -259,7 +255,6 @@ class RoleShopView(discord.ui.View):
         """Create a button callback for the specified role name."""
 
         async def button_callback(interaction: discord.Interaction):
-            # Determine duration_days based on page
             duration_days = 365 if self.page != 1 else 30
             await self.handle_buy_role(interaction, role_name, self.member, duration_days)
 
@@ -321,7 +316,6 @@ class RoleShopView(discord.ui.View):
 
     async def show_role_description(self, interaction: discord.Interaction):
         """Show the description of the role."""
-        # Add your code here
         db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
         await self.session.commit()
         balance = db_member.wallet_balance
@@ -345,10 +339,6 @@ class RoleShopView(discord.ui.View):
         role = discord.utils.get(self.guild.roles, id=role_id)
         price = self.role_price_map[role_name]
 
-        # Adjust price and duration if purchasing for a year
-        if duration_days == 365:
-            price *= 10
-
         if isinstance(member, discord.User):
             member = self.guild.get_member(member.id)
             if member is None:
@@ -357,89 +347,100 @@ class RoleShopView(discord.ui.View):
 
         async with self.session() as session:
             db_viewer = await MemberQueries.get_or_add_member(session, self.viewer.id)
-            db_member = await MemberQueries.get_or_add_member(session, member.id)
+            await MemberQueries.get_or_add_member(session, member.id)
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+            has_mute_roles = self.check_mute_roles(member)
 
-            # Check for mute roles
-            has_mute_roles = any(
-                role
-                for role in self.mute_roles.values()
-                if role["id"] in [r.id for r in member.roles]
+            if premium_roles:
+                await self.handle_existing_premium_roles(
+                    interaction, member, role, price, premium_roles, duration_days, has_mute_roles
+                )
+            else:
+                await self.purchase_role(interaction, member, role, price, duration_days)
+
+    def check_mute_roles(self, member):
+        """Check if member has mute roles."""
+        return any(
+            role for role in self.mute_roles.values() if role["id"] in [r.id for r in member.roles]
+        )
+
+    async def handle_existing_premium_roles(
+        self, interaction, member, role, price, premium_roles, duration_days, has_mute_roles
+    ):
+        """Handle logic for members with existing premium roles."""
+        last_role = premium_roles[0]
+        last_role_price = self.role_price_map.get(last_role.role.name)
+
+        if last_role_price is None:
+            await interaction.response.send_message(
+                "Nie można znaleźć ceny poprzedniej roli użytkownika."
             )
+            return
 
-            if premium_roles:
-                last_role = premium_roles[0]
-                last_role_price = self.role_price_map.get(last_role.role.name)
-
-                if last_role_price is None:
-                    await interaction.response.send_message(
-                        "Nie można znaleźć ceny poprzedniej roli użytkownika."
-                    )
-                    return
-
-                if price < last_role_price:
-                    # If user has mute roles and buying the lowest rank
-                    if role_name == "★1" and has_mute_roles:
-                        await self.remove_mute_roles(member)
-                        await interaction.response.send_message(
-                            "Usunięto mutujące role z powodu zakupu najniższej rangi."
-                        )
-                    else:
-                        await interaction.response.send_message(
-                            "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
-                        )
-                    return
-
-                # Calculate refund for the remaining time of the current role
-                refund_amount = calculate_refund(last_role.expiration_date, last_role_price)
-                difference = price - refund_amount
-                msg_refund = (
-                    f" Część kwoty została zwrócona za poprzednią rangę "
-                    f"({refund_amount}{CURRENCY_UNIT})."
+        if price < last_role_price:
+            if role.name == "★1" and has_mute_roles:
+                await self.remove_mute_roles(member)
+                await interaction.response.send_message(
+                    "Usunięto mutujące role z powodu zakupu najniższej rangi."
                 )
             else:
-                difference = price
-                msg_refund = ""
-
-            if db_viewer.wallet_balance < difference:
-                await interaction.response.send_message("Nie masz wystarczająco dużo pieniędzy.")
-                return
-
-            if premium_roles:
-                existing_role = premium_roles[0].role
-
-                if existing_role.id == role.id:
-                    # Extend role by 31 days for monthly renewal or 365 days for yearly renewal
-                    extend_days = 31 if duration_days == 30 else 365
-                    await RoleQueries.update_role_expiration_date(
-                        session, member.id, role.id, timedelta(days=extend_days)
-                    )
-                    msg = f"Przedłużyłeś rolę {role_name} o kolejne {extend_days} dni."
-                    difference = price
-                else:
-                    await member.remove_roles(existing_role)
-                    await RoleQueries.delete_member_role(session, member.id, existing_role.id)
-                    await member.add_roles(role)
-                    await RoleQueries.add_role_to_member(
-                        session, member.id, role.id, timedelta(days=duration_days)
-                    )
-                    msg = (
-                        f"Uaktualniono rolę {member.display_name} z {existing_role.name} do {role_name} na "
-                        f"{duration_days} dni.{msg_refund}"
-                    )
-                    await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
-            else:
-                await member.add_roles(role)
-                await RoleQueries.add_role_to_member(
-                    session, member.id, role.id, timedelta(days=duration_days)
+                await interaction.response.send_message(
+                    "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
                 )
-                msg = f"Zakupiłeś rolę {role_name} dla {member.display_name}.{msg_refund}"
+            return
 
-            await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -difference)
-            await session.commit()
-            await interaction.response.send_message(msg)
-            embed = await self.generate_embed()
-            await interaction.message.edit(embed=embed)
+        refund_amount = calculate_refund(last_role.expiration_date, last_role_price)
+        msg_refund = (
+            f" Część kwoty została zwrócona za poprzednią rangę ({refund_amount}{CURRENCY_UNIT})."
+        )
+
+        db_viewer = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
+
+        if db_viewer.wallet_balance < price:
+            await interaction.response.send_message("Nie masz wystarczająco dużo pieniędzy.")
+            return
+
+        existing_role = premium_roles[0].role
+
+        if existing_role.id == role.id:
+            extend_days = 31 if duration_days == 30 else 365
+            await RoleQueries.update_role_expiration_date(
+                self.session, member.id, role.id, timedelta(days=extend_days)
+            )
+            msg = f"Przedłużyłeś rolę {role.name} o kolejne {extend_days} dni."
+            await MemberQueries.add_to_wallet_balance(self.session, self.viewer.id, -price)
+        else:
+            await member.remove_roles(existing_role)
+            await RoleQueries.delete_member_role(self.session, member.id, existing_role.id)
+            await member.add_roles(role)
+            await RoleQueries.add_role_to_member(
+                self.session, member.id, role.id, timedelta(days=duration_days)
+            )
+            msg = f"Uaktualniono rolę {member.display_name} z {existing_role.name} do {role.name} na {duration_days} dni.{msg_refund}"
+            await MemberQueries.add_to_wallet_balance(self.session, member.id, refund_amount)
+            await MemberQueries.add_to_wallet_balance(
+                self.session, self.viewer.id, -price
+            )  # Kupujący płaci pełną kwotę
+
+        await self.session.commit()
+        await interaction.response.send_message(msg)
+        embed = await self.generate_embed()
+        await interaction.message.edit(embed=embed)
+
+    async def purchase_role(self, interaction, member, role, price, duration_days):
+        """Handle logic for purchasing a role without existing premium roles."""
+        await member.add_roles(role)
+        await RoleQueries.add_role_to_member(
+            self.session, member.id, role.id, timedelta(days=duration_days)
+        )
+        msg = f"Zakupiłeś rolę {role.name} dla {member.display_name}."
+        await MemberQueries.add_to_wallet_balance(
+            self.session, self.viewer.id, -price
+        )  # Kupujący płaci pełną kwotę
+        await self.session.commit()
+        await interaction.response.send_message(msg)
+        embed = await self.generate_embed()
+        await interaction.message.edit(embed=embed)
 
     async def remove_mute_roles(self, member: discord.Member):
         """Remove all mute roles from the member and notify them."""
@@ -684,7 +685,7 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, v
     return embed
 
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument too-many-arguments
 async def create_role_description_embed(ctx, page, premium_roles, balance, viewer, member):
     """Create the role description embed."""
     descriptions = {
