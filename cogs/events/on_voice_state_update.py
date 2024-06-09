@@ -86,7 +86,13 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             self.mute_roles["attach_files_off"]: discord.PermissionOverwrite(
                 attach_files=False, embed_links=False, external_emojis=False
             ),
-            member: discord.PermissionOverwrite(view_channel=True, connect=True, speak=True),
+            member: discord.PermissionOverwrite(
+                view_channel=True,
+                connect=True,
+                speak=True,
+                priority_speaker=True,
+                manage_messages=True,
+            ),
         }
 
         # Add permissions from database, if applicable
