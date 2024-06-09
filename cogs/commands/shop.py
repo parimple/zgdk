@@ -193,6 +193,7 @@ class PaymentsView(discord.ui.View):
 class RoleShopView(discord.ui.View):
     """View for displaying and handling the purchase of roles in the shop."""
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self,
         ctx: commands.Context,
@@ -586,9 +587,7 @@ class RoleDescriptionView(discord.ui.View):
             self.viewer,
             self.member,
         )
-        await role_shop_view.handle_buy_role(
-            interaction, role_name, self.ctx.author, duration_days=30
-        )
+        await role_shop_view.handle_buy_role(interaction, role_name, self.member, duration_days=30)
 
     async def go_to_shop(self, interaction: discord.Interaction):
         """Go to the role shop view."""

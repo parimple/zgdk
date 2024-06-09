@@ -72,6 +72,7 @@ class OnPaymentEvent(commands.Cog):
             logger.error("Member not found: %s", payment_data.name)
             return
 
+        logger.info(f"Handling payment for {member.display_name} with amount {amount_g}")
         await self.assign_temporary_roles(member, amount_g)
         await self.remove_mute_roles(member)
 
@@ -120,13 +121,30 @@ class OnPaymentEvent(commands.Cog):
 
         async with self.session() as session:
             for amount, role_name in roles_tiers:
+                logger.info("Checking if %d >= %d for role %s", amount_g, amount, role_name)
                 if amount_g >= amount:
                     role = discord.utils.get(self.guild.roles, name=role_name)
-                    if role and role not in member.roles:
-                        await member.add_roles(role)
-                        await RoleQueries.add_role_to_member(
-                            session, member.id, role.id, timedelta(days=30)
-                        )
+                    if role:
+                        logger.info("Found role %s for %s", role_name, member.display_name)
+                        if role not in member.roles:
+                            logger.info(
+                                "Assigning role %s to member %s", role_name, member.display_name
+                            )
+                            await member.add_roles(role)
+                            await RoleQueries.add_role_to_member(
+                                session, member.id, role.id, timedelta(days=30)
+                            )
+                            logger.info(
+                                "Assigned role %s to member %s", role_name, member.display_name
+                            )
+                        else:
+                            logger.info(
+                                "Member %s already has role %s", member.display_name, role_name
+                            )
+                    else:
+                        logger.error("Role %s not found in the guild", role_name)
+                else:
+                    logger.info("Amount %d is not enough for role %s", amount_g, role_name)
 
     async def remove_mute_roles(self, member):
         """Remove mute roles from a member if they have any temporary roles assigned"""
