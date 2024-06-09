@@ -121,6 +121,9 @@ class Zagadka(commands.Bot):
 
         if not self.test:
             await self.load_cogs()
+            await self.tree.sync(guild=discord.Object(id=self.guild_id))
+            logging.info("Slash commands synchronized")
+
         logging.info("Ready")
 
     def run(self):
