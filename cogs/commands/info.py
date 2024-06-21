@@ -20,7 +20,6 @@ class InfoCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.session = bot.session
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -63,8 +62,10 @@ class InfoCog(commands.Cog):
                 raise commands.UserInputError("Nie można znaleźć członka na tym serwerze.")
 
         roles = [role for role in member.roles if role.name != "@everyone"]
-        db_member = await MemberQueries.get_or_add_member(self.session, member.id)
-        await self.session.commit()
+
+        async with self.bot.get_db() as session:
+            db_member = await MemberQueries.get_or_add_member(session, member.id)
+            premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
 
         embed = discord.Embed(
             title=f"{member}",
@@ -85,8 +86,6 @@ class InfoCog(commands.Cog):
         )
         embed.add_field(name="Role:", value=" ".join([role.mention for role in roles]))
 
-        # Fetching premium roles
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, member.id)
         if premium_roles:
             PremiumManager.add_premium_roles_to_embed(ctx, embed, premium_roles)
 
@@ -105,7 +104,9 @@ class InfoCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def all_roles(self, ctx: commands.Context):
         """Fetch and display all roles in the database."""
-        roles = await RoleQueries.get_all_roles(self.session)
+        async with self.bot.get_db() as session:
+            roles = await RoleQueries.get_all_roles(session)
+
         embed = discord.Embed(title="All Roles")
         for role in roles:
             embed.add_field(
@@ -187,7 +188,7 @@ class SellRoleButton(discord.ui.Button):
 
         refund_amount = calculate_refund(last_role.expiration_date, role_price)
 
-        async with self.bot.session() as session:
+        async with self.bot.get_db() as session:
             try:
                 await MemberQueries.get_or_add_member(session, member.id)
                 await RoleQueries.delete_member_role(session, member.id, last_role.role.id)

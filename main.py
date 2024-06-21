@@ -6,6 +6,7 @@ Main file for Zagadka bot.
 import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 import discord
@@ -18,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.orm import sessionmaker
 
 from datasources.models import Base
 
@@ -45,31 +47,17 @@ class Zagadka(commands.Bot):
         self.guild: Optional[discord.Guild] = None
         self.invites: dict[str, discord.Invite] = {}
 
-        postgres_user: str = os.environ.get("POSTGRES_USER", "")
-        postgres_password: str = os.environ.get("POSTGRES_PASSWORD", "")
-        postgres_db: str = os.environ.get("POSTGRES_DB", "")
-        postgres_port: str = os.environ.get("POSTGRES_PORT", "")
-
-        database_url = (
-            f"postgresql+asyncpg://"
-            f"{postgres_user}:"
-            f"{postgres_password}@db:"
-            f"{postgres_port}/"
-            f"{postgres_db}"
-        )
+        database_url = self.get_database_url()
 
         self.engine = create_async_engine(
             database_url,
-            pool_size=40,
-            max_overflow=80,
-            pool_timeout=10,
-            pool_recycle=1200,
+            pool_size=20,
+            max_overflow=40,
+            pool_timeout=30,
+            pool_recycle=1800,
             pool_pre_ping=True,
         )
-        self.session = async_scoped_session(
-            async_sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession),
-            scopefunc=asyncio.current_task,
-        )
+        self.SessionLocal = sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
         self.base = Base
 
         super().__init__(
@@ -79,6 +67,34 @@ class Zagadka(commands.Bot):
             allowed_mentions=discord.AllowedMentions.all(),
             **kwargs,
         )
+
+    def get_database_url(self):
+        postgres_user: str = os.environ.get("POSTGRES_USER", "")
+        postgres_password: str = os.environ.get("POSTGRES_PASSWORD", "")
+        postgres_db: str = os.environ.get("POSTGRES_DB", "")
+        postgres_port: str = os.environ.get("POSTGRES_PORT", "")
+
+        return (
+            f"postgresql+asyncpg://"
+            f"{postgres_user}:"
+            f"{postgres_password}@db:"
+            f"{postgres_port}/"
+            f"{postgres_db}"
+        )
+
+    @asynccontextmanager
+    async def get_db(self):
+        async with self.SessionLocal() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    async def close(self):
+        await self.engine.dispose()
+        await super().close()
 
     async def load_cogs(self):
         """Load all cogs"""

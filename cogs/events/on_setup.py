@@ -1,7 +1,6 @@
 """
 On Setup Event
 """
-
 import logging
 
 import discord
@@ -17,7 +16,6 @@ class OnSetupEvent(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.session = bot.session
         self.setup_roles.start()  # pylint: disable=no-member
         self.setup_unknown_inviter.start()  # pylint: disable=no-member
 
@@ -28,7 +26,7 @@ class OnSetupEvent(commands.Cog):
     async def ensure_roles_in_db_and_guild(self, roles: list[dict], role_type: str):
         """Utility function to ensure roles exist in both database and guild"""
         guild = self.bot.guild
-        async with self.bot.session() as session:
+        async with self.bot.get_db() as session:
             for role_info in roles:
                 role_name = role_info["name"]
                 role = discord.utils.get(guild.roles, name=role_name)
@@ -43,7 +41,6 @@ class OnSetupEvent(commands.Cog):
                 if existing_role:
                     logger.info("Role with ID %s already exists in database", role.id)
                     continue
-
                 # Add role to database
                 await RoleQueries.add_role(session, role.id, role.name, role_type)
                 logger.info(
@@ -59,19 +56,15 @@ class OnSetupEvent(commands.Cog):
         """Setup roles"""
         await self.bot.wait_until_ready()
         logger.info("Setting up roles")
-
         # Premium roles
         premium_roles = self.bot.config["premium_roles"]
         await self.ensure_roles_in_db_and_guild(premium_roles, "premium")
-
         # Ranking roles
         rank_role_names = [{"name": str(i)} for i in range(1, 101)]
         await self.ensure_roles_in_db_and_guild(rank_role_names, "rank")
-
         # Mute roles
         mute_roles = self.bot.config["mute_roles"]
         await self.ensure_roles_in_db_and_guild(mute_roles, "mute")
-
         # Temporary roles for donations
         temporary_roles = [
             {"name": "$128"},
@@ -83,13 +76,12 @@ class OnSetupEvent(commands.Cog):
             {"name": "$2"},
         ]
         await self.ensure_roles_in_db_and_guild(temporary_roles, "temporary")
-
         logger.info("Roles setup complete")
 
     @tasks.loop(count=1)
     async def setup_unknown_inviter(self):
         """Create a special entry for unknown invites."""
-        async with self.session() as session:
+        async with self.bot.get_db() as session:
             unknown_inviter_id = self.bot.guild_id
             await MemberQueries.get_or_add_member(session, unknown_inviter_id)
             await session.commit()

@@ -1,14 +1,16 @@
-"""Queries for the database"""
+"""
+Queries for the database.
+"""
+
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Sequence
+from typing import List, Optional
 
-from sqlalchemy import delete, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
-from .models import ChannelPermission, HandledPayment, Member, MemberRole, Role
+from .models import ChannelPermission, HandledPayment, Member, MemberRole, NotificationLog, Role
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ class MemberQueries:
     """Class for Member Queries"""
 
     @staticmethod
-    async def get_or_add_member(  # pylint: disable=too-many-arguments
+    async def get_or_add_member(
         session: AsyncSession,
         member_id: int,
         wallet_balance: int = 0,
@@ -27,10 +29,8 @@ class MemberQueries:
         rejoined_at: Optional[datetime] = None,
     ) -> Member:
         """Get a Member by ID, or add a new one if it doesn't exist"""
-        result = await session.execute(select(Member).where(Member.id == member_id))
-        member = result.scalars().first()
+        member = await session.get(Member, member_id)
 
-        # If member does not exist, add them
         if member is None:
             member = Member(
                 id=member_id,
@@ -41,24 +41,18 @@ class MemberQueries:
                 rejoined_at=rejoined_at,
             )
             session.add(member)
+            await session.flush()
 
         return member
 
     @staticmethod
     async def add_to_wallet_balance(session: AsyncSession, member_id: int, amount: int) -> None:
         """Add to the wallet balance of a Member"""
-
-        # Get or add member before modifying their balance
-        logging.info("Getting or adding member")
-        await MemberQueries.get_or_add_member(session, member_id)
-
-        stmt = (
+        await session.execute(
             update(Member)
             .where(Member.id == member_id)
             .values(wallet_balance=Member.wallet_balance + amount)
         )
-        logging.info("Updating wallet balance")
-        await session.execute(stmt)
 
 
 class RoleQueries:
@@ -77,7 +71,6 @@ class RoleQueries:
             member_id=member_id, role_id=role_id, expiration_date=expiration_date
         )
         session.add(member_role)
-        await session.commit()
 
     @staticmethod
     async def add_role(
@@ -88,25 +81,24 @@ class RoleQueries:
         session.add(role)
 
     @staticmethod
-    async def get_all_roles(session: AsyncSession):
+    async def get_all_roles(session: AsyncSession) -> List[Role]:
         """Get all roles from the database"""
         result = await session.execute(select(Role))
         return result.scalars().all()
 
     @staticmethod
-    async def get_role_by_name(session: AsyncSession, name: str):
+    async def get_role_by_name(session: AsyncSession, name: str) -> Optional[Role]:
         """Get role by name"""
         result = await session.execute(select(Role).where(Role.name == name))
         return result.scalars().first()
 
     @staticmethod
-    async def get_role_by_id(session: AsyncSession, role_id: int):
+    async def get_role_by_id(session: AsyncSession, role_id: int) -> Optional[Role]:
         """Get role by ID"""
-        result = await session.execute(select(Role).where(Role.id == role_id))
-        return result.scalars().first()
+        return await session.get(Role, role_id)
 
     @staticmethod
-    async def get_member_roles(session: AsyncSession, member_id: int):
+    async def get_member_roles(session: AsyncSession, member_id: int) -> List[MemberRole]:
         """Get all roles of a member"""
         result = await session.execute(
             select(MemberRole)
@@ -116,24 +108,20 @@ class RoleQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def get_member_premium_roles(session: AsyncSession, member_id: int):
+    async def get_member_premium_roles(session: AsyncSession, member_id: int) -> List[MemberRole]:
         """Get all premium roles of a member"""
-        logger.info("Trying to fetch premium roles for member_id: %s", member_id)
         result = await session.execute(
             select(MemberRole)
             .options(joinedload(MemberRole.role))
             .join(Role, MemberRole.role_id == Role.id)
             .where((MemberRole.member_id == member_id) & (Role.role_type == "premium"))
         )
-
-        roles = result.scalars().all()
-        logger.info("Fetched premium roles: %s", roles)
-        return roles
+        return result.scalars().all()
 
     @staticmethod
     async def get_expiring_roles(
         session: AsyncSession, reminder_time: datetime, role_type: Optional[str] = None
-    ):
+    ) -> List[MemberRole]:
         """Get roles expiring within the next 24 hours"""
         query = (
             select(MemberRole)
@@ -141,14 +129,14 @@ class RoleQueries:
             .where(MemberRole.expiration_date <= reminder_time)
         )
         if role_type:
-            query = query.where(Role.role_type == role_type)
+            query = query.join(Role).where(Role.role_type == role_type)
         result = await session.execute(query)
         return result.scalars().all()
 
     @staticmethod
     async def get_expired_roles(
         session: AsyncSession, current_time: datetime, role_type: Optional[str] = None
-    ):
+    ) -> List[MemberRole]:
         """Get roles that have already expired"""
         query = (
             select(MemberRole)
@@ -156,7 +144,7 @@ class RoleQueries:
             .where(MemberRole.expiration_date <= current_time)
         )
         if role_type:
-            query = query.where(Role.role_type == role_type)
+            query = query.join(Role).where(Role.role_type == role_type)
         result = await session.execute(query)
         return result.scalars().all()
 
@@ -168,10 +156,9 @@ class RoleQueries:
                 (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
             )
         )
-        await session.commit()
 
     @staticmethod
-    async def get_premium_role(session: AsyncSession, member_id: int):
+    async def get_premium_role(session: AsyncSession, member_id: int) -> Optional[MemberRole]:
         """Get the active premium role of a member"""
         result = await session.execute(
             select(MemberRole)
@@ -185,41 +172,27 @@ class RoleQueries:
         return result.scalars().first()
 
     @staticmethod
-    async def get_role_for_member(session: AsyncSession, member_id: int, role_id: int):
+    async def get_role_for_member(
+        session: AsyncSession, member_id: int, role_id: int
+    ) -> Optional[MemberRole]:
         """Check if a member already has the role."""
-        result = await session.execute(
-            select(MemberRole).where(
-                (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
-            )
-        )
-        return result.scalars().first()
+        return await session.get(MemberRole, (member_id, role_id))
 
     @staticmethod
     async def update_role_expiration_date(
         session: AsyncSession, member_id: int, role_id: int, duration: timedelta
     ):
         """Update the expiration date of the role for the member."""
-        current_expiration = (
-            await session.execute(
-                select(MemberRole.expiration_date).where(
-                    (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
-                )
-            )
-        ).scalar_one()
-        new_expiration_date = current_expiration + duration
-        await session.execute(
-            update(MemberRole)
-            .where((MemberRole.member_id == member_id) & (MemberRole.role_id == role_id))
-            .values(expiration_date=new_expiration_date)
-        )
-        await session.commit()
+        member_role = await session.get(MemberRole, (member_id, role_id))
+        if member_role:
+            member_role.expiration_date += duration
 
 
 class HandledPaymentQueries:
     """Class for Handled Payment Queries"""
 
     @staticmethod
-    async def add_payment(  # pylint: disable=too-many-arguments
+    async def add_payment(
         session: AsyncSession,
         member_id: Optional[int],
         name: str,
@@ -228,7 +201,6 @@ class HandledPaymentQueries:
         payment_type: str,
     ) -> HandledPayment:
         """Add Payment"""
-        logger.info("add_payment")
         payment = HandledPayment(
             member_id=member_id,
             name=name,
@@ -236,20 +208,20 @@ class HandledPaymentQueries:
             paid_at=paid_at,
             payment_type=payment_type,
         )
-
         session.add(payment)
+        await session.flush()
         return payment
 
     @staticmethod
     async def get_last_payments(
         session: AsyncSession, offset: int = 0, limit: int = 10, payment_type: Optional[str] = None
-    ) -> Sequence[HandledPayment]:
+    ) -> List[HandledPayment]:
         """Get last 'limit' payments of specific type. If payment_type is None, return all types"""
-        logger.info("get_last_payments")
-        query = select(HandledPayment)
+        query = (
+            select(HandledPayment).order_by(HandledPayment.id.desc()).offset(offset).limit(limit)
+        )
         if payment_type is not None:
             query = query.where(HandledPayment.payment_type == payment_type)
-        query = query.order_by(HandledPayment.id.desc()).offset(offset).limit(limit)
         result = await session.execute(query)
         return result.scalars().all()
 
@@ -258,7 +230,6 @@ class HandledPaymentQueries:
         session: AsyncSession, payment_id: int, member_id: int
     ) -> None:
         """Add member_id to an existing payment"""
-        logger.info("add_member_id_to_payment")
         payment = await session.get(HandledPayment, payment_id)
         if payment is not None:
             payment.member_id = member_id
@@ -281,15 +252,9 @@ class ChannelPermissionQueries:
         target_id: int,
         allow_permissions_value: int,
         deny_permissions_value: int,
-    ):  # pylint: disable=too-many-arguments
+    ):
         """Add or update channel permissions for a specific member or role."""
-        result = await session.execute(
-            select(ChannelPermission).where(
-                (ChannelPermission.member_id == member_id)
-                & (ChannelPermission.target_id == target_id)
-            )
-        )
-        permission = result.scalars().first()
+        permission = await session.get(ChannelPermission, (member_id, target_id))
 
         if permission is None:
             permission = ChannelPermission(
@@ -297,16 +262,17 @@ class ChannelPermissionQueries:
                 target_id=target_id,
                 allow_permissions_value=allow_permissions_value,
                 deny_permissions_value=deny_permissions_value,
+                last_updated_at=datetime.now(timezone.utc),
             )
             session.add(permission)
         else:
-            # Remove overlapping permissions in both sets
-            permission.allow_permissions_value &= ~deny_permissions_value
-            permission.deny_permissions_value &= ~allow_permissions_value
-
-            # Update existing permissions
-            permission.allow_permissions_value |= allow_permissions_value
-            permission.deny_permissions_value |= deny_permissions_value
+            permission.allow_permissions_value = (
+                permission.allow_permissions_value | allow_permissions_value
+            ) & ~deny_permissions_value
+            permission.deny_permissions_value = (
+                permission.deny_permissions_value | deny_permissions_value
+            ) & ~allow_permissions_value
+            permission.last_updated_at = datetime.now(timezone.utc)
 
     @staticmethod
     async def remove_permission(session: AsyncSession, member_id: int, target_id: int):
@@ -323,18 +289,12 @@ class ChannelPermissionQueries:
         session: AsyncSession, member_id: int, target_id: int
     ) -> Optional[ChannelPermission]:
         """Get channel permissions for a specific member or role."""
-        result = await session.execute(
-            select(ChannelPermission).where(
-                (ChannelPermission.member_id == member_id)
-                & (ChannelPermission.target_id == target_id)
-            )
-        )
-        return result.scalars().first()
+        return await session.get(ChannelPermission, (member_id, target_id))
 
     @staticmethod
     async def get_permissions_for_target(
         session: AsyncSession, target_id: int
-    ) -> list[ChannelPermission]:
+    ) -> List[ChannelPermission]:
         """Get all channel permissions for a specific target (member or role)."""
         result = await session.execute(
             select(ChannelPermission).where(ChannelPermission.target_id == target_id)
@@ -344,9 +304,87 @@ class ChannelPermissionQueries:
     @staticmethod
     async def get_permissions_for_member(
         session: AsyncSession, member_id: int
-    ) -> list[ChannelPermission]:
+    ) -> List[ChannelPermission]:
         """Get all channel permissions across different channels for a specific member."""
         result = await session.execute(
             select(ChannelPermission).where(ChannelPermission.member_id == member_id)
         )
+        return result.scalars().all()
+
+
+class NotificationLogQueries:
+    """Class for Notification Log Queries"""
+
+    @staticmethod
+    async def add_or_update_notification_log(
+        session: AsyncSession,
+        member_id: int,
+        notification_tag: str,
+        opted_out: Optional[bool] = None,
+    ) -> NotificationLog:
+        """Add or update a notification log for a member"""
+        notification_log = await session.get(NotificationLog, (member_id, notification_tag))
+
+        if notification_log is None:
+            notification_log = NotificationLog(
+                member_id=member_id,
+                notification_tag=notification_tag,
+                sent_at=datetime.now(timezone.utc),
+                opted_out=False if opted_out is None else opted_out,
+            )
+            session.add(notification_log)
+        else:
+            notification_log.sent_at = datetime.now(timezone.utc)
+            if opted_out is not None:
+                notification_log.opted_out = opted_out
+
+        return notification_log
+
+    @staticmethod
+    async def get_notification_log(
+        session: AsyncSession, member_id: int, notification_tag: str
+    ) -> Optional[NotificationLog]:
+        """Get a notification log for a specific member and tag"""
+        return await session.get(NotificationLog, (member_id, notification_tag))
+
+    @staticmethod
+    async def get_notification_logs(
+        session: AsyncSession, member_id: int, notification_tag: Optional[str] = None
+    ) -> List[NotificationLog]:
+        """Get all notification logs for a specific member"""
+        query = select(NotificationLog).where(NotificationLog.member_id == member_id)
+        if notification_tag:
+            query = query.where(NotificationLog.notification_tag == notification_tag)
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @staticmethod
+    async def get_member_roles_with_notifications(
+        session: AsyncSession,
+        expiration_threshold: datetime,
+        role_ids: Optional[List[int]] = None,
+        notification_tag: Optional[str] = None,
+    ) -> List[MemberRole]:
+        """
+        Get member roles with associated notifications
+
+        :param session: The database session
+        :param expiration_threshold: Datetime to compare role expiration against
+        :param role_ids: Optional list of role IDs to filter
+        :param notification_tag: Optional notification tag to filter
+        :return: List of MemberRole objects
+        """
+        query = (
+            select(MemberRole)
+            .options(joinedload(MemberRole.role))
+            .outerjoin(NotificationLog, MemberRole.member_id == NotificationLog.member_id)
+            .where(MemberRole.expiration_date <= expiration_threshold)
+        )
+
+        if role_ids:
+            query = query.where(MemberRole.role_id.in_(role_ids))
+        if notification_tag:
+            query = query.where(NotificationLog.notification_tag == notification_tag)
+
+        result = await session.execute(query)
         return result.scalars().all()

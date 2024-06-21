@@ -1,5 +1,4 @@
 """On Ready Event"""
-
 import logging
 
 from discord.ext import commands
@@ -12,7 +11,6 @@ class OnReadyEvent(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.session = bot.session
 
     @commands.Cog.listener()
     async def on_ready(self):

@@ -29,9 +29,10 @@ PaymentData = namedtuple(
 class PremiumManager:
     """Class for managing premium payments and wallet"""
 
-    def __init__(self, session, guild):
-        self.session = session
-        self.guild = guild
+    def __init__(self, bot):
+        self.bot = bot
+        self.guild = bot.guild
+        self.config = bot.config
 
     def extract_id(self, text: str) -> Optional[int]:
         """Extract ID from various formats"""
@@ -99,44 +100,55 @@ class PremiumManager:
                 inline=False,
             )
 
-    async def process_data(self, payment_data: PaymentData) -> None:
+    async def process_data(self, session, payment_data: PaymentData) -> None:
         """Process Payment"""
         logger.info("process payment: %s", payment_data)
-        async with self.session() as session:
-            # First, try to find the banned member
-            banned_member = await self.get_banned_member(payment_data.name)
-            if banned_member:
-                logger.info("unban: %s", banned_member)
-                await self.guild.unban(banned_member)
-                await self.notify_unban(banned_member)
+        # First, try to find the banned member
+        banned_member = await self.get_banned_member(payment_data.name)
+        if banned_member:
+            logger.info("unban: %s", banned_member)
+            await self.guild.unban(banned_member)
+            await self.notify_unban(banned_member)
+            payment = await HandledPaymentQueries.add_payment(
+                session,
+                banned_member.id,
+                payment_data.name,
+                payment_data.amount,
+                payment_data.paid_at,
+                payment_data.payment_type,
+            )
+        else:
+            # If not banned, find the member in the guild
+            member = await self.get_member(payment_data.name)
+            if member:
+                logger.info("member id: %s", member)
+                payment = await HandledPaymentQueries.add_payment(
+                    session,
+                    member.id,
+                    payment_data.name,
+                    payment_data.amount,
+                    payment_data.paid_at,
+                    payment_data.payment_type,
+                )
+                logger.info("payment: %s", payment)
+                await MemberQueries.get_or_add_member(session, member.id)
+                await MemberQueries.add_to_wallet_balance(session, member.id, payment_data.amount)
+                logger.info("add_to_wallet_balance: %s", payment_data.amount)
             else:
-                # If not banned, find the member in the guild
-                member = await self.get_member(payment_data.name)
-                if member:
-                    logger.info("member id: %s", member)
-                    payment = await HandledPaymentQueries.add_payment(
-                        session,
-                        member.id,
-                        payment_data.name,
-                        payment_data.amount,
-                        payment_data.paid_at,
-                        payment_data.payment_type,
-                    )
-                    logger.info("payment: %s", payment)
-                    await MemberQueries.get_or_add_member(session, member.id)
-                    await MemberQueries.add_to_wallet_balance(
-                        session, member.id, payment_data.amount
-                    )
-                    logger.info("add_to_wallet_balance: %s", payment_data.amount)
-                else:
-                    logger.warning("Member not found for payment: %s", payment_data.name)
-                    await self.notify_member_not_found(payment_data.name)
-            logger.info("commit session")
-            await session.commit()
+                logger.warning("Member not found for payment: %s", payment_data.name)
+                payment = await HandledPaymentQueries.add_payment(
+                    session,
+                    None,
+                    payment_data.name,
+                    payment_data.amount,
+                    payment_data.paid_at,
+                    payment_data.payment_type,
+                )
+                await self.notify_member_not_found(payment_data.name)
 
     async def notify_unban(self, member):
         """Send notification about unban"""
-        channel_id = self.guild.config["channels"]["donation"]
+        channel_id = self.config["channels"]["donation"]
         channel = self.guild.get_channel(channel_id)
         if channel:
             embed = discord.Embed(
@@ -148,7 +160,7 @@ class PremiumManager:
 
     async def notify_member_not_found(self, name: str):
         """Send notification about member not found"""
-        channel_id = self.guild.config["channels"]["donation"]
+        channel_id = self.config["channels"]["donation"]
         channel = self.guild.get_channel(channel_id)
         if channel:
             embed = discord.Embed(
@@ -162,7 +174,7 @@ class PremiumManager:
 class DataProvider:
     """Base class for all data providers."""
 
-    async def get_data(self):
+    async def get_data(self, session):
         """Retrieve data for the payment processor."""
         raise NotImplementedError()
 
@@ -173,7 +185,7 @@ class CommandDataProvider(DataProvider):
     def __init__(self, command_data):
         self.command_data = command_data
 
-    async def get_data(self):
+    async def get_data(self, session):
         # Here you can convert command data into the correct format
         return self.command_data
 
@@ -181,8 +193,8 @@ class CommandDataProvider(DataProvider):
 class TipplyDataProvider(DataProvider):
     """Data provider for Tipply-based inputs."""
 
-    def __init__(self, db_session):
-        self.db_session = db_session
+    def __init__(self, get_db):
+        self.get_db = get_db
         self.widget_url = TIPPLY_API_URL
         self.payment_type = "tipply"
 
@@ -223,14 +235,15 @@ class TipplyDataProvider(DataProvider):
 
         return payments
 
-    async def get_data(self):
+    async def get_data(self, session):
         # Fetch all payments from the Tipply widget
         all_payments = await self.fetch_payments()
 
         # Get the 10 last handled payments of type "tipply"
-        last_handled_payments = await HandledPaymentQueries.get_last_payments(
-            self.db_session, offset=0, limit=10, payment_type=self.payment_type
-        )
+        async with self.get_db() as session:
+            last_handled_payments = await HandledPaymentQueries.get_last_payments(
+                session, offset=0, limit=10, payment_type=self.payment_type
+            )
         logger.info("last_handled_payments: %s", last_handled_payments[:3])
 
         # Transform both lists to contain only (name, amount) tuples
@@ -291,7 +304,7 @@ class TipoDataProvider(DataProvider):
             return []
         return payments
 
-    async def get_data(self):
+    async def get_data(self, session):
         payments = await self.fetch_payments()
         processed_payments = []
 

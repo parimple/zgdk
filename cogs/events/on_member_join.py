@@ -17,7 +17,6 @@ class OnMemberJoinEvent(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.guild = bot.guild
-        self.session = bot.session
         self.invites = bot.invites
         self.channel = bot.guild.get_channel(bot.channels.get("on_join"))
 
@@ -67,11 +66,9 @@ class OnMemberJoinEvent(commands.Cog):
         :param member: The member who joined
         :param invite: The invite that was used
         """
-        inviter_id = (
-            invite.inviter.id if invite.inviter else self.guild.id
-        )  # Use guild ID if inviter is unknown
+        inviter_id = invite.inviter.id if invite.inviter else self.guild.id
 
-        async with self.session() as session:
+        async with self.bot.get_db() as session:
             # Check if the inviter exists in the members table, if not, add them
             await MemberQueries.get_or_add_member(session, inviter_id)
 
@@ -88,7 +85,7 @@ class OnMemberJoinEvent(commands.Cog):
             # Commit the changes to the database
             await session.commit()
 
-        # logger.info("Member %s joined using invite %s from %s", member.id, invite.code, inviter_id
+        logger.info("Member %s joined using invite %s from %s", member.id, invite.code, inviter_id)
         await self.channel.send(
             f"{member.mention} {member.display_name} zaproszony przez {invite.inviter.mention} "
             f"Kod: {invite.code}, Użycia: {invite.uses}",
@@ -102,7 +99,7 @@ class OnMemberJoinEvent(commands.Cog):
         """
         characteristic_id = self.guild.id
 
-        async with self.session() as session:
+        async with self.bot.get_db() as session:
             # Add the member with the characteristic ID
             await MemberQueries.get_or_add_member(
                 session, member.id, first_inviter_id=characteristic_id
@@ -124,7 +121,7 @@ class OnMemberJoinEvent(commands.Cog):
         """
         # Add the new invite to the invites dictionary
         self.invites[invite.id] = invite
-        # logger.info("Invite %s created", invite.code)
+        logger.info("Invite %s created", invite.code)
 
     @commands.Cog.listener()
     async def on_invite_delete(self, invite):

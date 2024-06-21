@@ -14,7 +14,6 @@ class VoiceCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.session = bot.session
 
     async def update_permission_in_db(
         self,
@@ -39,6 +38,43 @@ class VoiceCog(commands.Cog):
             )
         elif update_db == "-":
             await ChannelPermissionQueries.remove_permission(session, member_id, target_id)
+
+    async def check_and_handle_permission_limit(
+        self, ctx, member_id: int, new_permission: discord.PermissionOverwrite
+    ):
+        """Check if the user has exceeded their permission limit and handle it accordingly."""
+        premium_role = self.get_user_premium_role(ctx.author)
+        if not premium_role:
+            return
+
+        permission_limit = premium_role.get("permission_limit", 50)  # default to 50 if not set
+        async with self.bot.get_db() as session:
+            current_permissions = await ChannelPermissionQueries.get_permissions_for_member(
+                session, member_id
+            )
+
+            if len(current_permissions) >= permission_limit:
+                # Sort permissions by creation date to find the oldest one
+                current_permissions.sort(key=lambda p: p.created_at)
+                # Find the first permission that is not manage_messages
+                for permission in current_permissions:
+                    if permission.permission_flag != "manage_messages":
+                        await ChannelPermissionQueries.remove_permission(
+                            session, member_id, permission.target_id
+                        )
+                        await ctx.send(
+                            f"Osiągnąłeś limit {permission_limit} uprawnień. Najstarsza uprawnienie nie dotyczące zarządzania wiadomościami zostało nadpisane. Aby uzyskać więcej uprawnień, rozważ zakup wyższej rangi premium.",
+                            allowed_mentions=AllowedMentions(users=False, roles=False),
+                        )
+                        break
+
+    def get_user_premium_role(self, member):
+        """Get the premium role of the member."""
+        premium_roles = self.bot.config["premium_roles"]
+        for role in reversed(premium_roles):
+            if any(r.name == role["name"] for r in member.roles):
+                return role
+        return None
 
     def determine_new_permission_value(
         self, current_perms, permission_flag, value, default_to_true=False, toggle=False
@@ -67,9 +103,10 @@ class VoiceCog(commands.Cog):
 
         if update_db:
             allow_bits, deny_bits = current_perms.pair()
-            await self.update_permission_in_db(
-                self.session, ctx.author.id, target.id, allow_bits, deny_bits, update_db
-            )
+            async with self.bot.get_db() as session:
+                await self.update_permission_in_db(
+                    session, ctx.author.id, target.id, allow_bits, deny_bits, update_db
+                )
 
     async def move_to_afk_if_needed(self, ctx, target, target_channel, permission_flag, value):
         """Move the target to the AFK channel if needed."""
@@ -104,6 +141,7 @@ class VoiceCog(commands.Cog):
         setattr(current_perms, permission_flag, new_value)
 
         await self.update_channel_and_db(ctx, target, current_perms, update_db)
+        await self.check_and_handle_permission_limit(ctx, ctx.author.id, current_perms)
 
         mention_str = target.mention
         await ctx.reply(
@@ -243,11 +281,13 @@ class VoiceCog(commands.Cog):
             if isinstance(target, discord.Member) and overwrite.manage_messages is True
         ]
 
+        # Count the author as one of the mods if they have manage_messages permission
         author_is_mod = await self.can_manage_channel(author, voice_channel)
         current_mods_count = len(current_mods)
         if author_is_mod:
             current_mods_count += 1
 
+        # If adding or toggling the permission and it exceeds the limit, send an error message
         if (
             can_manage == "+"
             or (can_manage is None and not await self.can_manage_channel(target, voice_channel))

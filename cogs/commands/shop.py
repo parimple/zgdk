@@ -21,7 +21,6 @@ class ShopCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.session = bot.session
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
     @commands.has_permissions(administrator=True)
@@ -35,10 +34,12 @@ class ShopCog(commands.Cog):
             if not member:
                 raise commands.UserInputError("Nie można znaleźć członka na tym serwerze.")
 
-        db_member = await MemberQueries.get_or_add_member(self.session, ctx.author.id)
-        await self.session.commit()
-        balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, member.id)
+        async with self.bot.get_db() as session:
+            db_member = await MemberQueries.get_or_add_member(session, ctx.author.id)
+            balance = db_member.wallet_balance
+            premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+            await session.commit()
+
         logger.info(
             "User %s requested shop. Balance: %s, %s", ctx.author.id, balance, premium_roles
         )
@@ -73,7 +74,7 @@ class ShopCog(commands.Cog):
             payment_type="command",
         )
 
-        async with self.session() as session:
+        async with self.bot.get_db() as session:
             await HandledPaymentQueries.add_payment(
                 session,
                 user.id,
@@ -92,15 +93,11 @@ class ShopCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def assign_payment(self, ctx: commands.Context, payment_id: int, user: discord.Member):
         """Assign a payment ID to a user."""
-        async with self.session() as session:
-            # Fetch the payment by its ID
+        async with self.bot.get_db() as session:
             payment = await HandledPaymentQueries.get_payment_by_id(session, payment_id)
 
             if payment:
-                # Assign the member ID to the payment
                 payment.member_id = user.id
-
-                # Update the user's wallet balance
                 await MemberQueries.add_to_wallet_balance(session, user.id, payment.amount)
                 await session.commit()
 
@@ -113,7 +110,6 @@ class ShopCog(commands.Cog):
                     f"Proszę przekazać mu te informacje ręcznie."
                 )
 
-                # Send a DM to the user
                 try:
                     await user.send(msg1)
                     await user.send(f"```{user.id}```")
@@ -126,7 +122,9 @@ class ShopCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def all_payments(self, ctx: commands.Context):
         """Fetch and display the initial set of payments."""
-        payments = await HandledPaymentQueries.get_last_payments(self.session, limit=10)
+        async with self.bot.get_db() as session:
+            payments = await HandledPaymentQueries.get_last_payments(session, limit=10)
+
         embed = discord.Embed(title="Wszystkie płatności")
         for payment in payments:
             name = f"ID płatności: {payment.id}"
@@ -150,15 +148,15 @@ class PaymentsView(discord.ui.View):
         super().__init__()
         self.ctx = ctx
         self.bot = bot
-        self.session = bot.session
-        self.current_offset = 0  # Start at the most recent payments
+        self.current_offset = 0
 
     async def display_payments(self, interaction: discord.Interaction):
         """Display the payments."""
         self.current_offset = max(0, self.current_offset)
-        payments = await HandledPaymentQueries.get_last_payments(
-            self.session, offset=self.current_offset, limit=10
-        )
+        async with self.bot.get_db() as session:
+            payments = await HandledPaymentQueries.get_last_payments(
+                session, offset=self.current_offset, limit=10
+            )
 
         embed = discord.Embed(title="Wszystkie płatności")
         for payment in payments:
@@ -174,17 +172,13 @@ class PaymentsView(discord.ui.View):
         await interaction.response.edit_message(embed=embed)
 
     @discord.ui.button(label="Nowsze", style=discord.ButtonStyle.primary)
-    async def newer_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
+    async def newer_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Go to the newer payments."""
         self.current_offset -= 10
         await self.display_payments(interaction)
 
     @discord.ui.button(label="Starsze", style=discord.ButtonStyle.primary)
-    async def older_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):  # pylint: disable=unused-argument
+    async def older_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Go to the older payments."""
         self.current_offset += 10
         await self.display_payments(interaction)
@@ -193,7 +187,6 @@ class PaymentsView(discord.ui.View):
 class RoleShopView(discord.ui.View):
     """View for displaying and handling the purchase of roles in the shop."""
 
-    # pylint: disable=too-many-arguments
     def __init__(
         self,
         ctx: commands.Context,
@@ -208,7 +201,6 @@ class RoleShopView(discord.ui.View):
         self.ctx = ctx
         self.guild = bot.guild
         self.bot = bot
-        self.session = bot.session
         self.balance = balance
         self.page = page
         self.role_price_map = {role["name"]: role["price"] for role in premium_roles}
@@ -256,7 +248,7 @@ class RoleShopView(discord.ui.View):
         """Create a button callback for the specified role name."""
 
         async def button_callback(interaction: discord.Interaction):
-            duration_days = 365 if self.page != 1 else 30
+            duration_days = 365 if self.page != 1 else 1
             await self.handle_buy_role(interaction, role_name, self.member, duration_days)
 
         return button_callback
@@ -264,10 +256,12 @@ class RoleShopView(discord.ui.View):
     async def next_page(self, interaction: discord.Interaction):
         """Go to the next page in the role shop."""
         self.page = 2
-        db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
-        await self.session.commit()
-        balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.member.id)
+        async with self.bot.get_db() as session:
+            db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
+            balance = db_member.wallet_balance
+            premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
+            await session.commit()
+
         embed = await create_shop_embed(
             self.ctx,
             balance,
@@ -291,10 +285,12 @@ class RoleShopView(discord.ui.View):
     async def previous_page(self, interaction: discord.Interaction):
         """Go to the previous page in the role shop."""
         self.page = 1
-        db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
-        await self.session.commit()
-        balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.member.id)
+        async with self.bot.get_db() as session:
+            db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
+            balance = db_member.wallet_balance
+            premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
+            await session.commit()
+
         embed = await create_shop_embed(
             self.ctx,
             balance,
@@ -317,9 +313,11 @@ class RoleShopView(discord.ui.View):
 
     async def show_role_description(self, interaction: discord.Interaction):
         """Show the description of the role."""
-        db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
-        await self.session.commit()
-        balance = db_member.wallet_balance
+        async with self.bot.get_db() as session:
+            db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
+            balance = db_member.wallet_balance
+            await session.commit()
+
         embed = await create_role_description_embed(
             self.ctx, self.page, self.bot.config["premium_roles"], balance, self.viewer, self.member
         )
@@ -346,7 +344,7 @@ class RoleShopView(discord.ui.View):
                 await interaction.response.send_message("Nie jesteś członkiem tego serwera.")
                 return
 
-        async with self.session() as session:
+        async with self.bot.get_db() as session:
             db_viewer = await MemberQueries.get_or_add_member(session, self.viewer.id)
             await MemberQueries.get_or_add_member(session, member.id)
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
@@ -354,10 +352,19 @@ class RoleShopView(discord.ui.View):
 
             if premium_roles:
                 await self.handle_existing_premium_roles(
-                    interaction, member, role, price, premium_roles, duration_days, has_mute_roles
+                    interaction,
+                    session,
+                    member,
+                    role,
+                    price,
+                    premium_roles,
+                    duration_days,
+                    has_mute_roles,
                 )
             else:
-                await self.purchase_role(interaction, member, role, price, duration_days)
+                await self.purchase_role(interaction, session, member, role, price, duration_days)
+
+            await session.commit()
 
     def check_mute_roles(self, member):
         """Check if member has mute roles."""
@@ -365,82 +372,16 @@ class RoleShopView(discord.ui.View):
             role for role in self.mute_roles.values() if role["id"] in [r.id for r in member.roles]
         )
 
-    async def handle_existing_premium_roles(
-        self, interaction, member, role, price, premium_roles, duration_days, has_mute_roles
-    ):
-        """Handle logic for members with existing premium roles."""
-        last_role = premium_roles[0]
-        last_role_price = self.role_price_map.get(last_role.role.name)
-
-        if last_role_price is None:
-            await interaction.response.send_message(
-                "Nie można znaleźć ceny poprzedniej roli użytkownika."
-            )
-            return
-
-        if price < last_role_price:
-            if role.name == "★1" and has_mute_roles:
-                await self.remove_mute_roles(member)
-                await interaction.response.send_message(
-                    "Usunięto mutujące role z powodu zakupu najniższej rangi."
-                )
-            else:
-                await interaction.response.send_message(
-                    "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
-                )
-            return
-
-        refund_amount = calculate_refund(last_role.expiration_date, last_role_price)
-        msg_refund = (
-            f" Część kwoty została zwrócona za poprzednią rangę ({refund_amount}{CURRENCY_UNIT})."
-        )
-
-        db_viewer = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
-
-        if db_viewer.wallet_balance < price:
-            await interaction.response.send_message("Nie masz wystarczająco dużo pieniędzy.")
-            return
-
-        existing_role = premium_roles[0].role
-
-        if existing_role.id == role.id:
-            extend_days = 31 if duration_days == 30 else 365
-            await RoleQueries.update_role_expiration_date(
-                self.session, member.id, role.id, timedelta(days=extend_days)
-            )
-            msg = f"Przedłużyłeś rolę {role.name} o kolejne {extend_days} dni."
-            await MemberQueries.add_to_wallet_balance(self.session, self.viewer.id, -price)
-        else:
-            await member.remove_roles(existing_role)
-            await RoleQueries.delete_member_role(self.session, member.id, existing_role.id)
-            await member.add_roles(role)
-            await RoleQueries.add_role_to_member(
-                self.session, member.id, role.id, timedelta(days=duration_days)
-            )
-            msg = f"Uaktualniono rolę {member.display_name} z {existing_role.name} do {role.name} na {duration_days} dni.{msg_refund}"
-            await MemberQueries.add_to_wallet_balance(self.session, member.id, refund_amount)
-            await MemberQueries.add_to_wallet_balance(
-                self.session, self.viewer.id, -price
-            )  # Kupujący płaci pełną kwotę
-
-        await self.session.commit()
-        await interaction.response.send_message(msg)
-        embed = await self.generate_embed()
-        await interaction.message.edit(embed=embed)
-
-    async def purchase_role(self, interaction, member, role, price, duration_days):
+    async def purchase_role(self, interaction, session, member, role, price, duration_days):
         """Handle logic for purchasing a role without existing premium roles."""
         await member.add_roles(role)
         await RoleQueries.add_role_to_member(
-            self.session, member.id, role.id, timedelta(days=duration_days)
+            session, member.id, role.id, timedelta(days=duration_days)
         )
         msg = f"Zakupiłeś rolę {role.name} dla {member.display_name}."
-        await MemberQueries.add_to_wallet_balance(
-            self.session, self.viewer.id, -price
-        )  # Kupujący płaci pełną kwotę
-        await self.session.commit()
+        await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -price)
         await interaction.response.send_message(msg)
-        embed = await self.generate_embed()
+        embed = await self.generate_embed(session)
         await interaction.message.edit(embed=embed)
 
     async def remove_mute_roles(self, member: discord.Member):
@@ -456,12 +397,11 @@ class RoleShopView(discord.ui.View):
             message = f"Usunięto następujące role mutujące: {', '.join(roles_removed)}"
             await member.send(message)
 
-    async def generate_embed(self):
+    async def generate_embed(self, session):
         """Generate the embed for the role shop."""
-        db_member = await MemberQueries.get_or_add_member(self.session, self.viewer.id)
-        await self.session.commit()
+        db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.member.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
         return await create_shop_embed(
             self.ctx,
             balance,
@@ -471,6 +411,67 @@ class RoleShopView(discord.ui.View):
             self.viewer,
             self.member,
         )
+
+
+async def handle_existing_premium_roles(
+    self, interaction, session, member, role, price, premium_roles, duration_days, has_mute_roles
+):
+    """Handle logic for members with existing premium roles."""
+    last_role = premium_roles[0]
+    last_role_price = self.role_price_map.get(last_role.role.name)
+
+    if last_role_price is None:
+        await interaction.response.send_message(
+            "Nie można znaleźć ceny poprzedniej roli użytkownika."
+        )
+        return
+
+    if price < last_role_price:
+        if role.name == "★1" and has_mute_roles:
+            await self.remove_mute_roles(member)
+            await interaction.response.send_message(
+                "Usunięto mutujące role z powodu zakupu najniższej rangi."
+            )
+        else:
+            await interaction.response.send_message(
+                "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
+            )
+        return
+
+    refund_amount = calculate_refund(last_role.expiration_date, last_role_price)
+    msg_refund = (
+        f" Część kwoty została zwrócona za poprzednią rangę ({refund_amount}{CURRENCY_UNIT})."
+    )
+
+    db_viewer = await MemberQueries.get_or_add_member(session, self.viewer.id)
+
+    if db_viewer.wallet_balance < price:
+        await interaction.response.send_message("Nie masz wystarczająco dużo pieniędzy.")
+        return
+
+    existing_role = premium_roles[0].role
+
+    if existing_role.id == role.id:
+        extend_days = 31 if duration_days == 30 else 365
+        await RoleQueries.update_role_expiration_date(
+            session, member.id, role.id, timedelta(days=extend_days)
+        )
+        msg = f"Przedłużyłeś rolę {role.name} o kolejne {extend_days} dni."
+        await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -price)
+    else:
+        await member.remove_roles(existing_role)
+        await RoleQueries.delete_member_role(session, member.id, existing_role.id)
+        await member.add_roles(role)
+        await RoleQueries.add_role_to_member(
+            session, member.id, role.id, timedelta(days=duration_days)
+        )
+        msg = f"Uaktualniono rolę {member.display_name} z {existing_role.name} do {role.name} na {duration_days} dni.{msg_refund}"
+        await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
+        await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -price)
+
+    await interaction.response.send_message(msg)
+    embed = await self.generate_embed(session)
+    await interaction.message.edit(embed=embed)
 
 
 class BuyRoleButton(discord.ui.Button):
@@ -491,7 +492,6 @@ class BuyRoleButton(discord.ui.Button):
 class RoleDescriptionView(discord.ui.View):
     """Role description view for displaying and handling role purchases."""
 
-    # pylint: disable=too-many-arguments
     def __init__(
         self,
         ctx: commands.Context,
@@ -505,7 +505,6 @@ class RoleDescriptionView(discord.ui.View):
         super().__init__()
         self.ctx = ctx
         self.bot = bot
-        self.session = bot.session
         self.page = page
         self.premium_roles = premium_roles or []
         self.balance = balance
@@ -591,6 +590,9 @@ class RoleDescriptionView(discord.ui.View):
 
     async def go_to_shop(self, interaction: discord.Interaction):
         """Go to the role shop view."""
+        async with self.bot.get_db() as session:
+            premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
+
         view = RoleShopView(
             self.ctx,
             self.bot,
@@ -600,7 +602,6 @@ class RoleDescriptionView(discord.ui.View):
             viewer=self.viewer,
             member=self.member,
         )
-        premium_roles = await RoleQueries.get_member_premium_roles(self.session, self.member.id)
         embed = await create_shop_embed(
             self.ctx,
             self.balance,
@@ -684,7 +685,6 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, v
     return embed
 
 
-# pylint: disable=unused-argument too-many-arguments
 async def create_role_description_embed(ctx, page, premium_roles, balance, viewer, member):
     """Create the role description embed."""
     descriptions = {

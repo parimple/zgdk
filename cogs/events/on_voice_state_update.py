@@ -13,7 +13,6 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.session = bot.session
         self.guild = bot.get_guild(self.bot.config["guild_id"])
 
         # Adjusting for new config structure
@@ -53,9 +52,11 @@ class OnVoiceStateUpdateEvent(commands.Cog):
     async def add_db_overwrites_to_permissions(self, member_id, permission_overwrites):
         """Fetch permissions from the database
         and add them to the provided permission_overwrites dict."""
-        member_permissions = await ChannelPermissionQueries.get_permissions_for_member(
-            self.session, member_id
-        )
+        async with self.bot.get_db() as session:
+            member_permissions = await ChannelPermissionQueries.get_permissions_for_member(
+                session, member_id
+            )
+
         db_overwrites = {}
         for permission in member_permissions:
             overwrite = discord.PermissionOverwrite.from_pair(
