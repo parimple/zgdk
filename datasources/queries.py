@@ -10,7 +10,15 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from .models import ChannelPermission, HandledPayment, Member, MemberRole, NotificationLog, Role
+from .models import (
+    ChannelPermission,
+    HandledPayment,
+    Member,
+    MemberRole,
+    Message,
+    NotificationLog,
+    Role,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +106,7 @@ class RoleQueries:
         return await session.get(Role, role_id)
 
     @staticmethod
-    async def get_member_roles(session: AsyncSession, member_id: int) -> List[MemberRole]:
+    async def get_member_roles(session: AsyncSession, member_id: int) -> list[MemberRole]:
         """Get all roles of a member"""
         result = await session.execute(
             select(MemberRole)
@@ -108,15 +116,22 @@ class RoleQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def get_member_premium_roles(session: AsyncSession, member_id: int) -> List[MemberRole]:
-        """Get all premium roles of a member"""
-        result = await session.execute(
-            select(MemberRole)
-            .options(joinedload(MemberRole.role))
+    async def get_member_premium_roles(
+        session: AsyncSession, member_id: Optional[int] = None
+    ) -> list[tuple[MemberRole, Role]]:
+        """Get all premium roles of a member or all members if member_id is None"""
+        query = (
+            select(MemberRole, Role)
             .join(Role, MemberRole.role_id == Role.id)
-            .where((MemberRole.member_id == member_id) & (Role.role_type == "premium"))
+            .where(Role.role_type == "premium")
+            .options(joinedload(MemberRole.role))
         )
-        return result.scalars().all()
+
+        if member_id is not None:
+            query = query.where(MemberRole.member_id == member_id)
+
+        result = await session.execute(query)
+        return result.unique().all()
 
     @staticmethod
     async def get_expiring_roles(
@@ -186,6 +201,17 @@ class RoleQueries:
         member_role = await session.get(MemberRole, (member_id, role_id))
         if member_role:
             member_role.expiration_date += duration
+
+    @staticmethod
+    async def get_all_premium_roles(session: AsyncSession) -> List[MemberRole]:
+        query = (
+            select(MemberRole)
+            .options(joinedload(MemberRole.role))
+            .join(Role, MemberRole.role_id == Role.id)
+            .where(Role.role_type == "premium")
+        )
+        result = await session.execute(query)
+        return result.scalars().all()
 
 
 class HandledPaymentQueries:
@@ -322,10 +348,13 @@ class NotificationLogQueries:
         notification_tag: str,
         opted_out: Optional[bool] = None,
     ) -> NotificationLog:
-        """Add or update a notification log for a member"""
+        logger.info(
+            f"Adding/updating notification log: Member ID: {member_id}, Tag: {notification_tag}"
+        )
         notification_log = await session.get(NotificationLog, (member_id, notification_tag))
 
         if notification_log is None:
+            logger.info("Creating new notification log")
             notification_log = NotificationLog(
                 member_id=member_id,
                 notification_tag=notification_tag,
@@ -334,10 +363,14 @@ class NotificationLogQueries:
             )
             session.add(notification_log)
         else:
+            logger.info(
+                f"Updating existing notification log. Old sent_at: {notification_log.sent_at}"
+            )
             notification_log.sent_at = datetime.now(timezone.utc)
             if opted_out is not None:
                 notification_log.opted_out = opted_out
 
+        logger.info(f"Notification log after update: {notification_log}")
         return notification_log
 
     @staticmethod
@@ -362,29 +395,59 @@ class NotificationLogQueries:
     async def get_member_roles_with_notifications(
         session: AsyncSession,
         expiration_threshold: datetime,
-        role_ids: Optional[List[int]] = None,
+        role_ids: Optional[list[int]] = None,
         notification_tag: Optional[str] = None,
-    ) -> List[MemberRole]:
-        """
-        Get member roles with associated notifications
-
-        :param session: The database session
-        :param expiration_threshold: Datetime to compare role expiration against
-        :param role_ids: Optional list of role IDs to filter
-        :param notification_tag: Optional notification tag to filter
-        :return: List of MemberRole objects
-        """
+    ) -> list[tuple[MemberRole, Optional[NotificationLog]]]:
         query = (
-            select(MemberRole)
+            select(MemberRole, NotificationLog)
             .options(joinedload(MemberRole.role))
-            .outerjoin(NotificationLog, MemberRole.member_id == NotificationLog.member_id)
-            .where(MemberRole.expiration_date <= expiration_threshold)
+            .outerjoin(
+                NotificationLog,
+                (MemberRole.member_id == NotificationLog.member_id)
+                & (NotificationLog.notification_tag == notification_tag),
+            )
+            .join(Role, MemberRole.role_id == Role.id)
+            .where(
+                (MemberRole.expiration_date <= expiration_threshold) & (Role.role_type == "premium")
+            )
         )
 
         if role_ids:
             query = query.where(MemberRole.role_id.in_(role_ids))
-        if notification_tag:
-            query = query.where(NotificationLog.notification_tag == notification_tag)
 
+        logger.info(f"SQL Query: {query.compile(compile_kwargs={'literal_binds': True})}")
         result = await session.execute(query)
-        return result.scalars().all()
+        roles_with_notifications = result.all()
+        for role, notification in roles_with_notifications:
+            logger.info(
+                f"Found role: Member ID: {role.member_id}, Role ID: {role.role_id}, "
+                f"Expiration Date: {role.expiration_date}, "
+                f"Notification: {notification.notification_tag if notification else 'None'}"
+            )
+        return roles_with_notifications
+
+
+class MessageQueries:
+    """Class for Message Queries"""
+
+    @staticmethod
+    async def save_message(
+        session: AsyncSession,
+        message_id: int,
+        author_id: int,
+        content: str,
+        timestamp: datetime,
+        channel_id: int,
+        reply_to_message_id: Optional[int] = None,
+    ):
+        """Save a message to the database"""
+        message = Message(
+            id=message_id,
+            author_id=author_id,
+            content=content,
+            timestamp=timestamp,
+            channel_id=channel_id,
+            reply_to_message_id=reply_to_message_id,
+        )
+        session.add(message)
+        await session.flush()

@@ -84,18 +84,11 @@ class PremiumManager:
     @staticmethod
     def add_premium_roles_to_embed(ctx, embed, premium_roles):
         """Add premium roles to the provided embed."""
-        role_ids = [role.role_id for role in premium_roles]
-        expiration_dates = [
-            (
-                discord.utils.format_dt(role.expiration_date, "D"),
-                discord.utils.format_dt(role.expiration_date, "R"),
-            )
-            for role in premium_roles
-        ]
-        for role_id, (formatted_date, relative_date) in zip(role_ids, expiration_dates):
-            role_name = ctx.guild.get_role(role_id).name
+        for member_role, role in premium_roles:
+            formatted_date = discord.utils.format_dt(member_role.expiration_date, "D")
+            relative_date = discord.utils.format_dt(member_role.expiration_date, "R")
             embed.add_field(
-                name=f"Aktualna rola: {role_name}",
+                name=f"Rola premium: {role.name}",
                 value=f"Do: {formatted_date} ({relative_date})",
                 inline=False,
             )

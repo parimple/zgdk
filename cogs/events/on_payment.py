@@ -10,12 +10,12 @@ import discord
 from discord.ext import commands, tasks
 
 from datasources.queries import RoleQueries
+from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager, TipplyDataProvider
 
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TIPO_API_TOKEN")
-CURRENCY_UNIT = "G"
 
 
 class OnPaymentEvent(commands.Cog):

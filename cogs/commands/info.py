@@ -1,16 +1,16 @@
 """Info cog."""
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 import discord
 from discord.ext import commands
 
 from datasources.queries import MemberQueries, RoleQueries
+from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager
 from utils.refund import calculate_refund
-
-CURRENCY_UNIT = "G"
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,13 @@ class InfoCog(commands.Cog):
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, member.id)
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+
+        current_time = datetime.now(timezone.utc)
+        logger.info(f"Current time: {current_time}")
+        for member_role, role in premium_roles:
+            logger.info(
+                f"Role {role.id} expiration: {member_role.expiration_date}, Is expired: {member_role.expiration_date <= current_time}"
+            )
 
         embed = discord.Embed(
             title=f"{member}",
@@ -179,26 +186,26 @@ class SellRoleButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         member = interaction.user
         role_price_map = {role["name"]: role["price"] for role in self.bot.config["premium_roles"]}
-        last_role = self.premium_roles[0]
-        role_price = role_price_map.get(last_role.role.name)
+        last_member_role, last_role = self.premium_roles[0]
+        role_price = role_price_map.get(last_role.name)
 
         if not role_price:
             await interaction.response.send_message("Nie można znaleźć ceny dla tej roli.")
             return
 
-        refund_amount = calculate_refund(last_role.expiration_date, role_price)
+        refund_amount = calculate_refund(last_member_role.expiration_date, role_price)
 
         async with self.bot.get_db() as session:
             try:
                 await MemberQueries.get_or_add_member(session, member.id)
-                await RoleQueries.delete_member_role(session, member.id, last_role.role.id)
+                await RoleQueries.delete_member_role(session, member.id, last_role.id)
                 await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
                 await session.commit()
 
-                await member.remove_roles(last_role.role)
+                await member.remove_roles(last_role)
 
                 await interaction.response.send_message(
-                    f"Sprzedano rolę {last_role.role.name} za {refund_amount}{CURRENCY_UNIT}. "
+                    f"Sprzedano rolę {last_role.name} za {refund_amount}{CURRENCY_UNIT}. "
                     f"Kwota zwrotu została dodana do twojego salda."
                 )
             except discord.DiscordException as error:
