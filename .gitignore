@@ -7,6 +7,7 @@ __pycache__/
 node_modules/
 dist/
 build/
+pg_log/
 
 # Ignore files with sensitive information
 .env
@@ -17,3 +18,6 @@ build/
 # Ignore vscode
 .vscode
 zgdk.code-workspace
+
+# Ignore logs
+postgresql.conf
