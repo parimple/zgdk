@@ -112,7 +112,7 @@ class OnTaskEvent(commands.Cog):
                     if member:
                         logger.info("Processing member %d for expired role %d", member.id, role.id)
                         await self.notify_premium_removal(member, member_role, role)
-                        await self.remove_premium_role(session, member, member_role, role)
+                        await self.remove_premium_role(session, member, role)
                         await NotificationLogQueries.add_or_update_notification_log(
                             session, member.id, "premium_role_expired"
                         )
@@ -152,11 +152,11 @@ class OnTaskEvent(commands.Cog):
 
     async def remove_premium_role(self, session, member, role):
         """Remove the expired premium role from the user"""
-        guild_role = self.bot.guild.get_role(role.role_id)
+        guild_role = self.bot.guild.get_role(role.id)
         if guild_role in member.roles:
             try:
                 await member.remove_roles(guild_role)
-                await RoleQueries.delete_member_role(session, member.id, role.role_id)
+                await RoleQueries.delete_member_role(session, member.id, role.id)
                 logger.info(
                     "Removed expired role %s from %s (%d).",
                     guild_role.name,

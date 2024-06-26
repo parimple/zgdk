@@ -39,7 +39,7 @@ class OnSetupEvent(commands.Cog):
                 # Check if role with given ID already exists in database
                 existing_role = await RoleQueries.get_role_by_id(session, role.id)
                 if existing_role:
-                    logger.info("Role with ID %s already exists in database", role.id)
+                    # logger.info("Role with ID %s already exists in database", role.id)
                     continue
                 # Add role to database
                 await RoleQueries.add_role(session, role.id, role.name, role_type)
