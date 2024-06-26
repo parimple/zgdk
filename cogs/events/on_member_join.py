@@ -57,35 +57,37 @@ class OnMemberJoinEvent(commands.Cog):
     async def process_invite(self, member, invite):
         """
         Process the used invite.
-
         This method checks if the inviter exists in the database, adds them if they don't,
         and updates or adds the member's record in the database with details about
         the invite used. It also sends a message to a specific text channel about the new
         member and the invite used.
-
         :param member: The member who joined
         :param invite: The invite that was used
         """
         inviter_id = invite.inviter.id if invite.inviter else self.guild.id
+        now = datetime.now(timezone.utc)
 
         async with self.bot.get_db() as session:
-            # Check if the inviter exists in the members table, if not, add them
-            await MemberQueries.get_or_add_member(session, inviter_id)
+            try:
+                # Check if the inviter exists in the members table, if not, add them
+                await MemberQueries.get_or_add_member(session, inviter_id)
 
-            # Check if the member already exists and set the inviter
-            db_member = await MemberQueries.get_or_add_member(session, member.id)
-            if db_member.first_inviter_id is None or db_member.first_inviter_id == self.guild.id:
-                db_member.first_inviter_id = inviter_id
-                db_member.joined_at = datetime.now(timezone.utc)
+                # Update or add the member's record
+                await MemberQueries.get_or_add_member(
+                    session,
+                    member.id,
+                    first_inviter_id=inviter_id,
+                    current_inviter_id=inviter_id,
+                    joined_at=now,
+                    rejoined_at=now,
+                )
 
-            # Update the current_inviter_id and rejoined_at fields
-            db_member.current_inviter_id = inviter_id
-            db_member.rejoined_at = datetime.now(timezone.utc)
+                await session.commit()
+            except Exception as e:
+                logger.error(f"Error processing invite for member {member.id}: {str(e)}")
+                await session.rollback()
+                # You might want to add some error handling here, like sending a message to a log channel
 
-            # Commit the changes to the database
-            await session.commit()
-
-        # logger.info("Member %s joined using invite %s from %s", member.id, invite.code, inviter_id)
         await self.channel.send(
             f"{member.mention} {member.display_name} zaproszony przez {invite.inviter.mention} "
             f"Kod: {invite.code}, Użycia: {invite.uses}",

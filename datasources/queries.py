@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -38,7 +39,6 @@ class MemberQueries:
     ) -> Member:
         """Get a Member by ID, or add a new one if it doesn't exist"""
         member = await session.get(Member, member_id)
-
         if member is None:
             member = Member(
                 id=member_id,
@@ -49,7 +49,20 @@ class MemberQueries:
                 rejoined_at=rejoined_at,
             )
             session.add(member)
-            await session.flush()
+            try:
+                await session.flush()
+            except IntegrityError:
+                await session.rollback()
+                member = await session.get(Member, member_id)
+                if member is None:
+                    logger.error(f"Failed to add or retrieve member with ID {member_id}")
+                    raise
+
+        # Update fields for existing members
+        if current_inviter_id is not None:
+            member.current_inviter_id = current_inviter_id
+        if rejoined_at is not None:
+            member.rejoined_at = rejoined_at
 
         return member
 
