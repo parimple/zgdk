@@ -70,7 +70,7 @@ class OnPaymentEvent(commands.Cog):
             return
 
         amount_g = payment_data.amount
-        member = await self.premium_manager.get_member(payment_data.name)   
+        member = await self.premium_manager.get_member(payment_data.name)
         if member is None:
             logger.error("Member not found: %s", payment_data.name)
             return

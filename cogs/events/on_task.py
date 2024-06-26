@@ -132,10 +132,12 @@ class OnTaskEvent(commands.Cog):
                 price_pln = g_to_pln(role_price)
                 price_message = f"Aby odnowić tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} (około {price_pln:.2f} PLN)."
             else:
-                price_message = "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."
+                price_message = (
+                    "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."
+                )
 
             expiration_date = discord.utils.format_dt(member_role.expiration_date, "R")
-            
+
             logger.info("Sending removal notification to %s (%d)", member.display_name, member.id)
             await member.send(
                 f"Twoja rola premium {role.name} wygasła {expiration_date}. \n"
