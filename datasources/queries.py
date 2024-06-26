@@ -119,11 +119,12 @@ class RoleQueries:
     async def get_member_premium_roles(
         session: AsyncSession, member_id: Optional[int] = None
     ) -> list[tuple[MemberRole, Role]]:
-        """Get all premium roles of a member or all members if member_id is None"""
+        """Get all active premium roles of a member or all members if member_id is None"""
+        now = datetime.now(timezone.utc)
         query = (
             select(MemberRole, Role)
             .join(Role, MemberRole.role_id == Role.id)
-            .where(Role.role_type == "premium")
+            .where((Role.role_type == "premium") & (MemberRole.expiration_date > now))
             .options(joinedload(MemberRole.role))
         )
 

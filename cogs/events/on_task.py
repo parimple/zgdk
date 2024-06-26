@@ -32,23 +32,45 @@ class OnTaskEvent(commands.Cog):
             expiring_roles = await RoleQueries.get_member_premium_roles(session)
             logger.info("Found %d premium roles", len(expiring_roles))
             for member_role, role in expiring_roles:
-                if member_role.expiration_date <= expiration_threshold:
+                logger.info(
+                    f"Checking role {role.id} for member {member_role.member_id}, expiration: {member_role.expiration_date}"
+                )
+                if now < member_role.expiration_date <= expiration_threshold:
                     member = self.bot.guild.get_member(member_role.member_id)
                     if member:
-                        logger.info("Processing member %d for role %d", member.id, role.id)
-                        notification_log = await NotificationLogQueries.get_notification_log(
-                            session, member.id, "premium_role_expiry"
-                        )
-                        if not notification_log or now - notification_log.sent_at > timedelta(
-                            hours=24
-                        ):
-                            logger.info(
-                                "Notifying member %d about expiring role %d", member.id, role.id
-                            )
-                            await self.notify_premium_expiry(member, member_role, role)
-                            await NotificationLogQueries.add_or_update_notification_log(
+                        guild_role = self.bot.guild.get_role(role.id)
+                        if guild_role and guild_role in member.roles:
+                            logger.info("Processing member %d for role %d", member.id, role.id)
+                            notification_log = await NotificationLogQueries.get_notification_log(
                                 session, member.id, "premium_role_expiry"
                             )
+                            if not notification_log or now - notification_log.sent_at > timedelta(
+                                hours=24
+                            ):
+                                logger.info(
+                                    "Notifying member %d about expiring role %d", member.id, role.id
+                                )
+                                await self.notify_premium_expiry(member, member_role, role)
+                                await NotificationLogQueries.add_or_update_notification_log(
+                                    session, member.id, "premium_role_expiry"
+                                )
+                        else:
+                            logger.info(
+                                f"Role {role.id} not found or not assigned to member {member.id}, removing from database"
+                            )
+                            await RoleQueries.delete_member_role(session, member.id, role.id)
+                    else:
+                        logger.info(
+                            f"Member {member_role.member_id} not found, removing role {role.id} from database"
+                        )
+                        await RoleQueries.delete_member_role(
+                            session, member_role.member_id, role.id
+                        )
+                elif member_role.expiration_date <= now:
+                    logger.info(
+                        f"Role {role.id} for member {member_role.member_id} has expired, removing from database"
+                    )
+                    await RoleQueries.delete_member_role(session, member_role.member_id, role.id)
         await session.commit()
         logger.info("Finished check_premium_expiry task")
 
