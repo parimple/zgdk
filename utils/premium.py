@@ -64,9 +64,12 @@ class PremiumManager:
         user_id = self.extract_id(name_or_id)
         if user_id:
             logger.info("get_member_id: %s is digit", user_id)
-            member = self.guild.get_member(user_id)
-            if member:
-                return member
+            try:
+                member = await self.guild.fetch_member(user_id)
+                if member:
+                    return member
+            except discord.NotFound:
+                logger.info("Member not found with ID: %s", user_id)
 
         # Try to get member by exact name or display name
         logger.info("get_member_id: %s from guild: %s", name_or_id, self.guild)
@@ -193,22 +196,22 @@ class TipplyDataProvider(DataProvider):
 
     async def fetch_payments(self) -> list[PaymentData]:
         """Fetch Payments from the Tipply widget"""
-        logger.info("fetch_payments")
+        # logger.info("fetch_payments")
 
         # Fetch the widget content
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch()
-            logger.info("Browser launched")
+            # logger.info("Browser launched")
             page = await browser.new_page()
-            logger.info("New page created")
+            # logger.info("New page created")
             await page.goto(self.widget_url)
-            logger.info("Page loaded")
+            # logger.info("Page loaded")
 
             # Wait for the specific selector to be loaded on the page
             await page.wait_for_selector(".ListItemWrapper-sc-1ode8mk-0")
 
             content = await page.content()
-            logger.info("Content fetched")
+            # logger.info("Content fetched")
             soup = BeautifulSoup(content, "html.parser")
 
             payments = []

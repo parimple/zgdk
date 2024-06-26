@@ -35,7 +35,7 @@ class OnPaymentEvent(commands.Cog):
     @tasks.loop(minutes=10.0)
     async def check_payments(self):
         """Check Payments"""
-        logger.info("Checking for new payments")
+        # logger.info("Checking for new payments")
 
         async with self.bot.get_db() as session:
             payments_data = await self.data_provider.get_data(session)
@@ -70,7 +70,7 @@ class OnPaymentEvent(commands.Cog):
             return
 
         amount_g = payment_data.amount
-        member = await self.premium_manager.get_member(payment_data.name)
+        member = await self.premium_manager.get_member(payment_data.name)   
         if member is None:
             logger.error("Member not found: %s", payment_data.name)
             return

@@ -119,16 +119,12 @@ class OnTaskEvent(commands.Cog):
         await session.commit()
         logger.info("Finished remove_expired_roles task")
 
-    async def notify_premium_removal(self, member, role):
+    async def notify_premium_removal(self, member, member_role, role):
         """Notify user about removed premium membership"""
         try:
             # Get the price of the role
             role_price = next(
-                (
-                    r["price"]
-                    for r in self.bot.config["premium_roles"]
-                    if r["name"] == role.role.name
-                ),
+                (r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role.name),
                 None,
             )
 
@@ -136,13 +132,13 @@ class OnTaskEvent(commands.Cog):
                 price_pln = g_to_pln(role_price)
                 price_message = f"Aby odnowić tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} (około {price_pln:.2f} PLN)."
             else:
-                price_message = (
-                    "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."
-                )
+                price_message = "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."
 
+            expiration_date = discord.utils.format_dt(member_role.expiration_date, "R")
+            
             logger.info("Sending removal notification to %s (%d)", member.display_name, member.id)
             await member.send(
-                f"Twoja rola premium {role.role.name} wygasła. \n"
+                f"Twoja rola premium {role.name} wygasła {expiration_date}. \n"
                 f"{price_message}\n"
                 f"Zasil swoje konto, aby ją odnowić: {self.bot.config['donate_url']}\n"
                 "Wpisując **TYLKO** swoje id w polu - Twój nick."
