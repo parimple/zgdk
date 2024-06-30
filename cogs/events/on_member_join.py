@@ -1,12 +1,16 @@
 """On Member Join Event"""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from discord import AllowedMentions
-from discord.ext import commands
+import discord
+import sqlalchemy.exc
+from discord import AllowedMentions, utils
+from discord.ext import commands, tasks
+from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
-from datasources.queries import MemberQueries
+from datasources.queries import InviteQueries, MemberQueries, NotificationLogQueries
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +23,7 @@ class OnMemberJoinEvent(commands.Cog):
         self.guild = bot.guild
         self.invites = bot.invites
         self.channel = bot.guild.get_channel(bot.channels.get("on_join"))
+        self.clean_invites.start()
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -82,11 +87,15 @@ class OnMemberJoinEvent(commands.Cog):
                     rejoined_at=now,
                 )
 
+                # Update or add the invite record
+                await InviteQueries.add_or_update_invite(
+                    session, invite.id, inviter_id, invite.uses, invite.created_at, now
+                )
+
                 await session.commit()
             except Exception as e:
                 logger.error(f"Error processing invite for member {member.id}: {str(e)}")
                 await session.rollback()
-                # You might want to add some error handling here, like sending a message to a log channel
 
         await self.channel.send(
             f"{member.mention} {member.display_name} zaproszony przez {invite.inviter.mention} "
@@ -123,7 +132,25 @@ class OnMemberJoinEvent(commands.Cog):
         """
         # Add the new invite to the invites dictionary
         self.invites[invite.id] = invite
-        # logger.info("Invite %s created", invite.code)
+
+        # Add the invite to the database
+        async with self.bot.get_db() as session:
+            try:
+                await InviteQueries.add_or_update_invite(
+                    session,
+                    invite.id,
+                    invite.inviter.id if invite.inviter else self.guild.id,
+                    invite.uses,
+                    invite.created_at,
+                    datetime.now(timezone.utc),
+                )
+                await session.commit()
+                logger.info(
+                    f"Invite {invite.code} (ID: {invite.id}) created and added to database."
+                )
+            except Exception as e:
+                logger.error(f"Error adding invite {invite.id} to database: {str(e)}")
+                await session.rollback()
 
     @commands.Cog.listener()
     async def on_invite_delete(self, invite):
@@ -134,7 +161,117 @@ class OnMemberJoinEvent(commands.Cog):
         """
         # Remove the deleted invite from the invites dictionary
         self.invites.pop(invite.id, None)
-        # logger.info("Invite %s deleted", invite.code)
+
+        # Remove the invite from the database
+        async with self.bot.get_db() as session:
+            try:
+                await InviteQueries.delete_invite(session, invite.id)
+                await session.commit()
+                logger.info(
+                    f"Invite {invite.code} (ID: {invite.id}) deleted from Discord and database."
+                )
+            except Exception as e:
+                logger.error(f"Error deleting invite {invite.id} from database: {str(e)}")
+                await session.rollback()
+
+    async def sync_invites(self):
+        guild_invites = await self.guild.invites()
+        async with self.bot.get_db() as session:
+            for invite in guild_invites:
+                creator_id = invite.inviter.id if invite.inviter else None
+                try:
+                    await InviteQueries.add_or_update_invite(
+                        session,
+                        invite.id,
+                        creator_id,
+                        invite.uses,
+                        invite.created_at,
+                        datetime.now(timezone.utc),
+                    )
+                    await session.commit()
+                except Exception as e:
+                    logger.error(f"Error syncing invite {invite.id}: {str(e)}")
+                    await session.rollback()
+
+        logger.info(f"Synchronized {len(guild_invites)} invites with the database")
+
+    @tasks.loop(hours=1)
+    async def clean_invites(self):
+        guild_invites = await self.guild.invites()
+        async with self.bot.get_db() as session:
+            db_invite_count = await InviteQueries.get_invite_count(session)
+
+            if db_invite_count < len(guild_invites):
+                logger.info(
+                    f"Database has fewer invites ({db_invite_count}) than Discord ({len(guild_invites)}). Syncing..."
+                )
+                await self.sync_invites()
+
+            if len(guild_invites) > 950:
+                inactive_invites = await InviteQueries.get_inactive_invites(
+                    session, days=30, max_uses=5, limit=100
+                )
+                deleted_count = 0
+                for invite in inactive_invites:
+                    guild_invite = discord.utils.get(guild_invites, id=invite.id)
+                    if guild_invite:
+                        try:
+                            await guild_invite.delete()
+                            await InviteQueries.delete_invite(session, invite.id)
+                            await self.notify_invite_deleted(invite.creator_id, invite.id)
+                            deleted_count += 1
+                        except discord.errors.NotFound:
+                            logger.warning(
+                                f"Invite {invite.id} not found on Discord, removing from database."
+                            )
+                            await InviteQueries.delete_invite(session, invite.id)
+                            deleted_count += 1
+                    else:
+                        await InviteQueries.delete_invite(session, invite.id)
+                        deleted_count += 1
+                await session.commit()
+
+                # Send summary to donation channel
+                donation_channel = self.bot.get_channel(self.bot.config["channels"]["donation"])
+                if donation_channel:
+                    remaining_invites = len(await self.guild.invites())
+                    await donation_channel.send(
+                        f"Usunięto {deleted_count} nieaktywnych zaproszeń. "
+                        f"Pozostało {remaining_invites} aktywnych zaproszeń na serwerze."
+                    )
+                else:
+                    logger.warning(
+                        "Donation channel not found. Could not send invite cleanup summary."
+                    )
+
+                logger.info(
+                    f"Invite cleanup completed. Deleted {deleted_count} invites. Remaining: {remaining_invites}"
+                )
+
+    @clean_invites.before_loop
+    async def before_clean_invites(self):
+        await self.bot.wait_until_ready()
+
+    async def notify_invite_deleted(self, user_id: int, invite_id: str):
+        user = self.guild.get_member(user_id)
+        if user:
+            async with self.bot.get_db() as session:
+                notification_log = await NotificationLogQueries.get_notification_log(
+                    session, user_id, "invite_deleted"
+                )
+                if not notification_log or (
+                    datetime.now(timezone.utc) - notification_log.sent_at
+                ) > timedelta(hours=24):
+                    try:
+                        # await user.send(
+                        #     f"Twoje zaproszenie o kodzie {invite_id} zostało usunięte z powodu nieaktywności. Jeśli chcesz zaprosić kogoś na serwer, musisz stworzyć nowe zaproszenie."
+                        # )
+                        await NotificationLogQueries.add_or_update_notification_log(
+                            session, user_id, "invite_deleted"
+                        )
+                    except discord.Forbidden:
+                        logger.warning(f"Could not send DM to user {user_id}")
+            await session.commit()
 
 
 async def setup(bot: commands.Bot):

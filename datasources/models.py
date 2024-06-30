@@ -48,6 +48,9 @@ class Member(Base):
         foreign_keys=[current_inviter_id],
         remote_side=[id],
     )
+    created_invites: Mapped[list["Invite"]] = relationship(
+        "Invite", back_populates="creator", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Member(id={self.id})>"
@@ -181,3 +184,19 @@ class Message(Base):
 
     def __repr__(self) -> str:
         return f"<Message(id={self.id}, author_id={self.author_id}, content={self.content})>"
+
+
+class Invite(Base):
+    """Invite Model"""
+
+    __tablename__ = "invites"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    creator_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID))
+    uses: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    creator: Mapped["Member"] = relationship("Member", back_populates="created_invites")
+
+    def __repr__(self) -> str:
+        return f"<Invite(id={self.id}, creator_id={self.creator_id}, uses={self.uses})>"

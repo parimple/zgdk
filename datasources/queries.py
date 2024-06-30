@@ -6,14 +6,17 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import asc, delete, desc, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql.expression import and_
+from sqlalchemy.sql.functions import func
 
 from .models import (
     ChannelPermission,
     HandledPayment,
+    Invite,
     Member,
     MemberRole,
     Message,
@@ -465,3 +468,99 @@ class MessageQueries:
         )
         session.add(message)
         await session.flush()
+
+
+class InviteQueries:
+    """Class for Invite Queries"""
+
+    @staticmethod
+    async def add_or_update_invite(
+        session: AsyncSession,
+        invite_id: str,
+        creator_id: Optional[int],
+        uses: int,
+        created_at: datetime,
+        last_used_at: datetime,
+    ) -> Invite:
+        """
+        Add or update an invite in the database.
+
+        :param session: The database session
+        :param invite_id: The ID of the invite
+        :param creator_id: The ID of the invite creator
+        :param uses: The number of times the invite has been used
+        :param created_at: The creation date of the invite
+        :param last_used_at: The last usage date of the invite
+        :return: The Invite object
+        """
+        try:
+            if creator_id:
+                await MemberQueries.get_or_add_member(session, creator_id)
+
+            invite = await session.get(Invite, invite_id)
+            if invite is None:
+                invite = Invite(
+                    id=invite_id,
+                    creator_id=creator_id,
+                    uses=uses,
+                    created_at=created_at,
+                    last_used_at=last_used_at,
+                )
+                session.add(invite)
+            else:
+                invite.creator_id = creator_id
+                invite.uses = uses
+                invite.last_used_at = last_used_at
+            await session.flush()
+            return invite
+        except IntegrityError as e:
+            logger.error(f"Error adding or updating invite {invite_id}: {str(e)}")
+            await session.rollback()
+            return None
+
+    @staticmethod
+    async def get_inactive_invites(
+        session: AsyncSession, days: int, max_uses: int, limit: int = 100
+    ) -> List[Invite]:
+        now = datetime.now(timezone.utc)
+        cutoff_date = now - timedelta(days=days)
+        query = (
+            select(Invite)
+            .where(and_(Invite.last_used_at < cutoff_date, Invite.uses <= max_uses))
+            .order_by(Invite.uses.asc(), Invite.last_used_at.asc())
+            .limit(limit)
+        )
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @staticmethod
+    async def delete_invite(session: AsyncSession, invite_id: str) -> None:
+        invite = await session.get(Invite, invite_id)
+        if invite:
+            await session.delete(invite)
+            await session.flush()
+
+    @staticmethod
+    async def get_invite_count(session: AsyncSession) -> int:
+        result = await session.execute(select(func.count()).select_from(Invite))
+        return result.scalar_one()
+
+    @staticmethod
+    async def get_sorted_invites(
+        session: AsyncSession, sort_by: str = "uses", order: str = "desc"
+    ) -> List[Invite]:
+        query = select(Invite)
+        if sort_by == "uses":
+            query = query.order_by(desc(Invite.uses) if order == "desc" else asc(Invite.uses))
+        elif sort_by == "created_at":
+            query = query.order_by(
+                desc(Invite.created_at) if order == "desc" else asc(Invite.created_at)
+            )
+
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @staticmethod
+    async def get_all_invites(session: AsyncSession) -> List[Invite]:
+        result = await session.execute(select(Invite))
+        return result.scalars().all()

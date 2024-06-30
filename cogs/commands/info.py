@@ -1,13 +1,14 @@
 """Info cog."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+from typing import Literal, Optional
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
-from datasources.queries import MemberQueries, RoleQueries
+from datasources.queries import InviteQueries, MemberQueries, RoleQueries
 from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager
 from utils.refund import calculate_refund
@@ -25,6 +26,51 @@ class InfoCog(commands.Cog):
     async def on_ready(self):
         """Event listener which is called when the bot goes online."""
         logger.info("Cog: info.py Loaded")
+
+    @commands.hybrid_command(
+        name="invites", description="Wyświetla listę zaproszeń z możliwością sortowania."
+    )
+    @commands.has_permissions(administrator=True)
+    @app_commands.describe(
+        sort_by="Pole do sortowania (uses, created_at, last_used)",
+        order="Kolejność sortowania (desc lub asc)",
+        target="Użytkownik, którego zaproszenia chcesz wyświetlić",
+    )
+    async def list_invites(
+        self,
+        ctx: commands.Context,
+        sort_by: Optional[Literal["uses", "created_at", "last_used"]] = "last_used",
+        order: Optional[Literal["desc", "asc"]] = "desc",
+        target: Optional[discord.Member] = None,
+    ):
+        """
+        Wyświetla listę zaproszeń z możliwością sortowania.
+
+        :param ctx: Kontekst komendy
+        :param sort_by: Pole do sortowania (uses, created_at lub last_used)
+        :param order: Kolejność sortowania (desc lub asc)
+        :param target: Użytkownik, którego zaproszenia chcesz wyświetlić
+        """
+        discord_invites = await ctx.guild.invites()
+
+        async with self.bot.get_db() as session:
+            db_invites = await InviteQueries.get_all_invites(session)
+
+        db_invites_dict = {invite.id: invite for invite in db_invites}
+
+        combined_invites = [
+            InviteInfo(discord_invite, db_invites_dict.get(discord_invite.code))
+            for discord_invite in discord_invites
+        ]
+
+        if target:
+            combined_invites = [
+                inv for inv in combined_invites if inv.inviter and inv.inviter.id == target.id
+            ]
+
+        view = InviteListView(self.bot, combined_invites, sort_by, order, target)
+        view.sort_invites()
+        await ctx.send(embed=view.create_embed(), view=view)
 
     @commands.hybrid_command(name="sync", description="Syncs commands.")
     @commands.has_permissions(administrator=True)
@@ -213,6 +259,134 @@ class SellRoleButton(discord.ui.Button):
                 await interaction.response.send_message(
                     "Wystąpił błąd podczas sprzedawania roli. Proszę spróbować ponownie później."
                 )
+
+
+class InviteInfo:
+    def __init__(self, discord_invite, db_invite):
+        self.code = discord_invite.code
+        self.inviter = discord_invite.inviter
+        self.uses = discord_invite.uses
+        self.max_uses = discord_invite.max_uses
+        self.max_age = discord_invite.max_age
+        self.created_at = discord_invite.created_at
+        self.last_used_at = db_invite.last_used_at if db_invite else None
+
+
+class InviteListView(discord.ui.View):
+    def __init__(self, bot, invites, sort_by="last_used", order="desc", target_user=None):
+        super().__init__(timeout=60)
+        self.bot = bot
+        self.invites = invites
+        self.sort_by = sort_by
+        self.order = order
+        self.target_user = target_user
+        self.current_page = 0
+        self.per_page = 5
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.clear_items()
+        self.add_item(
+            discord.ui.Button(
+                label="◀",
+                style=discord.ButtonStyle.primary,
+                custom_id="prev",
+                disabled=self.current_page == 0,
+            )
+        )
+        self.add_item(
+            discord.ui.Button(
+                label="▶",
+                style=discord.ButtonStyle.primary,
+                custom_id="next",
+                disabled=self.current_page >= (len(self.invites) - 1) // self.per_page,
+            )
+        )
+        self.add_item(
+            discord.ui.Button(
+                label="Użycia", style=discord.ButtonStyle.secondary, custom_id="sort_uses"
+            )
+        )
+        self.add_item(
+            discord.ui.Button(
+                label="Utworzone", style=discord.ButtonStyle.secondary, custom_id="sort_created_at"
+            )
+        )
+        self.add_item(
+            discord.ui.Button(
+                label="Ostatnie użycie",
+                style=discord.ButtonStyle.secondary,
+                custom_id="sort_last_used",
+            )
+        )
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.data["custom_id"] in ["prev", "next"]:
+            if interaction.data["custom_id"] == "prev":
+                self.current_page = max(0, self.current_page - 1)
+            elif interaction.data["custom_id"] == "next":
+                self.current_page = min(
+                    (len(self.invites) - 1) // self.per_page, self.current_page + 1
+                )
+        elif interaction.data["custom_id"].startswith("sort_"):
+            new_sort_by = interaction.data["custom_id"].split("_", 1)[1]
+            if new_sort_by == self.sort_by:
+                self.order = "asc" if self.order == "desc" else "desc"
+            else:
+                self.sort_by = new_sort_by
+                self.order = "desc"
+            self.sort_invites()
+            self.current_page = 0
+
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.create_embed(), view=self)
+        return True
+
+    def sort_invites(self):
+        if self.sort_by == "uses":
+            self.invites.sort(key=lambda x: x.uses, reverse=(self.order == "desc"))
+        elif self.sort_by == "created_at":
+            self.invites.sort(key=lambda x: x.created_at, reverse=(self.order == "desc"))
+        elif self.sort_by == "last_used":
+            self.invites.sort(
+                key=lambda x: x.last_used_at or datetime.min.replace(tzinfo=timezone.utc),
+                reverse=(self.order == "desc"),
+            )
+
+    def create_embed(self) -> discord.Embed:
+        start = self.current_page * self.per_page
+        end = start + self.per_page
+        current_invites = self.invites[start:end]
+
+        title = f"Lista zaproszeń ({len(self.invites)}/1000 aktywnych zaproszeń)"
+        if self.target_user:
+            title += f" użytkownika {self.target_user.display_name}"
+
+        embed = discord.Embed(title=title, color=discord.Color.blue())
+        for invite in current_invites:
+            creator = self.bot.get_user(invite.inviter.id) if invite.inviter else None
+            creator_mention = creator.mention if creator else "Nieznany"
+
+            invite_type = "Stałe"
+            if invite.max_age > 0:
+                expiry_time = timedelta(seconds=invite.max_age)
+                invite_type = f"Wygasa {discord.utils.format_dt(datetime.now(timezone.utc) + expiry_time, 'R')}"
+            elif invite.max_uses > 0:
+                invite_type = f"Wygasa po {invite.max_uses} użyciach"
+
+            value = (
+                f"Twórca: {creator_mention}\n"
+                f"Użycia: {invite.uses}/{invite.max_uses if invite.max_uses else '∞'}\n"
+                f"Utworzono: {discord.utils.format_dt(invite.created_at, 'R')}\n"
+                f"Ostatnie użycie: {discord.utils.format_dt(invite.last_used_at, 'R') if invite.last_used_at else 'Nigdy'}\n"
+                f"Typ: {invite_type}"
+            )
+            embed.add_field(name=f"Kod: {invite.code}", value=value, inline=False)
+
+        embed.set_footer(
+            text=f"Strona {self.current_page + 1}/{(len(self.invites) - 1) // self.per_page + 1} | Sortowanie: {self.sort_by}, Kolejność: {self.order}"
+        )
+        return embed
 
 
 async def setup(bot: commands.Bot):
