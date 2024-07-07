@@ -520,16 +520,31 @@ class InviteQueries:
 
     @staticmethod
     async def get_inactive_invites(
-        session: AsyncSession, days: int, max_uses: int, limit: int = 100
+        session: AsyncSession,
+        days: int = 30,
+        max_uses: int = 5,
+        limit: int = 100,
+        sort_by: str = "uses",
+        order: str = "asc",
     ) -> List[Invite]:
         now = datetime.now(timezone.utc)
         cutoff_date = now - timedelta(days=days)
-        query = (
-            select(Invite)
-            .where(and_(Invite.last_used_at < cutoff_date, Invite.uses <= max_uses))
-            .order_by(Invite.uses.asc(), Invite.last_used_at.asc())
-            .limit(limit)
+
+        query = select(Invite).where(
+            and_(Invite.last_used_at < cutoff_date, Invite.uses <= max_uses)
         )
+
+        if sort_by == "uses":
+            query = query.order_by(Invite.uses.asc() if order == "asc" else Invite.uses.desc())
+        elif sort_by == "last_used_at":
+            query = query.order_by(
+                Invite.last_used_at.asc() if order == "asc" else Invite.last_used_at.desc()
+            )
+        else:
+            query = query.order_by(Invite.uses.asc(), Invite.last_used_at.asc())
+
+        query = query.limit(limit)
+
         result = await session.execute(query)
         return result.scalars().all()
 

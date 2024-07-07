@@ -197,9 +197,25 @@ class OnMemberJoinEvent(commands.Cog):
 
     @tasks.loop(hours=1)
     async def clean_invites(self):
-        guild_invites = await self.guild.invites()
+        logger.info("Starting invite cleanup process")
+        try:
+            guild_invites = await self.guild.invites()
+        except discord.HTTPException as e:
+            logger.error(f"Failed to fetch guild invites: {e}")
+            return
+
+        if not guild_invites:
+            logger.warning("Received empty list of guild invites. Skipping cleanup process.")
+            return
+
+        now = datetime.now(timezone.utc)
+
         async with self.bot.get_db() as session:
             db_invite_count = await InviteQueries.get_invite_count(session)
+
+            if len(guild_invites) < db_invite_count * 0.5:
+                logger.error("Suspicious drop in invite count. Aborting cleanup.")
+                return
 
             if db_invite_count < len(guild_invites):
                 logger.info(
@@ -207,46 +223,82 @@ class OnMemberJoinEvent(commands.Cog):
                 )
                 await self.sync_invites()
 
+            deleted_count = 0
+            max_deletions = min(50, len(guild_invites) - 900)
+
+            async def delete_invite(invite, reason):
+                nonlocal deleted_count
+                try:
+                    if isinstance(invite, discord.Invite):
+                        await invite.delete()
+                    await InviteQueries.delete_invite(session, invite.id)
+                    if hasattr(invite, "inviter"):
+                        await self.notify_invite_deleted(invite.inviter.id, invite.id)
+                    deleted_count += 1
+                    logger.info(f"Deleted invite {invite.id}: {reason}")
+                except discord.errors.NotFound:
+                    logger.warning(f"Invite {invite.id} not found, might have been deleted already")
+                except Exception as e:
+                    logger.error(f"Error deleting invite {invite.id}: {str(e)}")
+
             if len(guild_invites) > 950:
+                logger.info(f"Number of invites ({len(guild_invites)}) exceeds 950. Cleaning up...")
                 inactive_invites = await InviteQueries.get_inactive_invites(
-                    session, days=30, max_uses=5, limit=100
+                    session, days=4, max_uses=5, limit=100
                 )
-                deleted_count = 0
-                for invite in inactive_invites:
-                    guild_invite = discord.utils.get(guild_invites, id=invite.id)
-                    if guild_invite:
-                        try:
-                            await guild_invite.delete()
-                            await InviteQueries.delete_invite(session, invite.id)
-                            await self.notify_invite_deleted(invite.creator_id, invite.id)
-                            deleted_count += 1
-                        except discord.errors.NotFound:
-                            logger.warning(
-                                f"Invite {invite.id} not found on Discord, removing from database."
-                            )
-                            await InviteQueries.delete_invite(session, invite.id)
-                            deleted_count += 1
-                    else:
-                        await InviteQueries.delete_invite(session, invite.id)
-                        deleted_count += 1
-                await session.commit()
+                timed_invites = [
+                    (db_inv, discord.utils.get(guild_invites, id=db_inv.id))
+                    for db_inv in inactive_invites
+                    if discord.utils.get(guild_invites, id=db_inv.id)
+                    and discord.utils.get(guild_invites, id=db_inv.id).max_age > 0
+                ]
 
-                # Send summary to donation channel
-                donation_channel = self.bot.get_channel(self.bot.config["channels"]["donation"])
-                if donation_channel:
-                    remaining_invites = len(await self.guild.invites())
-                    await donation_channel.send(
-                        f"Usunięto {deleted_count} nieaktywnych zaproszeń. "
-                        f"Pozostało {remaining_invites} aktywnych zaproszeń na serwerze."
-                    )
-                else:
-                    logger.warning(
-                        "Donation channel not found. Could not send invite cleanup summary."
-                    )
-
-                logger.info(
-                    f"Invite cleanup completed. Deleted {deleted_count} invites. Remaining: {remaining_invites}"
+                timed_invites.sort(
+                    key=lambda x: x[1].created_at + timedelta(seconds=x[1].max_age), reverse=True
                 )
+
+                for db_invite, discord_invite in timed_invites:
+                    if len(guild_invites) <= 950 or deleted_count >= max_deletions:
+                        break
+                    await delete_invite(discord_invite, "950+ limit")
+                    guild_invites.remove(discord_invite)
+
+            for guild_invite in guild_invites:
+                if guild_invite.max_age > 0:
+                    expiry_time = guild_invite.created_at + timedelta(seconds=guild_invite.max_age)
+                    if expiry_time <= now:
+                        await delete_invite(guild_invite, "expired")
+
+            db_invites = await InviteQueries.get_all_invites(session)
+            discord_invite_ids = {invite.id for invite in guild_invites}
+            db_invites_to_delete = [
+                db_inv for db_inv in db_invites if db_inv.id not in discord_invite_ids
+            ]
+
+            if len(db_invites_to_delete) > len(db_invites) * 0.5:
+                logger.error(
+                    f"Attempting to delete too many invites ({len(db_invites_to_delete)} out of {len(db_invites)}). Aborting."
+                )
+                return
+
+            for db_invite in db_invites_to_delete[:max_deletions]:
+                await delete_invite(db_invite, "not found on Discord")
+
+            await session.commit()
+
+            remaining_invites = len(guild_invites)
+            donation_channel = self.bot.get_channel(self.bot.config["channels"]["donation"])
+            if donation_channel:
+                await donation_channel.send(
+                    f"Usunięto {deleted_count} zaproszeń (wygasłych lub z powodu limitu 950+). "
+                    f"Pozostało {remaining_invites} aktywnych zaproszeń na serwerze."
+                )
+            else:
+                logger.warning("Donation channel not found. Could not send invite cleanup summary.")
+
+            logger.info(
+                f"Invite cleanup completed. Deleted {deleted_count} invites. Remaining: {remaining_invites}"
+            )
 
     @clean_invites.before_loop
     async def before_clean_invites(self):

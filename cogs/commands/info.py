@@ -282,6 +282,7 @@ class InviteListView(discord.ui.View):
         self.target_user = target_user
         self.current_page = 0
         self.per_page = 5
+        self.total_pages = max(1, (len(self.invites) - 1) // self.per_page + 1)
         self.update_buttons()
 
     def update_buttons(self):
@@ -291,7 +292,6 @@ class InviteListView(discord.ui.View):
                 label="◀",
                 style=discord.ButtonStyle.primary,
                 custom_id="prev",
-                disabled=self.current_page == 0,
             )
         )
         self.add_item(
@@ -299,7 +299,6 @@ class InviteListView(discord.ui.View):
                 label="▶",
                 style=discord.ButtonStyle.primary,
                 custom_id="next",
-                disabled=self.current_page >= (len(self.invites) - 1) // self.per_page,
             )
         )
         self.add_item(
@@ -323,11 +322,9 @@ class InviteListView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.data["custom_id"] in ["prev", "next"]:
             if interaction.data["custom_id"] == "prev":
-                self.current_page = max(0, self.current_page - 1)
+                self.current_page = (self.current_page - 1) % self.total_pages
             elif interaction.data["custom_id"] == "next":
-                self.current_page = min(
-                    (len(self.invites) - 1) // self.per_page, self.current_page + 1
-                )
+                self.current_page = (self.current_page + 1) % self.total_pages
         elif interaction.data["custom_id"].startswith("sort_"):
             new_sort_by = interaction.data["custom_id"].split("_", 1)[1]
             if new_sort_by == self.sort_by:
@@ -384,7 +381,7 @@ class InviteListView(discord.ui.View):
             embed.add_field(name=f"Kod: {invite.code}", value=value, inline=False)
 
         embed.set_footer(
-            text=f"Strona {self.current_page + 1}/{(len(self.invites) - 1) // self.per_page + 1} | Sortowanie: {self.sort_by}, Kolejność: {self.order}"
+            text=f"Strona {self.current_page + 1}/{self.total_pages} | Sortowanie: {self.sort_by}, Kolejność: {self.order}"
         )
         return embed
 

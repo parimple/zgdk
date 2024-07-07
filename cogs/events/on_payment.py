@@ -164,8 +164,8 @@ class BuyRoleButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         ctx = await self.bot.get_context(interaction.message)
-        ctx.author = self.member
-        await ctx.invoke(self.bot.get_command("shop"))
+        ctx.author = interaction.user
+        await ctx.invoke(self.bot.get_command("shop"), member=self.member)
 
 
 async def setup(bot: commands.Bot):
