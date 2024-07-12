@@ -244,7 +244,7 @@ class OnMemberJoinEvent(commands.Cog):
             if len(guild_invites) > 950:
                 logger.info(f"Number of invites ({len(guild_invites)}) exceeds 950. Cleaning up...")
                 inactive_invites = await InviteQueries.get_inactive_invites(
-                    session, days=4, max_uses=5, limit=100
+                    session, days=1, max_uses=5, limit=100
                 )
                 timed_invites = [
                     (db_inv, discord.utils.get(guild_invites, id=db_inv.id))

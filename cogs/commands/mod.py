@@ -9,7 +9,6 @@ from discord.ext import commands
 
 logger = logging.getLogger(__name__)
 
-
 class ModCog(commands.Cog):
     """Cog for moderation commands."""
 
@@ -22,29 +21,30 @@ class ModCog(commands.Cog):
     @commands.has_role("✪")
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
-        member="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
     )
     async def clear_messages(
         self,
         ctx: commands.Context,
         hours: Optional[int] = 1,
-        member: Optional[discord.Member] = None,
+        user: Optional[discord.User] = None,
     ):
-        logger.info(f"clear_messages called with hours={hours}, member={member}")
+        logger.info(f"clear_messages called with hours={hours}, user={user}")
         if not ctx.author.guild_permissions.administrator:
             hours = min(hours, 24)
-            if not member:
+            if not user:
                 await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
                 return
 
         target_id = None
-        if member:
-            target_id = member.id
-            if (
-                member.guild_permissions.manage_messages
-                and not ctx.author.guild_permissions.administrator
+        if user:
+            target_id = user.id
+            # Sprawdzenie czy user jest moderatorem lub administratorem
+            member = ctx.guild.get_member(user.id)
+            if member and (
+                member.guild_permissions.manage_messages or member.guild_permissions.administrator
             ):
-                await ctx.send("Nie możesz usuwać wiadomości moderatorów.")
+                await ctx.send("Nie możesz usuwać wiadomości moderatorów lub administratorów.")
                 return
         elif not ctx.author.guild_permissions.administrator:
             await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
@@ -66,31 +66,30 @@ class ModCog(commands.Cog):
     @commands.has_role("✪")
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
-        member="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
     )
     async def clear_all_channels(
         self,
         ctx: commands.Context,
         hours: Optional[int] = 1,
-        member: Optional[discord.Member] = None,
+        user: Optional[discord.User] = None,
     ):
-        logger.info(f"clear_all_channels called with hours={hours}, member={member}")
+        logger.info(f"clear_all_channels called with hours={hours}, user={user}")
         if not ctx.author.guild_permissions.administrator:
             hours = min(hours, 24)
-            if not member:
+            if not user:
                 await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
                 return
 
-        target_id = None
-        if member:
-            target_id = member.id
-            if (
-                member.guild_permissions.manage_messages
-                and not ctx.author.guild_permissions.administrator
-            ):
-                await ctx.send("Nie możesz usuwać wiadomości moderatorów.")
-                return
-        elif not ctx.author.guild_permissions.administrator:
+        target_id = user.id if user else None
+        # Sprawdzenie czy user jest moderatorem lub administratorem
+        member = ctx.guild.get_member(user.id) if user else None
+        if member and (
+            member.guild_permissions.manage_messages or member.guild_permissions.administrator
+        ):
+            await ctx.send("Nie możesz usuwać wiadomości moderatorów lub administratorów.")
+            return
+        elif not ctx.author.guild_permissions.administrator and not user:
             await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
             return
         else:
@@ -109,31 +108,30 @@ class ModCog(commands.Cog):
     @commands.has_role("✪")
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
-        member="Użytkownik, którego linki i obrazki mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik, którego linki i obrazki mają być usunięte (opcjonalnie dla administratorów)",
     )
     async def clear_images(
         self,
         ctx: commands.Context,
         hours: Optional[int] = 1,
-        member: Optional[discord.Member] = None,
+        user: Optional[discord.User] = None,
     ):
-        logger.info(f"clear_images called with hours={hours}, member={member}")
+        logger.info(f"clear_images called with hours={hours}, user={user}")
         if not ctx.author.guild_permissions.administrator:
             hours = min(hours, 24)
-            if not member:
+            if not user:
                 await ctx.send("Musisz podać użytkownika, którego obrazy i linki chcesz usunąć.")
                 return
 
-        target_id = None
-        if member:
-            target_id = member.id
-            if (
-                member.guild_permissions.manage_messages
-                and not ctx.author.guild_permissions.administrator
-            ):
-                await ctx.send("Nie możesz usuwać wiadomości moderatorów.")
-                return
-        elif not ctx.author.guild_permissions.administrator:
+        target_id = user.id if user else None
+        # Sprawdzenie czy user jest moderatorem lub administratorem
+        member = ctx.guild.get_member(user.id) if user else None
+        if member and (
+            member.guild_permissions.manage_messages or member.guild_permissions.administrator
+        ):
+            await ctx.send("Nie możesz usuwać wiadomości moderatorów lub administratorów.")
+            return
+        elif not ctx.author.guild_permissions.administrator and not user:
             await ctx.send("Musisz podać użytkownika, którego obrazy i linki chcesz usunąć.")
             return
         else:
@@ -171,35 +169,36 @@ class ModCog(commands.Cog):
 
             if target_id is not None and message.author.id != target_id:
                 return False
+
             if images_only:
-                has_image = message.attachments or any(
+                has_image = any(
                     attachment.filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))
                     for attachment in message.attachments
                 )
-                has_link = message.content and bool(
+                has_link = bool(
                     re.search(
                         r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
                         message.content,
                     )
                 )
                 return has_image or has_link
+
             return True
 
         total_deleted = 0
         status_message = await ctx.send("Rozpoczynam usuwanie wiadomości...")
 
         try:
-            # Pierwsza faza: Usuwanie ostatnich 100 wiadomości lub wiadomości z ostatnich 5 minut
             recent_threshold = datetime.now(timezone.utc) - timedelta(minutes=5)
             recent_deleted = await ctx.channel.purge(
                 limit=100, check=is_message_to_delete, after=max(time_threshold, recent_threshold)
             )
             total_deleted += len(recent_deleted)
+            logger.info(f"Deleted {total_deleted} recent messages")
             await status_message.edit(
                 content=f"Usunięto {total_deleted} najnowszych wiadomości. Kontynuuję usuwanie starszych..."
             )
 
-            # Druga faza: Usuwanie pozostałych wiadomości
             if time_threshold < recent_threshold:
                 older_deleted = await ctx.channel.purge(
                     limit=None,
@@ -208,6 +207,7 @@ class ModCog(commands.Cog):
                     after=time_threshold,
                 )
                 total_deleted += len(older_deleted)
+                logger.info(f"Deleted {len(older_deleted)} older messages")
 
             await status_message.edit(
                 content=f"Zakończono. Łącznie usunięto {total_deleted} wiadomości."
@@ -253,6 +253,7 @@ class ModCog(commands.Cog):
             try:
                 deleted = await channel.purge(limit=100, check=is_message_to_delete)
                 total_deleted += len(deleted)
+                logger.info(f"Deleted {len(deleted)} messages in channel {channel.id}")
                 await status_message.edit(
                     content=f"Usunięto łącznie {total_deleted} wiadomości. Trwa sprawdzanie kolejnych kanałów..."
                 )
