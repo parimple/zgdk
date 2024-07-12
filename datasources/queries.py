@@ -83,6 +83,38 @@ class RoleQueries:
     """Class for Role Queries"""
 
     @staticmethod
+    async def add_or_update_role_to_member(
+        session: AsyncSession,
+        member_id: int,
+        role_id: int,
+        duration: timedelta = timedelta(days=30),
+    ):
+        """Add a role to a member or update its expiration date if it already exists"""
+        expiration_date = datetime.now(timezone.utc) + duration
+        try:
+            member_role = await session.get(MemberRole, (member_id, role_id))
+            if member_role:
+                member_role.expiration_date = expiration_date
+                logger.info(f"Updated expiration date for role {role_id} of member {member_id}")
+            else:
+                member_role = MemberRole(
+                    member_id=member_id, role_id=role_id, expiration_date=expiration_date
+                )
+                session.add(member_role)
+                logger.info(f"Added new role {role_id} to member {member_id}")
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            logger.error(
+                f"IntegrityError occurred while adding/updating role {role_id} for member {member_id}"
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(
+                f"Unexpected error occurred while adding/updating role {role_id} for member {member_id}: {str(e)}"
+            )
+
+    @staticmethod
     async def add_role_to_member(
         session: AsyncSession,
         member_id: int,

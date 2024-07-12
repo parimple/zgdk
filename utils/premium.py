@@ -10,6 +10,7 @@ import discord
 import httpx
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright  # pylint: disable=import-error
+from sqlalchemy.exc import IntegrityError
 
 from datasources.queries import HandledPaymentQueries, MemberQueries
 
@@ -141,6 +142,17 @@ class PremiumManager:
                     payment_data.payment_type,
                 )
                 await self.notify_member_not_found(payment_data.name)
+
+        try:
+            await session.flush()
+        except IntegrityError as e:
+            logger.error(f"IntegrityError during payment processing: {str(e)}")
+            await session.rollback()
+            # Handle the error appropriately, maybe retry or notify admin
+        except Exception as e:
+            logger.error(f"Unexpected error during payment processing: {str(e)}")
+            await session.rollback()
+            # Handle other exceptionsi
 
     async def notify_unban(self, member):
         """Send notification about unban"""

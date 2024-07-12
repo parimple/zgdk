@@ -128,17 +128,25 @@ class OnPaymentEvent(commands.Cog):
                 role = discord.utils.get(self.guild.roles, name=role_name)
                 if role:
                     logger.info("Found role %s for %s", role_name, member.display_name)
-                    if role not in member.roles:
-                        logger.info(
-                            "Assigning role %s to member %s", role_name, member.display_name
-                        )
-                        await member.add_roles(role)
-                        await RoleQueries.add_role_to_member(
+                    try:
+                        await RoleQueries.add_or_update_role_to_member(
                             session, member.id, role.id, timedelta(days=30)
                         )
-                        logger.info("Assigned role %s to member %s", role_name, member.display_name)
-                    else:
-                        logger.info("Member %s already has role %s", member.display_name, role_name)
+                        if role not in member.roles:
+                            await member.add_roles(role)
+                            logger.info(
+                                "Assigned role %s to member %s", role_name, member.display_name
+                            )
+                        else:
+                            logger.info(
+                                "Updated expiration for role %s of member %s",
+                                role_name,
+                                member.display_name,
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"Error assigning/updating role {role_name} to member {member.display_name}: {str(e)}"
+                        )
                 else:
                     logger.error("Role %s not found in the guild", role_name)
             else:
