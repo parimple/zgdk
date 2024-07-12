@@ -16,49 +16,54 @@ class ModCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def get_target_user(
+        self, ctx: commands.Context, user
+    ) -> Optional[tuple[int, discord.Member]]:
+        if user is None:
+            return None, None
+
+        if isinstance(user, (discord.User, discord.Member)):
+            target_id = user.id
+            target_member = ctx.guild.get_member(user.id)
+        else:
+            try:
+                target_id = int(user)
+                target_member = ctx.guild.get_member(target_id)
+                if target_member is None:
+                    target_member = await ctx.guild.fetch_member(target_id)
+            except ValueError:
+                await ctx.send("Nieprawidłowe ID użytkownika.")
+                return None, None
+            except discord.NotFound:
+                await ctx.send("Nie znaleziono użytkownika o podanym ID na tym serwerze.")
+                return None, None
+
+        return target_id, target_member
+
+    async def check_permissions(
+        self, ctx: commands.Context, target_member: Optional[discord.Member]
+    ) -> bool:
+        if target_member and (
+            target_member.guild_permissions.manage_messages
+            or target_member.guild_permissions.administrator
+        ):
+            if not ctx.author.guild_permissions.administrator:
+                await ctx.send("Nie możesz usuwać wiadomości moderatorów lub administratorów.")
+                return False
+        return True
+
     @commands.hybrid_command(
         name="clear", description="Usuwa wiadomości użytkownika z ostatnich X godzin."
     )
     @commands.has_role("✪")
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
-        user="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik lub ID użytkownika, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
     )
     async def clear_messages(
-        self,
-        ctx: commands.Context,
-        hours: Optional[int] = 1,
-        user: Optional[discord.User] = None,
+        self, ctx: commands.Context, hours: Optional[int] = 1, user: Optional[str] = None
     ):
-        logger.info(f"clear_messages called with hours={hours}, user={user}")
-        if not ctx.author.guild_permissions.administrator:
-            hours = min(hours, 24)
-            if not user:
-                await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
-                return
-
-        target_id = None
-        if user:
-            target_id = user.id
-            # Sprawdzenie czy user jest moderatorem lub administratorem
-            member = ctx.guild.get_member(user.id)
-            if member and (
-                member.guild_permissions.manage_messages or member.guild_permissions.administrator
-            ):
-                await ctx.send("Nie możesz usuwać wiadomości moderatorów lub administratorów.")
-                return
-        elif not ctx.author.guild_permissions.administrator:
-            await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
-            return
-        else:
-            confirm = await self.confirm_action(
-                ctx, "Czy na pewno chcesz usunąć wszystkie wiadomości na tym kanale?"
-            )
-            if not confirm:
-                await ctx.send("Anulowano usuwanie wiadomości.")
-                return
-
-        await self._delete_messages(ctx, hours, target_id)
+        await self._clear_messages_base(ctx, hours, user, all_channels=False)
 
     @commands.hybrid_command(
         name="clearall",
@@ -67,41 +72,12 @@ class ModCog(commands.Cog):
     @commands.has_role("✪")
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
-        user="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik lub ID użytkownika, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
     )
     async def clear_all_channels(
-        self,
-        ctx: commands.Context,
-        hours: Optional[int] = 1,
-        user: Optional[discord.User] = None,
+        self, ctx: commands.Context, hours: Optional[int] = 1, user: Optional[str] = None
     ):
-        logger.info(f"clear_all_channels called with hours={hours}, user={user}")
-        if not ctx.author.guild_permissions.administrator:
-            hours = min(hours, 24)
-            if not user:
-                await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
-                return
-
-        target_id = user.id if user else None
-        # Sprawdzenie czy user jest moderatorem lub administratorem
-        member = ctx.guild.get_member(user.id) if user else None
-        if member and (
-            member.guild_permissions.manage_messages or member.guild_permissions.administrator
-        ):
-            await ctx.send("Nie możesz usuwać wiadomości moderatorów lub administratorów.")
-            return
-        elif not ctx.author.guild_permissions.administrator and not user:
-            await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
-            return
-        else:
-            confirm = await self.confirm_action(
-                ctx, "Czy na pewno chcesz usunąć wszystkie wiadomości na wszystkich kanałach?"
-            )
-            if not confirm:
-                await ctx.send("Anulowano usuwanie wiadomości.")
-                return
-
-        await self._delete_messages_all_channels(ctx, hours, target_id)
+        await self._clear_messages_base(ctx, hours, user, all_channels=True)
 
     @commands.hybrid_command(
         name="clearimg", description="Usuwa linki i obrazki użytkownika z ostatnich X godzin."
@@ -109,41 +85,66 @@ class ModCog(commands.Cog):
     @commands.has_role("✪")
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
-        user="Użytkownik, którego linki i obrazki mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik lub ID użytkownika, którego linki i obrazki mają być usunięte (opcjonalnie dla administratorów)",
     )
     async def clear_images(
+        self, ctx: commands.Context, hours: Optional[int] = 1, user: Optional[str] = None
+    ):
+        await self._clear_messages_base(ctx, hours, user, all_channels=False, images_only=True)
+
+    async def _clear_messages_base(
         self,
         ctx: commands.Context,
         hours: Optional[int] = 1,
-        user: Optional[discord.User] = None,
+        user: Optional[str] = None,
+        all_channels: bool = False,
+        images_only: bool = False,
     ):
-        logger.info(f"clear_images called with hours={hours}, user={user}")
+        logger.info(
+            f"clear_messages_base called with hours={hours}, user={user}, all_channels={all_channels}, images_only={images_only}"
+        )
+
         if not ctx.author.guild_permissions.administrator:
             hours = min(hours, 24)
-            if not user:
-                await ctx.send("Musisz podać użytkownika, którego obrazy i linki chcesz usunąć.")
+            if user is None:
+                await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
                 return
 
-        target_id = user.id if user else None
-        # Sprawdzenie czy user jest moderatorem lub administratorem
-        member = ctx.guild.get_member(user.id) if user else None
-        if member and (
-            member.guild_permissions.manage_messages or member.guild_permissions.administrator
-        ):
-            await ctx.send("Nie możesz usuwać wiadomości moderatorów lub administratorów.")
+        target_id, target_member = await self.get_target_user(ctx, user)
+
+        if user is not None and target_id is None:
+            return  # Error message already sent in get_target_user
+
+        if not await self.check_permissions(ctx, target_member):
             return
-        elif not ctx.author.guild_permissions.administrator and not user:
-            await ctx.send("Musisz podać użytkownika, którego obrazy i linki chcesz usunąć.")
+
+        if target_id is None and not ctx.author.guild_permissions.administrator:
+            await ctx.send("Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
             return
-        else:
-            confirm = await self.confirm_action(
-                ctx, "Czy na pewno chcesz usunąć wszystkie obrazy i linki na tym kanale?"
+
+        if target_id is None:
+            confirm_message = (
+                "Czy na pewno chcesz usunąć wszystkie wiadomości"
+                + (" na wszystkich kanałach" if all_channels else "")
+                + "?"
             )
+            confirm = await self.confirm_action(ctx, confirm_message)
             if not confirm:
-                await ctx.send("Anulowano usuwanie obrazów i linków.")
+                await ctx.send("Anulowano usuwanie wiadomości.")
                 return
 
-        await self._delete_messages(ctx, hours, target_id, images_only=True)
+        if all_channels:
+            deleted_count = await self._delete_messages_all_channels(
+                ctx, hours, target_id, images_only
+            )
+        else:
+            deleted_count = await self._delete_messages(ctx, hours, target_id, images_only)
+
+        await ctx.send(
+            f"Usunięto łącznie {deleted_count} wiadomości"
+            + (" ze wszystkich kanałów" if all_channels else "")
+            + "."
+        )
 
     async def _delete_messages(
         self,
@@ -159,6 +160,8 @@ class ModCog(commands.Cog):
         logger.info(f"Time threshold set to {time_threshold}")
 
         def is_message_to_delete(message):
+            if message.created_at < time_threshold:
+                return False
             if message.webhook_id:
                 attachment_pattern = (
                     rf"discord-gg-zagadka_{target_id}_\d{{4}}-\d{{2}}-\d{{2}}_\d{{6}}\.\d+\.\w+"
@@ -167,52 +170,41 @@ class ModCog(commands.Cog):
                     re.match(attachment_pattern, attachment.filename)
                     for attachment in message.attachments
                 )
-
             if target_id is not None and message.author.id != target_id:
                 return False
-
             if images_only:
-                has_image = any(
+                has_image = message.attachments or any(
                     attachment.filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))
                     for attachment in message.attachments
                 )
-                has_link = bool(
+                has_link = message.content and bool(
                     re.search(
                         r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
                         message.content,
                     )
                 )
                 return has_image or has_link
-
             return True
 
         total_deleted = 0
         status_message = await ctx.send("Rozpoczynam usuwanie wiadomości...")
 
         try:
-            recent_threshold = datetime.now(timezone.utc) - timedelta(minutes=5)
-            recent_deleted = await ctx.channel.purge(
-                limit=100, check=is_message_to_delete, after=max(time_threshold, recent_threshold)
-            )
-            total_deleted += len(recent_deleted)
-            logger.info(f"Deleted {total_deleted} recent messages")
-            await status_message.edit(
-                content=f"Usunięto {total_deleted} najnowszych wiadomości. Kontynuuję usuwanie starszych..."
-            )
-
-            if time_threshold < recent_threshold:
-                older_deleted = await ctx.channel.purge(
-                    limit=None,
+            while True:
+                deleted = await ctx.channel.purge(
+                    limit=100,
                     check=is_message_to_delete,
-                    before=recent_threshold,
+                    before=datetime.now(timezone.utc),
                     after=time_threshold,
                 )
-                total_deleted += len(older_deleted)
-                logger.info(f"Deleted {len(older_deleted)} older messages")
+                if not deleted:
+                    break
+                total_deleted += len(deleted)
+                await status_message.edit(
+                    content=f"Usunięto {total_deleted} wiadomości. Kontynuuję usuwanie..."
+                )
 
-            await status_message.edit(
-                content=f"Zakończono. Łącznie usunięto {total_deleted} wiadomości."
-            )
+            await status_message.delete()
         except discord.Forbidden:
             await status_message.edit(
                 content="Nie mam uprawnień do usuwania wiadomości na tym kanale."
@@ -223,11 +215,17 @@ class ModCog(commands.Cog):
             logger.error(f"Unexpected error in _delete_messages: {e}", exc_info=True)
             await status_message.edit(content=f"Wystąpił nieoczekiwany błąd: {e}")
 
+        return total_deleted
+
     async def _delete_messages_all_channels(
-        self, ctx: commands.Context, hours: int, target_id: Optional[int] = None
+        self,
+        ctx: commands.Context,
+        hours: int,
+        target_id: Optional[int] = None,
+        images_only: bool = False,
     ):
         logger.info(
-            f"_delete_messages_all_channels called with hours={hours}, target_id={target_id}"
+            f"_delete_messages_all_channels called with hours={hours}, target_id={target_id}, images_only={images_only}"
         )
         time_threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
         total_deleted = 0
@@ -239,6 +237,8 @@ class ModCog(commands.Cog):
                 continue
 
             def is_message_to_delete(message):
+                if message.created_at < time_threshold:
+                    return False
                 if message.webhook_id:
                     attachment_pattern = (
                         rf"discord-gg-zagadka_{target_id}_\d{{4}}-\d{{2}}-\d{{2}}_\d{{6}}\.\d+\.\w+"
@@ -247,9 +247,21 @@ class ModCog(commands.Cog):
                         re.match(attachment_pattern, attachment.filename)
                         for attachment in message.attachments
                     )
-                return (
-                    target_id is None or message.author.id == target_id
-                ) and message.created_at >= time_threshold
+                if target_id is not None and message.author.id != target_id:
+                    return False
+                if images_only:
+                    has_image = message.attachments or any(
+                        attachment.filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))
+                        for attachment in message.attachments
+                    )
+                    has_link = message.content and bool(
+                        re.search(
+                            r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
+                            message.content,
+                        )
+                    )
+                    return has_image or has_link
+                return True
 
             try:
                 deleted = await channel.purge(limit=100, check=is_message_to_delete)
@@ -265,9 +277,8 @@ class ModCog(commands.Cog):
                 logger.error(f"HTTP exception while purging messages in channel {channel.id}: {e}")
                 continue
 
-        await status_message.edit(
-            content=f"Zakończono. Usunięto łącznie {total_deleted} wiadomości ze wszystkich kanałów."
-        )
+        await status_message.delete()
+        return total_deleted
 
     async def confirm_action(self, ctx: commands.Context, message: str):
         logger.info(f"Confirming action: {message}")
