@@ -10,7 +10,7 @@ from sqlalchemy import asc, delete, desc, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-from sqlalchemy.sql.expression import and_
+from sqlalchemy.sql.expression import and_, case, or_
 from sqlalchemy.sql.functions import func
 
 from .models import (
