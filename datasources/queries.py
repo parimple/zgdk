@@ -514,16 +514,6 @@ class InviteQueries:
         created_at: datetime,
         last_used_at: Optional[datetime] = None,
     ) -> Invite:
-        """
-        Add or update an invite in the database.
-        :param session: The database session
-        :param invite_id: The ID of the invite
-        :param creator_id: The ID of the invite creator
-        :param uses: The number of times the invite has been used
-        :param created_at: The creation date of the invite
-        :param last_used_at: The last usage date of the invite (optional)
-        :return: The Invite object
-        """
         try:
             if creator_id:
                 await MemberQueries.get_or_add_member(session, creator_id)
@@ -609,4 +599,33 @@ class InviteQueries:
     @staticmethod
     async def get_all_invites(session: AsyncSession) -> List[Invite]:
         result = await session.execute(select(Invite))
+        return result.scalars().all()
+
+    @staticmethod
+    async def get_invites_for_cleanup(
+        session: AsyncSession, limit: int = 100, inactive_threshold: timedelta = timedelta(days=1)
+    ) -> List[Invite]:
+        now = datetime.now(timezone.utc)
+        threshold_date = now - inactive_threshold
+
+        query = (
+            select(Invite)
+            .where(
+                or_(
+                    and_(Invite.last_used_at.is_(None), Invite.created_at < threshold_date),
+                    Invite.last_used_at.isnot(None),
+                )
+            )
+            .order_by(
+                case(
+                    (and_(Invite.last_used_at.is_(None), Invite.created_at < threshold_date), 0),
+                    else_=1,
+                ),
+                Invite.last_used_at.asc().nulls_first(),
+                Invite.created_at.asc(),
+            )
+            .limit(limit)
+        )
+
+        result = await session.execute(query)
         return result.scalars().all()

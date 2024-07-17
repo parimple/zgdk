@@ -194,7 +194,7 @@ class Invite(Base):
     creator_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID))
     uses: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     creator: Mapped["Member"] = relationship("Member", back_populates="created_invites")
 
