@@ -208,77 +208,72 @@ class TipplyDataProvider(DataProvider):
 
     async def fetch_payments(self) -> list[PaymentData]:
         """Fetch Payments from the Tipply widget"""
-        # logger.info("fetch_payments")
-
-        # Fetch the widget content
-        async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch()
-            # logger.info("Browser launched")
-            page = await browser.new_page()
-            # logger.info("New page created")
-            await page.goto(self.widget_url)
-            # logger.info("Page loaded")
-
-            # Wait for the specific selector to be loaded on the page
-            await page.wait_for_selector(".ListItemWrapper-sc-1ode8mk-0")
-
-            content = await page.content()
-            # logger.info("Content fetched")
-            soup = BeautifulSoup(content, "html.parser")
-
-            payments = []
-            for div in soup.find_all(
-                "div", {"class": "ListItemWrapper-sc-1ode8mk-0 eYIAvf single-element"}
-            ):
-                name = div.find("span", {"data-element": "nickname"}).text
-                amount_str = div.find("span", {"data-element": "price"}).text.replace(",", ".")
-                amount_str = amount_str.replace(" zł", "")
-                amount = int(round(float(amount_str), 2) * 100)
-                payment_time = datetime.now(timezone.utc)
-
-                payment_data = PaymentData(name, amount, payment_time, self.payment_type)
-                payments.append(payment_data)
-
-            await browser.close()
-
-        return payments
+        try:
+            async with async_playwright() as playwright:
+                browser = await playwright.chromium.launch()
+                page = await browser.new_page()
+                await page.goto(self.widget_url)
+                await page.wait_for_selector(".ListItemWrapper-sc-1ode8mk-0")
+                content = await page.content()
+                soup = BeautifulSoup(content, "html.parser")
+                payments = []
+                for div in soup.find_all(
+                    "div", {"class": "ListItemWrapper-sc-1ode8mk-0 eYIAvf single-element"}
+                ):
+                    name = div.find("span", {"data-element": "nickname"}).text
+                    amount_str = div.find("span", {"data-element": "price"}).text.replace(",", ".")
+                    amount_str = amount_str.replace(" zł", "")
+                    amount = int(round(float(amount_str), 2) * 100)
+                    payment_time = datetime.now(timezone.utc)
+                    payment_data = PaymentData(name, amount, payment_time, self.payment_type)
+                    payments.append(payment_data)
+                await browser.close()
+            return payments
+        except Exception as e:
+            logger.error(f"Error fetching payments: {str(e)}")
+            return []
 
     async def get_data(self, session):
-        # Fetch all payments from the Tipply widget
-        all_payments = await self.fetch_payments()
+        try:
+            # Fetch all payments from the Tipply widget
+            all_payments = await self.fetch_payments()
+            if not all_payments:
+                return []
 
-        # Get the 10 last handled payments of type "tipply"
-        async with self.get_db() as session:
-            last_handled_payments = await HandledPaymentQueries.get_last_payments(
-                session, offset=0, limit=10, payment_type=self.payment_type
-            )
-        logger.info("last_handled_payments: %s", last_handled_payments[:3])
+            # Get the 10 last handled payments of type "tipply"
+            async with self.get_db() as session:
+                last_handled_payments = await HandledPaymentQueries.get_last_payments(
+                    session, offset=0, limit=10, payment_type=self.payment_type
+                )
+            logger.info("last_handled_payments: %s", last_handled_payments[:3])
 
-        # Transform both lists to contain only (name, amount) tuples
-        all_payments = [(payment.name, payment.amount) for payment in all_payments]
-        last_handled_payments = [
-            (payment.name, payment.amount) for payment in last_handled_payments
-        ]
-        logger.info("all_payments: %s", all_payments[:3])
+            # Transform both lists to contain only (name, amount) tuples
+            all_payments = [(payment.name, payment.amount) for payment in all_payments]
+            last_handled_payments = [
+                (payment.name, payment.amount) for payment in last_handled_payments
+            ]
+            logger.info("all_payments: %s", all_payments[:3])
 
-        # Iterate over the fetched payments from newest to oldest
-        for i in range(len(all_payments) - 10, -1, -1):
-            if all_payments[i : i + 10] == last_handled_payments:
-                new_payments = all_payments[:i]
-                break
-        else:
-            # If no matching payment is found, all fetched payments are new
-            new_payments = all_payments
+            # Iterate over the fetched payments from newest to oldest
+            for i in range(len(all_payments) - 10, -1, -1):
+                if all_payments[i : i + 10] == last_handled_payments:
+                    new_payments = all_payments[:i]
+                    break
+            else:
+                # If no matching payment is found, all fetched payments are new
+                new_payments = all_payments
 
-        # Transform back to PaymentData
-        current_time = datetime.now(timezone.utc)
-        payment_data_list = []
-        for i, (name, amount) in enumerate(new_payments[::-1]):
-            payment_time = current_time + timedelta(seconds=i)
-            payment_data_list.append(PaymentData(name, amount, payment_time, self.payment_type))
+            # Transform back to PaymentData
+            current_time = datetime.now(timezone.utc)
+            payment_data_list = []
+            for i, (name, amount) in enumerate(new_payments[::-1]):
+                payment_time = current_time + timedelta(seconds=i)
+                payment_data_list.append(PaymentData(name, amount, payment_time, self.payment_type))
 
-        return payment_data_list
-
+            return payment_data_list
+        except Exception as e:
+            logger.error(f"Error in get_data: {str(e)}")
+            return []
 
 class TipoDataProvider(DataProvider):
     """Data provider for API-based inputs."""

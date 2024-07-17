@@ -36,21 +36,24 @@ class OnPaymentEvent(commands.Cog):
     async def check_payments(self):
         """Check Payments"""
         # logger.info("Checking for new payments")
+        try:
+            async with self.bot.get_db() as session:
+                payments_data = await self.data_provider.get_data(session)
+                logger.info("Found %s new payments", len(payments_data))
 
-        async with self.bot.get_db() as session:
-            payments_data = await self.data_provider.get_data(session)
-            logger.info("Found %s new payments", len(payments_data))
-
-            for payment_data in payments_data:
-                try:
-                    await self.premium_manager.process_data(session, payment_data)
-                    await self.handle_payment(session, payment_data)
-                    logger.info("Processed payment: %s", payment_data)
-                except Exception as err:  # pylint: disable=broad-except
-                    logger.error("Error while processing payment %s: %s", payment_data, err)
-                    await session.rollback()
-                else:
-                    await session.commit()
+                for payment_data in payments_data:
+                    try:
+                        await self.premium_manager.process_data(session, payment_data)
+                        await self.handle_payment(session, payment_data)
+                        logger.info("Processed payment: %s", payment_data)
+                        await session.commit()
+                    except Exception as err:
+                        logger.error("Error while processing payment %s: %s", payment_data, err)
+                        await session.rollback()
+        except Exception as e:
+            logger.error(f"Error in check_payments: {str(e)}")
+        # finally:
+        #     logger.info("Finished checking for payments")
 
     @check_payments.before_loop
     async def before_check_payments(self):
