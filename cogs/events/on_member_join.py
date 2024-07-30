@@ -297,7 +297,7 @@ class OnMemberJoinEvent(commands.Cog):
                     f"  • Nieistniejące na Discord: {not_found_count}\n"
                     f"- Pozostało {remaining_invites} aktywnych zaproszeń na serwerze."
                 )
-                await donation_channel.send(message)
+                # await donation_channel.send(message)
             else:
                 logger.warning("Donation channel not found. Could not send invite cleanup summary.")
 

@@ -275,6 +275,7 @@ class TipplyDataProvider(DataProvider):
             logger.error(f"Error in get_data: {str(e)}")
             return []
 
+
 class TipoDataProvider(DataProvider):
     """Data provider for API-based inputs."""
 

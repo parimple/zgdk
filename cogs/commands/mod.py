@@ -156,33 +156,17 @@ class ModCog(commands.Cog):
         logger.info(
             f"_delete_messages called with hours={hours}, target_id={target_id}, images_only={images_only}"
         )
-        time_threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
+        time_threshold = ctx.message.created_at - timedelta(hours=hours)
         logger.info(f"Time threshold set to {time_threshold}")
 
         def is_message_to_delete(message):
-            if message.created_at < time_threshold:
+            if message.id == ctx.message.id:
                 return False
-            if message.webhook_id:
-                attachment_pattern = (
-                    rf"discord-gg-zagadka_{target_id}_\d{{4}}-\d{{2}}-\d{{2}}_\d{{6}}\.\d+\.\w+"
-                )
-                return any(
-                    re.match(attachment_pattern, attachment.filename)
-                    for attachment in message.attachments
-                )
             if target_id is not None and message.author.id != target_id:
                 return False
             if images_only:
-                has_image = message.attachments or any(
-                    attachment.filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))
-                    for attachment in message.attachments
-                )
-                has_link = message.content and bool(
-                    re.search(
-                        r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
-                        message.content,
-                    )
-                )
+                has_image = bool(message.attachments)
+                has_link = bool(re.search(r"http[s]?://\S+", message.content))
                 return has_image or has_link
             return True
 
@@ -190,21 +174,36 @@ class ModCog(commands.Cog):
         status_message = await ctx.send("Rozpoczynam usuwanie wiadomości...")
 
         try:
-            while True:
-                deleted = await ctx.channel.purge(
-                    limit=100,
-                    check=is_message_to_delete,
-                    before=datetime.now(timezone.utc),
-                    after=time_threshold,
-                )
-                if not deleted:
-                    break
-                total_deleted += len(deleted)
-                await status_message.edit(
-                    content=f"Usunięto {total_deleted} wiadomości. Kontynuuję usuwanie..."
-                )
+            # Najpierw usuwamy najnowsze wiadomości (ostatnie 100)
+            deleted = await ctx.channel.purge(
+                limit=100, check=is_message_to_delete, before=ctx.message, after=time_threshold
+            )
+            total_deleted += len(deleted)
+            await status_message.edit(
+                content=f"Szybko usunięto {total_deleted} najnowszych wiadomości. Kontynuuję usuwanie starszych..."
+            )
+
+            # Następnie usuwamy starsze wiadomości w tle
+            async for message in ctx.channel.history(
+                limit=None, before=ctx.message, after=time_threshold, oldest_first=False
+            ):
+                if is_message_to_delete(message):
+                    try:
+                        await message.delete()
+                        total_deleted += 1
+                        if total_deleted % 10 == 0:
+                            await status_message.edit(
+                                content=f"Usunięto łącznie {total_deleted} wiadomości. Kontynuuję usuwanie starszych..."
+                            )
+                    except discord.NotFound:
+                        logger.warning(f"Message {message.id} not found, probably already deleted")
+                    except discord.Forbidden:
+                        logger.error(f"No permission to delete message {message.id}")
+                    except Exception as e:
+                        logger.error(f"Error deleting message {message.id}: {e}")
 
             await status_message.delete()
+            await ctx.send(f"Zakończono. Usunięto łącznie {total_deleted} wiadomości.")
         except discord.Forbidden:
             await status_message.edit(
                 content="Nie mam uprawnień do usuwania wiadomości na tym kanale."
@@ -227,7 +226,7 @@ class ModCog(commands.Cog):
         logger.info(
             f"_delete_messages_all_channels called with hours={hours}, target_id={target_id}, images_only={images_only}"
         )
-        time_threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
+        time_threshold = ctx.message.created_at - timedelta(hours=hours)
         total_deleted = 0
         status_message = await ctx.send("Rozpoczynam usuwanie wiadomości na wszystkich kanałach...")
 
@@ -239,34 +238,41 @@ class ModCog(commands.Cog):
             def is_message_to_delete(message):
                 if message.created_at < time_threshold:
                     return False
-                if message.webhook_id:
-                    attachment_pattern = (
-                        rf"discord-gg-zagadka_{target_id}_\d{{4}}-\d{{2}}-\d{{2}}_\d{{6}}\.\d+\.\w+"
-                    )
-                    return any(
-                        re.match(attachment_pattern, attachment.filename)
-                        for attachment in message.attachments
-                    )
                 if target_id is not None and message.author.id != target_id:
                     return False
                 if images_only:
-                    has_image = message.attachments or any(
-                        attachment.filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))
-                        for attachment in message.attachments
-                    )
-                    has_link = message.content and bool(
-                        re.search(
-                            r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
-                            message.content,
-                        )
-                    )
+                    has_image = bool(message.attachments)
+                    has_link = bool(re.search(r"http[s]?://\S+", message.content))
                     return has_image or has_link
                 return True
 
             try:
+                # Najpierw usuwamy najnowsze wiadomości (ostatnie 100)
                 deleted = await channel.purge(limit=100, check=is_message_to_delete)
                 total_deleted += len(deleted)
-                logger.info(f"Deleted {len(deleted)} messages in channel {channel.id}")
+
+                # Następnie usuwamy starsze wiadomości
+                async for message in channel.history(
+                    limit=None, after=time_threshold, oldest_first=False
+                ):
+                    if is_message_to_delete(message):
+                        try:
+                            await message.delete()
+                            total_deleted += 1
+                        except discord.NotFound:
+                            logger.warning(
+                                f"Message {message.id} not found in channel {channel.id}, probably already deleted"
+                            )
+                        except discord.Forbidden:
+                            logger.error(
+                                f"No permission to delete message {message.id} in channel {channel.id}"
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Error deleting message {message.id} in channel {channel.id}: {e}"
+                            )
+
+                logger.info(f"Deleted {total_deleted} messages in channel {channel.id}")
                 await status_message.edit(
                     content=f"Usunięto łącznie {total_deleted} wiadomości. Trwa sprawdzanie kolejnych kanałów..."
                 )
