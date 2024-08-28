@@ -67,3 +67,7 @@ mute_roles:
   - id: 960665311953174558
     name: "☢︎"
     description: "attach_files_off"
+
+
+premium_categories:
+  - 960665318475325454

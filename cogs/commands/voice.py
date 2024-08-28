@@ -1,85 +1,99 @@
-"""Voice commands cog."""
+"""Voice commands cog for managing voice channel permissions and operations."""
+
 from typing import Literal, Optional
 
 import discord
 from discord import AllowedMentions, Member, PermissionOverwrite, Permissions
 from discord.ext import commands
 from sqlalchemy.ext.asyncio import AsyncSession
+from utils.user import get_target_user
 
 from datasources.queries import ChannelPermissionQueries
 
 
-class VoiceCog(commands.Cog):
-    """Voice commands cog."""
+class MessageSender:
+    """Handles sending messages to the server."""
 
-    def __init__(self, bot):
-        self.bot = bot
+    @staticmethod
+    async def send_permission_update(ctx, target, permission_flag, new_value):
+        """Sends a message about the updated permission."""
+        mention_str = target.mention
+        await ctx.reply(
+            f"Ustawiono uprawnienie {permission_flag} na {new_value} dla {mention_str}.",
+            allowed_mentions=AllowedMentions(users=False, roles=False),
+        )
 
-    async def update_permission_in_db(
-        self,
-        session: AsyncSession,
-        member_id: int,
-        target_id: int,
-        allow_permissions_value: Permissions,
-        deny_permissions_value: Permissions,
-        update_db: Optional[Literal["+", "-"]],
+    @staticmethod
+    async def send_not_in_voice_channel(ctx):
+        """Sends a message when the user is not in a voice channel."""
+        await ctx.send("Nie jesteś na żadnym kanale głosowym!")
+
+    @staticmethod
+    async def send_joined_channel(ctx, channel):
+        """Sends a message when the bot joins a channel."""
+        await ctx.send(f"Dołączono do {channel}")
+
+    @staticmethod
+    async def send_invalid_member_limit(ctx):
+        """Sends a message when an invalid member limit is provided."""
+        await ctx.reply("Podaj liczbę członków od 1 do 99.")
+
+    @staticmethod
+    async def send_member_limit_set(ctx, voice_channel, max_members):
+        """Sends a message when the member limit is set."""
+        await ctx.reply(f"Limit członków na kanale {voice_channel} ustawiony na {max_members}.")
+
+    @staticmethod
+    async def send_no_mod_permission(ctx):
+        """Sends a message when the user doesn't have permission to assign channel mods."""
+        await ctx.send("Nie masz uprawnień do nadawania channel moda!")
+
+    @staticmethod
+    async def send_cant_remove_self_mod(ctx):
+        """Sends a message when the user tries to remove their own mod permissions."""
+        await ctx.send("Nie możesz odebrać sobie uprawnień do zarządzania kanałem!")
+
+    @staticmethod
+    async def send_mod_limit_exceeded(ctx, mod_limit, current_mods):
+        """Sends a message when the mod limit is exceeded."""
+        current_mods_mentions = ", ".join(
+            [member.mention for member in current_mods if member != ctx.author]
+        )
+        await ctx.send(
+            f"Możesz przypisać maksymalnie {mod_limit - 1} channel modów. Aktualni channel modzi: {current_mods_mentions}.",
+            allowed_mentions=AllowedMentions(users=False, roles=False),
+        )
+
+    @staticmethod
+    async def send_permission_limit_exceeded(ctx, permission_limit):
+        """Sends a message when the permission limit is exceeded."""
+        await ctx.send(
+            f"Osiągnąłeś limit {permission_limit} uprawnień. Najstarsze uprawnienie nie dotyczące zarządzania wiadomościami zostało nadpisane. Aby uzyskać więcej uprawnień, rozważ zakup wyższej rangi premium.",
+            allowed_mentions=AllowedMentions(users=False, roles=False),
+        )
+    
+    @staticmethod
+    async def send_channel_mod_update(ctx, target, is_mod):
+        """Sends a message about updating channel mod status."""
+        action = "nadano uprawnienia" if is_mod else "odebrano uprawnienia"
+        await ctx.reply(
+            f"{target.mention} {action} moderatora kanału.",
+            allowed_mentions=AllowedMentions(users=False, roles=False),
+        )
+
+
+class PermissionValueCalculator:
+    """Calculates new permission values."""
+
+    @staticmethod
+    def determine_new_value(
+        current_perms,
+        permission_flag: str,
+        value: Optional[Literal["+", "-"]],
+        default_to_true=False,
+        toggle=False,
     ):
-        """Update the permission in the database."""
-        if update_db is None:
-            return
-
-        if update_db == "+":
-            await ChannelPermissionQueries.add_or_update_permission(
-                session,
-                member_id,
-                target_id,
-                allow_permissions_value,
-                deny_permissions_value,
-            )
-        elif update_db == "-":
-            await ChannelPermissionQueries.remove_permission(session, member_id, target_id)
-
-    async def check_and_handle_permission_limit(
-        self, ctx, member_id: int, new_permission: discord.PermissionOverwrite
-    ):
-        """Check if the user has exceeded their permission limit and handle it accordingly."""
-        premium_role = self.get_user_premium_role(ctx.author)
-        if not premium_role:
-            return
-
-        permission_limit = premium_role.get("permission_limit", 50)  # default to 50 if not set
-        async with self.bot.get_db() as session:
-            current_permissions = await ChannelPermissionQueries.get_permissions_for_member(
-                session, member_id
-            )
-
-            if len(current_permissions) >= permission_limit:
-                # Sort permissions by creation date to find the oldest one
-                current_permissions.sort(key=lambda p: p.created_at)
-                # Find the first permission that is not manage_messages
-                for permission in current_permissions:
-                    if permission.permission_flag != "manage_messages":
-                        await ChannelPermissionQueries.remove_permission(
-                            session, member_id, permission.target_id
-                        )
-                        await ctx.send(
-                            f"Osiągnąłeś limit {permission_limit} uprawnień. Najstarsza uprawnienie nie dotyczące zarządzania wiadomościami zostało nadpisane. Aby uzyskać więcej uprawnień, rozważ zakup wyższej rangi premium.",
-                            allowed_mentions=AllowedMentions(users=False, roles=False),
-                        )
-                        break
-
-    def get_user_premium_role(self, member):
-        """Get the premium role of the member."""
-        premium_roles = self.bot.config["premium_roles"]
-        for role in reversed(premium_roles):
-            if any(r.name == role["name"] for r in member.roles):
-                return role
-        return None
-
-    def determine_new_permission_value(
-        self, current_perms, permission_flag, value, default_to_true=False, toggle=False
-    ):
-        """Determine the new permission value."""
+        """Determines the new permission value based on inputs."""
         current_value = getattr(current_perms, permission_flag, None)
 
         if toggle:
@@ -97,19 +111,97 @@ class VoiceCog(commands.Cog):
                 return None
             return False
 
-    async def update_channel_and_db(self, ctx, target, current_perms, update_db):
-        """Update the channel and the database."""
-        await ctx.author.voice.channel.set_permissions(target, overwrite=current_perms)
 
-        if update_db:
-            allow_bits, deny_bits = current_perms.pair()
-            async with self.bot.get_db() as session:
-                await self.update_permission_in_db(
-                    session, ctx.author.id, target.id, allow_bits, deny_bits, update_db
+class DatabasePermissionManager:
+    """Manages database operations for permissions."""
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    async def update_permission(
+        self,
+        session: AsyncSession,
+        member_id: int,
+        target_id: int,
+        allow_permissions_value: Permissions,
+        deny_permissions_value: Permissions,
+        update_db: Optional[Literal["+", "-"]],
+    ):
+        """Updates the permission in the database."""
+        if update_db is None:
+            return
+
+        if update_db == "+":
+            await ChannelPermissionQueries.add_or_update_permission(
+                session,
+                member_id,
+                target_id,
+                allow_permissions_value,
+                deny_permissions_value,
+            )
+        elif update_db == "-":
+            await ChannelPermissionQueries.remove_permission(session, member_id, target_id)
+
+    async def get_member_permissions(self, session: AsyncSession, member_id: int):
+        """Retrieves permissions for a member from the database."""
+        return await ChannelPermissionQueries.get_permissions_for_member(session, member_id)
+
+
+class PermissionLimitHandler:
+    """Handles permission limits for users."""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.message_sender = MessageSender()
+
+    async def check_and_handle_limit(
+        self, ctx, member_id: int, new_permission: discord.PermissionOverwrite
+    ):
+        """Checks and handles the permission limit for a user."""
+        premium_role = self._get_user_premium_role(ctx.author)
+        if not premium_role:
+            return
+
+        permission_limit = premium_role.get("permission_limit", 50)  # default to 50 if not set
+        async with self.bot.get_db() as session:
+            current_permissions = await DatabasePermissionManager(self.bot).get_member_permissions(
+                session, member_id
+            )
+
+            if len(current_permissions) >= permission_limit:
+                await self._handle_limit_exceeded(ctx, session, member_id, permission_limit)
+
+    async def _handle_limit_exceeded(self, ctx, session, member_id, permission_limit):
+        """Handles the case when a user exceeds their permission limit."""
+        current_permissions = await DatabasePermissionManager(self.bot).get_member_permissions(
+            session, member_id
+        )
+        current_permissions.sort(key=lambda p: p.created_at)
+        for permission in current_permissions:
+            if permission.permission_flag != "manage_messages":
+                await ChannelPermissionQueries.remove_permission(
+                    session, member_id, permission.target_id
                 )
+                await self.message_sender.send_permission_limit_exceeded(ctx, permission_limit)
+                break
 
-    async def move_to_afk_if_needed(self, ctx, target, target_channel, permission_flag, value):
-        """Move the target to the AFK channel if needed."""
+    def _get_user_premium_role(self, member):
+        """Gets the premium role of the member."""
+        premium_roles = self.bot.config["premium_roles"]
+        for role in reversed(premium_roles):
+            if any(r.name == role["name"] for r in member.roles):
+                return role
+        return None
+
+
+class AFKChannelManager:
+    """Manages AFK channel movements."""
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    async def move_if_needed(self, ctx, target, target_channel, permission_flag, value):
+        """Moves the target to the AFK channel if needed based on permission changes."""
         afk_channel_id = self.bot.config["channels_voice"]["afk"]
         afk_channel = ctx.guild.get_channel(afk_channel_id)
 
@@ -122,6 +214,17 @@ class VoiceCog(commands.Cog):
                     await target.move_to(afk_channel)
                     await target.move_to(ctx.author.voice.channel)
 
+
+class VoicePermissionManager:
+    """Manages voice channel permissions."""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.db_manager = DatabasePermissionManager(bot)
+        self.limit_handler = PermissionLimitHandler(bot)
+        self.afk_manager = AFKChannelManager(bot)
+        self.message_sender = MessageSender()
+
     async def modify_channel_permission(
         self,
         ctx,
@@ -132,43 +235,149 @@ class VoiceCog(commands.Cog):
         default_to_true=False,
         toggle=False,
     ):
-        """Modify the channel permission."""
+        """Modifies the channel permission for a target user."""
         current_channel = ctx.author.voice.channel
         current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
-        new_value = self.determine_new_permission_value(
-            current_perms, permission_flag, value, default_to_true, toggle
-        )
+        new_value = PermissionValueCalculator.determine_new_value(current_perms, permission_flag, value, default_to_true, toggle)
         setattr(current_perms, permission_flag, new_value)
 
-        await self.update_channel_and_db(ctx, target, current_perms, update_db)
-        await self.check_and_handle_permission_limit(ctx, ctx.author.id, current_perms)
+        await self._update_channel_and_db(ctx, target, current_perms, update_db)
+        await self.limit_handler.check_and_handle_limit(ctx, ctx.author.id, current_perms)
 
-        mention_str = target.mention
-        await ctx.reply(
-            f"Ustawiono uprawnienie {permission_flag} na {new_value} dla {mention_str}.",
-            allowed_mentions=AllowedMentions(users=False, roles=False),
-        )
+        if permission_flag == "manage_messages":
+            await self.message_sender.send_channel_mod_update(ctx, target, new_value)
+        else:
+            await self.message_sender.send_permission_update(ctx, target, permission_flag, new_value)
 
-        target_channel = target.voice.channel if target.voice else None
-        await self.move_to_afk_if_needed(ctx, target, target_channel, permission_flag, new_value)
+        await self.afk_manager.move_if_needed(ctx, target, target.voice.channel if target.voice else None, permission_flag, new_value)
+
+    async def _update_channel_and_db(self, ctx, target, current_perms, update_db):
+        """Updates the channel permissions and the database if required."""
+        await ctx.author.voice.channel.set_permissions(target, overwrite=current_perms)
+
+        if update_db:
+            allow_bits, deny_bits = current_perms.pair()
+            async with self.bot.get_db() as session:
+                await self.db_manager.update_permission(
+                    session, ctx.author.id, target.id, allow_bits, deny_bits, update_db
+                )
 
     async def can_manage_channel(self, member, channel):
-        """Check if a member has manage_messages permission on the channel."""
+        """Checks if a member has manage_messages permission on the channel."""
         overwrites = channel.overwrites_for(member)
         return overwrites.manage_messages is True
 
     async def can_assign_channel_mod(self, member, channel):
-        """Check if a member has priority_speaker permission on the channel."""
+        """Checks if a member has priority_speaker permission on the channel."""
         overwrites = channel.overwrites_for(member)
         return overwrites.priority_speaker is True
 
     async def get_premium_role_limit(self, member):
-        """Get the maximum number of channel mods a member can assign based on their premium role."""
+        """Gets the maximum number of channel mods a member can assign based on their premium role."""
         premium_roles = self.bot.config["premium_roles"]
         for role in reversed(premium_roles):
             if any(r.name == role["name"] for r in member.roles):
                 return premium_roles.index(role) + 1
         return 0
+
+
+class VoiceChannelManager:
+    """Manages voice channel operations."""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.message_sender = MessageSender()
+
+    async def join_channel(self, ctx):
+        """Joins the voice channel of the command author."""
+        if ctx.author.voice is None:
+            await self.message_sender.send_not_in_voice_channel(ctx)
+            return
+
+        channel = ctx.author.voice.channel
+
+        if ctx.voice_client is not None:
+            await ctx.voice_client.move_to(channel)
+        else:
+            await channel.connect()
+
+        await self.message_sender.send_joined_channel(ctx, channel)
+
+    async def set_channel_limit(self, ctx, max_members: int):
+        """Sets the member limit for the current voice channel."""
+        if ctx.author.voice is None:
+            await self.message_sender.send_not_in_voice_channel(ctx)
+            return
+
+        if max_members < 1 or max_members > 99:
+            await self.message_sender.send_invalid_member_limit(ctx)
+            return
+
+        voice_channel = ctx.author.voice.channel
+        await voice_channel.edit(user_limit=max_members)
+        await self.message_sender.send_member_limit_set(ctx, voice_channel, max_members)
+
+
+class ChannelModManager:
+    """Manages channel moderators."""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.permission_manager = VoicePermissionManager(bot)
+        self.message_sender = MessageSender()
+
+    async def check_prerequisites(self, ctx, target, can_manage):
+        """Checks prerequisites for assigning channel mod."""
+        author = ctx.author
+        voice_channel = author.voice.channel if author.voice else None
+
+        if not voice_channel:
+            await self.message_sender.send_not_in_voice_channel(ctx)
+            return False
+
+        if not await self.permission_manager.can_assign_channel_mod(author, voice_channel):
+            await self.message_sender.send_no_mod_permission(ctx)
+            return False
+
+        if author == target and can_manage == "-":
+            await self.message_sender.send_cant_remove_self_mod(ctx)
+            return False
+
+        return True
+
+    async def check_mod_limit(self, ctx, target, mod_limit, can_manage):
+        """Checks if the mod limit would be exceeded by this action."""
+        voice_channel = ctx.author.voice.channel
+        current_mods = [
+            t
+            for t, overwrite in voice_channel.overwrites.items()
+            if isinstance(t, discord.Member) and overwrite.manage_messages is True
+        ]
+
+        author_is_mod = await self.permission_manager.can_manage_channel(ctx.author, voice_channel)
+        current_mods_count = len(current_mods) + (1 if author_is_mod else 0)
+
+        if (
+            can_manage == "+"
+            or (
+                can_manage is None
+                and not await self.permission_manager.can_manage_channel(target, voice_channel)
+            )
+        ) and current_mods_count > mod_limit:
+            await self.message_sender.send_mod_limit_exceeded(ctx, mod_limit, current_mods)
+            return True
+
+        return False
+
+
+class VoiceCog(commands.Cog):
+    """Voice commands cog for managing voice channel permissions and operations."""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.permission_manager = VoicePermissionManager(bot)
+        self.channel_manager = VoiceChannelManager(bot)
+        self.mod_manager = ChannelModManager(bot)
 
     @commands.hybrid_command(aliases=["v"])
     @commands.has_permissions(administrator=True)
@@ -179,8 +388,10 @@ class VoiceCog(commands.Cog):
         can_view: Optional[Literal["+", "-"]] = None,
         update_db: Optional[Literal["+", "-"]] = None,
     ):
-        """Set the view permission for the target."""
-        await self.modify_channel_permission(ctx, target, "view_channel", can_view, update_db)
+        """Sets the view permission for the target."""
+        await self.permission_manager.modify_channel_permission(
+            ctx, target, "view_channel", can_view, update_db
+        )
 
     @commands.hybrid_command(aliases=["c"])
     @commands.has_permissions(administrator=True)
@@ -196,8 +407,10 @@ class VoiceCog(commands.Cog):
         can_connect: Optional[Literal["+", "-"]] = None,
         update_db: Optional[Literal["+", "-"]] = None,
     ):
-        """Set the connect permission for the target."""
-        await self.modify_channel_permission(ctx, target, "connect", can_connect, update_db)
+        """Sets the connect permission for the target."""
+        await self.permission_manager.modify_channel_permission(
+            ctx, target, "connect", can_connect, update_db
+        )
 
     @commands.hybrid_command(aliases=["s"])
     @commands.has_permissions(administrator=True)
@@ -208,41 +421,22 @@ class VoiceCog(commands.Cog):
         can_speak: Optional[Literal["+", "-"]] = None,
         update_db: Optional[Literal["+", "-"]] = None,
     ):
-        """Set the speak permission for the target."""
-        await self.modify_channel_permission(ctx, target, "speak", can_speak, update_db)
+        """Sets the speak permission for the target."""
+        await self.permission_manager.modify_channel_permission(
+            ctx, target, "speak", can_speak, update_db
+        )
 
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
     async def join(self, ctx):
-        """Join the voice channel of the person who used the command."""
-        if ctx.author.voice is None:
-            await ctx.send("Nie jesteś na żadnym kanale głosowym!")
-            return
-
-        channel = ctx.author.voice.channel
-
-        if ctx.voice_client is not None:
-            await ctx.voice_client.move_to(channel)
-        else:
-            await channel.connect()
-
-        await ctx.send(f"Dołączono do {channel}")
+        """Joins the voice channel of the person who used the command."""
+        await self.channel_manager.join_channel(ctx)
 
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
     async def limit(self, ctx, max_members: int):
-        """Change the maximum number of members that can join the current voice channel."""
-        if ctx.author.voice is None:
-            await ctx.reply("Nie jesteś na żadnym kanale głosowym!")
-            return
-
-        if max_members < 1 or max_members > 99:
-            await ctx.reply("Podaj liczbę członków od 1 do 99.")
-            return
-
-        voice_channel = ctx.author.voice.channel
-        await voice_channel.edit(user_limit=max_members)
-        await ctx.reply(f"Limit członków na kanale {voice_channel} ustawiony na {max_members}.")
+        """Changes the maximum number of members that can join the current voice channel."""
+        await self.channel_manager.set_channel_limit(ctx, max_members)
 
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
@@ -258,50 +452,15 @@ class VoiceCog(commands.Cog):
         can_manage: Optional[Literal["+", "-"]] = None,
         update_db: Optional[Literal["+", "-"]] = None,
     ):
-        """Set the can_manage permission for the target."""
-        author = ctx.author
-        voice_channel = author.voice.channel if author.voice else None
-
-        if not voice_channel:
-            await ctx.send("Nie jesteś na żadnym kanale głosowym!")
+        """Sets the can_manage permission for the target."""
+        if not await self.mod_manager.check_prerequisites(ctx, target, can_manage):
             return
 
-        if not await self.can_assign_channel_mod(author, voice_channel):
-            await ctx.send("Nie masz uprawnień do nadawania channel moda!")
+        mod_limit = await self.permission_manager.get_premium_role_limit(ctx.author)
+        if await self.mod_manager.check_mod_limit(ctx, target, mod_limit, can_manage):
             return
 
-        if author == target and can_manage == "-":
-            await ctx.send("Nie możesz odebrać sobie uprawnień do zarządzania kanałem!")
-            return
-
-        mod_limit = await self.get_premium_role_limit(author)
-        current_mods = [
-            target
-            for target, overwrite in voice_channel.overwrites.items()
-            if isinstance(target, discord.Member) and overwrite.manage_messages is True
-        ]
-
-        # Count the author as one of the mods if they have manage_messages permission
-        author_is_mod = await self.can_manage_channel(author, voice_channel)
-        current_mods_count = len(current_mods)
-        if author_is_mod:
-            current_mods_count += 1
-
-        # If adding or toggling the permission and it exceeds the limit, send an error message
-        if (
-            can_manage == "+"
-            or (can_manage is None and not await self.can_manage_channel(target, voice_channel))
-        ) and current_mods_count > mod_limit:
-            current_mods_mentions = ", ".join(
-                [member.mention for member in current_mods if member != author]
-            )
-            await ctx.send(
-                f"Możesz przypisać maksymalnie {mod_limit - 1} channel modów. Aktualni channel modzi: {current_mods_mentions}.",
-                allowed_mentions=AllowedMentions(users=False, roles=False),
-            )
-            return
-
-        await self.modify_channel_permission(
+        await self.permission_manager.modify_channel_permission(
             ctx,
             target,
             "manage_messages",
