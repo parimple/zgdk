@@ -145,9 +145,9 @@ class OnMemberJoinEvent(commands.Cog):
                     datetime.now(timezone.utc),
                 )
                 await session.commit()
-                logger.info(
-                    f"Invite {invite.code} (ID: {invite.id}) created and added to database."
-                )
+                # logger.info(
+                #     f"Invite {invite.code} (ID: {invite.id}) created and added to database."
+                # )
             except Exception as e:
                 logger.error(f"Error adding invite {invite.id} to database: {str(e)}")
                 await session.rollback()
@@ -167,9 +167,9 @@ class OnMemberJoinEvent(commands.Cog):
             try:
                 await InviteQueries.delete_invite(session, invite.id)
                 await session.commit()
-                logger.info(
-                    f"Invite {invite.code} (ID: {invite.id}) deleted from Discord and database."
-                )
+                # logger.info(
+                #     f"Invite {invite.code} (ID: {invite.id}) deleted from Discord and database."
+                # )
             except Exception as e:
                 logger.error(f"Error deleting invite {invite.id} from database: {str(e)}")
                 await session.rollback()
@@ -187,7 +187,7 @@ class OnMemberJoinEvent(commands.Cog):
             for db_invite in db_invites:
                 if db_invite.id not in discord_invite_ids:
                     await InviteQueries.delete_invite(session, db_invite.id)
-                    logger.info(f"Deleted invite from database: {db_invite.id}")
+                    # logger.info(f"Deleted invite from database: {db_invite.id}")
 
             # Dodaj lub zaktualizuj zaproszenia z Discord w bazie danych
             for invite in guild_invites:
@@ -274,16 +274,16 @@ class OnMemberJoinEvent(commands.Cog):
                             deleted_count += 1
                             expired_count += 1
                             guild_invites.remove(discord_invite)
-                            logger.info(f"Deleted expired invite: {db_invite.id}")
+                            # logger.info(f"Deleted expired invite: {db_invite.id}")
                         except Exception as e:
                             logger.error(f"Error deleting invite {db_invite.id}: {str(e)}")
                     else:
                         await InviteQueries.delete_invite(session, db_invite.id)
                         deleted_count += 1
                         not_found_count += 1
-                        logger.info(
-                            f"Deleted invite from database (not found on Discord): {db_invite.id}"
-                        )
+                        # logger.info(
+                        #     f"Deleted invite from database (not found on Discord): {db_invite.id}"
+                        # )
 
             await session.commit()
 

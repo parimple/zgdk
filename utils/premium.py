@@ -72,17 +72,25 @@ class PremiumManager:
             except discord.NotFound:
                 logger.info("Member not found with ID: %s", user_id)
 
-        # Try to get member by exact name or display name
+        # Try to get member by exact name or display name (case-insensitive)
         logger.info("get_member_id: %s from guild: %s", name_or_id, self.guild)
-        member = self.guild.get_member_named(name_or_id)
-        if member:
-            return member
+        name_or_id_lower = name_or_id.lower()
+        for member in self.guild.members:
+            if (
+                (member.name and name_or_id_lower == member.name.lower())
+                or (member.display_name and name_or_id_lower == member.display_name.lower())
+                or (member.global_name and name_or_id_lower == member.global_name.lower())
+            ):
+                return member
 
-        # Try to search for partial match in display name or username
-        for m in self.guild.members:
-            if name_or_id.lower() in m.display_name.lower() or name_or_id.lower() in m.name.lower():
-                return m
+        # Try to search for partial match in display name, username or global name
+        # for member in self.guild.members:
+        #     if ((member.name and name_or_id_lower in member.name.lower()) or
+        #         (member.display_name and name_or_id_lower in member.display_name.lower()) or
+        #         (member.global_name and name_or_id_lower in member.global_name.lower())):
+        #         return member
 
+        logger.warning(f"Member not found: {name_or_id}")
         return None
 
     @staticmethod
