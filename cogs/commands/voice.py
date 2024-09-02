@@ -1,14 +1,14 @@
 """Voice commands cog for managing voice channel permissions and operations."""
 
-from typing import Literal, Optional
+from typing import Literal, Optional, Tuple, Union
 
 import discord
 from discord import AllowedMentions, Member, PermissionOverwrite, Permissions
 from discord.ext import commands
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.user import get_target_user
 
 from datasources.queries import ChannelPermissionQueries
+from utils.user import get_target_user
 
 
 class MessageSender:
@@ -17,11 +17,18 @@ class MessageSender:
     @staticmethod
     async def send_permission_update(ctx, target, permission_flag, new_value):
         """Sends a message about the updated permission."""
-        mention_str = target.mention
+        mention_str = (
+            target.mention if isinstance(target, discord.Member) else "użytkownik nie znaleziony"
+        )
         await ctx.reply(
             f"Ustawiono uprawnienie {permission_flag} na {new_value} dla {mention_str}.",
             allowed_mentions=AllowedMentions(users=False, roles=False),
         )
+
+    @staticmethod
+    async def send_user_not_found(ctx):
+        """Sends a message when the target user is not found."""
+        await ctx.send("Nie znaleziono użytkownika.")
 
     @staticmethod
     async def send_not_in_voice_channel(ctx):
@@ -71,7 +78,7 @@ class MessageSender:
             f"Osiągnąłeś limit {permission_limit} uprawnień. Najstarsze uprawnienie nie dotyczące zarządzania wiadomościami zostało nadpisane. Aby uzyskać więcej uprawnień, rozważ zakup wyższej rangi premium.",
             allowed_mentions=AllowedMentions(users=False, roles=False),
         )
-    
+
     @staticmethod
     async def send_channel_mod_update(ctx, target, is_mod):
         """Sends a message about updating channel mod status."""
@@ -82,41 +89,31 @@ class MessageSender:
         )
 
 
-class PermissionValueCalculator:
-    """Calculates new permission values."""
-
-    @staticmethod
-    def determine_new_value(
-        current_perms,
-        permission_flag: str,
-        value: Optional[Literal["+", "-"]],
-        default_to_true=False,
-        toggle=False,
-    ):
-        """Determines the new permission value based on inputs."""
-        current_value = getattr(current_perms, permission_flag, None)
-
-        if toggle:
-            return None if current_value is True else True
-
-        if value is None:
-            if current_value is None:
-                return True if default_to_true else False
-            return not current_value
-
-        if value == "+":
-            return True
-        if value == "-":
-            if permission_flag == "manage_messages":
-                return None
-            return False
-
-
-class DatabasePermissionManager:
-    """Manages database operations for permissions."""
+class DatabaseManager:
+    """Manages database operations."""
 
     def __init__(self, bot):
         self.bot = bot
+
+    async def should_update_db(
+        self, member: discord.Member, voice_channel: Optional[discord.VoiceChannel]
+    ) -> bool:
+        """
+        Determine if the database should be updated based on the member's roles and voice channel.
+
+        :param member: The member to check
+        :param voice_channel: The voice channel the member is in (if any)
+        :return: True if the database should be updated, False otherwise
+        """
+        has_premium = any(
+            role["name"] in [r.name for r in member.roles]
+            for role in self.bot.config["premium_roles"]
+        )
+        is_in_specific_category = (
+            voice_channel
+            and voice_channel.category_id in self.bot.config.get("premium_categories", [])
+        )
+        return has_premium and is_in_specific_category
 
     async def update_permission(
         self,
@@ -147,14 +144,87 @@ class DatabasePermissionManager:
         return await ChannelPermissionQueries.get_permissions_for_member(session, member_id)
 
 
-class PermissionLimitHandler:
-    """Handles permission limits for users."""
+class VoicePermissionManager:
+    """Manages voice channel permissions."""
 
     def __init__(self, bot):
         self.bot = bot
+        self.db_manager = DatabaseManager(bot)
         self.message_sender = MessageSender()
 
-    async def check_and_handle_limit(
+    async def modify_channel_permission(
+        self,
+        ctx,
+        target,
+        permission_flag: str,
+        value: Optional[Literal["+", "-"]],
+        update_db: Optional[Literal["+", "-"]],
+        default_to_true=False,
+        toggle=False,
+    ):
+        """Modifies the channel permission for a target user."""
+        current_channel = ctx.author.voice.channel
+        current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
+        new_value = self._determine_new_permission_value(
+            current_perms, permission_flag, value, default_to_true, toggle
+        )
+        setattr(current_perms, permission_flag, new_value)
+
+        await self._update_channel_permission(ctx, target, current_perms)
+        await self._update_db_permission(ctx, target, current_perms, update_db)
+        await self._check_and_handle_permission_limit(ctx, ctx.author.id, current_perms)
+
+        if permission_flag == "manage_messages":
+            await self.message_sender.send_channel_mod_update(ctx, target, new_value)
+        else:
+            await self.message_sender.send_permission_update(
+                ctx, target, permission_flag, new_value
+            )
+
+        await self._move_to_afk_if_needed(
+            ctx, target, target.voice.channel if target.voice else None, permission_flag, new_value
+        )
+
+    def _determine_new_permission_value(
+        self,
+        current_perms,
+        permission_flag: str,
+        value: Optional[Literal["+", "-"]],
+        default_to_true=False,
+        toggle=False,
+    ):
+        """Determines the new permission value based on inputs."""
+        current_value = getattr(current_perms, permission_flag, None)
+
+        if toggle:
+            return None if current_value is True else True
+
+        if value is None:
+            if current_value is None:
+                return True if default_to_true else False
+            return not current_value
+
+        if value == "+":
+            return True
+        if value == "-":
+            if permission_flag == "manage_messages":
+                return None
+            return False
+
+    async def _update_channel_permission(self, ctx, target, current_perms):
+        """Updates the channel permissions."""
+        await ctx.author.voice.channel.set_permissions(target, overwrite=current_perms)
+
+    async def _update_db_permission(self, ctx, target, current_perms, update_db):
+        """Updates the database permissions if required."""
+        if update_db:
+            allow_bits, deny_bits = current_perms.pair()
+            async with self.bot.get_db() as session:
+                await self.db_manager.update_permission(
+                    session, ctx.author.id, target.id, allow_bits, deny_bits, update_db
+                )
+
+    async def _check_and_handle_permission_limit(
         self, ctx, member_id: int, new_permission: discord.PermissionOverwrite
     ):
         """Checks and handles the permission limit for a user."""
@@ -164,18 +234,14 @@ class PermissionLimitHandler:
 
         permission_limit = premium_role.get("permission_limit", 50)  # default to 50 if not set
         async with self.bot.get_db() as session:
-            current_permissions = await DatabasePermissionManager(self.bot).get_member_permissions(
-                session, member_id
-            )
+            current_permissions = await self.db_manager.get_member_permissions(session, member_id)
 
             if len(current_permissions) >= permission_limit:
                 await self._handle_limit_exceeded(ctx, session, member_id, permission_limit)
 
     async def _handle_limit_exceeded(self, ctx, session, member_id, permission_limit):
         """Handles the case when a user exceeds their permission limit."""
-        current_permissions = await DatabasePermissionManager(self.bot).get_member_permissions(
-            session, member_id
-        )
+        current_permissions = await self.db_manager.get_member_permissions(session, member_id)
         current_permissions.sort(key=lambda p: p.created_at)
         for permission in current_permissions:
             if permission.permission_flag != "manage_messages":
@@ -193,14 +259,7 @@ class PermissionLimitHandler:
                 return role
         return None
 
-
-class AFKChannelManager:
-    """Manages AFK channel movements."""
-
-    def __init__(self, bot):
-        self.bot = bot
-
-    async def move_if_needed(self, ctx, target, target_channel, permission_flag, value):
+    async def _move_to_afk_if_needed(self, ctx, target, target_channel, permission_flag, value):
         """Moves the target to the AFK channel if needed based on permission changes."""
         afk_channel_id = self.bot.config["channels_voice"]["afk"]
         afk_channel = ctx.guild.get_channel(afk_channel_id)
@@ -213,54 +272,6 @@ class AFKChannelManager:
                 if afk_channel:
                     await target.move_to(afk_channel)
                     await target.move_to(ctx.author.voice.channel)
-
-
-class VoicePermissionManager:
-    """Manages voice channel permissions."""
-
-    def __init__(self, bot):
-        self.bot = bot
-        self.db_manager = DatabasePermissionManager(bot)
-        self.limit_handler = PermissionLimitHandler(bot)
-        self.afk_manager = AFKChannelManager(bot)
-        self.message_sender = MessageSender()
-
-    async def modify_channel_permission(
-        self,
-        ctx,
-        target: Member,
-        permission_flag: str,
-        value: Optional[Literal["+", "-"]],
-        update_db: Optional[Literal["+", "-"]],
-        default_to_true=False,
-        toggle=False,
-    ):
-        """Modifies the channel permission for a target user."""
-        current_channel = ctx.author.voice.channel
-        current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
-        new_value = PermissionValueCalculator.determine_new_value(current_perms, permission_flag, value, default_to_true, toggle)
-        setattr(current_perms, permission_flag, new_value)
-
-        await self._update_channel_and_db(ctx, target, current_perms, update_db)
-        await self.limit_handler.check_and_handle_limit(ctx, ctx.author.id, current_perms)
-
-        if permission_flag == "manage_messages":
-            await self.message_sender.send_channel_mod_update(ctx, target, new_value)
-        else:
-            await self.message_sender.send_permission_update(ctx, target, permission_flag, new_value)
-
-        await self.afk_manager.move_if_needed(ctx, target, target.voice.channel if target.voice else None, permission_flag, new_value)
-
-    async def _update_channel_and_db(self, ctx, target, current_perms, update_db):
-        """Updates the channel permissions and the database if required."""
-        await ctx.author.voice.channel.set_permissions(target, overwrite=current_perms)
-
-        if update_db:
-            allow_bits, deny_bits = current_perms.pair()
-            async with self.bot.get_db() as session:
-                await self.db_manager.update_permission(
-                    session, ctx.author.id, target.id, allow_bits, deny_bits, update_db
-                )
 
     async def can_manage_channel(self, member, channel):
         """Checks if a member has manage_messages permission on the channel."""
@@ -378,97 +389,157 @@ class VoiceCog(commands.Cog):
         self.permission_manager = VoicePermissionManager(bot)
         self.channel_manager = VoiceChannelManager(bot)
         self.mod_manager = ChannelModManager(bot)
+        self.message_sender = MessageSender()
+        self.db_manager = DatabaseManager(bot)
+
+    async def _get_target(
+        self, ctx, target: Optional[Union[discord.Member, str]] = None
+    ) -> Union[discord.Member, discord.Role]:
+        """
+        Get the target member or role.
+
+        :param ctx: The command context
+        :param target: The target user input (can be None, Member object, ID, mention, or username)
+        :return: Target member, @everyone role if target is None, or None if not found
+        """
+        target_member = await get_target_user(ctx, target)
+        if target_member:
+            return target_member
+        elif target is None:
+            return ctx.guild.default_role  # @everyone role
+        else:
+            await self.message_sender.send_user_not_found(ctx)
+            return None
+
+    async def _get_target_and_update_db(
+        self, ctx, target: Optional[Union[discord.Member, str]] = None
+    ) -> Tuple[Optional[Union[discord.Member, discord.Role]], bool]:
+        """
+        Get the target and determine if the database should be updated.
+
+        :param ctx: The command context
+        :param target: The target user input
+        :return: Tuple of (target_member_or_role, update_db)
+        """
+        target_member_or_role = await self._get_target(ctx, target)
+        if not target_member_or_role:
+            return None, False
+
+        update_db = await self.db_manager.should_update_db(
+            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
+        )
+        return target_member_or_role, update_db
+
+    @commands.hybrid_command(aliases=["s"])
+    @commands.has_permissions(administrator=True)
+    @discord.app_commands.describe(
+        target="User to modify permissions (ID, mention, or username)",
+        can_speak="Set speak permission (+ or -)",
+    )
+    async def speak(
+        self,
+        ctx,
+        target: Optional[Union[discord.Member, str]] = None,
+        can_speak: Optional[Literal["+", "-"]] = None,
+    ):
+        """Set the speak permission for the target."""
+        target_member_or_role, update_db = await self._get_target_and_update_db(ctx, target)
+        if not target_member_or_role:
+            return
+
+        await self.permission_manager.modify_channel_permission(
+            ctx, target_member_or_role, "speak", can_speak, update_db
+        )
 
     @commands.hybrid_command(aliases=["v"])
     @commands.has_permissions(administrator=True)
+    @discord.app_commands.describe(
+        target="User to modify permissions (ID, mention, or username)",
+        can_view="Set view permission (+ or -)",
+    )
     async def view(
         self,
         ctx,
-        target: Optional[Member] = None,
+        target: Optional[Union[discord.Member, str]] = None,
         can_view: Optional[Literal["+", "-"]] = None,
-        update_db: Optional[Literal["+", "-"]] = None,
     ):
-        """Sets the view permission for the target."""
+        """Set the view permission for the target."""
+        target_member_or_role, update_db = await self._get_target_and_update_db(ctx, target)
+        if not target_member_or_role:
+            return
+
         await self.permission_manager.modify_channel_permission(
-            ctx, target, "view_channel", can_view, update_db
+            ctx, target_member_or_role, "view_channel", can_view, update_db
         )
 
     @commands.hybrid_command(aliases=["c"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="Wybierz użytkownika",
-        can_connect="Ustal uprawnienie do połączenia",
-        update_db="Zaktualizuj uprawnienia w bazie danych",
+        target="User to modify permissions (ID, mention, or username)",
+        can_connect="Set connect permission (+ or -)",
     )
     async def connect(
         self,
         ctx,
-        target: Optional[Member] = None,
+        target: Optional[Union[discord.Member, str]] = None,
         can_connect: Optional[Literal["+", "-"]] = None,
-        update_db: Optional[Literal["+", "-"]] = None,
     ):
-        """Sets the connect permission for the target."""
+        """Set the connect permission for the target."""
+        target_member_or_role, update_db = await self._get_target_and_update_db(ctx, target)
+        if not target_member_or_role:
+            return
+
         await self.permission_manager.modify_channel_permission(
-            ctx, target, "connect", can_connect, update_db
+            ctx, target_member_or_role, "connect", can_connect, update_db
         )
-
-    @commands.hybrid_command(aliases=["s"])
-    @commands.has_permissions(administrator=True)
-    async def speak(
-        self,
-        ctx,
-        target: Optional[Member] = None,
-        can_speak: Optional[Literal["+", "-"]] = None,
-        update_db: Optional[Literal["+", "-"]] = None,
-    ):
-        """Sets the speak permission for the target."""
-        await self.permission_manager.modify_channel_permission(
-            ctx, target, "speak", can_speak, update_db
-        )
-
-    @commands.hybrid_command()
-    @commands.has_permissions(administrator=True)
-    async def join(self, ctx):
-        """Joins the voice channel of the person who used the command."""
-        await self.channel_manager.join_channel(ctx)
-
-    @commands.hybrid_command()
-    @commands.has_permissions(administrator=True)
-    async def limit(self, ctx, max_members: int):
-        """Changes the maximum number of members that can join the current voice channel."""
-        await self.channel_manager.set_channel_limit(ctx, max_members)
 
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="Użytkownik, którego chcesz dodać lub usunąć jako channel mod",
-        can_manage="Ustal uprawnienie do zarządzania kanałem (+ lub -)",
-        update_db="Zaktualizuj uprawnienia w bazie danych (+ lub -)",
+        target="User to add or remove as channel mod (ID, mention, or username)",
+        can_manage="Add (+) or remove (-) channel mod permissions",
     )
     async def channel_mod(
         self,
         ctx,
-        target: Member,
+        target: Optional[Union[discord.Member, str]] = None,
         can_manage: Optional[Literal["+", "-"]] = None,
-        update_db: Optional[Literal["+", "-"]] = None,
     ):
-        """Sets the can_manage permission for the target."""
-        if not await self.mod_manager.check_prerequisites(ctx, target, can_manage):
+        """Add or remove channel moderator permissions for the selected user."""
+        target_member_or_role, update_db = await self._get_target_and_update_db(ctx, target)
+        if not target_member_or_role:
+            return
+
+        if not await self.mod_manager.check_prerequisites(ctx, target_member_or_role, can_manage):
             return
 
         mod_limit = await self.permission_manager.get_premium_role_limit(ctx.author)
-        if await self.mod_manager.check_mod_limit(ctx, target, mod_limit, can_manage):
+        if await self.mod_manager.check_mod_limit(
+            ctx, target_member_or_role, mod_limit, can_manage
+        ):
             return
 
         await self.permission_manager.modify_channel_permission(
             ctx,
-            target,
+            target_member_or_role,
             "manage_messages",
             can_manage,
             update_db,
             default_to_true=True,
             toggle=(can_manage is None),
         )
+
+    @commands.hybrid_command()
+    @commands.has_permissions(administrator=True)
+    async def join(self, ctx):
+        """Join the voice channel of the person who used the command."""
+        await self.channel_manager.join_channel(ctx)
+
+    @commands.hybrid_command()
+    @commands.has_permissions(administrator=True)
+    async def limit(self, ctx, max_members: int):
+        """Change the maximum number of members that can join the current voice channel."""
+        await self.channel_manager.set_channel_limit(ctx, max_members)
 
 
 async def setup(bot):
