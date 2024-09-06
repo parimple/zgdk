@@ -89,6 +89,14 @@ class MessageSender:
             allowed_mentions=AllowedMentions(users=False, roles=False),
         )
 
+    @staticmethod
+    async def send_voice_channel_info(ctx, author_info, target_info=None):
+        """Sends a message with voice channel information."""
+        message = author_info
+        if target_info:
+            message += f"\n{target_info}"
+        await ctx.send(message)
+
 
 class DatabaseManager:
     """Manages database operations."""
@@ -459,6 +467,15 @@ class TargetHelper:
 
         return target_member_or_role, update_db
 
+    async def get_voice_channel_info(self, member: Member) -> str:
+        """Get voice channel information for a member."""
+        if member.voice and member.voice.channel:
+            channel = member.voice.channel
+            link = f"https://discord.com/channels/{member.guild.id}/{channel.id}"
+            return f"Kanał głosowy użytkownika {member.display_name}: {link}"
+        else:
+            return f"{member.display_name} nie jest na żadnym kanale głosowym."
+
 
 class VoiceCog(commands.Cog):
     """Voice commands cog for managing voice channel permissions and operations."""
@@ -573,6 +590,23 @@ class VoiceCog(commands.Cog):
     async def limit(self, ctx, max_members: int):
         """Change the maximum number of members that can join the current voice channel."""
         await self.channel_manager.set_channel_limit(ctx, max_members)
+
+    @commands.hybrid_command(aliases=["vc"])
+    @commands.has_permissions(administrator=True)
+    @discord.app_commands.describe(
+        target="User to check voice channel (ID, mention, or username)",
+    )
+    async def voicechat(self, ctx, target: Optional[Member] = None):
+        """Send a link to the user's voice channel and/or the target's voice channel."""
+        author_info = await self.target_helper.get_voice_channel_info(ctx.author)
+        
+        target_info = None
+        if target:
+            target_member = await self.target_helper.get_target(ctx, target)
+            if target_member:
+                target_info = await self.target_helper.get_voice_channel_info(target_member)
+
+        await self.message_sender.send_voice_channel_info(ctx, author_info, target_info)
 
 
 async def setup(bot):
