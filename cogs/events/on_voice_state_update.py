@@ -50,28 +50,25 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                 return
 
     async def add_db_overwrites_to_permissions(self, member_id, permission_overwrites):
-        """Fetch permissions from the database
-        and add them to the provided permission_overwrites dict."""
+        """Fetch permissions from the database and add them to the provided permission_overwrites dict."""
         async with self.bot.get_db() as session:
             member_permissions = await ChannelPermissionQueries.get_permissions_for_member(
-                session, member_id
+                session, member_id, limit=95
             )
 
-        db_overwrites = {}
         for permission in member_permissions:
-            overwrite = discord.PermissionOverwrite.from_pair(
-                permission.permissions_value, discord.Permissions(0)
-            )
-            db_overwrites[permission.target_id] = overwrite
+            allow_permissions = discord.Permissions(permission.allow_permissions_value)
+            deny_permissions = discord.Permissions(permission.deny_permissions_value)
+            overwrite = discord.PermissionOverwrite.from_pair(allow_permissions, deny_permissions)
 
-        if len(db_overwrites) > 95:
-            first_95_overwrites = {k: db_overwrites[k] for k in list(db_overwrites.keys())[:95]}
-            remaining_overwrites = {k: db_overwrites[k] for k in list(db_overwrites.keys())[95:]}
-            permission_overwrites.update(first_95_overwrites)
-            return remaining_overwrites
-        else:
-            permission_overwrites.update(db_overwrites)
-            return None
+            # Konwertuj target_id na odpowiedni obiekt Discord
+            target = self.guild.get_member(permission.target_id) or self.guild.get_role(
+                permission.target_id
+            )
+            if target:
+                permission_overwrites[target] = overwrite
+
+        return None
 
     async def handle_create_channel(self, member, after):
         """

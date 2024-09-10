@@ -327,10 +327,10 @@ class ChannelPermissionQueries:
         target_id: int,
         allow_permissions_value: int,
         deny_permissions_value: int,
+        guild_id: int,
     ):
         """Add or update channel permissions for a specific member or role."""
         permission = await session.get(ChannelPermission, (member_id, target_id))
-
         if permission is None:
             permission = ChannelPermission(
                 member_id=member_id,
@@ -348,6 +348,29 @@ class ChannelPermissionQueries:
                 permission.deny_permissions_value | deny_permissions_value
             ) & ~allow_permissions_value
             permission.last_updated_at = datetime.now(timezone.utc)
+
+        # Usuń najstarsze uprawnienie, jeśli przekroczono limit
+        permissions_count = await session.scalar(
+            select(func.count())
+            .select_from(ChannelPermission)
+            .where(ChannelPermission.member_id == member_id)
+        )
+        if permissions_count > 95:
+            oldest_permission = await session.execute(
+                select(ChannelPermission)
+                .where(
+                    (ChannelPermission.member_id == member_id)
+                    & (ChannelPermission.allow_permissions_value.bitwise_and(0x00002000) == 0)
+                    & (  # not manage_messages
+                        ChannelPermission.target_id != guild_id
+                    )  # not everyone permissions
+                )
+                .order_by(ChannelPermission.last_updated_at.asc())
+                .limit(1)
+            )
+            oldest_permission = oldest_permission.scalar_one_or_none()
+            if oldest_permission:
+                await session.delete(oldest_permission)
 
     @staticmethod
     async def remove_permission(session: AsyncSession, member_id: int, target_id: int):
@@ -378,11 +401,24 @@ class ChannelPermissionQueries:
 
     @staticmethod
     async def get_permissions_for_member(
-        session: AsyncSession, member_id: int
+        session: AsyncSession, member_id: int, limit: int = 95
     ) -> List[ChannelPermission]:
-        """Get all channel permissions across different channels for a specific member."""
+        """Get channel permissions for a specific member, limited to the most recent ones."""
         result = await session.execute(
-            select(ChannelPermission).where(ChannelPermission.member_id == member_id)
+            select(ChannelPermission)
+            .where(ChannelPermission.member_id == member_id)
+            .order_by(
+                case(
+                    (
+                        ChannelPermission.allow_permissions_value.bitwise_and(0x00002000) != 0,
+                        0,
+                    ),  # manage_messages
+                    (ChannelPermission.target_id == member_id, 0),  # everyone permissions
+                    else_=1,
+                ),
+                ChannelPermission.last_updated_at.desc(),
+            )
+            .limit(limit)
         )
         return result.scalars().all()
 

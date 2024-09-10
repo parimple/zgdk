@@ -21,7 +21,7 @@ async def get_target_user(
         if ctx.message.reference:
             # Check if the message is a reply
             return ctx.message.reference.resolved.author
-        
+
         # Extract potential target from the second word in message content
         message_parts = ctx.message.content.split()
         if len(message_parts) > 1:

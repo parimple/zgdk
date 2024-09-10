@@ -17,9 +17,7 @@ class MessageSender:
     @staticmethod
     async def send_permission_update(ctx, target, permission_flag, new_value):
         """Sends a message about the updated permission."""
-        mention_str = (
-            target.mention if isinstance(target, discord.Member) else "wszystkich"
-        )
+        mention_str = target.mention if isinstance(target, discord.Member) else "wszystkich"
         value_str = "+" if new_value else "-"
         await ctx.reply(
             f"Ustawiono uprawnienie {permission_flag} na {value_str} dla {mention_str}.",
@@ -47,9 +45,9 @@ class MessageSender:
         await ctx.reply("Podaj liczbę członków od 1 do 99.")
 
     @staticmethod
-    async def send_member_limit_set(ctx, voice_channel, max_members):
+    async def send_member_limit_set(ctx, voice_channel, limit_text):
         """Sends a message when the member limit is set."""
-        await ctx.reply(f"Limit członków na kanale {voice_channel} ustawiony na {max_members}.")
+        await ctx.reply(f"Limit członków na kanale {voice_channel} ustawiony na {limit_text}.")
 
     @staticmethod
     async def send_no_mod_permission(ctx):
@@ -171,7 +169,7 @@ class VoicePermissionManager:
         default_to_true=False,
         toggle=False,
     ):
-        """Modifies the channel permission for a target user."""
+        """Modifies the channel permission for a target user or role."""
         current_channel = ctx.author.voice.channel
         current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
         new_value = self._determine_new_permission_value(
@@ -190,9 +188,14 @@ class VoicePermissionManager:
                 ctx, target, permission_flag, new_value
             )
 
-        await self._move_to_afk_if_needed(
-            ctx, target, target.voice.channel if target.voice else None, permission_flag, new_value
-        )
+        if (
+            isinstance(target, discord.Member)
+            and target.voice
+            and target.voice.channel == current_channel
+        ):
+            await self._move_to_afk_if_needed(
+                ctx, target, target.voice.channel, permission_flag, new_value
+            )
 
     def _determine_new_permission_value(
         self,
@@ -229,8 +232,13 @@ class VoicePermissionManager:
         if update_db:
             allow_bits, deny_bits = current_perms.pair()
             async with self.bot.get_db() as session:
-                await self.db_manager.update_permission(
-                    session, ctx.author.id, target.id, allow_bits, deny_bits, update_db
+                await ChannelPermissionQueries.add_or_update_permission(
+                    session,
+                    ctx.author.id,
+                    target.id,
+                    allow_bits.value,
+                    deny_bits.value,
+                    ctx.guild.id,
                 )
 
     async def _check_and_handle_permission_limit(
@@ -329,13 +337,16 @@ class VoiceChannelManager:
             await self.message_sender.send_not_in_voice_channel(ctx)
             return
 
-        if max_members < 1 or max_members > 99:
-            await self.message_sender.send_invalid_member_limit(ctx)
-            return
+        if max_members > 99:
+            max_members = 0  # Set to 0 for unlimited
+        elif max_members < 1:
+            max_members = 1  # Set to 1 as the minimum
 
         voice_channel = ctx.author.voice.channel
         await voice_channel.edit(user_limit=max_members)
-        await self.message_sender.send_member_limit_set(ctx, voice_channel, max_members)
+
+        limit_text = "brak limitu" if max_members == 0 else str(max_members)
+        await self.message_sender.send_member_limit_set(ctx, voice_channel, limit_text)
 
 
 class ChannelModManager:
@@ -448,7 +459,10 @@ class TargetHelper:
         return target_member_or_role, update_db
 
     async def validate_and_get_target(
-        self, ctx, target: Optional[Union[discord.Member, str]], can_manage: Optional[Literal["+", "-"]]
+        self,
+        ctx,
+        target: Optional[Union[discord.Member, str]],
+        can_manage: Optional[Literal["+", "-"]],
     ) -> Tuple[Optional[Union[discord.Member, discord.Role]], bool]:
         """
         Validate and get the target member or role.
@@ -462,7 +476,9 @@ class TargetHelper:
         if not target_member_or_role:
             return None, False
 
-        if not await self.bot.get_cog("ChannelModManager").validate_channel_mod(ctx, target_member_or_role, can_manage):
+        if not await self.bot.get_cog("ChannelModManager").validate_channel_mod(
+            ctx, target_member_or_role, can_manage
+        ):
             return None, False
 
         return target_member_or_role, update_db
@@ -492,8 +508,8 @@ class VoiceCog(commands.Cog):
     @commands.hybrid_command(aliases=["s"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="User to modify permissions (ID, mention, or username)",
-        can_speak="Set speak permission (+ or -)",
+        target="Użytkownik do modyfikacji uprawnień (ID, wzmianka lub nazwa użytkownika)",
+        can_speak="Ustaw uprawnienie mówienia (+ lub -)",
     )
     async def speak(
         self,
@@ -502,7 +518,9 @@ class VoiceCog(commands.Cog):
         can_speak: Optional[Literal["+", "-"]] = None,
     ):
         """Set the speak permission for the target."""
-        target_member_or_role, update_db = await self.target_helper.get_target_and_update_db(ctx, target)
+        target_member_or_role, update_db = await self.target_helper.get_target_and_update_db(
+            ctx, target
+        )
         if not target_member_or_role:
             return
 
@@ -513,8 +531,8 @@ class VoiceCog(commands.Cog):
     @commands.hybrid_command(aliases=["v"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="User to modify permissions (ID, mention, or username)",
-        can_view="Set view permission (+ or -)",
+        target="Użytkownik do modyfikacji uprawnień (ID, wzmianka lub nazwa użytkownika)",
+        can_view="Ustaw uprawnienie wyświetlania (+ lub -)",
     )
     async def view(
         self,
@@ -523,7 +541,9 @@ class VoiceCog(commands.Cog):
         can_view: Optional[Literal["+", "-"]] = None,
     ):
         """Set the view permission for the target."""
-        target_member_or_role, update_db = await self.target_helper.get_target_and_update_db(ctx, target)
+        target_member_or_role, update_db = await self.target_helper.get_target_and_update_db(
+            ctx, target
+        )
         if not target_member_or_role:
             return
 
@@ -534,8 +554,8 @@ class VoiceCog(commands.Cog):
     @commands.hybrid_command(aliases=["c"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="User to modify permissions (ID, mention, or username)",
-        can_connect="Set connect permission (+ or -)",
+        target="Użytkownik do modyfikacji uprawnień (ID, wzmianka lub nazwa użytkownika)",
+        can_connect="Ustaw uprawnienie połączenia (+ lub -)",
     )
     async def connect(
         self,
@@ -544,7 +564,9 @@ class VoiceCog(commands.Cog):
         can_connect: Optional[Literal["+", "-"]] = None,
     ):
         """Set the connect permission for the target."""
-        target_member_or_role, update_db = await self.target_helper.get_target_and_update_db(ctx, target)
+        target_member_or_role, update_db = await self.target_helper.get_target_and_update_db(
+            ctx, target
+        )
         if not target_member_or_role:
             return
 
@@ -552,11 +574,11 @@ class VoiceCog(commands.Cog):
             ctx, target_member_or_role, "connect", can_connect, update_db
         )
 
-    @commands.hybrid_command()
+    @commands.hybrid_command(aliases=["cm"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="User to add or remove as channel mod (ID, mention, or username)",
-        can_manage="Add (+) or remove (-) channel mod permissions",
+        target="Użytkownik do dodania lub usunięcia jako moderator kanału (ID, wzmianka lub nazwa użytkownika)",
+        can_manage="Dodaj (+) lub usuń (-) uprawnienia moderatora kanału",
     )
     async def channel_mod(
         self,
@@ -565,7 +587,9 @@ class VoiceCog(commands.Cog):
         can_manage: Optional[Literal["+", "-"]] = None,
     ):
         """Add or remove channel moderator permissions for the selected user."""
-        target_member_or_role, update_db = await self.target_helper.validate_and_get_target(ctx, target, can_manage)
+        target_member_or_role, update_db = await self.target_helper.validate_and_get_target(
+            ctx, target, can_manage
+        )
         if not target_member_or_role:
             return
 
@@ -579,27 +603,31 @@ class VoiceCog(commands.Cog):
             toggle=(can_manage is None),
         )
 
-    @commands.hybrid_command()
+    @commands.hybrid_command(aliases=["j"])
     @commands.has_permissions(administrator=True)
+    @discord.app_commands.describe()
     async def join(self, ctx):
-        """Join the voice channel of the person who used the command."""
+        """Dołącz do kanału głosowego osoby, która użyła komendy."""
         await self.channel_manager.join_channel(ctx)
 
-    @commands.hybrid_command()
+    @commands.hybrid_command(aliases=["l"])
     @commands.has_permissions(administrator=True)
+    @discord.app_commands.describe(
+        max_members="Maksymalna liczba członków (1-99 dla konkretnej wartości)"
+    )
     async def limit(self, ctx, max_members: int):
-        """Change the maximum number of members that can join the current voice channel."""
+        """Zmień maksymalną liczbę członków, którzy mogą dołączyć do bieżącego kanału głosowego."""
         await self.channel_manager.set_channel_limit(ctx, max_members)
 
     @commands.hybrid_command(aliases=["vc"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="User to check voice channel (ID, mention, or username)",
+        target="Użytkownik do sprawdzenia kanału głosowego (ID, wzmianka lub nazwa użytkownika)",
     )
     async def voicechat(self, ctx, target: Optional[Member] = None):
-        """Send a link to the user's voice channel and/or the target's voice channel."""
+        """Wyślij link do kanału głosowego użytkownika i/lub kanału głosowego docelowego."""
         author_info = await self.target_helper.get_voice_channel_info(ctx.author)
-        
+
         target_info = None
         if target:
             target_member = await self.target_helper.get_target(ctx, target)
