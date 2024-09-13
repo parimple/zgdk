@@ -8,7 +8,7 @@ from discord.ext import commands
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from datasources.queries import ChannelPermissionQueries
-from utils.user import get_target_user
+from utils.user import get_target_and_permission
 
 
 class MessageSender:
@@ -412,87 +412,6 @@ class ChannelModManager:
         return True
 
 
-class TargetHelper:
-    """Helper class for target-related operations."""
-
-    def __init__(self, bot):
-        self.bot = bot
-        self.message_sender = MessageSender()
-        self.db_manager = DatabaseManager(bot)
-
-    async def get_target(
-        self, ctx, target: Optional[Union[discord.Member, str]] = None
-    ) -> Optional[Union[discord.Member, discord.Role]]:
-        """
-        Get the target member or role.
-
-        :param ctx: The command context
-        :param target: The target user input (can be None, Member object, ID, mention, or username)
-        :return: Target member, @everyone role if target is None, or None if not found
-        """
-        target_member = await get_target_user(ctx, target)
-        if target_member:
-            return target_member
-        elif target is None:
-            return ctx.guild.default_role  # @everyone role
-        else:
-            await self.message_sender.send_user_not_found(ctx)
-            return None
-
-    async def get_target_and_update_db(
-        self, ctx, target: Optional[Union[discord.Member, str]] = None
-    ) -> Tuple[Optional[Union[discord.Member, discord.Role]], bool]:
-        """
-        Get the target and determine if the database should be updated.
-
-        :param ctx: The command context
-        :param target: The target user input
-        :return: Tuple of (target_member_or_role, update_db)
-        """
-        target_member_or_role = await self.get_target(ctx, target)
-        if not target_member_or_role:
-            return None, False
-
-        update_db = await self.db_manager.should_update_db(
-            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
-        )
-        return target_member_or_role, update_db
-
-    async def validate_and_get_target(
-        self,
-        ctx,
-        target: Optional[Union[discord.Member, str]],
-        can_manage: Optional[Literal["+", "-"]],
-    ) -> Tuple[Optional[Union[discord.Member, discord.Role]], bool]:
-        """
-        Validate and get the target member or role.
-
-        :param ctx: The command context
-        :param target: The target user input
-        :param can_manage: The permission to manage
-        :return: Tuple of (target_member_or_role, update_db) if valid, (None, False) otherwise
-        """
-        target_member_or_role, update_db = await self.get_target_and_update_db(ctx, target)
-        if not target_member_or_role:
-            return None, False
-
-        if not await self.bot.get_cog("ChannelModManager").validate_channel_mod(
-            ctx, target_member_or_role, can_manage
-        ):
-            return None, False
-
-        return target_member_or_role, update_db
-
-    async def get_voice_channel_info(self, member: Member) -> str:
-        """Get voice channel information for a member."""
-        if member.voice and member.voice.channel:
-            channel = member.voice.channel
-            link = f"https://discord.com/channels/{member.guild.id}/{channel.id}"
-            return f"Kanał głosowy użytkownika {member.display_name}: {link}"
-        else:
-            return f"{member.display_name} nie jest na żadnym kanale głosowym."
-
-
 class VoiceCog(commands.Cog):
     """Voice commands cog for managing voice channel permissions and operations."""
 
@@ -503,7 +422,6 @@ class VoiceCog(commands.Cog):
         self.mod_manager = ChannelModManager(bot)
         self.message_sender = MessageSender()
         self.db_manager = DatabaseManager(bot)
-        self.target_helper = TargetHelper(bot)
 
     @commands.hybrid_command(aliases=["s"])
     @commands.has_permissions(administrator=True)
@@ -518,14 +436,18 @@ class VoiceCog(commands.Cog):
         can_speak: Optional[Literal["+", "-"]] = None,
     ):
         """Set the speak permission for the target."""
-        target_member_or_role, update_db = await self.target_helper.get_target_and_update_db(
-            ctx, target
-        )
-        if not target_member_or_role:
+        target_member, permission = await get_target_and_permission(ctx, target, can_speak)
+
+        if target_member == ctx.guild.default_role and target is not None:
+            await self.message_sender.send_user_not_found(ctx)
             return
 
+        update_db = await self.db_manager.should_update_db(
+            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
+        )
+
         await self.permission_manager.modify_channel_permission(
-            ctx, target_member_or_role, "speak", can_speak, update_db
+            ctx, target_member, "speak", permission, update_db
         )
 
     @commands.hybrid_command(aliases=["v"])
@@ -541,14 +463,18 @@ class VoiceCog(commands.Cog):
         can_view: Optional[Literal["+", "-"]] = None,
     ):
         """Set the view permission for the target."""
-        target_member_or_role, update_db = await self.target_helper.get_target_and_update_db(
-            ctx, target
-        )
-        if not target_member_or_role:
+        target_member, permission = await get_target_and_permission(ctx, target, can_view)
+
+        if target_member == ctx.guild.default_role and target is not None:
+            await self.message_sender.send_user_not_found(ctx)
             return
 
+        update_db = await self.db_manager.should_update_db(
+            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
+        )
+
         await self.permission_manager.modify_channel_permission(
-            ctx, target_member_or_role, "view_channel", can_view, update_db
+            ctx, target_member, "view_channel", permission, update_db
         )
 
     @commands.hybrid_command(aliases=["c"])
@@ -560,18 +486,22 @@ class VoiceCog(commands.Cog):
     async def connect(
         self,
         ctx,
-        target: Optional[Member] = None,
+        target: Optional[discord.Member] = None,
         can_connect: Optional[Literal["+", "-"]] = None,
     ):
-        """Set the connect permission for the target."""
-        target_member_or_role, update_db = await self.target_helper.get_target_and_update_db(
-            ctx, target
-        )
-        if not target_member_or_role:
+        """Set the connect permission for the target or everyone."""
+        target_member, permission = await get_target_and_permission(ctx, target, can_connect)
+
+        if target_member == ctx.guild.default_role and target is not None:
+            await self.message_sender.send_user_not_found(ctx)
             return
 
+        update_db = await self.db_manager.should_update_db(
+            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
+        )
+
         await self.permission_manager.modify_channel_permission(
-            ctx, target_member_or_role, "connect", can_connect, update_db
+            ctx, target_member, "connect", permission, update_db
         )
 
     @commands.hybrid_command(aliases=["cm"])
@@ -587,20 +517,27 @@ class VoiceCog(commands.Cog):
         can_manage: Optional[Literal["+", "-"]] = None,
     ):
         """Add or remove channel moderator permissions for the selected user."""
-        target_member_or_role, update_db = await self.target_helper.validate_and_get_target(
-            ctx, target, can_manage
-        )
-        if not target_member_or_role:
+        target_member, permission = await get_target_and_permission(ctx, target, can_manage)
+
+        if target_member == ctx.guild.default_role and target is not None:
+            await self.message_sender.send_user_not_found(ctx)
             return
+
+        if not await self.mod_manager.validate_channel_mod(ctx, target_member, permission):
+            return
+
+        update_db = await self.db_manager.should_update_db(
+            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
+        )
 
         await self.permission_manager.modify_channel_permission(
             ctx,
-            target_member_or_role,
+            target_member,
             "manage_messages",
-            can_manage,
+            permission,
             update_db,
             default_to_true=True,
-            toggle=(can_manage is None),
+            toggle=(permission is None),
         )
 
     @commands.hybrid_command(aliases=["j"])
