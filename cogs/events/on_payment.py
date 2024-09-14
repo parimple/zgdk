@@ -32,7 +32,7 @@ class OnPaymentEvent(commands.Cog):
         """Cog Unload"""
         self.check_payments.cancel()  # pylint: disable=no-member
 
-    @tasks.loop(minutes=10.0)
+    @tasks.loop(minutes=1.0)
     async def check_payments(self):
         """Check Payments"""
         # logger.info("Checking for new payments")
