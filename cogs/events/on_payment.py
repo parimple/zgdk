@@ -12,6 +12,7 @@ from discord.ext import commands, tasks
 from datasources.queries import RoleQueries
 from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager, TipplyDataProvider
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,9 @@ class OnPaymentEvent(commands.Cog):
             (63999, "$128"),
         ]
 
+        delay_after_roles = ["$4", "$8"]
+        last_assigned_role = None
+
         for amount, role_name in roles_tiers:
             logger.info("Checking if %d >= %d for role %s", amount_g, amount, role_name)
             if amount_g >= amount:
@@ -147,6 +151,7 @@ class OnPaymentEvent(commands.Cog):
                                 role_name,
                                 member.display_name,
                             )
+                        last_assigned_role = role_name
                     except Exception as e:
                         logger.error(
                             f"Error assigning/updating role {role_name} to member {member.display_name}: {str(e)}"
@@ -155,6 +160,16 @@ class OnPaymentEvent(commands.Cog):
                     logger.error("Role %s not found in the guild", role_name)
             else:
                 logger.info("Amount %d is not enough for role %s", amount_g, role_name)
+
+            if last_assigned_role in delay_after_roles:
+                # Start a background task that waits for 5 seconds before continuing
+                await self.delay_before_next_role()
+                last_assigned_role = None  # Reset to avoid multiple delays in a row
+
+    async def delay_before_next_role(self):
+        """Wait for 5 seconds before assigning the next roles."""
+        logger.info("Waiting 5 seconds before assigning the next roles.")
+        await asyncio.sleep(5)
 
     async def remove_mute_roles(self, member):
         """Remove mute roles from a member if they have any temporary roles assigned"""
