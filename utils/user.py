@@ -1,4 +1,5 @@
-from typing import Optional, Union, Tuple, Literal
+from typing import Literal, Optional, Tuple, Union
+
 import discord
 from discord.ext import commands
 
@@ -68,7 +69,7 @@ async def get_target_user(
 async def get_target_and_permission(
     ctx: commands.Context,
     target: Optional[Union[discord.Member, str]] = None,
-    permission: Optional[Literal["+", "-"]] = None
+    permission: Optional[Literal["+", "-"]] = None,
 ) -> Tuple[Union[discord.Member, discord.Role], Optional[Literal["+", "-"]]]:
     """
     Get the target member or @everyone role and parse the permission.

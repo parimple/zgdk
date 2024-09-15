@@ -433,13 +433,13 @@ class NotificationLogQueries:
         notification_tag: str,
         opted_out: Optional[bool] = None,
     ) -> NotificationLog:
-        logger.info(
-            f"Adding/updating notification log: Member ID: {member_id}, Tag: {notification_tag}"
-        )
+        # logger.info(
+        #     f"Adding/updating notification log: Member ID: {member_id}, Tag: {notification_tag}"
+        # )
         notification_log = await session.get(NotificationLog, (member_id, notification_tag))
 
         if notification_log is None:
-            logger.info("Creating new notification log")
+            # logger.info("Creating new notification log")
             notification_log = NotificationLog(
                 member_id=member_id,
                 notification_tag=notification_tag,
@@ -448,14 +448,14 @@ class NotificationLogQueries:
             )
             session.add(notification_log)
         else:
-            logger.info(
-                f"Updating existing notification log. Old sent_at: {notification_log.sent_at}"
-            )
+            # logger.info(
+            #     f"Updating existing notification log. Old sent_at: {notification_log.sent_at}"
+            # )
             notification_log.sent_at = datetime.now(timezone.utc)
             if opted_out is not None:
                 notification_log.opted_out = opted_out
 
-        logger.info(f"Notification log after update: {notification_log}")
+        # logger.info(f"Notification log after update: {notification_log}")
         return notification_log
 
     @staticmethod

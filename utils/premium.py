@@ -253,14 +253,14 @@ class TipplyDataProvider(DataProvider):
                 last_handled_payments = await HandledPaymentQueries.get_last_payments(
                     session, offset=0, limit=10, payment_type=self.payment_type
                 )
-            logger.info("last_handled_payments: %s", last_handled_payments[:3])
+            logger.debug("last_handled_payments: %s", last_handled_payments[:3])
 
             # Transform both lists to contain only (name, amount) tuples
             all_payments = [(payment.name, payment.amount) for payment in all_payments]
             last_handled_payments = [
                 (payment.name, payment.amount) for payment in last_handled_payments
             ]
-            logger.info("all_payments: %s", all_payments[:3])
+            logger.debug("all_payments: %s", all_payments[:3])
 
             # Iterate over the fetched payments from newest to oldest
             for i in range(len(all_payments) - 10, -1, -1):
@@ -277,6 +277,9 @@ class TipplyDataProvider(DataProvider):
             for i, (name, amount) in enumerate(new_payments[::-1]):
                 payment_time = current_time + timedelta(seconds=i)
                 payment_data_list.append(PaymentData(name, amount, payment_time, self.payment_type))
+
+            if payment_data_list:
+                logger.info("Found %d new payments", len(payment_data_list))
 
             return payment_data_list
         except Exception as e:

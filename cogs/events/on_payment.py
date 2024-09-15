@@ -39,7 +39,8 @@ class OnPaymentEvent(commands.Cog):
         try:
             async with self.bot.get_db() as session:
                 payments_data = await self.data_provider.get_data(session)
-                logger.info("Found %s new payments", len(payments_data))
+                if payments_data:
+                    logger.info("Found %s new payments", len(payments_data))
 
                 for payment_data in payments_data:
                     try:
