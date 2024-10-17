@@ -117,6 +117,12 @@ class OnPaymentEvent(commands.Cog):
 
     async def assign_temporary_roles(self, session, member, amount_g):
         """Assign all applicable temporary roles based on donation amount"""
+        # Create a set of role IDs the member currently has
+        member_role_ids = {role.id for role in member.roles}
+
+        # Log the member's roles before assignment for debugging
+        logger.info(f"Member {member.display_name} roles before assignment: {[r.name for r in member.roles]}")
+
         roles_tiers = [
             (1499, "$2"),
             (2499, "$4"),
@@ -140,11 +146,16 @@ class OnPaymentEvent(commands.Cog):
                         await RoleQueries.add_or_update_role_to_member(
                             session, member.id, role.id, timedelta(days=30)
                         )
-                        if role not in member.roles:
-                            await member.add_roles(role)
-                            logger.info(
-                                "Assigned role %s to member %s", role_name, member.display_name
-                            )
+                        if role.id not in member_role_ids:
+                            try:
+                                await member.add_roles(role)
+                                logger.info(
+                                    "Assigned role %s to member %s", role_name, member.display_name
+                                )
+                            except Exception as e:
+                                logger.error(
+                                    f"Error adding role {role_name} to member {member.display_name}: {str(e)}"
+                                )
                         else:
                             logger.info(
                                 "Updated expiration for role %s of member %s",
@@ -162,7 +173,7 @@ class OnPaymentEvent(commands.Cog):
                 logger.info("Amount %d is not enough for role %s", amount_g, role_name)
 
             if last_assigned_role in delay_after_roles:
-                # Start a background task that waits for 5 seconds before continuing
+                # Wait for 5 seconds before assigning the next roles
                 await self.delay_before_next_role()
                 last_assigned_role = None  # Reset to avoid multiple delays in a row
 
