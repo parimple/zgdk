@@ -179,7 +179,6 @@ class VoicePermissionManager:
 
         await self._update_channel_permission(ctx, target, current_perms)
         await self._update_db_permission(ctx, target, current_perms, update_db)
-        await self._check_and_handle_permission_limit(ctx, ctx.author.id, current_perms)
 
         if permission_flag == "manage_messages":
             await self.message_sender.send_channel_mod_update(ctx, target, new_value)
@@ -240,21 +239,6 @@ class VoicePermissionManager:
                     deny_bits.value,
                     ctx.guild.id,
                 )
-
-    async def _check_and_handle_permission_limit(
-        self, ctx, member_id: int, new_permission: discord.PermissionOverwrite
-    ):
-        """Checks and handles the permission limit for a user."""
-        premium_role = self._get_user_premium_role(ctx.author)
-        if not premium_role:
-            return
-
-        permission_limit = premium_role.get("permission_limit", 50)  # default to 50 if not set
-        async with self.bot.get_db() as session:
-            current_permissions = await self.db_manager.get_member_permissions(session, member_id)
-
-            if len(current_permissions) >= permission_limit:
-                await self._handle_limit_exceeded(ctx, session, member_id, permission_limit)
 
     async def _handle_limit_exceeded(self, ctx, session, member_id, permission_limit):
         """Handles the case when a user exceeds their permission limit."""
