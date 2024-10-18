@@ -2,6 +2,7 @@
 On Payments Event Cog
 """
 
+import asyncio
 import logging
 import os
 from datetime import timedelta
@@ -12,7 +13,6 @@ from discord.ext import commands, tasks
 from datasources.queries import RoleQueries
 from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager, TipplyDataProvider
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,9 @@ class OnPaymentEvent(commands.Cog):
         member_role_ids = {role.id for role in member.roles}
 
         # Log the member's roles before assignment for debugging
-        logger.info(f"Member {member.display_name} roles before assignment: {[r.name for r in member.roles]}")
+        logger.info(
+            f"Member {member.display_name} roles before assignment: {[r.name for r in member.roles]}"
+        )
 
         roles_tiers = [
             (1499, "$2"),
