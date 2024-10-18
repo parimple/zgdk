@@ -67,6 +67,9 @@ mute_roles:
   - id: 960665311953174558
     name: "☢︎"
     description: "attach_files_off"
+  - id: 960665311760248877
+    name: "♺"
+    description: "points_off"
 
 
 premium_categories:
