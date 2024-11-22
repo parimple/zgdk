@@ -333,3 +333,24 @@ class TipoDataProvider(DataProvider):
             processed_payments.append(payment_data)
 
         return processed_payments
+
+
+class PremiumRole:
+    def __init__(self, config: dict):
+        self.name = config["name"]
+        self.price = config["price"]
+        self.features = config.get("features", [])
+        self.team_size = config.get("team_size", 0)
+        self.moderator_count = config.get("moderator_count", 0)
+        self.points_multiplier = config.get("points_multiplier", 0)
+        self.emojis_access = config.get("emojis_access", False)
+
+    def get_description(self) -> str:
+        description = "\n".join([f"• {feature}" for feature in self.features])
+        if self.team_size > 0:
+            description += f"\n\nRozmiar drużyny: {self.team_size} osób"
+        if self.moderator_count > 0:
+            description += f"\nLiczba moderatorów: {self.moderator_count}"
+        if self.points_multiplier > 0:
+            description += f"\nPremia do punktów: +{self.points_multiplier}%"
+        return description

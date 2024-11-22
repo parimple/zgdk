@@ -28,33 +28,88 @@ channels_create:
   - 960665313895133209
 
 premium_roles:
-  - name: "★1"
-    price: 1499
-    permission_limit: 6
-  - name: "★2"
-    price: 2499
-    permission_limit: 100
-  - name: "★3"
-    price: 4499
-    permission_limit: 150
-  - name: "★4"
-    price: 8499
-    permission_limit: 200
-  - name: "★5"
-    price: 15999
-    permission_limit: 250
-  - name: "★6"
-    price: 31999
-    permission_limit: 300
-  - name: "★7"
-    price: 63999
-    permission_limit: 350
-  - name: "★8"
-    price: 127999
-    permission_limit: 400
-  - name: "★9"
-    price: 9999999999999
-    permission_limit: 450
+  # Ukryta ranga do odmutowania
+  - name: "zG20"
+    price: 1900  # 19 zł
+    features:
+      - "Zarządzanie publicznymi kanałami głosowymi przez miesiąc"
+      - "Wybór koloru nicku: czerwony lub niebieski"
+      - "Możliwość tworzenia kanałów prywatnych na 30 dni po zaproszeniu jednej osoby, lub boostując serwer"
+      - "Uprawnienia do wysyłania obrazków, linków, gifów"
+      - "Możliwość streamowania na kanałach"
+    team_size: 0
+    moderator_count: 0
+    points_multiplier: 0   # Brak dodatkowych punktów
+    emojis_access: false   # Brak dostępu do dodatkowych emotek
+
+  # Ranga z kolorami bez nazwy
+  - name: "zG30"
+    price: 2900  # 29zł
+    features:
+      - "Wybór koloru nicku: żółty, czarny lub zielony"
+      - "Możliwość tworzenia kanałów **prywatnych**"
+      - "Dostęp do emotek i stickerów z każdego serwera"
+      - "50% więcej punktów do aktywności"
+    team_size: 0
+    moderator_count: 0
+    points_multiplier: 50   # +50% punktów
+    emojis_access: true     # Dostęp do emotek
+
+  # Premium rangi
+  - name: "zG50"
+    price: 4900  # 49 zł
+    features:
+      - "Dowolny kolor dostępny za pomocą komendy ?color"
+      - "1 moderator kanału głosowego"
+      - "Dostęp do kanału głosowego premium"
+      - "Dostęp do emotek i stickerów z każdego serwera"
+      - "50% więcej punktów do aktywności"
+    team_size: 0
+    moderator_count: 1
+    points_multiplier: 50   # +50% punktów
+    emojis_access: true     # Dostęp do emotek
+
+  - name: "zG100"
+    price: 9900  # 99 zł
+    features:
+      - "Rola na samej górze serwera"
+      - "Kanał drużynowy dla maksymalnie 15 osób"
+      - "Kanał VIP do tworzenia kanałów głosowych"
+      - "2 moderatorów kanału głosowego"
+      - "Dostęp do emotek i stickerów z każdego serwera"
+      - "100% więcej punktów do aktywności"
+    team_size: 10
+    moderator_count: 2
+    points_multiplier: 100  # +100% punktów
+    emojis_access: true     # Dostęp do emotek
+
+  - name: "zG200"
+    price: 19900  # 199 zł
+    features:
+      - "Rola wyżej niż zG100"
+      - "Kanał VIP++ do tworzenia kanałów głosowych"
+      - "Drużyna do 30 osób"
+      - "4 moderatorów kanału głosowego"
+      - "Wszyscy w drużynie mają kolor klanu na serwerze"
+      - "Dostęp do emotek i stickerów z każdego serwera"
+      - "200% więcej punktów do aktywności"
+    team_size: 20
+    moderator_count: 3
+    points_multiplier: 150  # +150% punktów
+    emojis_access: true     # Dostęp do emotek
+
+  - name: "zG400"
+    price: 39900  # 399 zł
+    features:
+      - "Drużyna do 35 osób"
+      - "6 moderatorów kanału głosowego"
+      - "Wszyscy w drużynie mają kolor klanu na serwerze"
+      - "Dostęp do emotek i stickerów z każdego serwera"
+      - "250% więcej punktów do aktywności"
+    team_size: 40
+    moderator_count: 5
+    points_multiplier: 200  # +200% punktów
+    emojis_access: true     # Dostęp do emotek
 
 
 mute_roles:
@@ -70,7 +125,6 @@ mute_roles:
   - id: 960665311760248877
     name: "♺"
     description: "points_off"
-
 
 premium_categories:
   - 960665318475325454

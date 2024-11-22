@@ -23,21 +23,13 @@ class ShopCog(commands.Cog):
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
     @commands.has_permissions(administrator=True)
-    async def shop(self, ctx: commands.Context, member: Optional[discord.Member] = None):
-        if not member:
-            member = ctx.author
-
-        viewer = ctx.author  # Osoba przeglądająca sklep (ta, która kliknęła przycisk)
-
-        if not isinstance(member, discord.Member):
-            member = self.bot.guild.get_member(member.id)
-            if not member:
-                raise commands.UserInputError("Nie można znaleźć członka na tym serwerze.")
+    async def shop(self, ctx: commands.Context):
+        viewer = ctx.author
 
         async with self.bot.get_db() as session:
             db_viewer = await MemberQueries.get_or_add_member(session, viewer.id)
             balance = db_viewer.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+            premium_roles = await RoleQueries.get_member_premium_roles(session, viewer.id)
             await session.commit()
 
         view = RoleShopView(
@@ -47,7 +39,7 @@ class ShopCog(commands.Cog):
             balance,
             page=1,
             viewer=viewer,
-            member=member,
+            member=viewer,
         )
         embed = await create_shop_embed(
             ctx,
@@ -56,7 +48,7 @@ class ShopCog(commands.Cog):
             premium_roles,
             page=1,
             viewer=viewer,
-            member=member,
+            member=viewer,
         )
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
@@ -200,33 +192,47 @@ class RoleShopView(discord.ui.View):
         self.bot = bot
         self.balance = balance
         self.page = page
-        self.role_price_map = {role["name"]: role["price"] for role in premium_roles}
+        self.viewer = viewer
+        self.member = member
+
+        # Tworzenie mapy cen z uwzględnieniem strony (miesięczne/roczne)
+        self.role_price_map = {}
+        for role in premium_roles:
+            if page == 1:  # Ceny miesięczne
+                self.role_price_map[role["name"]] = role["price"]
+            else:  # Ceny roczne (10 miesięcy)
+                self.role_price_map[role["name"]] = role["price"] * 10
+
         self.role_ids = {
             role["name"]: discord.utils.get(self.guild.roles, name=role["name"]).id
             for role in premium_roles
         }
-        self.mute_roles = {role["name"]: role for role in self.bot.config["mute_roles"]}
-        self.viewer = viewer
-        self.member = member
 
-        for role_name, _ in self.role_ids.items():
+        # Przyciski dla każdej roli
+        for role_name, price in self.role_price_map.items():
             button = discord.ui.Button(
-                label=role_name,
+                label=f"{role_name} ({price}{CURRENCY_UNIT})",
                 style=discord.ButtonStyle.primary,
-                disabled=self.balance < self.role_price_map[role_name],
+                disabled=self.balance < price,
             )
             button.callback = self.create_button_callback(role_name)
             self.add_item(button)
 
+        # Przyciski nawigacji stron
         if page == 1:
-            next_button = discord.ui.Button(label="➡️", style=discord.ButtonStyle.secondary)
+            next_button = discord.ui.Button(
+                label="Ceny roczne ➡️", style=discord.ButtonStyle.secondary
+            )
             next_button.callback = self.next_page
             self.add_item(next_button)
         else:
-            previous_button = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary)
+            previous_button = discord.ui.Button(
+                label="⬅️ Ceny miesięczne", style=discord.ButtonStyle.secondary
+            )
             previous_button.callback = self.previous_page
             self.add_item(previous_button)
 
+        # Przycisk opisu ról
         description_button = discord.ui.Button(label="Opis ról", style=discord.ButtonStyle.primary)
         description_button.callback = self.show_role_description
         self.add_item(description_button)
@@ -241,11 +247,14 @@ class RoleShopView(discord.ui.View):
                 )
             )
 
+        self.mute_roles = {role["name"]: role for role in self.bot.config["mute_roles"]}
+
     def create_button_callback(self, role_name):
         """Create a button callback for the specified role name."""
 
         async def button_callback(interaction: discord.Interaction):
-            duration_days = 365 if self.page != 1 else 1
+            duration_days = 365 if self.page == 2 else 30
+            price = self.role_price_map[role_name]
             await self.handle_buy_role(interaction, role_name, self.member, duration_days)
 
         return button_callback
@@ -332,7 +341,12 @@ class RoleShopView(discord.ui.View):
     async def handle_buy_role(self, interaction, role_name, member, duration_days=30):
         role_id = self.role_ids[role_name]
         role = discord.utils.get(self.guild.roles, id=role_id)
-        price = self.role_price_map[role_name]
+        base_price = next(
+            r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role_name
+        )
+
+        # Oblicz cenę w zależności od długości trwania
+        price = base_price * 10 if duration_days == 365 else base_price
 
         if isinstance(member, discord.User):
             member = self.guild.get_member(member.id)
@@ -340,10 +354,7 @@ class RoleShopView(discord.ui.View):
                 await interaction.response.send_message("Nie jesteś członkiem tego serwera.")
                 return
 
-        if self.viewer != member:
-            confirm_message = f"Czy na pewno chcesz kupić rolę {role_name} dla {member.display_name} za {price}{CURRENCY_UNIT}?"
-        else:
-            confirm_message = f"Czy potwierdzasz zakup roli {role_name} za {price}{CURRENCY_UNIT}?"
+        confirm_message = f"Czy potwierdzasz zakup roli {role_name} za {price}{CURRENCY_UNIT}?"
 
         confirm_view = ConfirmView()
         await interaction.response.send_message(confirm_message, ephemeral=True, view=confirm_view)
@@ -392,9 +403,9 @@ class RoleShopView(discord.ui.View):
         await RoleQueries.add_role_to_member(
             session, member.id, role.id, timedelta(days=duration_days)
         )
-        msg = f"Zakupiłeś rolę {role.name} dla {member.display_name}."
+        msg = f"Gratulacje! Otrzymałeś rolę {role.name}."
         await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -price)
-        await interaction.response.send_message(msg)
+        await interaction.followup.send(msg)
 
     async def remove_mute_roles(self, member: discord.Member):
         """Remove all mute roles from the member and notify them."""
@@ -476,7 +487,7 @@ class RoleShopView(discord.ui.View):
             await RoleQueries.update_role_expiration_date(
                 session, member.id, role.id, timedelta(days=extend_days)
             )
-            msg = f"Przedłużyłeś rolę {role.name} o kolejne {extend_days} dni."
+            msg = f"Gratulacje! Przedłuyłeś rolę {role.name} o kolejne {extend_days} dni."
         else:
             await member.remove_roles(last_role)
             await RoleQueries.delete_member_role(session, member.id, last_role.id)
@@ -657,170 +668,96 @@ class ConfirmView(discord.ui.View):
 
 
 async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, viewer, member):
-    """Create the shop embed."""
-    logger.info("Starting the creation of the shop embed for user %s", ctx.author.id)
-
-    color = discord.Color.blurple()
-
     if page == 1:
-        embed = discord.Embed(
-            title="Sklep z rolami",
-            description=(
-                "Aby zakupić rangę, kliknij przycisk odpowiadający jej cenie.\n"
-                "Za każde 10 zł jest 1000G.\n"
-                "Kupno rangi ★1 jest równoznaczne ze zdjęciem wszystkich mutów na serwerze.\n"
-                "Kupno wyższej rangi lub przedłużenie również zdejmie muty."
-            ),
-            color=color,
+        title = "Sklep z rolami - ceny miesięczne"
+        description = (
+            "Aby zakupić rangę, kliknij przycisk odpowiadający jej nazwie.\n"
+            "Za każde 10 zł jest 1000G.\n"
+            "Kupno rangi zG20 jest równoznaczne ze zdjęciem wszystkich mutów na serwerze."
         )
     else:
-        embed = discord.Embed(
-            title="Sklep z rolami - ceny na rok",
-            description=(
-                "Za zakup na rok płacisz tylko za 10 miesięcy, 2 miesiące są gratis.\n"
-                "Za każde 10 zł jest 1000G.\n"
-                "Kupno rangi ★1 jest równoznaczne ze zdjęciem wszystkich mutów na serwerze.\n"
-                "Kupno wyższej rangi lub przedłużenie również zdejmie muty."
-            ),
-            color=color,
+        title = "Sklep z rolami - ceny roczne"
+        description = (
+            "Za zakup na rok płacisz tylko za 10 miesięcy, 2 miesiące są gratis.\n"
+            "Za każde 10 zł jest 1000G.\n"
+            "Kupno rangi zG20 jest równoznaczne ze zdjęciem wszystkich mutów na serwerze."
         )
 
-    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
-
-    logger.info("Basic embed setup completed for user %s", ctx.author.id)
+    embed = discord.Embed(title=title, description=description, color=discord.Color.blurple())
 
     embed.add_field(name="Twoje środki", value=f"{balance}{CURRENCY_UNIT}", inline=False)
 
+    # Wyświetlanie aktualnych ról
     if premium_roles:
-        current_role = premium_roles[0][1].name
-        embed.add_field(name="Aktualna rola", value=current_role, inline=False)
-        PremiumManager.add_premium_roles_to_embed(ctx, embed, premium_roles)
-    else:
-        embed.add_field(name="Aktualna rola", value="Brak", inline=False)
-
-    for role_name, price in role_price_map.items():
-        if page == 1:
-            embed.add_field(name=role_name, value=f"{price}{CURRENCY_UNIT}", inline=True)
-        else:
-            annual_price = price * 10
-            embed.add_field(name=role_name, value=f"{annual_price}{CURRENCY_UNIT}", inline=True)
-
-    if viewer != member:
+        current_role, role_obj = premium_roles[0]
+        expiration_date = discord.utils.format_dt(current_role.expiration_date, "R")
         embed.add_field(
-            name="Informacja",
-            value="Kupujesz rolę dla innego użytkownika, kwota będzie pobrana z twojego konta.",
-            inline=False,
+            name="Aktualna rola", value=f"{role_obj.name}\nWygasa: {expiration_date}", inline=False
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.set_footer(text=f"Rolę kupujesz dla: {member.display_name} ({member.id})")
-    else:
-        embed.set_thumbnail(url=viewer.display_avatar.url)
 
-    logger.info("Added role price map to embed for user %s", ctx.author.id)
+    # Wyświetlanie dostępnych ról z ich cechami
+    for role_name, price in role_price_map.items():
+        role_config = next(r for r in ctx.bot.config["premium_roles"] if r["name"] == role_name)
+        features_list = "\n".join([f"• {feature}" for feature in role_config["features"]])
 
-    embed.set_footer(text=f"Twoje ID: {ctx.author.id} wklej w polu (Wpisz swój nick)")
+        # Oblicz cenę w zależności od typu strony (miesięczna/roczna)
+        display_price = price * 10 if page == 2 else price
 
-    logger.info("Created shop embed for user %s", ctx.author.id)
+        # Tworzenie listy informacji o roli
+        role_info = [f"Cena: {display_price}{CURRENCY_UNIT}", features_list]
+
+        if role_config["team_size"] > 0:
+            role_info.append(f"Rozmiar drużyny: {role_config['team_size']}")
+
+        if role_config["moderator_count"] > 0:
+            role_info.append(f"Liczba moderatorów: {role_config['moderator_count']}")
+
+        if role_config["points_multiplier"] > 0:
+            role_info.append(f"Bonus punktów: +{role_config['points_multiplier']}%")
+
+        value = "\n".join(role_info)
+
+        embed.add_field(name=role_name, value=value, inline=False)
+
     return embed
 
 
 async def create_role_description_embed(ctx, page, premium_roles, balance, viewer, member):
-    """Create the role description embed."""
-    descriptions = {
-        "★1": (
-            "Jeśli masz bana to ta opcja tylko odbanowuje Cię z serwera, bez poniższych opcji!\n"
-            "Usunięcie wszystkich mutów\n"
-            "Czarny kolor nicku\n"
-            "Możliwość wyrzucania osób z kanałów (np ?connect - id)\n"
-            'Możliwość tworzenia kanałów #"@PREM"\n'
-            "Ranga wspierającego\n"
-            "Emotki i stickery z każdego serwera\n"
-            "25% więcej punktów dodawanych do aktywności"
-        ),
-        "★2": (
-            "Wszystko co niżej\n"
-            "Wybór jednego z 16 milionów kolorów nicku (np ?color ff00ff)\n"
-            "Dodatkowe 25% więcej punktów do aktywności (razem 50%)"
-        ),
-        "★3": (
-            "Wszystko co niżej\n"
-            "Kolor Twojego nicku zmienia barwy!\n"
-            "Dodatkowe 25% więcej punktów do aktywności (razem 75%)\n"
-            "Masz opcję założenia klanu (8 osób) z własną rangą i kanałem tekstowym ?team + id"
-        ),
-        "★4": (
-            "Wszystko co niżej\n"
-            "Lądujesz na samej górze listy użytkowników\n"
-            'Dostajesz możliwość tworzenia kanałów głosowych #"@VIP"\n'
-            "Dodatkowe 25% więcej punktów do aktywności (razem 100%)\n"
-            "Twój klan może mieć nawet 16 członków"
-        ),
-        "★5": (
-            "Wszystko co niżej\n"
-            "Lądujesz jeszcze wyżej na liście użytkowników\n"
-            'Dostajesz możliwość tworzenia kanałów głosowych #"@VIP+" NAD lounge¹\n'
-            "Dodatkowe 100% więcej punktów do aktywności (razem 200%)\n"
-            "Twój klan może mieć nawet 24 członków"
-        ),
-        "★6": (
-            "Wszystko co niżej\n"
-            "Dodatkowe 100% więcej punktów do aktywności (razem 300%)\n"
-            "Twój klan może mieć nawet 32 członków\n"
-            "Możesz zmieniać kolor klanu (wszystkie 32 osoby otrzymują ten sam kolor nicku) "
-            + "?teamcolor pink"
-        ),
-        "★7": (
-            "Wszystko co niżej\n"
-            "Możesz wybrać ikonkę roli klanu dla wszystkich członków (1 raz)\n"
-            "Dodatkowe 100% więcej punktów do aktywności (razem 400%)\n"
-            "Twój klan może mieć nawet 40 członków"
-        ),
-        "★8": (
-            "Wszystko co niżej\n"
-            "Lądujesz nad botem @zaGadka na liście użytkowników\n"
-            "Dodatkowe 100% więcej punktów do aktywności (razem 500%)\n"
-            "Twój klan może mieć nawet 48 członków"
-        ),
-        "★9": (
-            "Wszystko co niżej\n"
-            "Dodatkowe 200% więcej punktów do aktywności (razem 700%)\n"
-            "Twój klan może mieć nawet 64 członków"
-        ),
-    }
-
-    role_name = premium_roles[page - 1]["name"]
-    price = premium_roles[page - 1]["price"]
-    description = descriptions[role_name]
-
-    balance_in_pln = (price - balance) / 100 if price > balance else 0
+    role = premium_roles[page - 1]
+    role_name = role["name"]
 
     embed = discord.Embed(
         title=f"Opis roli {role_name}",
-        description=(
-            f"{description}\n\n"
-            f"Cena: {price}{CURRENCY_UNIT}\n"
-            f"Twój stan konta: {balance}{CURRENCY_UNIT}\n"
-            f"Dopłać: {balance_in_pln:.2f} zł aby kupić rangę"
-        )
-        if balance_in_pln > 0
-        else (
-            f"{description}\n\n"
-            f"Cena: {price}{CURRENCY_UNIT}\n"
-            f"Twój stan konta: {balance}{CURRENCY_UNIT}"
-        ),
+        description="\n".join([f"• {feature}" for feature in role["features"]]),
         color=discord.Color.blurple(),
     )
 
-    if viewer != member:
+    # Dodanie informacji o cenie
+    price = role["price"]
+    annual_price = price * 10
+    embed.add_field(
+        name="Ceny",
+        value=(
+            f"Miesięcznie: {price}{CURRENCY_UNIT}\n"
+            f"Rocznie: {annual_price}{CURRENCY_UNIT} (2 miesiące gratis)"
+        ),
+        inline=False,
+    )
+
+    # Dodanie informacji o koncie
+    embed.add_field(name="Stan konta", value=f"{balance}{CURRENCY_UNIT}", inline=False)
+
+    # Dodatkowe informacje o roli
+    if role.get("team_size", 0) > 0:
         embed.add_field(
-            name="Informacja",
-            value="Kupujesz rolę dla innego użytkownika, kwota będzie pobrana z twojego konta.",
-            inline=False,
+            name="Drużyna", value=f"Maksymalna liczba osób: {role['team_size']}", inline=True
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.set_footer(text=f"Rolę kupujesz dla: {member.display_name} ({member.id})")
-    else:
-        embed.set_thumbnail(url=viewer.display_avatar.url)
+    if role.get("moderator_count", 0) > 0:
+        embed.add_field(
+            name="Moderatorzy", value=f"Liczba moderatorów: {role['moderator_count']}", inline=True
+        )
+    if role.get("points_multiplier", 0) > 0:
+        embed.add_field(name="Bonus punktów", value=f"+{role['points_multiplier']}%", inline=True)
 
     return embed
 
