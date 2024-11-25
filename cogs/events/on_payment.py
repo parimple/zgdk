@@ -117,6 +117,14 @@ class OnPaymentEvent(commands.Cog):
 
     async def assign_temporary_roles(self, session, member, amount_g):
         """Assign all applicable temporary roles based on donation amount"""
+        # Sprawdź i usuń nieaktualne role z bazy danych
+        premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+        for member_role, role in premium_roles:
+            if role.id not in [r.id for r in member.roles]:
+                # Jeśli rola jest w bazie, ale nie ma jej na Discord, usuń z bazy
+                await session.delete(member_role)
+        await session.flush()
+
         # Create a set of role IDs the member currently has
         member_role_ids = {role.id for role in member.roles}
 
@@ -175,9 +183,8 @@ class OnPaymentEvent(commands.Cog):
                 logger.info("Amount %d is not enough for role %s", amount_g, role_name)
 
             if last_assigned_role in delay_after_roles:
-                # Wait for 5 seconds before assigning the next roles
                 await self.delay_before_next_role()
-                last_assigned_role = None  # Reset to avoid multiple delays in a row
+                last_assigned_role = None
 
     async def delay_before_next_role(self):
         """Wait for 5 seconds before assigning the next roles."""
