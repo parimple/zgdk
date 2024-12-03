@@ -194,14 +194,12 @@ class RoleShopView(discord.ui.View):
         self.page = page
         self.viewer = viewer
         self.member = member
+        self.premium_roles = premium_roles
 
+        # Tworzenie podstawowej mapy cen
+        self.base_price_map = {role["name"]: role["price"] for role in premium_roles}
         # Tworzenie mapy cen z uwzględnieniem strony (miesięczne/roczne)
-        self.role_price_map = {}
-        for role in premium_roles:
-            if page == 1:  # Ceny miesięczne
-                self.role_price_map[role["name"]] = role["price"]
-            else:  # Ceny roczne (10 miesięcy)
-                self.role_price_map[role["name"]] = role["price"] * 10
+        self.role_price_map = self.get_price_map()
 
         self.role_ids = {
             role["name"]: discord.utils.get(self.guild.roles, name=role["name"]).id
@@ -210,10 +208,13 @@ class RoleShopView(discord.ui.View):
 
         # Przyciski dla każdej roli
         for role_name, price in self.role_price_map.items():
+            price = (
+                price * 10 if self.page == 2 else price
+            )  # Upewniamy się, że używamy właściwej ceny
             button = discord.ui.Button(
-                label=f"{role_name} ({price}{CURRENCY_UNIT})",
+                label=role_name,
                 style=discord.ButtonStyle.primary,
-                disabled=self.balance < price,
+                disabled=self.balance < price,  # Porównujemy z właściwą ceną
             )
             button.callback = self.create_button_callback(role_name)
             self.add_item(button)
@@ -249,39 +250,53 @@ class RoleShopView(discord.ui.View):
 
         self.mute_roles = {role["name"]: role for role in self.bot.config["mute_roles"]}
 
+    def get_price_map(self):
+        """Get price map based on current page."""
+        price_map = {}
+        for role_name, base_price in self.base_price_map.items():
+            if self.page == 2:  # Ceny roczne (10 miesięcy)
+                price_map[role_name] = base_price * 10
+            else:  # Ceny miesięczne
+                price_map[role_name] = base_price
+        return price_map
+
     def create_button_callback(self, role_name):
         """Create a button callback for the specified role name."""
 
         async def button_callback(interaction: discord.Interaction):
             duration_days = 365 if self.page == 2 else 30
             price = self.role_price_map[role_name]
-            await self.handle_buy_role(interaction, role_name, self.member, duration_days)
+            if self.page == 2:
+                price = price * 10  # Używamy ceny rocznej
+            await self.handle_buy_role(interaction, role_name, self.member, duration_days, price)
 
         return button_callback
 
     async def next_page(self, interaction: discord.Interaction):
         """Go to the next page in the role shop."""
         self.page = 2
+        self.role_price_map = self.get_price_map()
+
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
             balance = db_member.wallet_balance
             premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
             await session.commit()
 
-        embed = await create_shop_embed(
+        view = RoleShopView(
             self.ctx,
+            self.bot,
+            self.premium_roles,
             balance,
-            self.role_price_map,
-            premium_roles,
             self.page,
             self.viewer,
             self.member,
         )
-        view = RoleShopView(
+        embed = await create_shop_embed(
             self.ctx,
-            self.bot,
-            self.bot.config["premium_roles"],
             balance,
+            view.role_price_map,  # Używamy cen z nowego widoku
+            premium_roles,
             self.page,
             self.viewer,
             self.member,
@@ -291,26 +306,28 @@ class RoleShopView(discord.ui.View):
     async def previous_page(self, interaction: discord.Interaction):
         """Go to the previous page in the role shop."""
         self.page = 1
+        self.role_price_map = self.get_price_map()
+
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
             balance = db_member.wallet_balance
             premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
             await session.commit()
 
-        embed = await create_shop_embed(
+        view = RoleShopView(
             self.ctx,
+            self.bot,
+            self.premium_roles,
             balance,
-            self.role_price_map,
-            premium_roles,
             self.page,
             self.viewer,
             self.member,
         )
-        view = RoleShopView(
+        embed = await create_shop_embed(
             self.ctx,
-            self.bot,
-            self.bot.config["premium_roles"],
             balance,
+            view.role_price_map,  # Używamy cen z nowego widoku
+            premium_roles,
             self.page,
             self.viewer,
             self.member,
@@ -338,15 +355,15 @@ class RoleShopView(discord.ui.View):
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
-    async def handle_buy_role(self, interaction, role_name, member, duration_days=30):
+    async def handle_buy_role(self, interaction, role_name, member, duration_days=30, price=None):
         role_id = self.role_ids[role_name]
         role = discord.utils.get(self.guild.roles, id=role_id)
-        base_price = next(
-            r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role_name
-        )
 
-        # Oblicz cenę w zależności od długości trwania
-        price = base_price * 10 if duration_days == 365 else base_price
+        if price is None:
+            base_price = next(
+                r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role_name
+            )
+            price = base_price * 10 if self.page == 2 else base_price
 
         if isinstance(member, discord.User):
             member = self.guild.get_member(member.id)
@@ -448,9 +465,6 @@ class RoleShopView(discord.ui.View):
     ):
         """
         Handle the process of buying or extending a premium role for a member who already has one.
-
-        This method checks if the new role is of higher value than the existing one,
-        calculates refunds if necessary, and updates the member's roles accordingly.
         """
         last_member_role, last_role = premium_roles[0]
         last_role_price = self.role_price_map.get(last_role.name)
@@ -460,16 +474,15 @@ class RoleShopView(discord.ui.View):
             return
 
         if price < last_role_price:
-            if role.name == "★1" and has_mute_roles:
+            if has_mute_roles:
                 await self.remove_mute_roles(member)
-                await interaction.followup.send(
-                    "Usunięto mutujące role z powodu zakupu najniższej rangi."
-                )
+                await interaction.followup.send("Usunięto mutujące role.")
+                return
             else:
                 await interaction.followup.send(
-                    "Nie możesz kupić niższej rangi, jeśli posiadasz już wyższą rangę."
+                    "Nie możesz kupić niższej rangi, jeśli nie masz nałożonych mutów."
                 )
-            return
+                return
 
         refund_amount = calculate_refund(last_member_role.expiration_date, last_role_price)
         msg_refund = (
@@ -482,12 +495,16 @@ class RoleShopView(discord.ui.View):
             await interaction.followup.send("Nie masz wystarczająco dużo pieniędzy.")
             return
 
+        if has_mute_roles:
+            await self.remove_mute_roles(member)
+            await interaction.followup.send("Usunięto mutujące role.")
+
         if last_role.id == role.id:
             extend_days = 31 if duration_days == 30 else 365
             await RoleQueries.update_role_expiration_date(
                 session, member.id, role.id, timedelta(days=extend_days)
             )
-            msg = f"Gratulacje! Przedłuyłeś rolę {role.name} o kolejne {extend_days} dni."
+            msg = f"Gratulacje! Przedłużyłeś rolę {role.name} o kolejne {extend_days} dni."
         else:
             await member.remove_roles(last_role)
             await RoleQueries.delete_member_role(session, member.id, last_role.id)
@@ -673,18 +690,21 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, v
         description = (
             "Aby zakupić rangę, kliknij przycisk odpowiadający jej nazwie.\n"
             "Za każde 10 zł jest 1000G.\n"
-            "Kupno rangi zG20 jest równoznaczne ze zdjęciem wszystkich mutów na serwerze."
+            "Zakup lub przedłużenie dowolnej rangi zdejmuje wszystkie muty na serwerze.\n\n"
+            f"**Twoje ID: {viewer.id}**\n"
+            "Pamiętaj, aby podczas wpłaty wpisać swoje ID w polu 'Wpisz swój nick'"
         )
     else:
         title = "Sklep z rolami - ceny roczne"
         description = (
             "Za zakup na rok płacisz tylko za 10 miesięcy, 2 miesiące są gratis.\n"
             "Za każde 10 zł jest 1000G.\n"
-            "Kupno rangi zG20 jest równoznaczne ze zdjęciem wszystkich mutów na serwerze."
+            "Zakup lub przedłużenie dowolnej rangi zdejmuje wszystkie muty na serwerze.\n\n"
+            f"**Twoje ID: {viewer.id}**\n"
+            "Pamiętaj, aby podczas wpłaty wpisać swoje ID w polu 'Wpisz swój nick'"
         )
 
     embed = discord.Embed(title=title, description=description, color=discord.Color.blurple())
-
     embed.add_field(name="Twoje środki", value=f"{balance}{CURRENCY_UNIT}", inline=False)
 
     # Wyświetlanie aktualnych ról
@@ -695,30 +715,15 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, v
             name="Aktualna rola", value=f"{role_obj.name}\nWygasa: {expiration_date}", inline=False
         )
 
-    # Wyświetlanie dostępnych ról z ich cechami
+    # Wyświetlanie dostępnych ról
     for role_name, price in role_price_map.items():
-        role_config = next(r for r in ctx.bot.config["premium_roles"] if r["name"] == role_name)
-        features_list = "\n".join([f"• {feature}" for feature in role_config["features"]])
+        if page == 2:  # Ceny roczne (10 miesięcy)
+            display_price = price * 10
+        else:  # Ceny miesięczne
+            display_price = price
+        embed.add_field(name=role_name, value=f"Cena: {display_price}{CURRENCY_UNIT}", inline=True)
 
-        # Oblicz cenę w zależności od typu strony (miesięczna/roczna)
-        display_price = price * 10 if page == 2 else price
-
-        # Tworzenie listy informacji o roli
-        role_info = [f"Cena: {display_price}{CURRENCY_UNIT}", features_list]
-
-        if role_config["team_size"] > 0:
-            role_info.append(f"Rozmiar drużyny: {role_config['team_size']}")
-
-        if role_config["moderator_count"] > 0:
-            role_info.append(f"Liczba moderatorów: {role_config['moderator_count']}")
-
-        if role_config["points_multiplier"] > 0:
-            role_info.append(f"Bonus punktów: +{role_config['points_multiplier']}%")
-
-        value = "\n".join(role_info)
-
-        embed.add_field(name=role_name, value=value, inline=False)
-
+    embed.set_footer(text="Użyj przycisku 'Opis ról' aby zobaczyć szczegółowe informacje o rangach")
     return embed
 
 
