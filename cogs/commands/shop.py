@@ -129,6 +129,39 @@ class ShopCog(commands.Cog):
         view = PaymentsView(ctx, self.bot)
         await ctx.send(embed=embed, view=view)
 
+    @commands.command(
+        name="set_role_expiry", description="Ustawia czas wygaśnięcia roli (tylko dla testów)."
+    )
+    @commands.has_permissions(administrator=True)
+    async def set_role_expiry(self, ctx: commands.Context, member: discord.Member, hours: int):
+        """
+        Ustawia czas wygaśnięcia roli dla użytkownika.
+
+        Args:
+            ctx: Kontekst komendy
+            member: Użytkownik, którego rola ma być zmodyfikowana
+            hours: Liczba godzin do wygaśnięcia roli
+        """
+        async with self.bot.get_db() as session:
+            premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+
+            if not premium_roles:
+                await ctx.reply("Ten użytkownik nie ma żadnej roli premium.")
+                return
+
+            member_role, role = premium_roles[0]
+            new_expiry = datetime.now(timezone.utc) + timedelta(hours=hours)
+
+            await RoleQueries.update_role_expiration_date_direct(
+                session, member.id, role.id, new_expiry
+            )
+            await session.commit()
+
+            await ctx.reply(
+                f"Zaktualizowano czas wygaśnięcia roli {role.name} dla {member.display_name}.\n"
+                f"Nowy czas wygaśnięcia: {discord.utils.format_dt(new_expiry, 'R')}"
+            )
+
 
 class PaymentsView(discord.ui.View):
     """View for navigating through payment history."""

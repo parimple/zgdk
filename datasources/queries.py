@@ -262,6 +262,23 @@ class RoleQueries:
         result = await session.execute(query)
         return result.scalars().all()
 
+    @staticmethod
+    async def update_role_expiration_date_direct(
+        session, member_id: int, role_id: int, new_expiry: datetime
+    ):
+        """Update role expiration date directly to a specific datetime."""
+        member_role = (
+            await session.execute(
+                select(MemberRole).where(
+                    MemberRole.member_id == member_id,
+                    MemberRole.role_id == role_id,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if member_role:
+            member_role.expiration_date = new_expiry
+
 
 class HandledPaymentQueries:
     """Class for Handled Payment Queries"""
