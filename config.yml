@@ -30,7 +30,7 @@ channels_create:
 premium_roles:
   # Ukryta ranga do odmutowania
   - name: "zG20"
-    price: 1900  # 19 zł
+    price: 1999  # 19 zł
     features:
       - "Zarządzanie publicznymi kanałami głosowymi przez miesiąc"
       - "Wybór koloru nicku: czerwony lub niebieski"
@@ -44,7 +44,7 @@ premium_roles:
 
   # Ranga z kolorami bez nazwy
   - name: "zG30"
-    price: 2900  # 29zł
+    price: 2999  # 29zł
     features:
       - "Wybór koloru nicku: żółty, czarny lub zielony"
       - "Możliwość tworzenia kanałów **prywatnych**"
@@ -57,7 +57,7 @@ premium_roles:
 
   # Premium rangi
   - name: "zG50"
-    price: 4900  # 49 zł
+    price: 4999  # 49 zł
     features:
       - "Dowolny kolor dostępny za pomocą komendy ?color"
       - "1 moderator kanału głosowego"
@@ -70,7 +70,7 @@ premium_roles:
     emojis_access: true     # Dostęp do emotek
 
   - name: "zG100"
-    price: 9900  # 99 zł
+    price: 9999  # 99 zł
     features:
       - "Rola na samej górze serwera"
       - "Kanał drużynowy dla maksymalnie 15 osób"
@@ -84,7 +84,7 @@ premium_roles:
     emojis_access: true     # Dostęp do emotek
 
   - name: "zG200"
-    price: 19900  # 199 zł
+    price: 19999  # 199 zł
     features:
       - "Rola wyżej niż zG100"
       - "Kanał VIP++ do tworzenia kanałów głosowych"
@@ -98,8 +98,8 @@ premium_roles:
     points_multiplier: 150  # +150% punktów
     emojis_access: true     # Dostęp do emotek
 
-  - name: "zG400"
-    price: 39900  # 399 zł
+  - name: "zG500"
+    price: 49999  # 499 zł
     features:
       - "Drużyna do 35 osób"
       - "6 moderatorów kanału głosowego"
