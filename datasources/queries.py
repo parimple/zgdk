@@ -279,6 +279,18 @@ class RoleQueries:
         if member_role:
             member_role.expiration_date = new_expiry
 
+    @staticmethod
+    async def get_member_role(
+        session: AsyncSession, member_id: int, role_id: int
+    ) -> Optional[MemberRole]:
+        """Get a specific member role"""
+        result = await session.execute(
+            select(MemberRole).where(
+                and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id)
+            )
+        )
+        return result.scalar_one_or_none()
+
 
 class HandledPaymentQueries:
     """Class for Handled Payment Queries"""
