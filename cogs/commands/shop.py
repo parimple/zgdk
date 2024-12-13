@@ -162,6 +162,40 @@ class ShopCog(commands.Cog):
                 f"Nowy czas wygaśnięcia: {discord.utils.format_dt(new_expiry, 'R')}"
             )
 
+    @commands.command(name="force_check_roles")
+    @commands.has_permissions(administrator=True)
+    async def force_check_roles(self, ctx: commands.Context):
+        """Wymusza sprawdzenie i usunięcie wygasłych ról."""
+        now = datetime.now(timezone.utc)
+        count = 0
+
+        # Pobierz konfigurację ról premium
+        premium_role_names = {role["name"]: role for role in self.bot.config["premium_roles"]}
+
+        # Znajdź role premium na serwerze
+        premium_roles = [role for role in ctx.guild.roles if role.name in premium_role_names]
+
+        # Dla każdej roli premium
+        for role in premium_roles:
+            # Sprawdź członków z tą rolą
+            for member in role.members:
+                async with self.bot.get_db() as session:
+                    db_role = await RoleQueries.get_member_role(session, member.id, role.id)
+
+                    if not db_role or db_role.expiration_date <= now:
+                        try:
+                            await member.remove_roles(role)
+                            count += 1
+                            logger.info(
+                                f"Removed role {role.name} from {member.display_name} - no DB entry or expired"
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Error removing role {role.name} from {member.display_name}: {str(e)}"
+                            )
+
+        await ctx.reply(f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne.")
+
 
 class PaymentsView(discord.ui.View):
     """View for navigating through payment history."""
@@ -299,8 +333,6 @@ class RoleShopView(discord.ui.View):
         async def button_callback(interaction: discord.Interaction):
             duration_days = 365 if self.page == 2 else 30
             price = self.role_price_map[role_name]
-            if self.page == 2:
-                price = price * 10  # Używamy ceny rocznej
             await self.handle_buy_role(interaction, role_name, self.member, duration_days, price)
 
         return button_callback
@@ -448,14 +480,39 @@ class RoleShopView(discord.ui.View):
         )
 
     async def purchase_role(self, interaction, session, member, role, price, duration_days):
-        """Handle logic for purchasing a role without existing premium roles."""
-        await member.add_roles(role)
-        await RoleQueries.add_role_to_member(
-            session, member.id, role.id, timedelta(days=duration_days)
-        )
-        msg = f"Gratulacje! Otrzymałeś rolę {role.name}."
-        await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -price)
-        await interaction.followup.send(msg)
+        """Purchase a role for a member"""
+        try:
+            # Sprawdź, czy rola już istnieje
+            existing_role = await RoleQueries.get_member_role(session, member.id, role.id)
+
+            if existing_role:
+                # Jeśli rola istnieje, zaktualizuj datę wygaśnięcia
+                await RoleQueries.update_role_expiration_date(
+                    session, member.id, role.id, timedelta(days=duration_days)
+                )
+            else:
+                # Jeśli rola nie istnieje, dodaj nową
+                await RoleQueries.add_role_to_member(
+                    session, member.id, role.id, timedelta(days=duration_days)
+                )
+
+            # Dodaj rolę na Discordzie
+            await member.add_roles(role)
+
+            # Odejmij cenę z portfela
+            await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -price)
+
+            await session.commit()
+
+            expiry_date = datetime.now(timezone.utc) + timedelta(days=duration_days)
+            await interaction.followup.send(
+                f"Gratulacje! Zakupiłeś rolę {role.name} do {discord.utils.format_dt(expiry_date, 'R')}."
+            )
+
+        except Exception as e:
+            logger.error(f"Error purchasing role: {str(e)}")
+            await session.rollback()
+            await interaction.followup.send("Wystąpił błąd podczas zakupu roli.")
 
     async def remove_mute_roles(self, member: discord.Member):
         """Remove all mute roles from the member and notify them."""
@@ -750,11 +807,7 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, v
 
     # Wyświetlanie dostępnych ról
     for role_name, price in role_price_map.items():
-        if page == 2:  # Ceny roczne (10 miesięcy)
-            display_price = price * 10
-        else:  # Ceny miesięczne
-            display_price = price
-        embed.add_field(name=role_name, value=f"Cena: {display_price}{CURRENCY_UNIT}", inline=True)
+        embed.add_field(name=role_name, value=f"Cena: {price}{CURRENCY_UNIT}", inline=True)
 
     embed.set_footer(text="Użyj przycisku 'Opis ról' aby zobaczyć szczegółowe informacje o rangach")
     return embed

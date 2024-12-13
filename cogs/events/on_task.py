@@ -87,7 +87,7 @@ class OnTaskEvent(commands.Cog):
 
             if role_price is not None:
                 price_pln = g_to_pln(role_price)
-                price_message = f"Aby przedłużyć tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} (około {price_pln:.2f} PLN)."
+                price_message = f"Aby przedłużyć tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} ({price_pln:.2f} PLN)."
             else:
                 price_message = (
                     "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."
@@ -125,20 +125,58 @@ class OnTaskEvent(commands.Cog):
         """Remove expired premium memberships"""
         logger.info("Starting remove_expired_roles task")
         now = datetime.now(timezone.utc)
-        async with self.bot.get_db() as session:
-            expired_roles = await RoleQueries.get_member_premium_roles(session)
-            logger.info("Found %d premium roles", len(expired_roles))
-            for member_role, role in expired_roles:
-                if member_role.expiration_date <= now:
-                    member = self.bot.guild.get_member(member_role.member_id)
-                    if member:
-                        logger.info("Processing member %d for expired role %d", member.id, role.id)
-                        await self.notify_premium_removal(member, member_role, role)
-                        await self.remove_premium_role(session, member, role)
-                        await NotificationLogQueries.add_or_update_notification_log(
-                            session, member.id, "premium_role_expired"
-                        )
-        await session.commit()
+
+        # Pobierz konfigurację ról premium
+        premium_role_names = {role["name"]: role for role in self.bot.config["premium_roles"]}
+
+        # Znajdź role premium na serwerze
+        premium_roles = [role for role in self.bot.guild.roles if role.name in premium_role_names]
+
+        # Dla każdej roli premium
+        for role in premium_roles:
+            # Sprawdź członków z tą rolą
+            for member in role.members:
+                async with self.bot.get_db() as session:
+                    db_role = await RoleQueries.get_member_role(session, member.id, role.id)
+
+                    if not db_role or db_role.expiration_date <= now:
+                        try:
+                            await member.remove_roles(role)
+                            logger.info(
+                                "Successfully removed role %s from %s (%d) - no DB entry or expired",
+                                role.name,
+                                member.display_name,
+                                member.id,
+                            )
+                            if (
+                                db_role
+                            ):  # Powiadom tylko jeśli rola wygasła (a nie gdy jej brak w DB)
+                                await self.notify_premium_removal(member, db_role, role)
+                        except discord.Forbidden:
+                            logger.error(
+                                "Failed to remove role %s from %s (%d) - Missing permissions",
+                                role.name,
+                                member.display_name,
+                                member.id,
+                            )
+                        except Exception as e:
+                            logger.error(
+                                "Failed to remove role %s from %s (%d) - %s",
+                                role.name,
+                                member.display_name,
+                                member.id,
+                                str(e),
+                            )
+
+                        # Jeśli rola istnieje w bazie, usuń ją
+                        if db_role:
+                            await RoleQueries.delete_member_role(session, member.id, role.id)
+                            await NotificationLogQueries.add_or_update_notification_log(
+                                session, member.id, "premium_role_expired"
+                            )
+
+                    await session.commit()
+
         logger.info("Finished remove_expired_roles task")
 
     async def notify_premium_removal(self, member, member_role, role):
@@ -152,7 +190,7 @@ class OnTaskEvent(commands.Cog):
 
             if role_price is not None:
                 price_pln = g_to_pln(role_price)
-                price_message = f"Aby odnowić tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} (około {price_pln:.2f} PLN)."
+                price_message = f"Aby odnowić tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} ({price_pln:.2f} PLN)."
             else:
                 price_message = (
                     "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."
