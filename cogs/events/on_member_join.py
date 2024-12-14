@@ -248,10 +248,10 @@ class OnMemberJoinEvent(commands.Cog):
             deleted_count = 0
             expired_count = 0
             not_found_count = 0
-            max_deletions = min(50, max(0, len(guild_invites) - 950))
+            max_deletions = min(100, max(0, len(guild_invites) - 900))
 
-            if len(guild_invites) > 950:
-                logger.info(f"Number of invites ({len(guild_invites)}) exceeds 950. Cleaning up...")
+            if len(guild_invites) > 900:
+                logger.info(f"Number of invites ({len(guild_invites)}) exceeds 900. Cleaning up...")
 
                 inactive_threshold = timedelta(days=1)  # Konfigurowalny próg czasowy
 
@@ -260,7 +260,7 @@ class OnMemberJoinEvent(commands.Cog):
                 )
 
                 for db_invite in invites_to_check:
-                    if len(guild_invites) <= 950 or deleted_count >= max_deletions:
+                    if len(guild_invites) <= 900 or deleted_count >= max_deletions:
                         break
 
                     discord_invite = discord.utils.get(guild_invites, id=db_invite.id)
