@@ -396,6 +396,66 @@ class ChannelModManager:
         return True
 
 
+class BasePermissionCommand:
+    """Base class for permission-related commands."""
+
+    def __init__(self, permission_flag: str, permission_name: str):
+        self.permission_flag = permission_flag
+        self.permission_name = permission_name
+
+    async def execute(self, cog, ctx, target, permission_value):
+        """Execute the permission command."""
+        # Sprawdź czy użytkownik jest na kanale głosowym
+        if not await cog.permission_checker.check_voice_channel(ctx):
+            return
+
+        # Sprawdź uprawnienia administratora/moderatora
+        if not await cog.permission_checker.check_admin_or_mod(ctx, ctx.author.voice.channel):
+            return
+
+        target, permission_value = cog._handle_text_command_permission(
+            ctx, target, permission_value
+        )
+        target_member, permission = await get_target_and_permission(ctx, target, permission_value)
+
+        if target_member == ctx.guild.default_role and target is not None:
+            await cog.message_sender.send_user_not_found(ctx)
+            return
+
+        update_db = await cog.db_manager.should_update_db(
+            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
+        )
+
+        await cog.permission_manager.modify_channel_permission(
+            ctx, target_member, self.permission_flag, permission, update_db
+        )
+
+
+class PermissionChecker:
+    """Handles permission checking logic."""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.message_sender = MessageSender()
+
+    async def check_voice_channel(self, ctx) -> bool:
+        """Check if user is in voice channel."""
+        if ctx.author.voice is None:
+            await self.message_sender.send_not_in_voice_channel(ctx)
+            return False
+        return True
+
+    async def check_admin_or_mod(self, ctx, channel) -> bool:
+        """Check if user has admin or mod permissions."""
+        if not (
+            ctx.author.guild_permissions.administrator
+            or channel.overwrites_for(ctx.author).manage_messages
+        ):
+            await self.message_sender.send_no_mod_permission(ctx)
+            return False
+        return True
+
+
 class VoiceCog(commands.Cog):
     """Voice commands cog for managing voice channel permissions and operations."""
 
@@ -406,11 +466,20 @@ class VoiceCog(commands.Cog):
         self.mod_manager = ChannelModManager(bot)
         self.message_sender = MessageSender()
         self.db_manager = DatabaseManager(bot)
+        self.permission_checker = PermissionChecker(bot)
+
+        # Initialize permission commands
+        self.permission_commands = {
+            "speak": BasePermissionCommand("speak", "mówienia"),
+            "view": BasePermissionCommand("view_channel", "wyświetlania"),
+            "connect": BasePermissionCommand("connect", "połączenia"),
+            "message": BasePermissionCommand("send_messages", "pisania"),
+        }
 
     @commands.hybrid_command(aliases=["s"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="Użytkownik do modyfikacji uprawnień (ID, wzmianka lub nazwa użytkownika)",
+        target="Użytkownik do modyfikacji uprawnień",
         can_speak="Ustaw uprawnienie mówienia (+ lub -)",
     )
     async def speak(
@@ -420,24 +489,12 @@ class VoiceCog(commands.Cog):
         can_speak: Optional[Literal["+", "-"]] = None,
     ):
         """Set the speak permission for the target."""
-        target_member, permission = await get_target_and_permission(ctx, target, can_speak)
-
-        if target_member == ctx.guild.default_role and target is not None:
-            await self.message_sender.send_user_not_found(ctx)
-            return
-
-        update_db = await self.db_manager.should_update_db(
-            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
-        )
-
-        await self.permission_manager.modify_channel_permission(
-            ctx, target_member, "speak", permission, update_db
-        )
+        await self.permission_commands["speak"].execute(self, ctx, target, can_speak)
 
     @commands.hybrid_command(aliases=["v"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="Użytkownik do modyfikacji uprawnień (ID, wzmianka lub nazwa użytkownika)",
+        target="Użytkownik do modyfikacji uprawnień",
         can_view="Ustaw uprawnienie wyświetlania (+ lub -)",
     )
     async def view(
@@ -447,51 +504,42 @@ class VoiceCog(commands.Cog):
         can_view: Optional[Literal["+", "-"]] = None,
     ):
         """Set the view permission for the target."""
-        target_member, permission = await get_target_and_permission(ctx, target, can_view)
-
-        if target_member == ctx.guild.default_role and target is not None:
-            await self.message_sender.send_user_not_found(ctx)
-            return
-
-        update_db = await self.db_manager.should_update_db(
-            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
-        )
-
-        await self.permission_manager.modify_channel_permission(
-            ctx, target_member, "view_channel", permission, update_db
-        )
+        await self.permission_commands["view"].execute(self, ctx, target, can_view)
 
     @commands.hybrid_command(aliases=["c"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="Użytkownik do modyfikacji uprawnień (ID, wzmianka lub nazwa użytkownika)",
+        target="Użytkownik do modyfikacji uprawnień",
         can_connect="Ustaw uprawnienie połączenia (+ lub -)",
     )
     async def connect(
         self,
         ctx,
-        target: Optional[discord.Member] = None,
+        target: Optional[Member] = None,
         can_connect: Optional[Literal["+", "-"]] = None,
     ):
-        """Set the connect permission for the target or everyone."""
-        target_member, permission = await get_target_and_permission(ctx, target, can_connect)
+        """Set the connect permission for the target."""
+        await self.permission_commands["connect"].execute(self, ctx, target, can_connect)
 
-        if target_member == ctx.guild.default_role and target is not None:
-            await self.message_sender.send_user_not_found(ctx)
-            return
-
-        update_db = await self.db_manager.should_update_db(
-            ctx.author, ctx.author.voice.channel if ctx.author.voice else None
-        )
-
-        await self.permission_manager.modify_channel_permission(
-            ctx, target_member, "connect", permission, update_db
-        )
+    @commands.hybrid_command(aliases=["m"])
+    @commands.has_permissions(administrator=True)
+    @discord.app_commands.describe(
+        target="Użytkownik do modyfikacji uprawnień",
+        can_message="Ustaw uprawnienie pisania (+ lub -)",
+    )
+    async def message(
+        self,
+        ctx,
+        target: Optional[Member] = None,
+        can_message: Optional[Literal["+", "-"]] = None,
+    ):
+        """Set the message permission for the target."""
+        await self.permission_commands["message"].execute(self, ctx, target, can_message)
 
     @commands.hybrid_command(aliases=["cm"])
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
-        target="Użytkownik do dodania lub usunięcia jako moderator kanału (ID, wzmianka lub nazwa użytkownika)",
+        target="Użytkownik do dodania lub usunięcia jako moderator kanału",
         can_manage="Dodaj (+) lub usuń (-) uprawnienia moderatora kanału",
     )
     async def channel_mod(
@@ -501,6 +549,12 @@ class VoiceCog(commands.Cog):
         can_manage: Optional[Literal["+", "-"]] = None,
     ):
         """Add or remove channel moderator permissions for the selected user."""
+        if not await self.permission_checker.check_voice_channel(ctx):
+            return
+
+        if not await self.permission_checker.check_admin_or_mod(ctx, ctx.author.voice.channel):
+            return
+
         target_member, permission = await get_target_and_permission(ctx, target, can_manage)
 
         if target_member == ctx.guild.default_role and target is not None:
@@ -556,6 +610,14 @@ class VoiceCog(commands.Cog):
                 target_info = await self.target_helper.get_voice_channel_info(target_member)
 
         await self.message_sender.send_voice_channel_info(ctx, author_info, target_info)
+
+    def _handle_text_command_permission(self, ctx, target, permission_value):
+        """Handle text command permission parsing for voice commands."""
+        if not ctx.interaction:  # This means it's a text command, not a slash command
+            message_parts = ctx.message.content.split()
+            if len(message_parts) > 1 and message_parts[1] in ["+", "-"]:
+                return None, message_parts[1]
+        return target, permission_value
 
 
 async def setup(bot):
