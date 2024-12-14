@@ -137,7 +137,13 @@ class InfoCog(commands.Cog):
             if member.joined_at
             else "Brak danych",
         )
-        embed.add_field(name="Role:", value=" ".join([role.mention for role in roles]))
+
+        if premium_roles:
+            premium_role = premium_roles[0][1]
+            roles = [role for role in roles if role.id != premium_role.id]
+
+        if roles:
+            embed.add_field(name="Role:", value=" ".join([role.mention for role in roles]))
 
         if premium_roles:
             PremiumManager.add_premium_roles_to_embed(ctx, embed, premium_roles)
