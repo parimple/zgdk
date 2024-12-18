@@ -445,12 +445,24 @@ class PermissionChecker:
             return False
         return True
 
-    async def check_admin_or_mod(self, ctx, channel) -> bool:
-        """Check if user has admin or mod permissions."""
-        if not (
-            ctx.author.guild_permissions.administrator
-            or channel.overwrites_for(ctx.author).manage_messages
-        ):
+    async def check_channel_owner(self, ctx, channel) -> bool:
+        """Check if user is the channel owner (has priority_speaker)."""
+        if not channel.overwrites_for(ctx.author).priority_speaker:
+            await self.message_sender.send_no_mod_permission(ctx)
+            return False
+        return True
+
+    async def check_channel_mod(self, ctx, channel) -> bool:
+        """Check if user is a channel mod (has manage_messages)."""
+        if not channel.overwrites_for(ctx.author).manage_messages:
+            await self.message_sender.send_no_mod_permission(ctx)
+            return False
+        return True
+
+    async def check_channel_mod_or_owner(self, ctx, channel) -> bool:
+        """Check if user is either channel owner or mod."""
+        channel_perms = channel.overwrites_for(ctx.author)
+        if not (channel_perms.priority_speaker or channel_perms.manage_messages):
             await self.message_sender.send_no_mod_permission(ctx)
             return False
         return True
@@ -489,6 +501,15 @@ class VoiceCog(commands.Cog):
         can_speak: Optional[Literal["+", "-"]] = None,
     ):
         """Set the speak permission for the target."""
+        if not await self.permission_checker.check_voice_channel(ctx):
+            return
+
+        # Właściciel lub mod może zarządzać uprawnieniami do mówienia
+        if not await self.permission_checker.check_channel_mod_or_owner(
+            ctx, ctx.author.voice.channel
+        ):
+            return
+
         await self.permission_commands["speak"].execute(self, ctx, target, can_speak)
 
     @commands.hybrid_command(aliases=["v"])
@@ -552,7 +573,8 @@ class VoiceCog(commands.Cog):
         if not await self.permission_checker.check_voice_channel(ctx):
             return
 
-        if not await self.permission_checker.check_admin_or_mod(ctx, ctx.author.voice.channel):
+        # Tylko właściciel kanału może dodawać/usuwać modów
+        if not await self.permission_checker.check_channel_owner(ctx, ctx.author.voice.channel):
             return
 
         target_member, permission = await get_target_and_permission(ctx, target, can_manage)
