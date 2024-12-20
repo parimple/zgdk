@@ -8,6 +8,7 @@ channels:
   on_join: 1105588284555546634
   lounge: 1143990867946913845
   donation: 960665312200626201
+  premium_info: 960665316109713421
 
 gifs:
   donation: "https://media1.tenor.com/m/tn_MOQB9pV4AAAAd/tony-tonylife.gif"
@@ -30,7 +31,7 @@ channels_create:
 premium_roles:
   # Ukryta ranga do odmutowania
   - name: "zG20"
-    price: 1999  # 19 zł
+    price: 1999  # 19,99 zł
     features:
       - "Zarządzanie publicznymi kanałami głosowymi przez miesiąc"
       - "Wybór koloru nicku: czerwony lub niebieski"
@@ -44,7 +45,7 @@ premium_roles:
 
   # Ranga z kolorami bez nazwy
   - name: "zG30"
-    price: 2999  # 29zł
+    price: 2999  # 29,99zł
     features:
       - "Wybór koloru nicku: żółty, czarny lub zielony"
       - "Możliwość tworzenia kanałów **prywatnych**"
@@ -57,7 +58,7 @@ premium_roles:
 
   # Premium rangi
   - name: "zG50"
-    price: 4999  # 49 zł
+    price: 4999  # 49,99 zł
     features:
       - "Dowolny kolor dostępny za pomocą komendy ?color"
       - "1 moderator kanału głosowego"
@@ -70,7 +71,7 @@ premium_roles:
     emojis_access: true     # Dostęp do emotek
 
   - name: "zG100"
-    price: 9999  # 99 zł
+    price: 9999  # 99,99 zł
     features:
       - "Rola na samej górze serwera"
       - "Kanał drużynowy dla maksymalnie 15 osób"
@@ -84,7 +85,7 @@ premium_roles:
     emojis_access: true     # Dostęp do emotek
 
   - name: "zG200"
-    price: 19999  # 199 zł
+    price: 19999  # 199,99 zł
     features:
       - "Rola wyżej niż zG100"
       - "Kanał VIP++ do tworzenia kanałów głosowych"
