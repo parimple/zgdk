@@ -84,11 +84,35 @@ class MessageSender:
         )
 
     @staticmethod
-    async def send_channel_mod_update(ctx, target, is_mod):
-        """Sends a message about updating channel mod status."""
+    async def send_channel_mod_update(ctx, target, is_mod, voice_channel, mod_limit):
+        """Sends a message about updating channel mod status and displays mod information."""
         action = "nadano uprawnienia" if is_mod else "odebrano uprawnienia"
+
+        # Get current mods
+        current_mods = [
+            t
+            for t, overwrite in voice_channel.overwrites.items()
+            if isinstance(t, discord.Member)
+            and overwrite.manage_messages is True
+            and not overwrite.priority_speaker
+        ]
+
+        current_mods_mentions = ", ".join(
+            [member.mention for member in current_mods if member != ctx.author]
+        )
+        if not current_mods_mentions:
+            current_mods_mentions = "brak"
+
+        remaining_slots = max(0, mod_limit - len(current_mods))
+
+        message = (
+            f"{target.mention} {action} moderatora kanału.\n"
+            f"Aktualni moderatorzy: {current_mods_mentions}\n"
+            f"Możesz przypisać maksymalnie {mod_limit} moderatorów (pozostało slotów: {remaining_slots})"
+        )
+
         await ctx.reply(
-            f"{target.mention} {action} moderatora kanału.",
+            message,
             allowed_mentions=AllowedMentions(users=False, roles=False),
         )
 
@@ -106,6 +130,14 @@ class MessageSender:
         await ctx.send(
             f"Nie posiadasz żadnej rangi premium. Możesz przypisać 0 channel modów. "
             f"Jeśli chcesz mieć możliwość dodawania moderatorów, sprawdź kanał <#{premium_channel_id}>."
+        )
+
+    @staticmethod
+    async def send_permission_update_error(ctx, target, permission_flag):
+        """Sends a message when there is an error updating the permission."""
+        await ctx.reply(
+            f"Nie udało się ustawić uprawnienia {permission_flag} dla {target.mention}.",
+            allowed_mentions=AllowedMentions(users=False, roles=False),
         )
 
 
@@ -191,10 +223,21 @@ class VoicePermissionManager:
         setattr(current_perms, permission_flag, new_value)
 
         await self._update_channel_permission(ctx, target, current_perms)
+
+        # Jeśli nie podano wartości update_db, używamy "+" dla True i "-" dla False
+        if update_db is None:
+            update_db = "+" if new_value else "-"
+
         await self._update_db_permission(ctx, target, current_perms, update_db)
 
         if permission_flag == "manage_messages":
-            await self.message_sender.send_channel_mod_update(ctx, target, new_value)
+            await self.message_sender.send_channel_mod_update(
+                ctx,
+                target,
+                new_value,
+                current_channel,
+                await self.get_premium_role_limit(ctx.author),
+            )
         else:
             await self.message_sender.send_permission_update(
                 ctx, target, permission_flag, new_value
@@ -268,7 +311,6 @@ class VoicePermissionManager:
     async def get_premium_role_limit(self, member):
         """Gets the maximum number of channel mods a member can assign based on their premium role."""
         premium_roles = self.bot.config["premium_roles"]
-        # logger.info(f"Premium roles config: {premium_roles}")
         logger.info(f"Member roles: {[r.name for r in member.roles]}")
 
         for role in reversed(premium_roles):
@@ -284,10 +326,12 @@ class VoicePermissionManager:
         afk_channel = ctx.guild.get_channel(afk_channel_id)
 
         if target and target_channel == ctx.author.voice.channel:
+            # Dla view_channel i connect przenoś tylko gdy odbieramy uprawnienia
             if permission_flag in ["view_channel", "connect"] and not value:
                 if afk_channel:
                     await target.move_to(afk_channel)
-            if permission_flag == "speak" and not value:
+            # Dla speak przenoś na AFK i z powrotem zawsze aby odświeżyć uprawnienia
+            if permission_flag == "speak":
                 if afk_channel:
                     await target.move_to(afk_channel)
                     await target.move_to(ctx.author.voice.channel)
@@ -353,6 +397,34 @@ class ChannelModManager:
         self.bot = bot
         self.permission_manager = VoicePermissionManager(bot)
         self.message_sender = MessageSender()
+
+    async def show_mod_status(self, ctx, voice_channel, mod_limit):
+        """Shows current mod status."""
+        current_mods = [
+            t
+            for t, overwrite in voice_channel.overwrites.items()
+            if isinstance(t, discord.Member)
+            and overwrite.manage_messages is True
+            and not overwrite.priority_speaker
+        ]
+
+        current_mods_mentions = ", ".join(
+            [member.mention for member in current_mods if member != ctx.author]
+        )
+        if not current_mods_mentions:
+            current_mods_mentions = "brak"
+
+        remaining_slots = max(0, mod_limit - len(current_mods))
+
+        message = (
+            f"Aktualni moderatorzy: {current_mods_mentions}\n"
+            f"Możesz przypisać maksymalnie {mod_limit} moderatorów (pozostało slotów: {remaining_slots})"
+        )
+
+        await ctx.reply(
+            message,
+            allowed_mentions=AllowedMentions(users=False, roles=False),
+        )
 
     async def check_prerequisites(self, ctx, target, can_manage):
         """Checks prerequisites for assigning channel mod."""
@@ -452,15 +524,34 @@ class BasePermissionCommand:
         permission_display_name: str,
         default_to_true=False,
         toggle=False,
+        requires_mod=False,  # Czy wymaga uprawnień moderatora
+        requires_owner=False,  # Czy wymaga uprawnień właściciela
     ):
         self.permission_name = permission_name
         self.permission_display_name = permission_display_name
         self.default_to_true = default_to_true
         self.toggle = toggle
+        self.requires_mod = requires_mod
+        self.requires_owner = requires_owner
 
     async def execute(self, cog, ctx, target, permission_value):
         """Execute the permission command."""
         if not await cog.permission_checker.check_voice_channel(ctx):
+            return
+
+        voice_channel = ctx.author.voice.channel
+
+        # Sprawdź uprawnienia
+        if self.requires_owner and not await cog.permission_checker.check_channel_owner(
+            voice_channel, ctx
+        ):
+            await cog.message_sender.send_no_mod_permission(ctx)
+            return
+
+        if self.requires_mod and not await cog.permission_checker.check_channel_mod_or_owner(
+            voice_channel, ctx
+        ):
+            await cog.message_sender.send_no_mod_permission(ctx)
             return
 
         # Przetwórz argumenty dla komend tekstowych
@@ -471,27 +562,18 @@ class BasePermissionCommand:
             f"After handling text command: target={target}, permission_value={permission_value}"
         )
 
-        # Sprawdź limit modów jeśli to komenda mod
+        # Dla komendy mod sprawdź dodatkowe warunki
         if self.permission_name == "manage_messages":
-            mod_limit = await cog.permission_manager.get_premium_role_limit(ctx.author)
-            logger.info(f"Got mod limit: {mod_limit}, permission_value: {permission_value}")
             if not await cog.mod_manager.validate_channel_mod(ctx, target, permission_value):
                 return
 
-        # Ustaw domyślną wartość jeśli nie podano
-        if permission_value is None and self.toggle:
-            current_value = await cog.permission_manager.get_permission(
-                target, ctx.author.voice.channel, self.permission_name
-            )
-            permission_value = "-" if current_value else "+"
-            logger.info(f"Toggle mode: current={current_value}, new value={permission_value}")
-
+        # For all commands
         await cog.permission_manager.modify_channel_permission(
             ctx,
             target,
             self.permission_name,
             permission_value,
-            None,  # update_db
+            permission_value,  # update_db - używamy tej samej wartości co dla uprawnienia
             self.default_to_true,
             self.toggle,
         )
@@ -511,27 +593,29 @@ class PermissionChecker:
             return False
         return True
 
-    async def check_channel_owner(self, ctx, channel) -> bool:
+    async def check_channel_owner(self, channel, ctx) -> bool:
         """Check if user is the channel owner (has priority_speaker)."""
-        if not channel.overwrites_for(ctx.author).priority_speaker:
-            await self.message_sender.send_no_mod_permission(ctx)
+        if not channel:
             return False
-        return True
 
-    async def check_channel_mod(self, ctx, channel) -> bool:
+        perms = channel.overwrites_for(ctx.author)
+        return perms and perms.priority_speaker
+
+    async def check_channel_mod(self, channel, ctx) -> bool:
         """Check if user is a channel mod (has manage_messages)."""
-        if not channel.overwrites_for(ctx.author).manage_messages:
-            await self.message_sender.send_no_mod_permission(ctx)
+        if not channel:
             return False
-        return True
 
-    async def check_channel_mod_or_owner(self, ctx, channel) -> bool:
+        perms = channel.overwrites_for(ctx.author)
+        return perms and perms.manage_messages
+
+    async def check_channel_mod_or_owner(self, channel, ctx) -> bool:
         """Check if user is either channel owner or mod."""
-        channel_perms = channel.overwrites_for(ctx.author)
-        if not (channel_perms.priority_speaker or channel_perms.manage_messages):
-            await self.message_sender.send_no_mod_permission(ctx)
+        if not channel:
             return False
-        return True
+
+        perms = channel.overwrites_for(ctx.author)
+        return perms and (perms.priority_speaker or perms.manage_messages)
 
 
 class VoiceCog(commands.Cog):
@@ -548,12 +632,16 @@ class VoiceCog(commands.Cog):
 
         # Initialize permission commands
         self.permission_commands = {
-            "speak": BasePermissionCommand("speak", "mówienia"),
-            "view": BasePermissionCommand("view_channel", "wyświetlania"),
-            "connect": BasePermissionCommand("connect", "połączenia"),
-            "text": BasePermissionCommand("send_messages", "pisania"),
+            "speak": BasePermissionCommand("speak", "mówienia", requires_mod=True),
+            "view": BasePermissionCommand("view_channel", "wyświetlania", requires_mod=True),
+            "connect": BasePermissionCommand("connect", "połączenia", requires_mod=True),
+            "text": BasePermissionCommand("send_messages", "pisania", requires_mod=True),
             "mod": BasePermissionCommand(
-                "manage_messages", "moderatora", default_to_true=True, toggle=True
+                "manage_messages",
+                "moderatora",
+                default_to_true=True,
+                toggle=True,
+                requires_owner=True,
             ),
         }
 
@@ -570,15 +658,6 @@ class VoiceCog(commands.Cog):
         can_speak: Optional[Literal["+", "-"]] = None,
     ):
         """Set the speak permission for the target."""
-        if not await self.permission_checker.check_voice_channel(ctx):
-            return
-
-        # Właściciel lub mod może zarządzać uprawnieniami do mówienia
-        if not await self.permission_checker.check_channel_mod_or_owner(
-            ctx, ctx.author.voice.channel
-        ):
-            return
-
         await self.permission_commands["speak"].execute(self, ctx, target, can_speak)
 
     @commands.hybrid_command(aliases=["v"])
@@ -642,11 +721,12 @@ class VoiceCog(commands.Cog):
         if not await self.permission_checker.check_voice_channel(ctx):
             return
 
-        # Tylko właściciel kanału może dodawać/usuwać modów
-        if not await self.permission_checker.check_channel_owner(ctx, ctx.author.voice.channel):
-            return
+        voice_channel = ctx.author.voice.channel
+        mod_limit = await self.permission_manager.get_premium_role_limit(ctx.author)
 
-        if not await self.mod_manager.validate_channel_mod(ctx, target, can_manage):
+        # If no target is provided, just show current mod information
+        if target is None:
+            await self.mod_manager.show_mod_status(ctx, voice_channel, mod_limit)
             return
 
         await self.permission_commands["mod"].execute(self, ctx, target, can_manage)
@@ -709,6 +789,11 @@ class VoiceCog(commands.Cog):
 
         logger.info(f"Final target: {target}, permission_value: {permission_value}")  # Debug log
         return target, permission_value
+
+
+async def setup(bot):
+    """This function is called when the cog is loaded."""
+    await bot.add_cog(VoiceCog(bot))
 
 
 async def setup(bot):
