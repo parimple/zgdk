@@ -88,14 +88,21 @@ class MessageSender:
         """Sends a message about updating channel mod status and displays mod information."""
         action = "nadano uprawnienia" if is_mod else "odebrano uprawnienia"
 
-        # Get current mods
+        # Get current mods from channel overwrites only
         current_mods = [
             t
             for t, overwrite in voice_channel.overwrites.items()
             if isinstance(t, discord.Member)
-            and overwrite.manage_messages is True
-            and not overwrite.priority_speaker
+            and overwrite.manage_messages is True  # Musi być dokładnie True (nie None ani False)
+            and not (
+                overwrite.priority_speaker is True and t == ctx.author
+            )  # Wykluczamy tylko właściciela kanału
+            and t != target  # Nie pokazujemy użytkownika któremu właśnie zmieniamy uprawnienia
         ]
+
+        # Dodaj target tylko jeśli nadajemy uprawnienia
+        if is_mod:
+            current_mods.append(target)
 
         current_mods_mentions = ", ".join(
             [member.mention for member in current_mods if member != ctx.author]
@@ -222,13 +229,8 @@ class VoicePermissionManager:
         )
         setattr(current_perms, permission_flag, new_value)
 
+        # Aktualizuj uprawnienia na kanale i w bazie
         await self._update_channel_permission(ctx, target, current_perms)
-
-        # Jeśli nie podano wartości update_db, używamy "+" dla True i "-" dla False
-        if update_db is None:
-            update_db = "+" if new_value else "-"
-
-        await self._update_db_permission(ctx, target, current_perms, update_db)
 
         if permission_flag == "manage_messages":
             await self.message_sender.send_channel_mod_update(
@@ -264,29 +266,56 @@ class VoicePermissionManager:
         current_value = getattr(current_perms, permission_flag, None)
 
         if toggle:
-            return None if current_value is True else True
+            if current_value is True:
+                return None if permission_flag == "manage_messages" else False
+            return True
 
         if value is None:
             if current_value is None:
                 return True if default_to_true else False
-            return not current_value
+            if current_value is True:
+                return None if permission_flag == "manage_messages" else False
+            return True
 
         if value == "+":
             return True
         if value == "-":
-            if permission_flag == "manage_messages":
-                return None
-            return False
-
-    async def _update_channel_permission(self, ctx, target, current_perms):
-        """Updates the channel permissions."""
-        await ctx.author.voice.channel.set_permissions(target, overwrite=current_perms)
+            return None if permission_flag == "manage_messages" else False
 
     async def _update_db_permission(self, ctx, target, current_perms, update_db):
         """Updates the database permissions if required."""
         if update_db:
             allow_bits, deny_bits = current_perms.pair()
             async with self.bot.get_db() as session:
+                # Zawsze aktualizujemy uprawnienia w bazie
+                await ChannelPermissionQueries.add_or_update_permission(
+                    session,
+                    ctx.author.id,
+                    target.id,
+                    allow_bits.value,
+                    deny_bits.value,
+                    ctx.guild.id,
+                )
+
+    async def _update_channel_permission(self, ctx, target, current_perms):
+        """Updates the channel permissions."""
+        # Najpierw aktualizujemy uprawnienia na kanale
+        await ctx.author.voice.channel.set_permissions(target, overwrite=current_perms)
+
+        # Następnie aktualizujemy uprawnienia w bazie
+        allow_bits, deny_bits = current_perms.pair()
+
+        async with self.bot.get_db() as session:
+            # Jeśli odbieramy uprawnienia moderatora (manage_messages=None)
+            if getattr(current_perms, "manage_messages", None) is None:
+                # Usuń uprawnienia z bazy
+                await ChannelPermissionQueries.remove_permission(
+                    session,
+                    ctx.author.id,
+                    target.id,
+                )
+            else:
+                # W przeciwnym razie aktualizuj uprawnienia
                 await ChannelPermissionQueries.add_or_update_permission(
                     session,
                     ctx.author.id,
@@ -314,7 +343,7 @@ class VoicePermissionManager:
         logger.info(f"Member roles: {[r.name for r in member.roles]}")
 
         for role in reversed(premium_roles):
-            logger.info(f"Checking role: {role}")
+            # logger.info(f"Checking role: {role}")
             if any(r.name == role["name"] for r in member.roles):
                 logger.info(f"Found matching role: {role}, limit: {role['moderator_count']}")
                 return role["moderator_count"]
@@ -348,6 +377,44 @@ class VoicePermissionManager:
     async def can_assign_channel_mod(self, member, channel):
         """Checks if a member has priority_speaker permission on the channel."""
         return await self.get_permission(member, channel, "priority_speaker")
+
+    async def sync_permissions_from_db(self, ctx, channel, is_public=False):
+        """Synchronizes channel permissions from database.
+
+        Args:
+            ctx: The command context
+            channel: The voice channel to sync permissions to
+            is_public: If True, don't sync permissions from database (for public channels)
+        """
+        # Dla kanałów publicznych nie synchronizujemy uprawnień z bazy
+        if is_public:
+            return
+
+        # Dla kanałów prywatnych synchronizujemy wszystkie uprawnienia
+        async with self.bot.get_db() as session:
+            # Pobierz wszystkie uprawnienia z bazy dla tego właściciela
+            db_permissions = await ChannelPermissionQueries.get_permissions_for_member(
+                session, ctx.author.id
+            )
+
+            # Dla każdego uprawnienia w bazie
+            for perm in db_permissions:
+                target = ctx.guild.get_member(perm.target_id)
+                if target:
+                    # Konwertuj bity uprawnień na obiekt PermissionOverwrite
+                    allow_perms = discord.Permissions(perm.allow_permissions_value)
+                    deny_perms = discord.Permissions(perm.deny_permissions_value)
+
+                    overwrite = discord.PermissionOverwrite()
+                    for perm_name, value in allow_perms:
+                        if value:
+                            setattr(overwrite, perm_name, True)
+                    for perm_name, value in deny_perms:
+                        if value:
+                            setattr(overwrite, perm_name, False)
+
+                    # Ustaw uprawnienia na kanale
+                    await channel.set_permissions(target, overwrite=overwrite)
 
 
 class VoiceChannelManager:
@@ -400,12 +467,15 @@ class ChannelModManager:
 
     async def show_mod_status(self, ctx, voice_channel, mod_limit):
         """Shows current mod status."""
+        # Get current mods from channel overwrites only
         current_mods = [
             t
             for t, overwrite in voice_channel.overwrites.items()
             if isinstance(t, discord.Member)
-            and overwrite.manage_messages is True
-            and not overwrite.priority_speaker
+            and overwrite.manage_messages is True  # Musi być dokładnie True (nie None ani False)
+            and not (
+                overwrite.priority_speaker is True and t == ctx.author
+            )  # Wykluczamy tylko właściciela kanału
         ]
 
         current_mods_mentions = ", ".join(
@@ -505,7 +575,7 @@ class ChannelModManager:
 
         # Sprawdź role od najwyższej do najniższej
         for role_config in reversed(premium_roles):
-            logger.info(f"Checking role: {role_config}")
+            # logger.info(f"Checking role: {role_config}")
             if role_config["name"] in member_roles:
                 logger.info(
                     f"Found matching role: {role_config}, limit: {role_config['moderator_count']}"
@@ -553,6 +623,18 @@ class BasePermissionCommand:
         ):
             await cog.message_sender.send_no_mod_permission(ctx)
             return
+
+        # Sprawdź czy moderator (nie właściciel) próbuje modyfikować uprawnienia właściciela lub innych moderatorów
+        is_owner = await cog.permission_checker.check_channel_owner(voice_channel, ctx)
+        if not is_owner and await cog.permission_checker.check_channel_mod(voice_channel, ctx):
+            target_perms = voice_channel.overwrites_for(target)
+            if target_perms:
+                if target_perms.priority_speaker:
+                    await ctx.reply("Nie możesz modyfikować uprawnień właściciela kanału!")
+                    return
+                if target_perms.manage_messages:
+                    await ctx.reply("Nie możesz modyfikować uprawnień innych moderatorów!")
+                    return
 
         # Przetwórz argumenty dla komend tekstowych
         target, permission_value = cog._handle_text_command_permission(
