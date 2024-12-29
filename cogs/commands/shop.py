@@ -321,8 +321,8 @@ class RoleShopView(discord.ui.View):
         """Get price map based on current page."""
         price_map = {}
         for role_name, base_price in self.base_price_map.items():
-            if self.page == 2:  # Ceny roczne (10 miesięcy)
-                price_map[role_name] = base_price * 10
+            if self.page == 2:  # Ceny roczne (10 miesięcy + 9)
+                price_map[role_name] = base_price * 10 + 9
             else:  # Ceny miesięczne
                 price_map[role_name] = base_price
         return price_map
@@ -779,7 +779,7 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, v
         title = "Sklep z rolami - ceny miesięczne"
         description = (
             "Aby zakupić rangę, kliknij przycisk odpowiadający jej nazwie.\n"
-            "Za każde 10 zł jest 1000G.\n"
+            "Za każde 10 zł jest 10G.\n"
             "Zakup lub przedłużenie dowolnej rangi zdejmuje wszystkie muty na serwerze.\n\n"
             f"**Twoje ID: {viewer.id}**\n"
             "Pamiętaj, aby podczas wpłaty wpisać swoje ID w polu 'Wpisz swój nick'"
@@ -787,8 +787,8 @@ async def create_shop_embed(ctx, balance, role_price_map, premium_roles, page, v
     else:
         title = "Sklep z rolami - ceny roczne"
         description = (
-            "Za zakup na rok płacisz tylko za 10 miesięcy, 2 miesiące są gratis.\n"
-            "Za każde 10 zł jest 1000G.\n"
+            "Za zakup na rok płacisz za 10 miesięcy (2 miesiące gratis).\n"
+            "Za każde 10 zł jest 10G.\n"
             "Zakup lub przedłużenie dowolnej rangi zdejmuje wszystkie muty na serwerze.\n\n"
             f"**Twoje ID: {viewer.id}**\n"
             "Pamiętaj, aby podczas wpłaty wpisać swoje ID w polu 'Wpisz swój nick'"
@@ -825,7 +825,7 @@ async def create_role_description_embed(ctx, page, premium_roles, balance, viewe
 
     # Dodanie informacji o cenie
     price = role["price"]
-    annual_price = price * 10
+    annual_price = price * 10 + 9
     embed.add_field(
         name="Ceny",
         value=(

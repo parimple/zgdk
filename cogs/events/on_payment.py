@@ -74,14 +74,20 @@ class OnPaymentEvent(commands.Cog):
             logger.error("Donation channel not found: %s", channel_id)
             return
 
-        amount_g = payment_data.amount
+        # Konwersja kwoty na G (10 zł = 10G)
+        amount_g = int(payment_data.amount / 100 + 0.99)  # Zaokrąglanie w górę
+        amount_old = payment_data.amount  # Zachowujemy oryginalną kwotę w groszach dla rang $
         member = await self.premium_manager.get_member(payment_data.name)
         if member is None:
             logger.error("Member not found: %s", payment_data.name)
             return
 
-        logger.info(f"Handling payment for {member.display_name} with amount {amount_g}")
-        await self.assign_temporary_roles(session, member, amount_g)
+        logger.info(
+            f"Handling payment for {member.display_name} with amount {amount_g}G ({amount_old} groszy)"
+        )
+        await self.assign_temporary_roles(
+            session, member, amount_g
+        )  # Przekazujemy oryginalną kwotę
         await self.remove_mute_roles(member)
 
         owner_id = self.bot.config.get("owner_id")
@@ -134,13 +140,13 @@ class OnPaymentEvent(commands.Cog):
         )
 
         roles_tiers = [
-            (1499, "$2"),
-            (2499, "$4"),
-            (4499, "$8"),
-            (8499, "$16"),
-            (15999, "$32"),
-            (31999, "$64"),
-            (63999, "$128"),
+            (15, "$2"),
+            (25, "$4"),
+            (45, "$8"),
+            (85, "$16"),
+            (160, "$32"),
+            (320, "$64"),
+            (640, "$128"),
         ]
 
         delay_after_roles = ["$4", "$8"]

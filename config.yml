@@ -30,22 +30,24 @@ channels_create:
 
 premium_roles:
   # Ukryta ranga do odmutowania
-  - name: "zG20"
-    price: 1999  # 19,99 zł
-    features:
-      - "Zarządzanie publicznymi kanałami głosowymi przez miesiąc"
-      - "Wybór koloru nicku: czerwony lub niebieski"
-      - "Możliwość tworzenia kanałów prywatnych na 30 dni po zaproszeniu jednej osoby, lub boostując serwer"
-      - "Uprawnienia do wysyłania obrazków, linków, gifów"
-      - "Możliwość streamowania na kanałach"
-    team_size: 0
-    moderator_count: 0
-    points_multiplier: 0   # Brak dodatkowych punktów
-    emojis_access: false   # Brak dostępu do dodatkowych emotek
+  # - name: "zG20"
+  #   price: 1999  # 19,99 zł
+  #   features:
+  #     - "Zarządzanie publicznymi kanałami głosowymi przez miesiąc"
+  #     - "Wybór koloru nicku: czerwony lub niebieski"
+  #     - "Możliwość tworzenia kanałów prywatnych na 30 dni po zaproszeniu jednej osoby, lub boostując serwer"
+  #     - "Uprawnienia do wysyłania obrazków, linków, gifów"
+  #     - "Możliwość streamowania na kanałach"
+  #   team_size: 0
+  #   moderator_count: 0
+  #   points_multiplier: 0   # Brak dodatkowych punktów
+  #   emojis_access: false   # Brak dostępu do dodatkowych emotek
 
   # Ranga z kolorami bez nazwy
   - name: "zG30"
-    price: 2999  # 29,99zł
+    premium: "Git"
+    price: 29  # 29zł
+    usd: 9
     features:
       - "Wybór koloru nicku: żółty, czarny lub zielony"
       - "Możliwość tworzenia kanałów **prywatnych**"
@@ -54,63 +56,74 @@ premium_roles:
     team_size: 0
     moderator_count: 0
     points_multiplier: 50   # +50% punktów
-    emojis_access: true     # Dostęp do emotek
+    emojis_access: false     # Dostęp do emotek
 
   # Premium rangi
   - name: "zG50"
-    price: 4999  # 49,99 zł
+    premium: "Git Plus"
+    usd: 15
+    price: 49  # 49 zł
     features:
       - "Dowolny kolor dostępny za pomocą komendy ?color"
       - "1 moderator kanału głosowego"
-      - "Dostęp do kanału głosowego premium"
+      - "Dostęp do kanału głosowego Git Plus"
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "50% więcej punktów do aktywności"
     team_size: 0
     moderator_count: 1
     points_multiplier: 50   # +50% punktów
-    emojis_access: true     # Dostęp do emotek
+    emojis_access: false     # Dostęp do emotek
 
   - name: "zG100"
-    price: 9999  # 99,99 zł
+    premium: "Git Pro"
+    price: 99  # 99 zł
+    usd: 25
     features:
       - "Rola na samej górze serwera"
       - "Kanał drużynowy dla maksymalnie 15 osób"
-      - "Kanał VIP do tworzenia kanałów głosowych"
+      - "Kanał Git Pro do tworzenia kanałów głosowych"
       - "2 moderatorów kanału głosowego"
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "100% więcej punktów do aktywności"
     team_size: 10
     moderator_count: 2
     points_multiplier: 100  # +100% punktów
-    emojis_access: true     # Dostęp do emotek
+    emojis_access: false     # Dostęp do emotek
 
-  - name: "zG200"
-    price: 19999  # 199,99 zł
+  - name: "zG400"
+    premium: "Git Pro Max"
+    price: 399  # 399 zł
+    usd: 99
     features:
       - "Rola wyżej niż zG100"
-      - "Kanał VIP++ do tworzenia kanałów głosowych"
+      - "Kanał Git Pro Max nad lounge do tworzenia kanałów głosowych"
       - "Drużyna do 30 osób"
       - "4 moderatorów kanału głosowego"
       - "Wszyscy w drużynie mają kolor klanu na serwerze"
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "200% więcej punktów do aktywności"
     team_size: 20
-    moderator_count: 3
+    moderator_count: 4
     points_multiplier: 150  # +150% punktów
-    emojis_access: true     # Dostęp do emotek
+    emojis_access: false    # Dostęp do emotek
 
-  - name: "zG500"
-    price: 49999  # 499 zł
+  - name: "zG1000"
+    premium: "Git Ultra"
+    price: 999  # 999 zł
+    usd: 249
     features:
-      - "Drużyna do 35 osób"
+      - "Moderator na serwerze"
+      - "Kanał Git Ultra nad info do tworzenia kanałów głosowych"
+      - "Drużyna do 40 osób"
       - "6 moderatorów kanału głosowego"
       - "Wszyscy w drużynie mają kolor klanu na serwerze"
-      - "Dostęp do emotek i stickerów z każdego serwera"
-      - "250% więcej punktów do aktywności"
+      - "Moliwość dodania emotki na serwer raz w miesiącu"
+      - "Moliwość dodania odznaki emotki całej drużynie"
+      - "300% więcej punktów do aktywności"
     team_size: 40
-    moderator_count: 5
-    points_multiplier: 200  # +200% punktów
-    emojis_access: true     # Dostęp do emotek
+    moderator_count: 10
+    points_multiplier: 300  # +300% punktów
+    emojis_access: false     # Dostęp do emotek
 
 
 mute_roles:
