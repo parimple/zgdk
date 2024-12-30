@@ -369,11 +369,20 @@ class ModCog(commands.Cog):
 
             # Save punishment in database
             async with self.bot.get_db() as session:
+                # Check if there's an existing mute
+                existing_role = await RoleQueries.get_member_role(
+                    session, user.id, self.config["mute_roles"][2]["id"]
+                )
+
+                new_duration = timedelta(days=30)
+                if existing_role and existing_role.expiration_date:
+                    time_left = existing_role.expiration_date - datetime.now(timezone.utc)
+                    if time_left > new_duration:
+                        # Keep the existing longer duration
+                        new_duration = time_left
+
                 await RoleQueries.add_or_update_role_to_member(
-                    session,
-                    user.id,
-                    self.config["mute_roles"][2]["id"],
-                    duration=timedelta(days=3650),  # 10 years
+                    session, user.id, self.config["mute_roles"][2]["id"], duration=new_duration
                 )
                 await session.commit()
 
