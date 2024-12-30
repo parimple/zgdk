@@ -7,6 +7,8 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
+from datasources.queries import RoleQueries
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,6 +17,7 @@ class ModCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.config = bot.config
 
     async def get_target_user(
         self, ctx: commands.Context, user
@@ -325,6 +328,121 @@ class ModCog(commands.Cog):
         except Exception as e:
             logger.error(f"Error during command synchronization: {e}", exc_info=True)
             await ctx.send(f"Wystąpił błąd podczas synchronizacji ModCog: {e}")
+
+    @commands.command(
+        name="mutenick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę."
+    )
+    @commands.has_role("✪")
+    async def mutenick_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Handle inappropriate nickname by removing color roles and applying punishment."""
+        await self.handle_bad_nickname_logic(ctx, user)
+
+    @commands.hybrid_group(name="mute", description="Komendy związane z wyciszaniem użytkowników.")
+    @commands.has_role("✪")
+    async def mute(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Użyj jednej z podkomend: nick")
+
+    @mute.command(name="nick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę.")
+    @discord.app_commands.describe(user="Użytkownik z niewłaściwym nickiem")
+    async def mute_nick(self, ctx: commands.Context, user: discord.Member):
+        """Handle inappropriate nickname by removing color roles and applying punishment."""
+        await self.handle_bad_nickname_logic(ctx, user)
+
+    async def handle_bad_nickname_logic(self, ctx: commands.Context, user: discord.Member):
+        """Common logic for handling inappropriate nicknames."""
+        try:
+            # Check if target is a moderator (has ✪ role)
+            if discord.utils.get(user.roles, name="✪"):
+                await ctx.send("Nie możesz zmienić nicku innemu moderatorowi.")
+                return
+
+            # Remove color roles if present
+            color_roles = [
+                discord.Object(id=role_id) for role_id in self.config["color_roles"].values()
+            ]
+            await user.remove_roles(*color_roles, reason="Niewłaściwy nick")
+
+            # Add mute role
+            mute_role = discord.Object(id=self.config["mute_roles"][2]["id"])  # ☢︎ role
+            await user.add_roles(mute_role, reason="Niewłaściwy nick")
+
+            # Save punishment in database
+            async with self.bot.get_db() as session:
+                await RoleQueries.add_or_update_role_to_member(
+                    session,
+                    user.id,
+                    self.config["mute_roles"][2]["id"],
+                    duration=timedelta(days=3650),  # 10 years
+                )
+                await session.commit()
+
+            await ctx.send(
+                f"Nałożono karę na {user.mention}. "
+                f"Aby odzyskać możliwość zmiany nicku, udaj się na <#{self.config['channels']['premium_info']}> "
+                f"i zakup dowolną rangę premium."
+            )
+
+            # Wait 5 seconds before changing nickname
+            await asyncio.sleep(5)
+            try:
+                await user.edit(nick="random", reason="Niewłaściwy nick")
+            except discord.Forbidden:
+                await ctx.send("Nie mogę zmienić nicku tego użytkownika.")
+            except Exception as e:
+                logger.error(f"Error changing nickname for user {user.id}: {e}")
+                await ctx.send("Wystąpił błąd podczas zmiany nicku.")
+
+        except Exception as e:
+            logger.error(f"Error handling bad nickname for user {user.id}: {e}", exc_info=True)
+            await ctx.send("Wystąpił błąd podczas nakładania kary.")
+
+    @commands.command(
+        name="unmutenick", description="Przywraca możliwość zmiany nicku użytkownikowi."
+    )
+    @commands.has_role("✪")
+    async def unmutenick_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Handle unmuting nickname."""
+        await self.handle_unmute_nickname_logic(ctx, user)
+
+    @commands.hybrid_group(
+        name="unmute", description="Komendy związane z odwyciszaniem użytkowników."
+    )
+    @commands.has_role("✪")
+    async def unmute(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Użyj jednej z podkomend: nick")
+
+    @unmute.command(name="nick", description="Przywraca możliwość zmiany nicku użytkownikowi.")
+    @discord.app_commands.describe(user="Użytkownik do odmutowania nicku")
+    async def unmute_nick(self, ctx: commands.Context, user: discord.Member):
+        """Handle unmuting nickname."""
+        await self.handle_unmute_nickname_logic(ctx, user)
+
+    async def handle_unmute_nickname_logic(self, ctx: commands.Context, user: discord.Member):
+        """Common logic for handling nickname unmuting."""
+        try:
+            # Check if target is a moderator (has ✪ role)
+            if discord.utils.get(user.roles, name="✪"):
+                await ctx.send("Nie możesz zarządzać nickiem innego moderatora.")
+                return
+
+            # Remove mute role
+            mute_role = discord.Object(id=self.config["mute_roles"][2]["id"])  # ☢︎ role
+            await user.remove_roles(mute_role, reason="Przywrócenie możliwości zmiany nicku")
+
+            # Remove role from database
+            async with self.bot.get_db() as session:
+                await RoleQueries.delete_member_role(
+                    session, user.id, self.config["mute_roles"][2]["id"]
+                )
+                await session.commit()
+
+            await ctx.send(f"Przywrócono możliwość zmiany nicku dla {user.mention}.")
+
+        except Exception as e:
+            logger.error(f"Error handling nickname unmute for user {user.id}: {e}", exc_info=True)
+            await ctx.send("Wystąpił błąd podczas odmutowywania nicku.")
 
 
 async def setup(bot):

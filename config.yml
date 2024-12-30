@@ -142,3 +142,8 @@ mute_roles:
 
 premium_categories:
   - 960665318475325454
+
+color_roles:
+  blue: 960665311730868235
+  green: 960665311730868236
+  red: 960665311730868237
