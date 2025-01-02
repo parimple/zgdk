@@ -329,16 +329,21 @@ class ModCog(commands.Cog):
             logger.error(f"Error during command synchronization: {e}", exc_info=True)
             await ctx.send(f"Wystąpił błąd podczas synchronizacji ModCog: {e}")
 
-    @commands.command(
-        name="mutenick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę."
-    )
-    @commands.has_role("✪")
-    async def mutenick_prefix(self, ctx: commands.Context, user: discord.Member):
-        """Handle inappropriate nickname by removing color roles and applying punishment."""
-        await self.handle_bad_nickname_logic(ctx, user)
+    def has_mod_admin_perms():
+        async def predicate(ctx):
+            # Check if user has moderator or admin role
+            has_mod_role = discord.utils.get(
+                ctx.author.roles, id=ctx.bot.config["admin_roles"]["mod"]
+            )
+            has_admin_role = discord.utils.get(
+                ctx.author.roles, id=ctx.bot.config["admin_roles"]["admin"]
+            )
+            return bool(has_mod_role or has_admin_role)
+
+        return commands.check(predicate)
 
     @commands.hybrid_group(name="mute", description="Komendy związane z wyciszaniem użytkowników.")
-    @commands.has_role("✪")
+    @has_mod_admin_perms()
     async def mute(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             await ctx.send("Użyj jednej z podkomend: nick")
@@ -349,12 +354,52 @@ class ModCog(commands.Cog):
         """Handle inappropriate nickname by removing color roles and applying punishment."""
         await self.handle_bad_nickname_logic(ctx, user)
 
+    @commands.hybrid_group(
+        name="unmute", description="Komendy związane z odwyciszaniem użytkowników."
+    )
+    @has_mod_admin_perms()
+    async def unmute(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Użyj jednej z podkomend: nick")
+
+    @unmute.command(name="nick", description="Przywraca możliwość zmiany nicku użytkownikowi.")
+    @discord.app_commands.describe(user="Użytkownik do odmutowania nicku")
+    async def unmute_nick(self, ctx: commands.Context, user: discord.Member):
+        """Handle unmuting nickname."""
+        await self.handle_unmute_nickname_logic(ctx, user)
+
+    @commands.command(
+        name="mutenick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę."
+    )
+    @has_mod_admin_perms()
+    async def mutenick_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Handle inappropriate nickname by removing color roles and applying punishment."""
+        await self.handle_bad_nickname_logic(ctx, user)
+
+    @commands.command(
+        name="unmutenick", description="Przywraca możliwość zmiany nicku użytkownikowi."
+    )
+    @has_mod_admin_perms()
+    async def unmutenick_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Handle unmuting nickname."""
+        await self.handle_unmute_nickname_logic(ctx, user)
+
     async def handle_bad_nickname_logic(self, ctx: commands.Context, user: discord.Member):
         """Common logic for handling inappropriate nicknames."""
         try:
-            # Check if target is a moderator (has ✪ role)
-            if discord.utils.get(user.roles, name="✪"):
-                await ctx.send("Nie możesz zmienić nicku innemu moderatorowi.")
+            # Check if target is a moderator or admin
+            has_mod_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["mod"])
+            has_admin_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["admin"])
+
+            # Only admins can mute mods, and nobody can mute admins
+            if has_admin_role:
+                await ctx.send("Nie możesz zmienić nicku administratorowi.")
+                return
+
+            if has_mod_role and not discord.utils.get(
+                ctx.author.roles, id=self.config["admin_roles"]["admin"]
+            ):
+                await ctx.send("Tylko administrator może zmienić nick moderatorowi.")
                 return
 
             # Remove color roles if present
@@ -406,34 +451,22 @@ class ModCog(commands.Cog):
             logger.error(f"Error handling bad nickname for user {user.id}: {e}", exc_info=True)
             await ctx.send("Wystąpił błąd podczas nakładania kary.")
 
-    @commands.command(
-        name="unmutenick", description="Przywraca możliwość zmiany nicku użytkownikowi."
-    )
-    @commands.has_role("✪")
-    async def unmutenick_prefix(self, ctx: commands.Context, user: discord.Member):
-        """Handle unmuting nickname."""
-        await self.handle_unmute_nickname_logic(ctx, user)
-
-    @commands.hybrid_group(
-        name="unmute", description="Komendy związane z odwyciszaniem użytkowników."
-    )
-    @commands.has_role("✪")
-    async def unmute(self, ctx: commands.Context):
-        if ctx.invoked_subcommand is None:
-            await ctx.send("Użyj jednej z podkomend: nick")
-
-    @unmute.command(name="nick", description="Przywraca możliwość zmiany nicku użytkownikowi.")
-    @discord.app_commands.describe(user="Użytkownik do odmutowania nicku")
-    async def unmute_nick(self, ctx: commands.Context, user: discord.Member):
-        """Handle unmuting nickname."""
-        await self.handle_unmute_nickname_logic(ctx, user)
-
     async def handle_unmute_nickname_logic(self, ctx: commands.Context, user: discord.Member):
         """Common logic for handling nickname unmuting."""
         try:
-            # Check if target is a moderator (has ✪ role)
-            if discord.utils.get(user.roles, name="✪"):
-                await ctx.send("Nie możesz zarządzać nickiem innego moderatora.")
+            # Check if target is a moderator or admin
+            has_mod_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["mod"])
+            has_admin_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["admin"])
+
+            # Only admins can unmute mods, and nobody can unmute admins
+            if has_admin_role:
+                await ctx.send("Nie możesz zarządzać nickiem administratora.")
+                return
+
+            if has_mod_role and not discord.utils.get(
+                ctx.author.roles, id=self.config["admin_roles"]["admin"]
+            ):
+                await ctx.send("Tylko administrator może zarządzać nickiem moderatora.")
                 return
 
             # Remove mute role

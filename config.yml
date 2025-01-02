@@ -44,25 +44,25 @@ premium_roles:
   #   emojis_access: false   # Brak dostępu do dodatkowych emotek
 
   # Ranga z kolorami bez nazwy
-  - name: "zG30"
-    premium: "Git"
-    price: 29  # 29zł
-    usd: 9
-    features:
-      - "Wybór koloru nicku: żółty, czarny lub zielony"
-      - "Możliwość tworzenia kanałów **prywatnych**"
-      - "Dostęp do emotek i stickerów z każdego serwera"
-      - "50% więcej punktów do aktywności"
-    team_size: 0
-    moderator_count: 0
-    points_multiplier: 50   # +50% punktów
-    emojis_access: false     # Dostęp do emotek
+  # - name: "zG30"
+  #   premium: "Git"
+  #   price: 29  # 29zł
+  #   usd: 9
+  #   features:
+  #     - "Wybór koloru nicku: żółty, czarny lub zielony"
+  #     - "Możliwość tworzenia kanałów **prywatnych**"
+  #     - "Dostęp do emotek i stickerów z każdego serwera"
+  #     - "50% więcej punktów do aktywności"
+  #   team_size: 0
+  #   moderator_count: 0
+  #   points_multiplier: 50   # +50% punktów
+  #   emojis_access: false     # Dostęp do emotek
 
   # Premium rangi
-  - name: "zG50"
-    premium: "Git Plus"
-    usd: 15
-    price: 49  # 49 zł
+  - name: "zG40"
+    premium: "Git"
+    usd: 9
+    price: 39  # 39 zł
     features:
       - "Dowolny kolor dostępny za pomocą komendy ?color"
       - "1 moderator kanału głosowego"
@@ -75,9 +75,9 @@ premium_roles:
     emojis_access: false     # Dostęp do emotek
 
   - name: "zG100"
-    premium: "Git Pro"
+    premium: "Git Plus"
     price: 99  # 99 zł
-    usd: 25
+    usd: 29
     features:
       - "Rola na samej górze serwera"
       - "Kanał drużynowy dla maksymalnie 15 osób"
@@ -91,7 +91,7 @@ premium_roles:
     emojis_access: false     # Dostęp do emotek
 
   - name: "zG400"
-    premium: "Git Pro Max"
+    premium: "Git Pro"
     price: 399  # 399 zł
     usd: 99
     features:
@@ -110,7 +110,7 @@ premium_roles:
   - name: "zG1000"
     premium: "Git Ultra"
     price: 999  # 999 zł
-    usd: 249
+    usd: 299
     features:
       - "Moderator na serwerze"
       - "Kanał Git Ultra nad info do tworzenia kanałów głosowych"
@@ -147,3 +147,7 @@ color_roles:
   blue: 960665311730868235
   green: 960665311730868236
   red: 960665311730868237
+
+admin_roles:
+  mod: 960665311953174564  # ID roli moderatora (✪)
+  admin: 960665311953174565  # ID roli administratora (✪)
