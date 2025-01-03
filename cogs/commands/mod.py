@@ -1,13 +1,13 @@
 import asyncio
 import logging
+import random
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-import random
 
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 
 from datasources.queries import RoleQueries
 
@@ -488,16 +488,13 @@ class ModCog(commands.Cog):
             logger.error(f"Error handling nickname unmute for user {user.id}: {e}", exc_info=True)
             await ctx.send("Wystąpił błąd podczas odmutowywania nicku.")
 
-    @commands.hybrid_command(
-        name="giveaway",
-        description="Losuje użytkownika z wybranych ról."
-    )
+    @commands.hybrid_command(name="giveaway", description="Losuje użytkownika z wybranych ról.")
     @commands.has_role("✪")
     @discord.app_commands.describe(
         role1="Pierwsza rola do losowania (wymagana)",
         role2="Druga rola do losowania (opcjonalna)",
         role3="Trzecia rola do losowania (opcjonalna)",
-        mode="Tryb sprawdzania ról: 'or' (dowolna z ról) lub 'and' (wszystkie role)"
+        mode="Tryb sprawdzania ról: 'or' (dowolna z ról) lub 'and' (wszystkie role)",
     )
     async def giveaway(
         self,
@@ -505,10 +502,10 @@ class ModCog(commands.Cog):
         role1: str,
         role2: str = None,
         role3: str = None,
-        mode: str = "and"
+        mode: str = "and",
     ):
         """Losuje użytkownika z wybranych ról.
-        
+
         Przykład użycia:
         ,giveaway "Nazwa Roli 1" "Nazwa Roli 2" "Nazwa Roli 3" or  # Losuje użytkownika z dowolną z tych ról
         ,giveaway "Nazwa Roli 1" "Nazwa Roli 2"                    # Losuje użytkownika z obiema rolami (domyślnie and)
@@ -562,11 +559,11 @@ class ModCog(commands.Cog):
 
         # Wylosuj zwycięzcę
         winner = random.choice(eligible_members)
-        
+
         # Przygotuj wiadomość z informacją o rolach (bez pingowania)
         role_info = " ".join(f"'{role.name}'" for role in roles)
         mode_info = "dowolnej z" if mode == "or" else "wszystkich"
-        
+
         await ctx.send(
             f"🎉 Wylosowano zwycięzcę spośród użytkowników z {mode_info} ról: {role_info}\n"
             f"Zwycięzca: {winner.mention}\n"
@@ -575,7 +572,9 @@ class ModCog(commands.Cog):
 
     # Osobna wersja dla slash command
     @giveaway.app_command.error
-    async def giveaway_app_command_error(self, interaction: discord.Interaction, error: app_commands.CommandInvokeError):
+    async def giveaway_app_command_error(
+        self, interaction: discord.Interaction, error: app_commands.CommandInvokeError
+    ):
         # Konwertuj parametry z discord.Role na str dla wersji z prefixem
         if isinstance(error.original, commands.CommandInvokeError):
             ctx = await self.bot.get_context(interaction)

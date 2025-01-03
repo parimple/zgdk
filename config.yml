@@ -59,20 +59,21 @@ premium_roles:
   #   emojis_access: false     # Dostęp do emotek
 
   # Premium rangi
-  - name: "zG40"
+  - name: "zG50"
     premium: "Git"
-    usd: 9
-    price: 39  # 39 zł
+    usd: 14
+    price: 49  # 49 zł
     features:
       - "Dowolny kolor dostępny za pomocą komendy ?color"
       - "1 moderator kanału głosowego"
-      - "Dostęp do kanału głosowego Git Plus"
+      - "Dostęp do kanału głosowego Git"
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "50% więcej punktów do aktywności"
     team_size: 0
     moderator_count: 1
     points_multiplier: 50   # +50% punktów
     emojis_access: false     # Dostęp do emotek
+    override_limit: true
 
   - name: "zG100"
     premium: "Git Plus"
@@ -89,23 +90,27 @@ premium_roles:
     moderator_count: 2
     points_multiplier: 100  # +100% punktów
     emojis_access: false     # Dostęp do emotek
+    override_limit: true
 
-  - name: "zG400"
+  - name: "zG500"
     premium: "Git Pro"
-    price: 399  # 399 zł
-    usd: 99
+    price: 499  # 499 zł
+    usd: 149
     features:
       - "Rola wyżej niż zG100"
-      - "Kanał Git Pro Max nad lounge do tworzenia kanałów głosowych"
+      - "Kanał Git Pro nad lounge do tworzenia kanałów głosowych"
       - "Drużyna do 30 osób"
       - "4 moderatorów kanału głosowego"
       - "Wszyscy w drużynie mają kolor klanu na serwerze"
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "200% więcej punktów do aktywności"
-    team_size: 20
+      - "Autokick 1 osoby na każdym kanale"
+    team_size: 30
     moderator_count: 4
-    points_multiplier: 150  # +150% punktów
+    points_multiplier: 200  # +20% punktów
     emojis_access: false    # Dostęp do emotek
+    override_limit: false
+    auto_kick: 1
 
   - name: "zG1000"
     premium: "Git Ultra"
@@ -119,11 +124,14 @@ premium_roles:
       - "Wszyscy w drużynie mają kolor klanu na serwerze"
       - "Moliwość dodania emotki na serwer raz w miesiącu"
       - "Moliwość dodania odznaki emotki całej drużynie"
-      - "300% więcej punktów do aktywności"
-    team_size: 40
-    moderator_count: 10
-    points_multiplier: 300  # +300% punktów
+      - "400% więcej punktów do aktywności"
+      - "Autokick 3 osób na każdym kanale"
+    team_size: 60
+    moderator_count: 8
+    points_multiplier: 400  # +400% punktów
     emojis_access: false     # Dostęp do emotek
+    override_limit: false
+    auto_kick: 3
 
 
 mute_roles:
