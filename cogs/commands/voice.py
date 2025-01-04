@@ -6,9 +6,11 @@ from typing import Literal, Optional
 import discord
 from discord import AllowedMentions, Member, PermissionOverwrite, Permissions
 from discord.ext import commands
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from datasources.queries import ChannelPermissionQueries
+from datasources.models import AutoKick
+from datasources.queries import AutoKickQueries, ChannelPermissionQueries
 from utils.user import get_target_and_permission
 
 logger = logging.getLogger(__name__)
@@ -146,6 +148,48 @@ class MessageSender:
             f"Nie udało się ustawić uprawnienia {permission_flag} dla {target.mention}.",
             allowed_mentions=AllowedMentions(users=False, roles=False),
         )
+
+    @staticmethod
+    async def send_no_autokick_permission(ctx, premium_channel_id):
+        """Sends a message when user doesn't have required role for autokick."""
+        await ctx.send(
+            f"Nie posiadasz wymaganych uprawnień do używania autokicka.\n"
+            f"Aby móc używać autokicka, musisz posiadać rangę zG500 (1 slot) lub zG1000 (3 sloty).\n"
+            f"Sprawdź dostępne rangi premium na kanale <#{premium_channel_id}>"
+        )
+
+    @staticmethod
+    async def send_autokick_limit_reached(ctx, max_autokicks, premium_channel_id):
+        """Sends a message when user has reached their autokick limit."""
+        await ctx.send(
+            f"Osiągnąłeś limit {max_autokicks} osób na liście autokick.\n"
+            f"Aby móc dodać więcej osób, rozważ zakup wyższej rangi premium na kanale <#{premium_channel_id}>"
+        )
+
+    @staticmethod
+    async def send_autokick_already_exists(ctx, target):
+        """Sends a message when target is already on autokick list."""
+        await ctx.send(f"{target.mention} jest już na twojej liście autokick.")
+
+    @staticmethod
+    async def send_autokick_added(ctx, target):
+        """Sends a message when target is added to autokick list."""
+        await ctx.send(f"Dodano {target.mention} do twojej listy autokick.")
+
+    @staticmethod
+    async def send_autokick_not_found(ctx, target):
+        """Sends a message when target is not on autokick list."""
+        await ctx.send(f"{target.mention} nie jest na twojej liście autokick.")
+
+    @staticmethod
+    async def send_autokick_removed(ctx, target):
+        """Sends a message when target is removed from autokick list."""
+        await ctx.send(f"Usunięto {target.mention} z twojej listy autokick.")
+
+    @staticmethod
+    async def send_autokick_list_empty(ctx):
+        """Sends a message when autokick list is empty."""
+        await ctx.send("Twoja lista autokick jest pusta.")
 
 
 class DatabaseManager:
@@ -596,6 +640,7 @@ class BasePermissionCommand:
         toggle=False,
         requires_mod=False,  # Czy wymaga uprawnień moderatora
         requires_owner=False,  # Czy wymaga uprawnień właściciela
+        is_autokick=False,  # Czy to komenda autokick
     ):
         self.permission_name = permission_name
         self.permission_display_name = permission_display_name
@@ -603,9 +648,24 @@ class BasePermissionCommand:
         self.toggle = toggle
         self.requires_mod = requires_mod
         self.requires_owner = requires_owner
+        self.is_autokick = is_autokick
 
     async def execute(self, cog, ctx, target, permission_value):
         """Execute the permission command."""
+        if self.is_autokick:
+            if target is None:
+                await cog.autokick_manager.list_autokicks(ctx)
+                return
+
+            if permission_value is None:
+                permission_value = "+"  # domyślnie dodajemy do listy
+
+            if permission_value == "+":
+                await cog.autokick_manager.add_autokick(ctx, target)
+            elif permission_value == "-":
+                await cog.autokick_manager.remove_autokick(ctx, target)
+            return
+
         if not await cog.permission_checker.check_voice_channel(ctx):
             return
 
@@ -700,6 +760,156 @@ class PermissionChecker:
         return perms and (perms.priority_speaker or perms.manage_messages)
 
 
+class AutoKickManager:
+    """Manages autokick functionality for voice channels."""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.message_sender = MessageSender()
+        # Cache structure: {target_id: set(owner_ids)}
+        self._autokick_cache = {}
+        self._cache_initialized = False
+
+    async def _initialize_cache(self):
+        """Initialize the cache with data from database"""
+        if self._cache_initialized:
+            return
+
+        async with self.bot.get_db() as session:
+            # Get all autokicks using SQLAlchemy ORM
+            result = await session.execute(select(AutoKick.target_id, AutoKick.owner_id))
+            rows = result.all()
+
+            # Build the cache
+            for target_id, owner_id in rows:
+                if target_id not in self._autokick_cache:
+                    self._autokick_cache[target_id] = set()
+                self._autokick_cache[target_id].add(owner_id)
+
+        self._cache_initialized = True
+
+    async def get_autokick_limit(self, member: discord.Member) -> int:
+        """Get the autokick limit for a member based on their premium roles."""
+        max_autokicks = 0
+        for role_config in self.bot.config["premium_roles"]:
+            if "auto_kick" in role_config:
+                role = discord.utils.get(member.roles, name=role_config["name"])
+                if role:
+                    max_autokicks = max(max_autokicks, role_config["auto_kick"])
+        return max_autokicks
+
+    async def add_autokick(self, ctx, target: discord.Member):
+        """Add a member to autokick list."""
+        await self._initialize_cache()
+        max_autokicks = await self.get_autokick_limit(ctx.author)
+
+        if max_autokicks == 0:
+            await self.message_sender.send_no_autokick_permission(
+                ctx, self.bot.config["channels"]["premium_info"]
+            )
+            return
+
+        # Check cache for existing autokicks count
+        owner_autokicks_count = sum(
+            1 for owners in self._autokick_cache.values() if ctx.author.id in owners
+        )
+
+        if owner_autokicks_count >= max_autokicks:
+            await self.message_sender.send_autokick_limit_reached(
+                ctx, max_autokicks, self.bot.config["channels"]["premium_info"]
+            )
+            return
+
+        # Check if autokick already exists
+        if target.id in self._autokick_cache and ctx.author.id in self._autokick_cache[target.id]:
+            await self.message_sender.send_autokick_already_exists(ctx, target)
+            return
+
+        # Update cache
+        if target.id not in self._autokick_cache:
+            self._autokick_cache[target.id] = set()
+        self._autokick_cache[target.id].add(ctx.author.id)
+
+        # Update database
+        async with self.bot.get_db() as session:
+            await AutoKickQueries.add_autokick(session, ctx.author.id, target.id)
+            await self.message_sender.send_autokick_added(ctx, target)
+
+    async def remove_autokick(self, ctx, target: discord.Member):
+        """Remove a member from autokick list."""
+        await self._initialize_cache()
+
+        # Check cache first
+        if (
+            target.id not in self._autokick_cache
+            or ctx.author.id not in self._autokick_cache[target.id]
+        ):
+            await self.message_sender.send_autokick_not_found(ctx, target)
+            return
+
+        # Update cache
+        self._autokick_cache[target.id].remove(ctx.author.id)
+        if not self._autokick_cache[target.id]:
+            del self._autokick_cache[target.id]
+
+        # Update database
+        async with self.bot.get_db() as session:
+            await AutoKickQueries.remove_autokick(session, ctx.author.id, target.id)
+            await self.message_sender.send_autokick_removed(ctx, target)
+
+    async def list_autokicks(self, ctx):
+        """Show autokick list."""
+        await self._initialize_cache()
+
+        # Get all targets that this user has autokick on
+        user_autokicks = [
+            target_id
+            for target_id, owners in self._autokick_cache.items()
+            if ctx.author.id in owners
+        ]
+
+        if not user_autokicks:
+            await self.message_sender.send_autokick_list_empty(ctx)
+            return
+
+        embed = discord.Embed(
+            title="Twoja Lista Autokick",
+            description="Lista użytkowników, którzy będą automatycznie wyrzucani z kanałów głosowych.",
+            color=discord.Color.blue(),
+        )
+
+        max_autokicks = await self.get_autokick_limit(ctx.author)
+        embed.set_footer(
+            text=f"Wykorzystano {len(user_autokicks)}/{max_autokicks} dostępnych slotów"
+        )
+
+        for target_id in user_autokicks:
+            member = ctx.guild.get_member(target_id)
+            if member:
+                embed.add_field(
+                    name=member.display_name,
+                    value=f"{member.mention}\nID: {member.id}",
+                    inline=False,
+                )
+
+        await ctx.send(embed=embed)
+
+    async def check_autokick(self, member: discord.Member, channel: discord.VoiceChannel) -> bool:
+        """Check if a member should be autokicked from a channel."""
+        await self._initialize_cache()
+
+        if member.id not in self._autokick_cache:
+            return False
+
+        # Check if any channel members have autokick on this member
+        for owner_id in self._autokick_cache[member.id]:
+            owner = channel.guild.get_member(owner_id)
+            if owner and owner in channel.members:
+                return True
+
+        return False
+
+
 class VoiceCog(commands.Cog):
     """Voice commands cog for managing voice channel permissions and operations."""
 
@@ -711,6 +921,7 @@ class VoiceCog(commands.Cog):
         self.message_sender = MessageSender()
         self.db_manager = DatabaseManager(bot)
         self.permission_checker = PermissionChecker(bot)
+        self.autokick_manager = AutoKickManager(bot)
 
         # Initialize permission commands
         self.permission_commands = {
@@ -724,6 +935,13 @@ class VoiceCog(commands.Cog):
                 default_to_true=True,
                 toggle=True,
                 requires_owner=True,
+            ),
+            "autokick": BasePermissionCommand(
+                "autokick",
+                "autokick",
+                default_to_true=True,
+                toggle=True,
+                is_autokick=True,
             ),
         }
 
@@ -872,10 +1090,19 @@ class VoiceCog(commands.Cog):
         logger.info(f"Final target: {target}, permission_value: {permission_value}")  # Debug log
         return target, permission_value
 
-
-async def setup(bot):
-    """This function is called when the cog is loaded."""
-    await bot.add_cog(VoiceCog(bot))
+    @commands.hybrid_command(aliases=["ak"])
+    @discord.app_commands.describe(
+        target="Użytkownik do dodania/usunięcia z listy autokick",
+        action="Dodaj (+) lub usuń (-) użytkownika z listy autokick",
+    )
+    async def autokick(
+        self,
+        ctx,
+        target: Optional[Member] = None,
+        action: Optional[Literal["+", "-"]] = None,
+    ):
+        """Zarządzaj listą autokick - dodawaj lub usuwaj użytkowników."""
+        await self.permission_commands["autokick"].execute(self, ctx, target, action)
 
 
 async def setup(bot):

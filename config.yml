@@ -17,16 +17,7 @@ channels_voice:
   afk: 1052997299233636402
 
 channels_create:
-  - 1057676020209168436
-  - 960665314062897198
-  - 960665314285219878
-  - 960665314629156893
-  - 960665314960486404
-  - 960665311965749296
-  - 960665312376807529
-  - 960665313718960142
-  - 960665313895133204
-  - 960665313895133209
+  - 1057676020209168436  # test
 
 premium_roles:
   # Ukryta ranga do odmutowania
@@ -148,7 +139,7 @@ mute_roles:
     name: "♺"
     description: "points_off"
 
-premium_categories:
+vc_categories:
   - 960665318475325454
 
 color_roles:

@@ -200,3 +200,24 @@ class Invite(Base):
 
     def __repr__(self) -> str:
         return f"<Invite(id={self.id}, creator_id={self.creator_id}, uses={self.uses})>"
+
+
+class AutoKick(Base):
+    """AutoKick Model for storing automatic kick settings"""
+
+    __tablename__ = "autokicks"
+    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    target_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)
+    )
+
+    owner: Mapped[Member] = relationship(
+        "Member", foreign_keys=[owner_id], backref="owned_autokicks"
+    )
+    target: Mapped[Member] = relationship(
+        "Member", foreign_keys=[target_id], backref="autokicks_targeting"
+    )
+
+    def __repr__(self) -> str:
+        return f"<AutoKick(owner_id={self.owner_id}, target_id={self.target_id})>"

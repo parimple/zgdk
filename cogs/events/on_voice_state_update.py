@@ -3,7 +3,7 @@ import logging
 import discord
 from discord.ext import commands
 
-from datasources.queries import ChannelPermissionQueries
+from datasources.queries import AutoKickQueries, ChannelPermissionQueries
 
 logger = logging.getLogger(__name__)
 
@@ -22,17 +22,21 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         }
 
         self.channels_create = self.bot.config["channels_create"]
+        self.vc_categories = self.bot.config["vc_categories"]
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         """Handle the event when a member joins or leaves a voice channel."""
-        if member.id != self.bot.config["owner_id"]:
-            return
+        # Check for autokicks when a member joins a voice channel
         if after.channel and before.channel != after.channel:
-            if after.channel.id in self.channels_create:
+            if member.id != self.bot.config["owner_id"]:
+                await self.handle_autokicks(member, after.channel)
+
+            if after.channel and after.channel.id in self.channels_create:
                 await self.handle_create_channel(member, after)
-            elif after.channel.id == self.bot.config["channels_voice"]["afk"]:
+            elif after.channel and after.channel.id == self.bot.config["channels_voice"]["afk"]:
                 return
+
         if (
             before.channel
             and before.channel != after.channel
@@ -40,6 +44,34 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             and len(before.channel.members) == 0
         ):
             await self.handle_channel_leave(before)
+
+    async def handle_autokicks(self, member, channel):
+        """Handle autokicks for a member joining a voice channel"""
+        if channel.id == self.bot.config["channels_voice"]["afk"]:
+            return
+
+        # Check if member should be autokicked using cached data
+        if await self.bot.get_cog("VoiceCog").autokick_manager.check_autokick(member, channel):
+            try:
+                # Kick the member
+                await member.move_to(None)
+
+                # Set connect permission to False
+                current_perms = channel.overwrites_for(member) or discord.PermissionOverwrite()
+                current_perms.connect = False
+                await channel.set_permissions(member, overwrite=current_perms)
+
+                # Send message in the voice channel chat
+                premium_channel = self.bot.config["channels"]["premium_info"]
+                await channel.send(
+                    f"{member.mention} został automatycznie wyrzucony z kanału głosowego, "
+                    f"ponieważ znajduje się na czyjejś liście autokick.\n"
+                    f"Podobną funkcjonalność możesz kupić na kanale <#{premium_channel}>"
+                )
+            except discord.Forbidden:
+                logger.warning(f"Failed to autokick {member.id} (no permission)")
+            except Exception as e:
+                logger.error(f"Failed to autokick {member.id}: {str(e)}")
 
     async def add_remaining_overwrites(self, channel, remaining_overwrites):
         """Add remaining overwrites to the channel."""
@@ -119,12 +151,16 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
         :param before: VoiceState object representing the state before the update
         """
+        # Nie usuwamy kanałów create ani AFK
         if (
             before.channel.id in self.channels_create
             or before.channel.id == self.bot.config["channels_voice"]["afk"]
         ):
             return
-        await before.channel.delete()
+
+        # Usuwamy tylko kanały w kategoriach głosowych
+        if before.channel.category and before.channel.category.id in self.vc_categories:
+            await before.channel.delete()
 
 
 async def setup(bot: commands.Bot):
