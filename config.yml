@@ -16,40 +16,42 @@ gifs:
 channels_voice:
   afk: 1052997299233636402
 
+channel_emojis: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑',
+          '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶', '️🌽', '🥕', '🧅', '🧄', '🥔', '🍠', '🎃',
+          '🫑', '🫒', '🍄']
+
+channel_name_formats:
+  1325439940351229962: "{emoji} public"    # publ
+  1325440354648068206: "{emoji} max²"      # max²
+  1325440407605346335: "{emoji} max³"      # max³
+  1325440479499649075: "{emoji} max⁴"      # max⁴
+  1325440557161648160: "{emoji} max⁵"      # max⁵
+
 channels_create:
-  - 1057676020209168436  # test
+  - 1325445547586359307  # git ultra
+  - 1057676020209168436  # git pro
+  - 1325445609074987100  # git plus
+  - 1325445576946614274  # git
+  - 1325445737206513727  # priv
+  - 1325445679706935296  # publ
+  - 1325445657858670622  # max2
+  - 1325445711436714095  # max3
+  - 1325445884967780442  # max4
+  - 1325445638002970684  # max5
+
+vc_categories:
+  - 1325436667359662100  # git ultra
+  - 1325436219714441267  # git pro
+  - 1325435639260516442  # git plus
+  - 960665318475325454   # git
+  - 1325439014488117278  # priv
+  - 1325439940351229962  # publ
+  - 1325440354648068206  # max2
+  - 1325440407605346335  # max3
+  - 1325440479499649075  # max4
+  - 1325440557161648160  # max5
 
 premium_roles:
-  # Ukryta ranga do odmutowania
-  # - name: "zG20"
-  #   price: 1999  # 19,99 zł
-  #   features:
-  #     - "Zarządzanie publicznymi kanałami głosowymi przez miesiąc"
-  #     - "Wybór koloru nicku: czerwony lub niebieski"
-  #     - "Możliwość tworzenia kanałów prywatnych na 30 dni po zaproszeniu jednej osoby, lub boostując serwer"
-  #     - "Uprawnienia do wysyłania obrazków, linków, gifów"
-  #     - "Możliwość streamowania na kanałach"
-  #   team_size: 0
-  #   moderator_count: 0
-  #   points_multiplier: 0   # Brak dodatkowych punktów
-  #   emojis_access: false   # Brak dostępu do dodatkowych emotek
-
-  # Ranga z kolorami bez nazwy
-  # - name: "zG30"
-  #   premium: "Git"
-  #   price: 29  # 29zł
-  #   usd: 9
-  #   features:
-  #     - "Wybór koloru nicku: żółty, czarny lub zielony"
-  #     - "Możliwość tworzenia kanałów **prywatnych**"
-  #     - "Dostęp do emotek i stickerów z każdego serwera"
-  #     - "50% więcej punktów do aktywności"
-  #   team_size: 0
-  #   moderator_count: 0
-  #   points_multiplier: 50   # +50% punktów
-  #   emojis_access: false     # Dostęp do emotek
-
-  # Premium rangi
   - name: "zG50"
     premium: "Git"
     usd: 14
@@ -138,9 +140,6 @@ mute_roles:
   - id: 960665311760248877
     name: "♺"
     description: "points_off"
-
-vc_categories:
-  - 960665318475325454
 
 color_roles:
   blue: 960665311730868235

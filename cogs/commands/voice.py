@@ -197,6 +197,7 @@ class DatabaseManager:
 
     def __init__(self, bot):
         self.bot = bot
+        self.logger = logging.getLogger(__name__)
 
     async def should_update_db(
         self, member: discord.Member, voice_channel: Optional[discord.VoiceChannel]
@@ -213,8 +214,10 @@ class DatabaseManager:
             for role in self.bot.config["premium_roles"]
         )
         is_in_specific_category = (
-            voice_channel
-            and voice_channel.category_id in self.bot.config.get("premium_categories", [])
+            voice_channel and voice_channel.category_id in self.bot.config.get("vc_categories", [])
+        )
+        self.logger.info(
+            f"Checking database update conditions for {member}: has_premium={has_premium}, is_in_specific_category={is_in_specific_category}"
         )
         return has_premium and is_in_specific_category
 
@@ -228,23 +231,53 @@ class DatabaseManager:
         update_db: Optional[Literal["+", "-"]],
     ):
         """Updates the permission in the database."""
+        self.logger.info(
+            f"Attempting to update permission: member_id={member_id}, target_id={target_id}, update_db={update_db}"
+        )
+
         if update_db is None:
+            self.logger.info("Skipping database update as update_db is None")
             return
 
-        if update_db == "+":
-            await ChannelPermissionQueries.add_or_update_permission(
-                session,
-                member_id,
-                target_id,
-                allow_permissions_value,
-                deny_permissions_value,
-            )
-        elif update_db == "-":
-            await ChannelPermissionQueries.remove_permission(session, member_id, target_id)
+        try:
+            if update_db == "+":
+                self.logger.info(
+                    f"Adding/updating permission: member_id={member_id}, target_id={target_id}"
+                )
+                await ChannelPermissionQueries.add_or_update_permission(
+                    session,
+                    member_id,
+                    target_id,
+                    allow_permissions_value,
+                    deny_permissions_value,
+                )
+                self.logger.info("Permission successfully added/updated in database")
+            elif update_db == "-":
+                self.logger.info(
+                    f"Removing permission: member_id={member_id}, target_id={target_id}"
+                )
+                await ChannelPermissionQueries.remove_permission(session, member_id, target_id)
+                self.logger.info("Permission successfully removed from database")
+        except Exception as e:
+            self.logger.error(f"Error updating permission in database: {str(e)}", exc_info=True)
+            raise
 
     async def get_member_permissions(self, session: AsyncSession, member_id: int):
         """Retrieves permissions for a member from the database."""
-        return await ChannelPermissionQueries.get_permissions_for_member(session, member_id)
+        self.logger.info(f"Retrieving permissions for member_id={member_id}")
+        try:
+            permissions = await ChannelPermissionQueries.get_permissions_for_member(
+                session, member_id
+            )
+            self.logger.info(
+                f"Retrieved {len(permissions) if permissions else 0} permissions for member"
+            )
+            return permissions
+        except Exception as e:
+            self.logger.error(
+                f"Error retrieving permissions from database: {str(e)}", exc_info=True
+            )
+            raise
 
 
 class VoicePermissionManager:
@@ -254,6 +287,7 @@ class VoicePermissionManager:
         self.bot = bot
         self.db_manager = DatabaseManager(bot)
         self.message_sender = MessageSender()
+        self.logger = logging.getLogger(__name__)
 
     async def modify_channel_permission(
         self,
@@ -266,15 +300,32 @@ class VoicePermissionManager:
         toggle=False,
     ):
         """Modifies the channel permission for a target user or role."""
+        self.logger.info(
+            f"Modifying channel permission: target={target}, permission={permission_flag}, value={value}, update_db={update_db}"
+        )
+
         current_channel = ctx.author.voice.channel
+        self.logger.info(f"Current channel: {current_channel.name} (ID: {current_channel.id})")
+
         current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
+        self.logger.info(f"Current permissions for target: {current_perms}")
+
         new_value = self._determine_new_permission_value(
             current_perms, permission_flag, value, default_to_true, toggle
         )
+        self.logger.info(f"New permission value determined: {new_value}")
+
         setattr(current_perms, permission_flag, new_value)
+        self.logger.info(f"Updated permissions object: {current_perms}")
 
         # Aktualizuj uprawnienia na kanale i w bazie
-        await self._update_channel_permission(ctx, target, current_perms)
+        try:
+            await self._update_channel_permission(ctx, target, current_perms, permission_flag)
+            self.logger.info("Successfully updated channel permissions")
+        except Exception as e:
+            self.logger.error(f"Error updating channel permissions: {str(e)}", exc_info=True)
+            await self.message_sender.send_permission_update_error(ctx, target, permission_flag)
+            return
 
         if permission_flag == "manage_messages":
             await self.message_sender.send_channel_mod_update(
@@ -341,33 +392,48 @@ class VoicePermissionManager:
                     ctx.guild.id,
                 )
 
-    async def _update_channel_permission(self, ctx, target, current_perms):
+    async def _update_channel_permission(self, ctx, target, current_perms, permission_name):
         """Updates the channel permissions."""
+        self.logger.info(
+            f"Updating channel permissions for target={target} in channel={ctx.author.voice.channel}"
+        )
+
         # Najpierw aktualizujemy uprawnienia na kanale
         await ctx.author.voice.channel.set_permissions(target, overwrite=current_perms)
+        self.logger.info("Successfully updated Discord channel permissions")
 
         # Następnie aktualizujemy uprawnienia w bazie
         allow_bits, deny_bits = current_perms.pair()
+        self.logger.info(f"Permission bits: allow={allow_bits.value}, deny={deny_bits.value}")
 
-        async with self.bot.get_db() as session:
-            # Jeśli odbieramy uprawnienia moderatora (manage_messages=None)
-            if getattr(current_perms, "manage_messages", None) is None:
-                # Usuń uprawnienia z bazy
-                await ChannelPermissionQueries.remove_permission(
-                    session,
-                    ctx.author.id,
-                    target.id,
-                )
-            else:
-                # W przeciwnym razie aktualizuj uprawnienia
-                await ChannelPermissionQueries.add_or_update_permission(
-                    session,
-                    ctx.author.id,
-                    target.id,
-                    allow_bits.value,
-                    deny_bits.value,
-                    ctx.guild.id,
-                )
+        try:
+            async with self.bot.get_db() as session:
+                # Dla uprawnienia manage_messages, usuwamy z bazy gdy jest None
+                if (
+                    permission_name == "manage_messages"
+                    and getattr(current_perms, "manage_messages", None) is None
+                ):
+                    self.logger.info(
+                        f"Removing mod permissions from database for target={target.id}"
+                    )
+                    await ChannelPermissionQueries.remove_permission(
+                        session, ctx.author.id, target.id
+                    )
+                else:
+                    # Dla wszystkich innych przypadków aktualizujemy uprawnienia
+                    self.logger.info(f"Updating permissions in database for target={target.id}")
+                    await ChannelPermissionQueries.add_or_update_permission(
+                        session,
+                        ctx.author.id,
+                        target.id,
+                        allow_bits.value,
+                        deny_bits.value,
+                        ctx.guild.id,
+                    )
+                self.logger.info("Successfully updated database permissions")
+        except Exception as e:
+            self.logger.error(f"Error in _update_channel_permission: {str(e)}", exc_info=True)
+            raise
 
     async def _handle_limit_exceeded(self, ctx, session, member_id, permission_limit):
         """Handles the case when a user exceeds their permission limit."""
@@ -634,24 +700,25 @@ class BasePermissionCommand:
 
     def __init__(
         self,
-        permission_name: str,
-        permission_display_name: str,
+        permission_name,
+        requires_owner=False,
         default_to_true=False,
         toggle=False,
-        requires_mod=False,  # Czy wymaga uprawnień moderatora
-        requires_owner=False,  # Czy wymaga uprawnień właściciela
-        is_autokick=False,  # Czy to komenda autokick
+        is_autokick=False,
     ):
         self.permission_name = permission_name
-        self.permission_display_name = permission_display_name
+        self.requires_owner = requires_owner
         self.default_to_true = default_to_true
         self.toggle = toggle
-        self.requires_mod = requires_mod
-        self.requires_owner = requires_owner
         self.is_autokick = is_autokick
+        self.logger = logging.getLogger(__name__)
 
     async def execute(self, cog, ctx, target, permission_value):
         """Execute the permission command."""
+        self.logger.info(
+            f"Executing permission command: {self.permission_name} for target={target}, value={permission_value}"
+        )
+
         if self.is_autokick:
             if target is None:
                 await cog.autokick_manager.list_autokicks(ctx)
@@ -666,56 +733,115 @@ class BasePermissionCommand:
                 await cog.autokick_manager.remove_autokick(ctx, target)
             return
 
-        if not await cog.permission_checker.check_voice_channel(ctx):
+        # Sprawdź czy użytkownik jest na kanale głosowym
+        if not ctx.author.voice:
+            self.logger.info("User not in voice channel")
+            await cog.message_sender.send_not_in_voice_channel(ctx)
             return
 
         voice_channel = ctx.author.voice.channel
+        if not voice_channel:
+            self.logger.info("User not in voice channel")
+            await cog.message_sender.send_not_in_voice_channel(ctx)
+            return
+
+        self.logger.info(f"Voice channel: {voice_channel.name} (ID: {voice_channel.id})")
 
         # Sprawdź uprawnienia
-        if self.requires_owner and not await cog.permission_checker.check_channel_owner(
-            voice_channel, ctx
-        ):
-            await cog.message_sender.send_no_mod_permission(ctx)
-            return
-
-        if self.requires_mod and not await cog.permission_checker.check_channel_mod_or_owner(
-            voice_channel, ctx
-        ):
-            await cog.message_sender.send_no_mod_permission(ctx)
-            return
-
-        # Sprawdź czy moderator (nie właściciel) próbuje modyfikować uprawnienia właściciela lub innych moderatorów
         is_owner = await cog.permission_checker.check_channel_owner(voice_channel, ctx)
-        if not is_owner and await cog.permission_checker.check_channel_mod(voice_channel, ctx):
-            target_perms = voice_channel.overwrites_for(target)
-            if target_perms:
-                if target_perms.priority_speaker:
-                    await ctx.reply("Nie możesz modyfikować uprawnień właściciela kanału!")
-                    return
-                if target_perms.manage_messages:
-                    await ctx.reply("Nie możesz modyfikować uprawnień innych moderatorów!")
-                    return
+        is_mod = await cog.permission_checker.check_channel_mod(voice_channel, ctx)
+        has_permission = is_owner or (is_mod and not self.requires_owner)
+        self.logger.info(
+            f"Permission check: is_owner={is_owner}, is_mod={is_mod}, has_permission={has_permission}"
+        )
+
+        if not has_permission:
+            self.logger.info("User lacks required permissions")
+            await cog.message_sender.send_no_mod_permission(ctx)
+            return
+
+        # Jeśli nie ma argumentów, przełącz uprawnienie dla @everyone
+        if target is None and permission_value is None:
+            target = ctx.guild.default_role
+            # Sprawdź aktualne uprawnienie
+            current_perms = voice_channel.overwrites_for(target)
+            current_value = getattr(current_perms, self.permission_name, None)
+            # Przełącz na przeciwne
+            permission_value = "-" if current_value else "+"
+            self.logger.info(
+                f"Toggling permission for @everyone: current_value={current_value}, new_value={permission_value}"
+            )
+
+        # Jeśli target to "-", ustaw dla @everyone
+        elif isinstance(target, str) and target == "-":
+            target = ctx.guild.default_role
+            permission_value = "-" if permission_value is None else permission_value
+            self.logger.info(f"Setting permission for @everyone: value={permission_value}")
 
         # Przetwórz argumenty dla komend tekstowych
-        target, permission_value = cog._handle_text_command_permission(
-            ctx, target, permission_value
-        )
-        logger.info(
-            f"After handling text command: target={target}, permission_value={permission_value}"
-        )
+        if target is not None or permission_value is not None:
+            target, permission_value = cog._handle_text_command_permission(
+                ctx, target, permission_value
+            )
+            self.logger.info(
+                f"After handling text command: target={target}, permission_value={permission_value}"
+            )
+
+        # Sprawdź czy moderator (nie właściciel) próbuje modyfikować uprawnienia właściciela lub innych moderatorów
+        if not is_owner and is_mod:
+            if target != ctx.guild.default_role:  # Pomijamy sprawdzanie dla @everyone
+                target_perms = voice_channel.overwrites_for(target)
+                if target_perms:
+                    if target_perms.priority_speaker:
+                        self.logger.info("Mod attempting to modify owner permissions")
+                        await ctx.reply("Nie możesz modyfikować uprawnień właściciela kanału!")
+                        return
+                    if target_perms.manage_messages:
+                        self.logger.info("Mod attempting to modify other mod permissions")
+                        await ctx.reply("Nie możesz modyfikować uprawnień innych moderatorów!")
+                        return
 
         # Dla komendy mod sprawdź dodatkowe warunki
         if self.permission_name == "manage_messages":
             if not await cog.mod_manager.validate_channel_mod(ctx, target, permission_value):
+                self.logger.info("Mod validation failed")
                 return
 
+        # If permission_value is None, determine it based on current state and @everyone permissions
+        if permission_value is None:
+            current_perms = voice_channel.overwrites_for(target)
+            current_value = getattr(current_perms, self.permission_name, None)
+
+            if current_value is None:
+                # User has no specific permissions, check @everyone permissions
+                everyone_perms = voice_channel.overwrites_for(ctx.guild.default_role)
+                everyone_value = getattr(everyone_perms, self.permission_name, None)
+                self.logger.info(f"@everyone permission value: {everyone_value}")
+
+                # If @everyone has explicit permission or no permission set (None = allowed)
+                if everyone_value is None or everyone_value:
+                    permission_value = "-"  # Restrict the permission
+                else:
+                    permission_value = "+"  # Allow the permission
+            else:
+                # User has specific permissions, toggle them
+                permission_value = "-" if current_value else "+"
+
+            self.logger.info(
+                f"Determined permission value based on current state and @everyone permissions: {permission_value}"
+            )
+
         # For all commands
+        self.logger.info(
+            f"Modifying channel permission: target={target}, permission={self.permission_name}, value={permission_value}"
+        )
+
         await cog.permission_manager.modify_channel_permission(
             ctx,
             target,
             self.permission_name,
             permission_value,
-            permission_value,  # update_db - używamy tej samej wartości co dla uprawnienia
+            "+",  # Always update database, regardless of permission value
             self.default_to_true,
             self.toggle,
         )
@@ -925,20 +1051,19 @@ class VoiceCog(commands.Cog):
 
         # Initialize permission commands
         self.permission_commands = {
-            "speak": BasePermissionCommand("speak", "mówienia", requires_mod=True),
-            "view": BasePermissionCommand("view_channel", "wyświetlania", requires_mod=True),
-            "connect": BasePermissionCommand("connect", "połączenia", requires_mod=True),
-            "text": BasePermissionCommand("send_messages", "pisania", requires_mod=True),
+            "speak": BasePermissionCommand("speak", requires_owner=False),
+            "view": BasePermissionCommand("view_channel", requires_owner=False),
+            "connect": BasePermissionCommand("connect", requires_owner=False),
+            "text": BasePermissionCommand("send_messages", requires_owner=False),
             "mod": BasePermissionCommand(
                 "manage_messages",
-                "moderatora",
+                requires_owner=True,
                 default_to_true=True,
                 toggle=True,
-                requires_owner=True,
             ),
             "autokick": BasePermissionCommand(
                 "autokick",
-                "autokick",
+                requires_owner=False,
                 default_to_true=True,
                 toggle=True,
                 is_autokick=True,
