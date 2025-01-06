@@ -452,6 +452,14 @@ class ChannelPermissionQueries:
         )
         return result.scalars().all()
 
+    @staticmethod
+    async def remove_all_permissions(session: AsyncSession, owner_id: int):
+        """Remove all permissions for a specific owner."""
+        await session.execute(
+            delete(ChannelPermission).where(ChannelPermission.member_id == owner_id)
+        )
+        await session.commit()
+
 
 class NotificationLogQueries:
     """Class for Notification Log Queries"""

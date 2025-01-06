@@ -373,3 +373,17 @@ class MessageSender:
             fields=fields,
         )
         await MessageSender._send_embed(ctx, embed, reply=True)
+
+    async def send_permission_reset(self, ctx, target):
+        """Send message confirming user permissions reset."""
+        await ctx.send(
+            f"✅ Zresetowano wszystkie uprawnienia dla {target.mention} na tym kanale.",
+            allowed_mentions=AllowedMentions(users=False),
+        )
+
+    async def send_channel_reset(self, ctx):
+        """Send message confirming channel permissions reset."""
+        await ctx.send(
+            "✅ Zresetowano wszystkie uprawnienia na tym kanale do ustawień domyślnych.",
+            allowed_mentions=AllowedMentions(users=False),
+        )

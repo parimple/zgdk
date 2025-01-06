@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from datasources.models import AutoKick
 from datasources.queries import AutoKickQueries, ChannelPermissionQueries
+from utils.channel_permissions import ChannelPermissionManager
 from utils.message_sender import MessageSender
 from utils.user import get_target_and_permission
 
@@ -523,12 +524,14 @@ class BasePermissionCommand:
         default_to_true=False,
         toggle=False,
         is_autokick=False,
+        is_reset=False,
     ):
         self.permission_name = permission_name
         self.requires_owner = requires_owner
         self.default_to_true = default_to_true
         self.toggle = toggle
         self.is_autokick = is_autokick
+        self.is_reset = is_reset
         self.logger = logging.getLogger(__name__)
 
     async def execute(self, cog, ctx, target, permission_value):
@@ -536,6 +539,23 @@ class BasePermissionCommand:
         self.logger.info(
             f"Executing permission command: {self.permission_name} for target={target}, value={permission_value}"
         )
+
+        if self.is_reset:
+            if not await cog.permission_checker.check_voice_channel(ctx):
+                return
+
+            voice_channel = ctx.author.voice.channel
+            if not await cog.permission_checker.check_channel_owner(voice_channel, ctx):
+                await cog.message_sender.send_no_mod_permission(ctx)
+                return
+
+            if target:
+                # Reset specific user permissions
+                await cog.reset_user_permissions(ctx, target)
+            else:
+                # Reset entire channel permissions
+                await cog.reset_channel_permissions(ctx)
+            return
 
         if self.is_autokick:
             if target is None:
@@ -847,6 +867,7 @@ class VoiceCog(commands.Cog):
         self.db_manager = DatabaseManager(bot)
         self.permission_checker = PermissionChecker(bot)
         self.autokick_manager = AutoKickManager(bot)
+        self.channel_permission_manager = ChannelPermissionManager(bot)
 
         # Initialize permission commands
         self.permission_commands = {
@@ -866,6 +887,11 @@ class VoiceCog(commands.Cog):
                 default_to_true=True,
                 toggle=True,
                 is_autokick=True,
+            ),
+            "reset": BasePermissionCommand(
+                "reset",
+                requires_owner=True,
+                is_reset=True,
             ),
         }
 
@@ -1027,6 +1053,33 @@ class VoiceCog(commands.Cog):
     ):
         """Zarządzaj listą autokick - dodawaj lub usuwaj użytkowników."""
         await self.permission_commands["autokick"].execute(self, ctx, target, action)
+
+    async def reset_user_permissions(self, ctx, target: discord.Member):
+        """Reset permissions for a specific user."""
+        await self.channel_permission_manager.reset_user_permissions(
+            ctx.author.voice.channel, ctx.author, target
+        )
+        await self.message_sender.send_permission_reset(ctx, target)
+
+    async def reset_channel_permissions(self, ctx):
+        """Reset all channel permissions to default."""
+        await self.channel_permission_manager.reset_channel_permissions(
+            ctx.author.voice.channel, ctx.author
+        )
+        await self.message_sender.send_channel_reset(ctx)
+
+    @commands.hybrid_command(aliases=["r"])
+    @commands.has_permissions(administrator=True)
+    @discord.app_commands.describe(
+        target="Użytkownik, którego uprawnienia mają zostać zresetowane (opcjonalne)",
+    )
+    async def reset(
+        self,
+        ctx,
+        target: Optional[Member] = None,
+    ):
+        """Reset channel permissions or specific user permissions."""
+        await self.permission_commands["reset"].execute(self, ctx, target, None)
 
 
 async def setup(bot):

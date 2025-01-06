@@ -1,3 +1,5 @@
+"""Event handler for voice state updates."""
+
 import logging
 import random
 
@@ -6,7 +8,7 @@ from discord.ext import commands
 from sqlalchemy.sql import select
 
 from datasources.models import AutoKick
-from datasources.queries import AutoKickQueries, ChannelPermissionQueries
+from utils.channel_permissions import ChannelPermissionManager
 from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
@@ -23,12 +25,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         self._autokick_cache = {}
         self._cache_initialized = False
         self.message_sender = MessageSender()
-
-        # Adjusting for new config structure
-        self.mute_roles = {
-            role["description"]: self.guild.get_role(role["id"])
-            for role in self.bot.config["mute_roles"]
-        }
+        self.channel_permission_manager = ChannelPermissionManager(bot)
 
         self.channels_create = self.bot.config["channels_create"]
         self.vc_categories = self.bot.config["vc_categories"]
@@ -121,43 +118,6 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             except Exception as e:
                 self.logger.error(f"Failed to autokick {member.id}: {str(e)}")
 
-    async def add_remaining_overwrites(self, channel, remaining_overwrites):
-        """Add remaining overwrites to the channel."""
-        for target, overwrite in remaining_overwrites.items():
-            try:
-                await channel.set_permissions(target, overwrite=overwrite)
-            except discord.errors.NotFound:
-                return
-
-    async def add_db_overwrites_to_permissions(self, member_id, permission_overwrites):
-        """Fetch permissions from the database and add them to the provided permission_overwrites dict."""
-        remaining_overwrites = {}
-        async with self.bot.get_db() as session:
-            member_permissions = await ChannelPermissionQueries.get_permissions_for_member(
-                session, member_id, limit=95
-            )
-
-        for permission in member_permissions:
-            allow_permissions = discord.Permissions(permission.allow_permissions_value)
-            deny_permissions = discord.Permissions(permission.deny_permissions_value)
-            overwrite = discord.PermissionOverwrite.from_pair(allow_permissions, deny_permissions)
-
-            # Konwertuj target_id na odpowiedni obiekt Discord
-            target = self.guild.get_member(permission.target_id) or self.guild.get_role(
-                permission.target_id
-            )
-            if target:
-                if target in permission_overwrites:
-                    # Jeśli target już jest w głównych uprawnieniach, dodaj do nich nowe uprawnienia
-                    for key, value in overwrite._values.items():
-                        if value is not None:
-                            setattr(permission_overwrites[target], key, value)
-                else:
-                    # Jeśli targetu nie ma w głównych uprawnieniach, dodaj do pozostałych
-                    remaining_overwrites[target] = overwrite
-
-        return remaining_overwrites
-
     async def handle_create_channel(self, member, after):
         """
         Handle the creation of a new voice channel when a member joins a creation channel.
@@ -189,24 +149,16 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                 f"No format found for category {category_id}, using default name: {channel_name}"
             )
 
-        permission_overwrites = {
-            self.mute_roles["stream_off"]: discord.PermissionOverwrite(stream=False),
-            self.mute_roles["send_messages_off"]: discord.PermissionOverwrite(send_messages=False),
-            self.mute_roles["attach_files_off"]: discord.PermissionOverwrite(
-                attach_files=False, embed_links=False, external_emojis=False
-            ),
-            member: discord.PermissionOverwrite(
-                view_channel=True,
-                connect=True,
-                speak=True,
-                priority_speaker=True,
-                manage_messages=True,
-            ),
-        }
+        # Get default permission overwrites
+        permission_overwrites = self.channel_permission_manager.get_default_permission_overwrites(
+            self.guild, member
+        )
 
         # Add permissions from database, if applicable
-        remaining_overwrites = await self.add_db_overwrites_to_permissions(
-            member.id, permission_overwrites
+        remaining_overwrites = (
+            await self.channel_permission_manager.add_db_overwrites_to_permissions(
+                self.guild, member.id, permission_overwrites
+            )
         )
 
         # Create the new channel
@@ -220,7 +172,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
         # Add any remaining overwrites
         if remaining_overwrites:
-            await self.add_remaining_overwrites(new_channel, remaining_overwrites)
+            await self.channel_permission_manager.add_remaining_overwrites(
+                new_channel, remaining_overwrites
+            )
 
         await member.move_to(new_channel)
 
