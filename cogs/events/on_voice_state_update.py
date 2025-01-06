@@ -7,6 +7,7 @@ from sqlalchemy.sql import select
 
 from datasources.models import AutoKick
 from datasources.queries import AutoKickQueries, ChannelPermissionQueries
+from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         # Cache structure: {target_id: set(owner_ids)}
         self._autokick_cache = {}
         self._cache_initialized = False
+        self.message_sender = MessageSender()
 
         # Adjusting for new config structure
         self.mute_roles = {
@@ -93,6 +95,17 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         # Check if member should be autokicked using cached data
         if await self.check_autokick(member, channel):
             try:
+                # Find the owner who has autokick on this member
+                owner = None
+                for owner_id in self._autokick_cache[member.id]:
+                    potential_owner = channel.guild.get_member(owner_id)
+                    if potential_owner and potential_owner in channel.members:
+                        owner = potential_owner
+                        break
+
+                if not owner:
+                    return
+
                 # Kick the member
                 await member.move_to(None)
 
@@ -101,13 +114,8 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                 current_perms.connect = False
                 await channel.set_permissions(member, overwrite=current_perms)
 
-                # Send message in the voice channel chat
-                premium_channel = self.bot.config["channels"]["premium_info"]
-                await channel.send(
-                    f"{member.mention} został automatycznie wyrzucony z kanału głosowego, "
-                    f"ponieważ znajduje się na czyjejś liście autokick.\n"
-                    f"Podobną funkcjonalność możesz kupić na kanale <#{premium_channel}>"
-                )
+                # Send notification
+                await self.message_sender.send_autokick_notification(channel, member, owner)
             except discord.Forbidden:
                 self.logger.warning(f"Failed to autokick {member.id} (no permission)")
             except Exception as e:

@@ -11,185 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from datasources.models import AutoKick
 from datasources.queries import AutoKickQueries, ChannelPermissionQueries
+from utils.message_sender import MessageSender
 from utils.user import get_target_and_permission
 
 logger = logging.getLogger(__name__)
-
-
-class MessageSender:
-    """Handles sending messages to the server."""
-
-    @staticmethod
-    async def send_permission_update(ctx, target, permission_flag, new_value):
-        """Sends a message about the updated permission."""
-        mention_str = target.mention if isinstance(target, discord.Member) else "wszystkich"
-        value_str = "+" if new_value else "-"
-        await ctx.reply(
-            f"Ustawiono uprawnienie {permission_flag} na {value_str} dla {mention_str}.",
-            allowed_mentions=AllowedMentions(users=False, roles=False),
-        )
-
-    @staticmethod
-    async def send_user_not_found(ctx):
-        """Sends a message when the target user is not found."""
-        await ctx.send("Nie znaleziono użytkownika.")
-
-    @staticmethod
-    async def send_not_in_voice_channel(ctx):
-        """Sends a message when the user is not in a voice channel."""
-        await ctx.send("Nie jesteś na żadnym kanale głosowym!")
-
-    @staticmethod
-    async def send_joined_channel(ctx, channel):
-        """Sends a message when the bot joins a channel."""
-        await ctx.send(f"Dołączono do {channel}")
-
-    @staticmethod
-    async def send_invalid_member_limit(ctx):
-        """Sends a message when an invalid member limit is provided."""
-        await ctx.reply("Podaj liczbę członków od 1 do 99.")
-
-    @staticmethod
-    async def send_member_limit_set(ctx, voice_channel, limit_text):
-        """Sends a message when the member limit is set."""
-        await ctx.reply(f"Limit członków na kanale {voice_channel} ustawiony na {limit_text}.")
-
-    @staticmethod
-    async def send_no_mod_permission(ctx):
-        """Sends a message when the user doesn't have permission to assign channel mods."""
-        await ctx.send("Nie masz uprawnień do nadawania channel moda!")
-
-    @staticmethod
-    async def send_cant_remove_self_mod(ctx):
-        """Sends a message when the user tries to remove their own mod permissions."""
-        await ctx.send("Nie możesz odebrać sobie uprawnień do zarządzania kanałem!")
-
-    @staticmethod
-    async def send_mod_limit_exceeded(ctx, mod_limit, current_mods):
-        """Sends a message when the mod limit is exceeded."""
-        current_mods_mentions = ", ".join(
-            [member.mention for member in current_mods if member != ctx.author]
-        )
-        remaining_slots = max(0, mod_limit - len(current_mods))
-        await ctx.send(
-            f"Możesz przypisać maksymalnie {mod_limit} channel modów (pozostało: {remaining_slots}). "
-            f"Aktualni channel modzi: {current_mods_mentions}.",
-            allowed_mentions=AllowedMentions(users=False, roles=False),
-        )
-
-    @staticmethod
-    async def send_permission_limit_exceeded(ctx, permission_limit):
-        """Sends a message when the permission limit is exceeded."""
-        await ctx.send(
-            f"Osiągnąłeś limit {permission_limit} uprawnień. Najstarsze uprawnienie nie dotyczące zarządzania wiadomościami zostało nadpisane. Aby uzyskać więcej uprawnień, rozważ zakup wyższej rangi premium.",
-            allowed_mentions=AllowedMentions(users=False, roles=False),
-        )
-
-    @staticmethod
-    async def send_channel_mod_update(ctx, target, is_mod, voice_channel, mod_limit):
-        """Sends a message about updating channel mod status and displays mod information."""
-        action = "nadano uprawnienia" if is_mod else "odebrano uprawnienia"
-
-        # Get current mods from channel overwrites only
-        current_mods = [
-            t
-            for t, overwrite in voice_channel.overwrites.items()
-            if isinstance(t, discord.Member)
-            and overwrite.manage_messages is True  # Musi być dokładnie True (nie None ani False)
-            and not (
-                overwrite.priority_speaker is True and t == ctx.author
-            )  # Wykluczamy tylko właściciela kanału
-            and t != target  # Nie pokazujemy użytkownika któremu właśnie zmieniamy uprawnienia
-        ]
-
-        # Dodaj target tylko jeśli nadajemy uprawnienia
-        if is_mod:
-            current_mods.append(target)
-
-        current_mods_mentions = ", ".join(
-            [member.mention for member in current_mods if member != ctx.author]
-        )
-        if not current_mods_mentions:
-            current_mods_mentions = "brak"
-
-        remaining_slots = max(0, mod_limit - len(current_mods))
-
-        message = (
-            f"{target.mention} {action} moderatora kanału.\n"
-            f"Aktualni moderatorzy: {current_mods_mentions}\n"
-            f"Możesz przypisać maksymalnie {mod_limit} moderatorów (pozostało slotów: {remaining_slots})"
-        )
-
-        await ctx.reply(
-            message,
-            allowed_mentions=AllowedMentions(users=False, roles=False),
-        )
-
-    @staticmethod
-    async def send_voice_channel_info(ctx, author_info, target_info=None):
-        """Sends a message with voice channel information."""
-        message = author_info
-        if target_info:
-            message += f"\n{target_info}"
-        await ctx.send(message)
-
-    @staticmethod
-    async def send_no_premium_role(ctx, premium_channel_id):
-        """Sends a message when user has no premium role."""
-        await ctx.send(
-            f"Nie posiadasz żadnej rangi premium. Możesz przypisać 0 channel modów. "
-            f"Jeśli chcesz mieć możliwość dodawania moderatorów, sprawdź kanał <#{premium_channel_id}>."
-        )
-
-    @staticmethod
-    async def send_permission_update_error(ctx, target, permission_flag):
-        """Sends a message when there is an error updating the permission."""
-        await ctx.reply(
-            f"Nie udało się ustawić uprawnienia {permission_flag} dla {target.mention}.",
-            allowed_mentions=AllowedMentions(users=False, roles=False),
-        )
-
-    @staticmethod
-    async def send_no_autokick_permission(ctx, premium_channel_id):
-        """Sends a message when user doesn't have required role for autokick."""
-        await ctx.send(
-            f"Nie posiadasz wymaganych uprawnień do używania autokicka.\n"
-            f"Aby móc używać autokicka, musisz posiadać rangę zG500 (1 slot) lub zG1000 (3 sloty).\n"
-            f"Sprawdź dostępne rangi premium na kanale <#{premium_channel_id}>"
-        )
-
-    @staticmethod
-    async def send_autokick_limit_reached(ctx, max_autokicks, premium_channel_id):
-        """Sends a message when user has reached their autokick limit."""
-        await ctx.send(
-            f"Osiągnąłeś limit {max_autokicks} osób na liście autokick.\n"
-            f"Aby móc dodać więcej osób, rozważ zakup wyższej rangi premium na kanale <#{premium_channel_id}>"
-        )
-
-    @staticmethod
-    async def send_autokick_already_exists(ctx, target):
-        """Sends a message when target is already on autokick list."""
-        await ctx.send(f"{target.mention} jest już na twojej liście autokick.")
-
-    @staticmethod
-    async def send_autokick_added(ctx, target):
-        """Sends a message when target is added to autokick list."""
-        await ctx.send(f"Dodano {target.mention} do twojej listy autokick.")
-
-    @staticmethod
-    async def send_autokick_not_found(ctx, target):
-        """Sends a message when target is not on autokick list."""
-        await ctx.send(f"{target.mention} nie jest na twojej liście autokick.")
-
-    @staticmethod
-    async def send_autokick_removed(ctx, target):
-        """Sends a message when target is removed from autokick list."""
-        await ctx.send(f"Usunięto {target.mention} z twojej listy autokick.")
-
-    @staticmethod
-    async def send_autokick_list_empty(ctx):
-        """Sends a message when autokick list is empty."""
-        await ctx.send("Twoja lista autokick jest pusta.")
 
 
 class DatabaseManager:
@@ -595,15 +420,8 @@ class ChannelModManager:
             current_mods_mentions = "brak"
 
         remaining_slots = max(0, mod_limit - len(current_mods))
-
-        message = (
-            f"Aktualni moderatorzy: {current_mods_mentions}\n"
-            f"Możesz przypisać maksymalnie {mod_limit} moderatorów (pozostało slotów: {remaining_slots})"
-        )
-
-        await ctx.reply(
-            message,
-            allowed_mentions=AllowedMentions(users=False, roles=False),
+        await self.message_sender.send_mod_info(
+            ctx, current_mods_mentions, mod_limit, remaining_slots
         )
 
     async def check_prerequisites(self, ctx, target, can_manage):
@@ -794,11 +612,11 @@ class BasePermissionCommand:
                 if target_perms:
                     if target_perms.priority_speaker:
                         self.logger.info("Mod attempting to modify owner permissions")
-                        await ctx.reply("Nie możesz modyfikować uprawnień właściciela kanału!")
+                        await self.message_sender.send_cant_modify_owner_permissions(ctx)
                         return
                     if target_perms.manage_messages:
                         self.logger.info("Mod attempting to modify other mod permissions")
-                        await ctx.reply("Nie możesz modyfikować uprawnień innych moderatorów!")
+                        await self.message_sender.send_cant_modify_mod_permissions(ctx)
                         return
 
         # Dla komendy mod sprawdź dodatkowe warunki
@@ -998,27 +816,8 @@ class AutoKickManager:
             await self.message_sender.send_autokick_list_empty(ctx)
             return
 
-        embed = discord.Embed(
-            title="Twoja Lista Autokick",
-            description="Lista użytkowników, którzy będą automatycznie wyrzucani z kanałów głosowych.",
-            color=discord.Color.blue(),
-        )
-
         max_autokicks = await self.get_autokick_limit(ctx.author)
-        embed.set_footer(
-            text=f"Wykorzystano {len(user_autokicks)}/{max_autokicks} dostępnych slotów"
-        )
-
-        for target_id in user_autokicks:
-            member = ctx.guild.get_member(target_id)
-            if member:
-                embed.add_field(
-                    name=member.display_name,
-                    value=f"{member.mention}\nID: {member.id}",
-                    inline=False,
-                )
-
-        await ctx.send(embed=embed)
+        await self.message_sender.send_autokick_list(ctx, user_autokicks, max_autokicks)
 
     async def check_autokick(self, member: discord.Member, channel: discord.VoiceChannel) -> bool:
         """Check if a member should be autokicked from a channel."""
