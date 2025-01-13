@@ -387,3 +387,45 @@ class MessageSender:
             "✅ Zresetowano wszystkie uprawnienia na tym kanale do ustawień domyślnych.",
             allowed_mentions=AllowedMentions(users=False),
         )
+
+    @staticmethod
+    async def send_error(ctx, message: str):
+        """Send an error message."""
+        embed = MessageSender._create_embed(
+            title="Błąd",
+            description=message,
+            color="error",
+        )
+        await MessageSender._send_embed(ctx, embed)
+
+    @staticmethod
+    async def send_giveaway_results(
+        ctx, winners: list, channel: discord.TextChannel, winners_count: int
+    ):
+        """Send giveaway results."""
+        description = []
+        for i, message in enumerate(winners, 1):
+            jump_url = message.jump_url
+            if message.webhook_id:
+                # Dla wiadomości od webhooków pokazujemy nazwę webhooka
+                author_text = f"Webhook ({message.author.name})"
+            else:
+                # Dla normalnych wiadomości pokazujemy oznaczenie użytkownika
+                author_text = message.author.mention if message.author else "Nieznany użytkownik"
+            description.append(f"{i}. {author_text} - [Link do wiadomości]({jump_url})")
+
+        if len(winners) < winners_count:
+            description.append(
+                f"\n⚠️ Wylosowano tylko {len(winners)} wiadomości z {winners_count} żądanych."
+            )
+
+        embed = MessageSender._create_embed(
+            title="🎉 Wyniki Losowania",
+            description="\n".join(description),
+            color="success",
+            fields=[
+                ("Kanał", channel.mention, True),
+                ("Liczba wygranych", str(len(winners)), True),
+            ],
+        )
+        await MessageSender._send_embed(ctx, embed, reply=True)

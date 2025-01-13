@@ -127,27 +127,22 @@ class VoicePermissionManager:
     ):
         """Modifies the channel permission for a target user or role."""
         self.logger.info(
-            f"Modifying channel permission: target={target}, permission={permission_flag}, value={value}, update_db={update_db}"
+            f"Modifying channel permission: target={target}, permission={permission_flag}, value={value}, update_db={update_db}, default_to_true={default_to_true}, toggle={toggle}"
         )
 
         current_channel = ctx.author.voice.channel
-        self.logger.info(f"Current channel: {current_channel.name} (ID: {current_channel.id})")
-
         current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
-        self.logger.info(f"Current permissions for target: {current_perms}")
 
         new_value = self._determine_new_permission_value(
-            current_perms, permission_flag, value, default_to_true, toggle
+            current_perms, permission_flag, value, default_to_true, toggle, ctx=ctx, target=target
         )
         self.logger.info(f"New permission value determined: {new_value}")
 
         setattr(current_perms, permission_flag, new_value)
-        self.logger.info(f"Updated permissions object: {current_perms}")
 
         # Aktualizuj uprawnienia na kanale i w bazie
         try:
             await self._update_channel_permission(ctx, target, current_perms, permission_flag)
-            self.logger.info("Successfully updated channel permissions")
         except Exception as e:
             self.logger.error(f"Error updating channel permissions: {str(e)}", exc_info=True)
             await self.message_sender.send_permission_update_error(ctx, target, permission_flag)
@@ -182,9 +177,12 @@ class VoicePermissionManager:
         value: Optional[Literal["+", "-"]],
         default_to_true=False,
         toggle=False,
+        ctx=None,
+        target=None,
     ):
         """Determines the new permission value based on inputs."""
         current_value = getattr(current_perms, permission_flag, None)
+        self.logger.info(f"Current permission value: {current_value}")
 
         if toggle:
             if current_value is True:
@@ -193,7 +191,19 @@ class VoicePermissionManager:
 
         if value is None:
             if current_value is None:
-                return True if default_to_true else False
+                if permission_flag == "manage_messages":
+                    # Dla manage_messages (mod) używamy default_to_true
+                    return True if default_to_true else False
+                else:
+                    # Dla innych uprawnień sprawdzamy @everyone
+                    everyone_perms = ctx.author.voice.channel.overwrites_for(ctx.guild.default_role)
+                    everyone_value = getattr(everyone_perms, permission_flag, None)
+                    self.logger.info(f"@everyone permission value: {everyone_value}")
+
+                    # Jeśli @everyone ma jawne uprawnienie lub brak uprawnienia (None = dozwolone)
+                    if everyone_value is None or everyone_value:
+                        return False  # Ograniczamy uprawnienie
+                    return True  # Zezwalamy na uprawnienie
             if current_value is True:
                 return None if permission_flag == "manage_messages" else False
             return True
@@ -604,8 +614,8 @@ class BasePermissionCommand:
             # Sprawdź aktualne uprawnienie
             current_perms = voice_channel.overwrites_for(target)
             current_value = getattr(current_perms, self.permission_name, None)
-            # Przełącz na przeciwne
-            permission_value = "-" if current_value else "+"
+            # Przełącz na przeciwne (None lub True -> "-", False -> "+")
+            permission_value = "+" if current_value is False else "-"
             self.logger.info(
                 f"Toggling permission for @everyone: current_value={current_value}, new_value={permission_value}"
             )
@@ -632,11 +642,11 @@ class BasePermissionCommand:
                 if target_perms:
                     if target_perms.priority_speaker:
                         self.logger.info("Mod attempting to modify owner permissions")
-                        await self.message_sender.send_cant_modify_owner_permissions(ctx)
+                        await cog.message_sender.send_cant_modify_owner_permissions(ctx)
                         return
                     if target_perms.manage_messages:
                         self.logger.info("Mod attempting to modify other mod permissions")
-                        await self.message_sender.send_cant_modify_mod_permissions(ctx)
+                        await cog.message_sender.send_cant_modify_mod_permissions(ctx)
                         return
 
         # Dla komendy mod sprawdź dodatkowe warunki
@@ -645,41 +655,13 @@ class BasePermissionCommand:
                 self.logger.info("Mod validation failed")
                 return
 
-        # If permission_value is None, determine it based on current state and @everyone permissions
-        if permission_value is None:
-            current_perms = voice_channel.overwrites_for(target)
-            current_value = getattr(current_perms, self.permission_name, None)
-
-            if current_value is None:
-                # User has no specific permissions, check @everyone permissions
-                everyone_perms = voice_channel.overwrites_for(ctx.guild.default_role)
-                everyone_value = getattr(everyone_perms, self.permission_name, None)
-                self.logger.info(f"@everyone permission value: {everyone_value}")
-
-                # If @everyone has explicit permission or no permission set (None = allowed)
-                if everyone_value is None or everyone_value:
-                    permission_value = "-"  # Restrict the permission
-                else:
-                    permission_value = "+"  # Allow the permission
-            else:
-                # User has specific permissions, toggle them
-                permission_value = "-" if current_value else "+"
-
-            self.logger.info(
-                f"Determined permission value based on current state and @everyone permissions: {permission_value}"
-            )
-
-        # For all commands
-        self.logger.info(
-            f"Modifying channel permission: target={target}, permission={self.permission_name}, value={permission_value}"
-        )
-
+        # Modify channel permission with default_to_true and toggle parameters
         await cog.permission_manager.modify_channel_permission(
             ctx,
             target,
             self.permission_name,
             permission_value,
-            "+",  # Always update database, regardless of permission value
+            "+",  # Always update database
             self.default_to_true,
             self.toggle,
         )
@@ -884,8 +866,6 @@ class VoiceCog(commands.Cog):
             "autokick": BasePermissionCommand(
                 "autokick",
                 requires_owner=False,
-                default_to_true=True,
-                toggle=True,
                 is_autokick=True,
             ),
             "reset": BasePermissionCommand(
