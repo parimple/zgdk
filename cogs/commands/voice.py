@@ -240,7 +240,9 @@ class VoicePermissionManager:
 
         # Następnie aktualizujemy uprawnienia w bazie
         allow_bits, deny_bits = current_perms.pair()
-        self.logger.info(f"Permission bits: allow={allow_bits.value}, deny={deny_bits.value}")
+        self.logger.info(
+            f"Permission bits for {target}: allow={allow_bits.value}, deny={deny_bits.value}"
+        )
 
         try:
             async with self.bot.get_db() as session:
@@ -257,7 +259,10 @@ class VoicePermissionManager:
                     )
                 else:
                     # Dla wszystkich innych przypadków aktualizujemy uprawnienia
-                    self.logger.info(f"Updating permissions in database for target={target.id}")
+                    self.logger.info(
+                        f"Updating permissions in database for target={target.id} "
+                        f"with allow={allow_bits.value}, deny={deny_bits.value}"
+                    )
                     await ChannelPermissionQueries.add_or_update_permission(
                         session,
                         ctx.author.id,
@@ -266,7 +271,8 @@ class VoicePermissionManager:
                         deny_bits.value,
                         ctx.guild.id,
                     )
-                self.logger.info("Successfully updated database permissions")
+                await session.commit()
+                self.logger.info("Successfully committed database changes")
         except Exception as e:
             self.logger.error(f"Error in _update_channel_permission: {str(e)}", exc_info=True)
             raise

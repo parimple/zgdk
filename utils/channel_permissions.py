@@ -105,11 +105,18 @@ class ChannelPermissionManager:
             member_permissions = await ChannelPermissionQueries.get_permissions_for_member(
                 session, member_id, limit=95
             )
+            self.logger.info(
+                f"Found {len(member_permissions)} permissions in database for member {member_id}"
+            )
 
         for permission in member_permissions:
             allow_permissions = discord.Permissions(permission.allow_permissions_value)
             deny_permissions = discord.Permissions(permission.deny_permissions_value)
             overwrite = PermissionOverwrite.from_pair(allow_permissions, deny_permissions)
+            self.logger.info(
+                f"Processing permission for target {permission.target_id}: "
+                f"allow={permission.allow_permissions_value}, deny={permission.deny_permissions_value}"
+            )
 
             # Convert target_id to appropriate Discord object
             target = guild.get_member(permission.target_id) or guild.get_role(permission.target_id)
@@ -119,9 +126,13 @@ class ChannelPermissionManager:
                     for key, value in overwrite._values.items():
                         if value is not None:
                             setattr(permission_overwrites[target], key, value)
+                            self.logger.info(
+                                f"Updated existing permission {key}={value} for {target}"
+                            )
                 else:
                     # If target doesn't exist in main permissions, add to remaining
                     remaining_overwrites[target] = overwrite
+                    self.logger.info(f"Added to remaining overwrites for {target}")
 
         return remaining_overwrites
 
