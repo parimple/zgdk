@@ -397,8 +397,8 @@ class VoicePermissionManager:
             if permission_flag in ["view_channel", "connect"] and not value:
                 if afk_channel:
                     await target.move_to(afk_channel)
-            # Dla speak przenoś na AFK i z powrotem zawsze aby odświeżyć uprawnienia
-            if permission_flag == "speak":
+            # Dla speak i stream przenoś na AFK i z powrotem zawsze aby odświeżyć uprawnienia
+            if permission_flag in ["speak", "stream"]:
                 if afk_channel:
                     await target.move_to(afk_channel)
                     await target.move_to(ctx.author.voice.channel)

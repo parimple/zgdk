@@ -35,6 +35,7 @@ class VoiceCog(commands.Cog):
             "view": BasePermissionCommand("view_channel", requires_owner=False),
             "connect": BasePermissionCommand("connect", requires_owner=False),
             "text": BasePermissionCommand("send_messages", requires_owner=False),
+            "live": BasePermissionCommand("stream", requires_owner=False),
             "mod": BasePermissionCommand(
                 "manage_messages",
                 requires_owner=True,
@@ -198,6 +199,21 @@ class VoiceCog(commands.Cog):
     ):
         """Reset channel permissions or specific user permissions."""
         await self.permission_commands["reset"].execute(self, ctx, target, None)
+
+    @commands.hybrid_command(aliases=["l"])
+    @commands.has_permissions(administrator=True)
+    @discord.app_commands.describe(
+        target="Użytkownik do modyfikacji uprawnień",
+        can_stream="Ustaw uprawnienie streamowania (+ lub -)",
+    )
+    async def live(
+        self,
+        ctx,
+        target: Optional[Member] = None,
+        can_stream: Optional[Literal["+", "-"]] = None,
+    ):
+        """Set the stream permission for the target."""
+        await self.permission_commands["live"].execute(self, ctx, target, can_stream)
 
 
 async def setup(bot):
