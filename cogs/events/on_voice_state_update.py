@@ -5,11 +5,10 @@ import random
 
 import discord
 from discord.ext import commands
-from sqlalchemy.sql import select
 
-from datasources.models import AutoKick
 from utils.channel_permissions import ChannelPermissionManager
 from utils.message_sender import MessageSender
+from utils.voice.autokick import AutoKickManager
 
 logger = logging.getLogger(__name__)
 
@@ -21,47 +20,12 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         self.bot = bot
         self.guild = bot.get_guild(self.bot.config["guild_id"])
         self.logger = logging.getLogger(__name__)
-        # Cache structure: {target_id: set(owner_ids)}
-        self._autokick_cache = {}
-        self._cache_initialized = False
         self.message_sender = MessageSender()
         self.channel_permission_manager = ChannelPermissionManager(bot)
+        self.autokick_manager = AutoKickManager(bot)
 
         self.channels_create = self.bot.config["channels_create"]
         self.vc_categories = self.bot.config["vc_categories"]
-
-    async def _initialize_cache(self):
-        """Initialize the cache with data from database"""
-        if self._cache_initialized:
-            return
-
-        async with self.bot.get_db() as session:
-            # Get all autokicks using SQLAlchemy ORM
-            result = await session.execute(select(AutoKick.target_id, AutoKick.owner_id))
-            rows = result.all()
-
-            # Build the cache
-            for target_id, owner_id in rows:
-                if target_id not in self._autokick_cache:
-                    self._autokick_cache[target_id] = set()
-                self._autokick_cache[target_id].add(owner_id)
-
-        self._cache_initialized = True
-
-    async def check_autokick(self, member: discord.Member, channel: discord.VoiceChannel) -> bool:
-        """Check if a member should be autokicked from a channel."""
-        await self._initialize_cache()
-
-        if member.id not in self._autokick_cache:
-            return False
-
-        # Check if any channel members have autokick on this member
-        for owner_id in self._autokick_cache[member.id]:
-            owner = channel.guild.get_member(owner_id)
-            if owner and owner in channel.members:
-                return True
-
-        return False
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -89,12 +53,12 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         if channel.id == self.bot.config["channels_voice"]["afk"]:
             return
 
-        # Check if member should be autokicked using cached data
-        if await self.check_autokick(member, channel):
+        # Check if member should be autokicked using AutoKickManager
+        if await self.autokick_manager.check_autokick(member, channel):
             try:
                 # Find the owner who has autokick on this member
                 owner = None
-                for owner_id in self._autokick_cache[member.id]:
+                for owner_id in self.autokick_manager._autokick_cache[member.id]:
                     potential_owner = channel.guild.get_member(owner_id)
                     if potential_owner and potential_owner in channel.members:
                         owner = potential_owner
@@ -103,8 +67,12 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                 if not owner:
                     return
 
-                # Kick the member
-                await member.move_to(None)
+                # Move member to AFK channel
+                afk_channel = self.guild.get_channel(self.bot.config["channels_voice"]["afk"])
+                if afk_channel:
+                    await member.move_to(afk_channel)
+                else:
+                    await member.move_to(None)
 
                 # Set connect permission to False
                 current_perms = channel.overwrites_for(member) or discord.PermissionOverwrite()
