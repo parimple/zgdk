@@ -15,6 +15,9 @@ class MessageSender:
         "warning": discord.Color.orange(),
     }
 
+    def __init__(self, bot=None):
+        self.bot = bot
+
     @staticmethod
     def _create_embed(title, description=None, color="info", fields=None, footer=None):
         """Creates a consistent embed with the given parameters."""
@@ -429,3 +432,136 @@ class MessageSender:
             ],
         )
         await MessageSender._send_embed(ctx, embed, reply=True)
+
+    async def send_voice_channel_info(self, ctx, channel, owner, mods, disabled_perms):
+        """Send voice channel information."""
+        fields = []
+
+        # Owner field
+        owner_value = owner.mention if owner else "brak"
+        fields.append(("Właściciel", owner_value, False))
+
+        # Moderators field
+        if mods:
+            mods_value = ", ".join(mod.mention for mod in mods)
+        else:
+            mods_value = "brak"
+        fields.append(("Moderatorzy", mods_value, False))
+
+        # Permissions field
+        # Convert permission names to command names
+        perm_to_cmd = {
+            "połączenia": "connect",
+            "mówienia": "speak",
+            "streamowania": "live",
+            "widzenia kanału": "view",
+            "pisania": "text",
+        }
+        if disabled_perms:
+            converted_perms = [f"`{perm_to_cmd.get(perm, perm)}`" for perm in disabled_perms]
+            perms_value = ", ".join(converted_perms)
+            fields.append(("Wyłączone uprawnienia", perms_value, False))
+        else:
+            fields.append(("Wyłączone uprawnienia", "brak", False))
+
+        # Channel field (at the bottom)
+        fields.append(("Kanał", channel.mention, False))
+
+        embed = MessageSender._create_embed(
+            title="Informacje o Kanale",
+            color="info",
+            fields=fields,
+        )
+        await MessageSender._send_embed(ctx, embed)
+
+    async def send_channel_creation_info(self, channel, owner):
+        """Send information about newly created voice channel."""
+        premium_channel_id = self.bot.config["channels"]["premium_info"]
+        prefix = self.bot.config["prefix"]
+
+        # Get current mods from channel overwrites
+        current_mods = [
+            member
+            for member, overwrite in channel.overwrites.items()
+            if isinstance(member, discord.Member)
+            and overwrite.manage_messages is True  # Musi być dokładnie True (nie None ani False)
+            and not (
+                overwrite.priority_speaker is True and member == owner
+            )  # Wykluczamy właściciela
+        ]
+
+        # Get mod limit from owner's roles
+        mod_limit = 0
+        for role in reversed(self.bot.config["premium_roles"]):
+            if any(r.name == role["name"] for r in owner.roles):
+                mod_limit = role["moderator_count"]
+                break
+
+        # Format moderators list
+        if current_mods:
+            mods_value = ", ".join(mod.mention for mod in current_mods)
+        else:
+            mods_value = "brak"
+        mods_value += f"\n(Limit moderatorów: {len(current_mods)}/{mod_limit})"
+
+        # Check disabled permissions for @everyone
+        permissions_to_check = {
+            "connect": "connect",
+            "speak": "speak",
+            "stream": "live",
+            "view_channel": "view",
+            "send_messages": "text",
+        }
+
+        everyone_perms = channel.overwrites_for(channel.guild.default_role)
+        disabled_perms = []
+        for perm_name, perm_display in permissions_to_check.items():
+            if getattr(everyone_perms, perm_name) is False:
+                disabled_perms.append(perm_display)
+
+        # Format permissions info
+        if disabled_perms:
+            perms_value = ", ".join(f"`{perm}`" for perm in disabled_perms)
+        else:
+            perms_value = "brak"
+
+        embed = MessageSender._create_embed(
+            title="🎤 Nowy Kanał Głosowy",
+            description=(
+                f"Witaj w swoim nowym kanale głosowym!\n"
+                f"Możesz zarządzać uprawnieniami używając następujących komend:"
+            ),
+            color="info",
+            fields=[
+                ("Właściciel", owner.mention, False),
+                ("Moderatorzy", mods_value, False),
+                ("Wyłączone uprawnienia", perms_value, False),
+                (
+                    "Komendy",
+                    f"• `{prefix}speak <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do mówienia\n"
+                    f"• `{prefix}live <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do streamowania\n"
+                    f"• `{prefix}connect <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do dołączania\n"
+                    f"• `{prefix}view <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do widzenia kanału\n"
+                    f"• `{prefix}text <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do pisania\n"
+                    f"• `{prefix}mod <@użytkownik> [+/-]` - Dodaj/usuń moderatora kanału\n"
+                    f"• `{prefix}limit <liczba>` - Ustaw limit użytkowników (0-99)\n"
+                    f"• `{prefix}reset` - Zresetuj wszystkie uprawnienia",
+                    False,
+                ),
+                (
+                    "Globalne Uprawnienia",
+                    "Aby zmienić uprawnienia dla wszystkich użytkowników:\n"
+                    f"• Użyj komendy bez oznaczania użytkownika, np. `{prefix}live +` włączy streamowanie dla wszystkich\n"
+                    "• Możesz użyć `+` aby włączyć lub `-` aby wyłączyć uprawnienie\n"
+                    "• Użycie komendy bez `+/-` przełączy uprawnienie na przeciwne",
+                    False,
+                ),
+                (
+                    "Uwaga",
+                    f"Komenda `{prefix}limit` jest dostępna dla wszystkich.\n"
+                    f"Sprawdź dostępne rangi premium na kanale <#{premium_channel_id}> aby dowiedzieć się więcej!",
+                    False,
+                ),
+            ],
+        )
+        await channel.send(embed=embed)

@@ -177,16 +177,18 @@ class VoiceCog(commands.Cog):
         target="Użytkownik do sprawdzenia kanału głosowego (ID, wzmianka lub nazwa użytkownika)",
     )
     async def voicechat(self, ctx, target: Optional[Member] = None):
-        """Wylij link do kanału głosowego użytkownika i/lub kanału głosowego docelowego."""
-        author_info = await self.target_helper.get_voice_channel_info(ctx.author)
+        """Wyślij link do kanału głosowego użytkownika i informacje o uprawnieniach."""
+        member = target or ctx.author
 
-        target_info = None
-        if target:
-            target_member = await self.target_helper.get_target(ctx, target)
-            if target_member:
-                target_info = await self.target_helper.get_voice_channel_info(target_member)
+        if not member.voice or not member.voice.channel:
+            await self.message_sender.send_not_in_voice_channel(ctx)
+            return
 
-        await self.message_sender.send_voice_channel_info(ctx, author_info, target_info)
+        channel = member.voice.channel
+        info = await self.channel_manager.get_channel_info(channel, member)
+        await self.message_sender.send_voice_channel_info(
+            ctx, info["channel"], info["owner"], info["mods"], info["disabled_perms"]
+        )
 
     @commands.hybrid_command(aliases=["ak"])
     @discord.app_commands.describe(

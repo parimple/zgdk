@@ -104,3 +104,50 @@ async def get_target_and_permission(
         return ctx.guild.default_role, permission
 
     return target_member, permission
+
+
+class TargetHelper:
+    """Helper class for handling user targets and permissions."""
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    async def get_target(self, ctx, target_arg):
+        """Get target member from command argument."""
+        if isinstance(target_arg, discord.Member):
+            return target_arg
+
+        try:
+            # Try to get member by ID
+            member_id = int("".join(filter(str.isdigit, target_arg)))
+            return ctx.guild.get_member(member_id)
+        except (ValueError, TypeError):
+            # If not ID, try to find member by name
+            return discord.utils.get(ctx.guild.members, name=target_arg)
+
+    async def get_voice_channel_info(self, member):
+        """Get voice channel information for a member."""
+        if not member.voice or not member.voice.channel:
+            return None
+
+        channel = member.voice.channel
+        return {
+            "name": channel.name,
+            "id": channel.id,
+            "mention": channel.mention,
+            "member_count": len(channel.members),
+        }
+
+
+def get_target_and_permission(ctx, target_arg, permission_value=None):
+    """Legacy function for backward compatibility."""
+    if isinstance(target_arg, discord.Member):
+        return target_arg, permission_value
+
+    try:
+        # Try to get member by ID
+        member_id = int("".join(filter(str.isdigit, target_arg)))
+        return ctx.guild.get_member(member_id), permission_value
+    except (ValueError, TypeError):
+        # If not ID, try to find member by name
+        return discord.utils.get(ctx.guild.members, name=target_arg), permission_value

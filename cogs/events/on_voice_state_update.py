@@ -20,7 +20,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         self.bot = bot
         self.guild = bot.get_guild(self.bot.config["guild_id"])
         self.logger = logging.getLogger(__name__)
-        self.message_sender = MessageSender()
+        self.message_sender = MessageSender(bot)
         self.channel_permission_manager = ChannelPermissionManager(bot)
         self.autokick_manager = AutoKickManager(bot)
 
@@ -145,6 +145,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             )
 
         await member.move_to(new_channel)
+
+        # Send channel creation info
+        await self.message_sender.send_channel_creation_info(new_channel, member)
 
     async def handle_channel_leave(self, before):
         """

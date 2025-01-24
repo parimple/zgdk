@@ -49,6 +49,39 @@ class VoiceChannelManager:
         limit_text = "brak limitu" if max_members == 0 else str(max_members)
         await self.message_sender.send_member_limit_set(ctx, voice_channel, limit_text)
 
+    async def get_channel_info(self, channel: discord.VoiceChannel, member: discord.Member):
+        """Get voice channel information including permissions and roles."""
+        # Lista uprawnień do sprawdzenia
+        permissions_to_check = {
+            "connect": "połączenia",
+            "speak": "mówienia",
+            "stream": "streamowania",
+            "view_channel": "widzenia kanału",
+            "send_messages": "pisania",
+        }
+
+        # Sprawdź uprawnienia dla roli @everyone
+        everyone_perms = channel.overwrites_for(channel.guild.default_role)
+
+        # Zbierz wyłączone uprawnienia
+        disabled_perms = []
+        for perm_name, perm_display in permissions_to_check.items():
+            if getattr(everyone_perms, perm_name) is False:
+                disabled_perms.append(perm_display)
+
+        # Znajdź właściciela i moderatorów kanału
+        owner = None
+        mods = []
+        for member, overwrite in channel.overwrites.items():
+            if not isinstance(member, discord.Member):
+                continue
+            if overwrite.priority_speaker:
+                owner = member
+            elif overwrite.manage_messages:
+                mods.append(member)
+
+        return {"channel": channel, "owner": owner, "mods": mods, "disabled_perms": disabled_perms}
+
 
 class ChannelModManager:
     """Manages channel moderators."""
