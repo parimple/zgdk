@@ -1,5 +1,6 @@
 """Event handler for voice state updates."""
 
+import asyncio
 import logging
 import random
 
@@ -122,14 +123,25 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             self.guild, member
         )
 
-        # Add permissions from database, if applicable
-        remaining_overwrites = (
-            await self.channel_permission_manager.add_db_overwrites_to_permissions(
-                self.guild, member.id, permission_overwrites
-            )
+        # Add permissions from database and combine them with default overwrites
+        db_overwrites = await self.channel_permission_manager.add_db_overwrites_to_permissions(
+            self.guild, member.id, permission_overwrites
         )
 
-        # Create the new channel
+        # Combine all overwrites before channel creation
+        if db_overwrites:
+            for target, overwrite in db_overwrites.items():
+                if target in permission_overwrites:
+                    # Update existing overwrite
+                    current = permission_overwrites[target]
+                    for perm, value in overwrite._values.items():
+                        if value is not None:
+                            setattr(current, perm, value)
+                else:
+                    # Add new overwrite
+                    permission_overwrites[target] = overwrite
+
+        # Create the new channel with all permissions
         new_channel = await self.guild.create_voice_channel(
             channel_name,
             category=after.channel.category,
@@ -137,12 +149,6 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             user_limit=after.channel.user_limit,
             overwrites=permission_overwrites,
         )
-
-        # Add any remaining overwrites
-        if remaining_overwrites:
-            await self.channel_permission_manager.add_remaining_overwrites(
-                new_channel, remaining_overwrites
-            )
 
         await member.move_to(new_channel)
 
