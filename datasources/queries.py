@@ -379,21 +379,27 @@ class ChannelPermissionQueries:
             ) & ~allow_permissions_value
             permission.last_updated_at = datetime.now(timezone.utc)
 
-        # Usuń najstarsze uprawnienie, jeśli przekroczono limit
+        # Count permissions excluding default ones (which are not in database)
         permissions_count = await session.scalar(
             select(func.count())
             .select_from(ChannelPermission)
             .where(ChannelPermission.member_id == member_id)
         )
+
+        # If we're about to exceed the limit
         if permissions_count > 95:
+            # Find the oldest permission that:
+            # 1. Belongs to this owner
+            # 2. Is not a moderator permission (no manage_messages)
+            # 3. Is not an @everyone permission
             oldest_permission = await session.execute(
                 select(ChannelPermission)
                 .where(
                     (ChannelPermission.member_id == member_id)
-                    & (ChannelPermission.allow_permissions_value.bitwise_and(0x00002000) == 0)
-                    & (  # not manage_messages
-                        ChannelPermission.target_id != guild_id
-                    )  # not everyone permissions
+                    & (
+                        ChannelPermission.allow_permissions_value.bitwise_and(0x00002000) == 0
+                    )  # not manage_messages
+                    & (ChannelPermission.target_id != guild_id)  # not @everyone
                 )
                 .order_by(ChannelPermission.last_updated_at.asc())
                 .limit(1)
@@ -401,6 +407,9 @@ class ChannelPermissionQueries:
             oldest_permission = oldest_permission.scalar_one_or_none()
             if oldest_permission:
                 await session.delete(oldest_permission)
+                logger.info(
+                    f"Deleted oldest permission for member {member_id} (target: {oldest_permission.target_id})"
+                )
 
     @staticmethod
     async def remove_permission(session: AsyncSession, member_id: int, target_id: int):
