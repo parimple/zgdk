@@ -62,7 +62,7 @@ premium_roles:
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "50% więcej punktów do aktywności"
     team_size: 0
-    moderator_count: 0
+    moderator_count: 1
     points_multiplier: 50   # +50% punktów
     emojis_access: false     # Dostęp do emotek
     override_limit: true
@@ -79,7 +79,7 @@ premium_roles:
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "100% więcej punktów do aktywności"
     team_size: 10
-    moderator_count: 1
+    moderator_count: 2
     points_multiplier: 100  # +100% punktów
     emojis_access: false     # Dostęp do emotek
     override_limit: true
@@ -98,7 +98,7 @@ premium_roles:
       - "200% więcej punktów do aktywności"
       - "Autokick 1 osoby na każdym kanale"
     team_size: 30
-    moderator_count: 5
+    moderator_count: 3
     points_multiplier: 200  # +20% punktów
     emojis_access: false    # Dostęp do emotek
     override_limit: false
@@ -119,7 +119,7 @@ premium_roles:
       - "300% więcej punktów do aktywności"
       - "Autokick 3 osób na każdym kanale"
     team_size: 50
-    moderator_count: 6
+    moderator_count: 5
     points_multiplier: 400  # +400% punktów
     emojis_access: false     # Dostęp do emotek
     override_limit: false
