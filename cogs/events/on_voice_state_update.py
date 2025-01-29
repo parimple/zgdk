@@ -114,9 +114,19 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             channel_name = formats[format_key].format(emoji=emoji)
             logger.info(f"Using format for category {category_id}: {channel_name}")
         else:
-            logger.info(
-                f"No format found for category {category_id}, using default name: {channel_name}"
+            # Check if this is a git category
+            git_categories = (
+                self.bot.config.get("default_user_limits", {})
+                .get("git_categories", {})
+                .get("categories", [])
             )
+            if category_id in git_categories:
+                channel_name = f"- {channel_name}"
+                logger.info(f"Added dash prefix for git category: {channel_name}")
+            else:
+                logger.info(
+                    f"No format found for category {category_id}, using default name: {channel_name}"
+                )
 
         # Get default permission overwrites
         permission_overwrites = self.permission_manager.get_default_permission_overwrites(
