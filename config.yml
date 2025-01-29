@@ -51,6 +51,47 @@ vc_categories:
   - 1325440479499649075  # max4
   - 1325440557161648160  # max5
 
+# Kategorie gdzie @everyone ma mieć czyste permisje
+clean_permission_categories:
+  - 1325439940351229962  # publ
+  - 1325440354648068206  # max2
+  - 1325440407605346335  # max3
+  - 1325440479499649075  # max4
+  - 1325440557161648160  # max5
+
+# Domyślne limity użytkowników dla różnych typów kanałów
+default_user_limits:
+  git_categories:
+    categories:
+      - 1325436667359662100  # git ultra
+      - 1325436219714441267  # git pro
+      - 1325435639260516442  # git plus
+      - 960665318475325454   # git
+    limit: 99
+  public_categories:
+    categories:
+      - 1325439940351229962  # publ
+    limit: 99
+  max_categories:
+    max2:
+      id: 1325440354648068206
+      limit: 2
+    max3:
+      id: 1325440407605346335
+      limit: 3
+    max4:
+      id: 1325440479499649075
+      limit: 4
+    max5:
+      id: 1325440557161648160
+      limit: 5
+
+max_channels_categories:
+  - 1325440354648068206  # max2
+  - 1325440407605346335  # max3
+  - 1325440479499649075  # max4
+  - 1325440557161648160  # max5
+
 premium_roles:
   - name: "zG50"
     premium: "Git"

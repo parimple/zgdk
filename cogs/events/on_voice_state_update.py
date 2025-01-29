@@ -7,9 +7,9 @@ import random
 import discord
 from discord.ext import commands
 
-from utils.channel_permissions import ChannelPermissionManager
 from utils.message_sender import MessageSender
 from utils.voice.autokick import AutoKickManager
+from utils.voice.permissions import VoicePermissionManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         self.guild = bot.get_guild(self.bot.config["guild_id"])
         self.logger = logging.getLogger(__name__)
         self.message_sender = MessageSender(bot)
-        self.channel_permission_manager = ChannelPermissionManager(bot)
+        self.permission_manager = VoicePermissionManager(bot)
         self.autokick_manager = AutoKickManager(bot)
 
         self.channels_create = self.bot.config["channels_create"]
@@ -119,16 +119,47 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             )
 
         # Get default permission overwrites
-        permission_overwrites = self.channel_permission_manager.get_default_permission_overwrites(
+        permission_overwrites = self.permission_manager.get_default_permission_overwrites(
             self.guild, member
         )
 
-        # Add permissions from database and combine them with default overwrites
-        db_overwrites = await self.channel_permission_manager.add_db_overwrites_to_permissions(
-            self.guild, member.id, permission_overwrites
+        # Get user limit based on category
+        user_limit = 0
+        if category_id:
+            config = self.bot.config.get("default_user_limits", {})
+
+            # Sprawdź kategorie git i public
+            for cat_type in ["git_categories", "public_categories"]:
+                cat_config = config.get(cat_type, {})
+                if category_id in cat_config.get("categories", []):
+                    user_limit = cat_config.get("limit", 0)
+                    logger.info(f"Setting {cat_type} limit: {user_limit}")
+                    break
+
+            # Sprawdź kategorie max
+            if user_limit == 0:  # jeśli nie znaleziono limitu w git/public
+                max_categories = config.get("max_categories", {})
+                for max_type, max_config in max_categories.items():
+                    if category_id == max_config.get("id"):
+                        user_limit = max_config.get("limit", 0)
+                        logger.info(f"Setting max channel limit for {max_type}: {user_limit}")
+                        break
+
+        # Check if this is a clean permissions category (max/public)
+        is_clean_perms = category_id in self.bot.config.get("clean_permission_categories", [])
+        if is_clean_perms:
+            # Set clean permissions for @everyone
+            permission_overwrites[
+                self.guild.default_role
+            ] = self.permission_manager._get_clean_everyone_permissions()
+            logger.info(f"Set clean permissions for @everyone in category {category_id}")
+
+        # Add permissions from database (always, except @everyone for clean_perms categories)
+        db_overwrites = await self.permission_manager.add_db_overwrites_to_permissions(
+            self.guild, member.id, permission_overwrites, is_clean_perms=is_clean_perms
         )
 
-        # Combine all overwrites before channel creation
+        # Combine all overwrites
         if db_overwrites:
             for target, overwrite in db_overwrites.items():
                 if target in permission_overwrites:
@@ -141,15 +172,16 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                     # Add new overwrite
                     permission_overwrites[target] = overwrite
 
-        # Create the new channel with all permissions
+        # Create the new channel with all permissions and limits
         new_channel = await self.guild.create_voice_channel(
             channel_name,
             category=after.channel.category,
             bitrate=self.guild.bitrate_limit,
-            user_limit=after.channel.user_limit,
+            user_limit=user_limit,
             overwrites=permission_overwrites,
         )
 
+        # Move member to the new channel
         await member.move_to(new_channel)
 
         # Send channel creation info

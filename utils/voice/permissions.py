@@ -160,22 +160,38 @@ class BasePermissionCommand:
             message_parts = ctx.message.content.split()
             logger.info(f"Processing text command parts: {message_parts}")
 
-            if len(message_parts) > 2:
-                # Jeśli drugi argument to + lub -, zamieniamy miejscami argumenty
-                if message_parts[1] in ["+", "-"]:
-                    # Pobierz target z trzeciego argumentu - użyj discord.utils.get
+            if len(message_parts) > 1:
+                # Sprawdź drugi argument
+                second_arg = message_parts[1]
+
+                # Jeśli drugi argument to + lub - i nie ma trzeciego argumentu
+                if second_arg in ["+", "-"] and len(message_parts) == 2:
+                    target = ctx.guild.default_role
+                    permission_value = second_arg
+                    self.logger.info(f"Setting @everyone permission to {permission_value}")
+
+                # Jeśli drugi argument to + lub - i jest trzeci argument (mention)
+                elif second_arg in ["+", "-"] and len(message_parts) > 2:
                     mention = message_parts[2]
-                    # Usuń <@! lub <@ i > z ID
                     user_id = "".join(filter(str.isdigit, mention))
                     target = ctx.guild.get_member(int(user_id)) if user_id else None
-                    permission_value = message_parts[1]  # Ustaw permission_value na znak + lub -
-                    logger.info(
-                        f"Extracted user_id: {user_id}, found member: {target}, permission: {permission_value}"
-                    )
-                elif message_parts[2] in ["+", "-"]:
-                    permission_value = message_parts[2]
-            elif len(message_parts) > 1 and message_parts[1] in ["+", "-"]:
-                permission_value = message_parts[1]
+                    permission_value = second_arg
+                    logger.info(f"Setting permission {permission_value} for user {target}")
+
+                # Jeśli drugi argument to mention
+                elif second_arg.startswith("<@"):
+                    user_id = "".join(filter(str.isdigit, second_arg))
+                    target = ctx.guild.get_member(int(user_id)) if user_id else None
+                    # Sprawdź czy jest trzeci argument (+ lub -)
+                    if len(message_parts) > 2 and message_parts[2] in ["+", "-"]:
+                        permission_value = message_parts[2]
+                    logger.info(f"Setting permission for user {target} to {permission_value}")
+
+            elif len(message_parts) == 1:
+                # Jeśli jest tylko komenda, domyślnie dla @everyone
+                target = ctx.guild.default_role
+                permission_value = None
+                self.logger.info("No arguments provided, defaulting to @everyone toggle")
 
         logger.info(f"Final target: {target}, permission_value: {permission_value}")  # Debug log
         return target, permission_value
@@ -229,6 +245,85 @@ class VoicePermissionManager:
         self.message_sender = MessageSender()
         self.logger = logging.getLogger(__name__)
 
+    def get_default_permission_overwrites(
+        self, guild: discord.Guild, owner: discord.Member
+    ) -> dict:
+        """
+        Get the default permission overwrites for a voice channel.
+
+        Args:
+            guild: The guild to get roles from
+            owner: The channel owner to set permissions for
+
+        Returns:
+            dict: A dictionary of permission overwrites
+        """
+        # Initialize mute roles dictionary
+        mute_roles = {
+            role["description"]: guild.get_role(role["id"])
+            for role in self.bot.config["mute_roles"]
+        }
+
+        # Set up permission overwrites
+        return {
+            mute_roles["stream_off"]: PermissionOverwrite(stream=False),
+            mute_roles["send_messages_off"]: PermissionOverwrite(send_messages=False),
+            mute_roles["attach_files_off"]: PermissionOverwrite(
+                attach_files=False, embed_links=False, external_emojis=False
+            ),
+            owner: PermissionOverwrite(
+                view_channel=True,
+                connect=True,
+                speak=True,
+                priority_speaker=True,
+                manage_messages=True,
+            ),
+        }
+
+    def _get_clean_everyone_permissions(self) -> PermissionOverwrite:
+        """Get clean/default permissions for @everyone role in max/public channels."""
+        return PermissionOverwrite(
+            view_channel=None,
+            connect=None,
+            speak=None,
+            stream=None,
+            use_voice_activation=None,
+            priority_speaker=None,
+            mute_members=None,
+            deafen_members=None,
+            move_members=None,
+            manage_messages=None,
+            send_messages=None,
+            embed_links=None,
+            attach_files=None,
+            add_reactions=None,
+            external_emojis=None,
+            manage_channels=None,
+            create_instant_invite=None,
+        )
+
+    def _get_default_user_limit(self, category_id: int) -> int:
+        """Get default user limit for a channel based on its category."""
+        config = self.bot.config.get("default_user_limits", {})
+
+        # Sprawdź kategorie git i public
+        for cat_type in ["git_categories", "public_categories"]:
+            cat_config = config.get(cat_type, {})
+            if category_id in cat_config.get("categories", []):
+                self.logger.info(f"Found {cat_type} limit: {cat_config.get('limit', 0)}")
+                return cat_config.get("limit", 0)
+
+        # Sprawdź kategorie max
+        max_categories = config.get("max_categories", {})
+        for max_type, max_config in max_categories.items():
+            if category_id == max_config.get("id"):
+                limit = max_config.get("limit", 0)
+                self.logger.info(f"Found max channel limit for {max_type}: {limit}")
+                return limit
+
+        self.logger.info(f"No limit found for category {category_id}")
+        return 0  # Domyślnie brak limitu
+
     async def modify_channel_permission(
         self,
         ctx,
@@ -245,6 +340,37 @@ class VoicePermissionManager:
         )
 
         current_channel = ctx.author.voice.channel
+
+        # Special handling for @everyone role in channels that should have clean permissions
+        if isinstance(target, discord.Role) and target.id == ctx.guild.id:
+            if current_channel.category and current_channel.category.id in self.bot.config.get(
+                "clean_permission_categories", []
+            ):
+                current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
+                current_value = getattr(current_perms, permission_flag, None)
+                self.logger.info(f"Current @everyone permission value: {current_value}")
+
+                # Determine new value based on input
+                if value is None:
+                    # Toggle logic: None -> False, False -> True, True -> False
+                    if current_value is None:
+                        new_value = False
+                    elif current_value is False:
+                        new_value = True
+                    else:
+                        new_value = False
+                else:
+                    # Direct setting with + or -
+                    new_value = True if value == "+" else False
+
+                self.logger.info(f"Setting @everyone {permission_flag} to {new_value}")
+                setattr(current_perms, permission_flag, new_value)
+                await current_channel.set_permissions(target, overwrite=current_perms)
+                await self.message_sender.send_permission_update(
+                    ctx, target, permission_flag, new_value
+                )
+                return
+
         current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
 
         new_value = self._determine_new_permission_value(
@@ -424,11 +550,36 @@ class VoicePermissionManager:
             channel: The voice channel to sync permissions to
             is_public: If True, don't sync permissions from database (for public channels)
         """
+        # Ustaw domyślny limit użytkowników
+        if channel.category:
+            user_limit = self._get_default_user_limit(channel.category.id)
+            if user_limit > 0:
+                self.logger.info(
+                    f"Setting user limit to {user_limit} for channel in category {channel.category.id}"
+                )
+                try:
+                    await channel.edit(user_limit=user_limit)
+                except Exception as e:
+                    self.logger.error(f"Failed to set user limit: {str(e)}", exc_info=True)
+
+        # Sprawdź czy kanał jest w kategorii gdzie @everyone ma mieć czyste permisje
+        clean_perms_category = channel.category and channel.category.id in self.bot.config.get(
+            "clean_permission_categories", []
+        )
+        if clean_perms_category:
+            # Ustaw czyste permisje dla @everyone
+            clean_perms = self._get_clean_everyone_permissions()
+            try:
+                await channel.set_permissions(channel.guild.default_role, overwrite=clean_perms)
+                self.logger.info(f"Set clean permissions for @everyone in channel {channel.name}")
+            except Exception as e:
+                self.logger.error(f"Failed to set clean permissions: {str(e)}", exc_info=True)
+
         # Dla kanałów publicznych nie synchronizujemy uprawnień z bazy
         if is_public:
             return
 
-        # Dla kanałów prywatnych synchronizujemy wszystkie uprawnienia
+        # Dla kanałów prywatnych synchronizujemy uprawnienia z bazy
         async with self.bot.get_db() as session:
             # Pobierz wszystkie uprawnienia z bazy dla tego właściciela
             db_permissions = await ChannelPermissionQueries.get_permissions_for_member(
@@ -437,6 +588,13 @@ class VoicePermissionManager:
 
             # Dla każdego uprawnienia w bazie
             for perm in db_permissions:
+                # Pomijamy uprawnienia dla roli @everyone dla kanałów z czystymi permisjami
+                if perm.target_id == channel.guild.id and clean_perms_category:
+                    self.logger.info(
+                        f"Skipping @everyone permissions from DB for channel {channel.name} in clean perms category"
+                    )
+                    continue
+
                 target = ctx.guild.get_member(perm.target_id)
                 if target:
                     # Konwertuj bity uprawnień na obiekt PermissionOverwrite
@@ -453,3 +611,65 @@ class VoicePermissionManager:
 
                     # Ustaw uprawnienia na kanale
                     await channel.set_permissions(target, overwrite=overwrite)
+
+    async def add_db_overwrites_to_permissions(
+        self,
+        guild: discord.Guild,
+        member_id: int,
+        permission_overwrites: dict,
+        is_clean_perms: bool = False,
+    ) -> dict:
+        """
+        Fetch permissions from the database and add them to the provided permission_overwrites dict.
+
+        Args:
+            guild: The guild to get members/roles from
+            member_id: The ID of the member whose permissions to fetch
+            permission_overwrites: The existing permission overwrites to add to
+            is_clean_perms: Whether this is a channel that should have clean @everyone permissions
+
+        Returns:
+            dict: Additional overwrites that couldn't be added to the main dict
+        """
+        remaining_overwrites = {}
+        async with self.bot.get_db() as session:
+            member_permissions = await ChannelPermissionQueries.get_permissions_for_member(
+                session, member_id, limit=95
+            )
+            self.logger.info(
+                f"Found {len(member_permissions)} permissions in database for member {member_id}"
+            )
+
+        for permission in member_permissions:
+            # Skip @everyone permissions for clean_perms channels
+            if is_clean_perms and permission.target_id == guild.id:
+                self.logger.info(f"Skipping @everyone permissions from DB for clean perms channel")
+                continue
+
+            allow_permissions = discord.Permissions(permission.allow_permissions_value)
+            deny_permissions = discord.Permissions(permission.deny_permissions_value)
+            overwrite = PermissionOverwrite.from_pair(allow_permissions, deny_permissions)
+            self.logger.info(
+                f"Processing permission for target {permission.target_id}: "
+                f"allow={permission.allow_permissions_value}, deny={permission.deny_permissions_value}"
+            )
+
+            # Convert target_id to appropriate Discord object
+            target = guild.get_member(permission.target_id) or guild.get_role(permission.target_id)
+            if target:
+                if target in permission_overwrites:
+                    # If target already exists in main permissions, add new permissions to it
+                    # Skip @everyone for clean_perms channels
+                    if not (is_clean_perms and target == guild.default_role):
+                        for key, value in overwrite._values.items():
+                            if value is not None:
+                                setattr(permission_overwrites[target], key, value)
+                                self.logger.info(
+                                    f"Updated existing permission {key}={value} for {target}"
+                                )
+                else:
+                    # If target doesn't exist in main permissions, add to remaining
+                    remaining_overwrites[target] = overwrite
+                    self.logger.info(f"Added to remaining overwrites for {target}")
+
+        return remaining_overwrites

@@ -393,11 +393,21 @@ class MessageSender:
 
     @staticmethod
     async def send_error(ctx, message: str):
-        """Send an error message."""
+        """Sends an error message."""
         embed = MessageSender._create_embed(
             title="Błąd",
             description=message,
             color="error",
+        )
+        await MessageSender._send_embed(ctx, embed)
+
+    @staticmethod
+    async def send_success(ctx, message: str):
+        """Sends a success message."""
+        embed = MessageSender._create_embed(
+            title="Sukces",
+            description=message,
+            color="success",
         )
         await MessageSender._send_embed(ctx, embed)
 
