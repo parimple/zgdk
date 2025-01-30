@@ -231,7 +231,13 @@ class TipplyDataProvider(DataProvider):
                     name = div.find("span", {"data-element": "nickname"}).text
                     amount_str = div.find("span", {"data-element": "price"}).text.replace(",", ".")
                     amount_str = amount_str.replace(" zł", "")
-                    amount = int(round(float(amount_str), 2) * 100)
+                    # Konwertujemy na grosze, zaokrąglamy w górę jeśli >= 99 groszy, w dół jeśli mniej
+                    amount_groszy = round(float(amount_str) * 100)
+                    amount = (
+                        (amount_groszy + 99) // 100
+                        if amount_groszy % 100 >= 99
+                        else amount_groszy // 100
+                    )
                     payment_time = datetime.now(timezone.utc)
                     payment_data = PaymentData(name, amount, payment_time, self.payment_type)
                     payments.append(payment_data)

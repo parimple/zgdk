@@ -74,20 +74,15 @@ class OnPaymentEvent(commands.Cog):
             logger.error("Donation channel not found: %s", channel_id)
             return
 
-        # Konwersja kwoty na G (10 zł = 10G)
-        amount_g = int(payment_data.amount / 100 + 0.99)  # Zaokrąglanie w górę
-        amount_old = payment_data.amount  # Zachowujemy oryginalną kwotę w groszach dla rang $
         member = await self.premium_manager.get_member(payment_data.name)
         if member is None:
             logger.error("Member not found: %s", payment_data.name)
             return
 
         logger.info(
-            f"Handling payment for {member.display_name} with amount {amount_g}G ({amount_old} groszy)"
+            f"Handling payment for {member.display_name} with amount {payment_data.amount}G"
         )
-        await self.assign_temporary_roles(
-            session, member, amount_g
-        )  # Przekazujemy oryginalną kwotę
+        await self.assign_temporary_roles(session, member, payment_data.amount)
         await self.remove_mute_roles(member)
 
         owner_id = self.bot.config.get("owner_id")
@@ -95,7 +90,7 @@ class OnPaymentEvent(commands.Cog):
 
         embed = discord.Embed(
             title="Gratulacje!",
-            description=f"Twoje konto zostało pomyślnie zasilone {amount_g}{CURRENCY_UNIT}!",
+            description=f"Twoje konto zostało pomyślnie zasilone {payment_data.amount}{CURRENCY_UNIT}!",
             color=discord.Color.green(),
         )
         embed.set_image(url=self.bot.config["gifs"]["donation"])
