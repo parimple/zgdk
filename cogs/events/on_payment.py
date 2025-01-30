@@ -5,12 +5,13 @@ On Payments Event Cog
 import asyncio
 import logging
 import os
-from datetime import timedelta
+import random
+from datetime import datetime, timedelta, timezone
 
 import discord
 from discord.ext import commands, tasks
 
-from datasources.queries import RoleQueries
+from datasources.queries import MemberQueries, RoleQueries
 from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager, TipplyDataProvider
 
@@ -18,13 +19,19 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TIPO_API_TOKEN")
 
+# Flaga do łatwego wyłączenia starego systemu po testach
+LEGACY_SYSTEM_ENABLED = True
+
+# Mapowanie starych kwot na nowe
+LEGACY_AMOUNTS = {15: 49, 25: 99, 45: 499, 85: 999}  # zG50  # zG100  # zG500  # zG1000
+
 
 class OnPaymentEvent(commands.Cog):
     """Class for the Tipo Payments Cog"""
 
     def __init__(self, bot):
         self.bot = bot
-        self.guild = bot.guild
+        self.guild = None
         self.premium_manager = PremiumManager(bot)
         self.data_provider = TipplyDataProvider(bot.get_db)
         self.check_payments.start()  # pylint: disable=no-member
@@ -36,13 +43,11 @@ class OnPaymentEvent(commands.Cog):
     @tasks.loop(minutes=1.0)
     async def check_payments(self):
         """Check Payments"""
-        # logger.info("Checking for new payments")
         try:
             async with self.bot.get_db() as session:
                 payments_data = await self.data_provider.get_data(session)
                 if payments_data:
                     logger.info("Found %s new payments", len(payments_data))
-
                 for payment_data in payments_data:
                     try:
                         await self.premium_manager.process_data(session, payment_data)
@@ -54,8 +59,6 @@ class OnPaymentEvent(commands.Cog):
                         await session.rollback()
         except Exception as e:
             logger.error(f"Error in check_payments: {str(e)}")
-        # finally:
-        #     logger.info("Finished checking for payments")
 
     @check_payments.before_loop
     async def before_check_payments(self):
@@ -64,6 +67,13 @@ class OnPaymentEvent(commands.Cog):
         if self.guild is None:
             logger.info("Guild is not set, fetching from bot")
             self.guild = self.bot.get_guild(self.bot.guild_id)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Set guild when bot is ready"""
+        self.guild = self.bot.get_guild(self.bot.config["guild_id"])
+        if not self.guild:
+            logger.error("Guild not found")
 
     async def handle_payment(self, session, payment_data):
         """Handle a single payment and send notification"""
@@ -79,20 +89,220 @@ class OnPaymentEvent(commands.Cog):
             logger.error("Member not found: %s", payment_data.name)
             return
 
-        logger.info(
-            f"Handling payment for {member.display_name} with amount {payment_data.amount}G"
-        )
-        await self.assign_temporary_roles(session, member, payment_data.amount)
-        await self.remove_mute_roles(member)
+        # Initialize variables
+        original_amount = payment_data.amount
+        amount = original_amount
+        converted_amount = None
+        premium_role = None  # Initialize premium_role here
 
+        # Initialize owner and embed variables
         owner_id = self.bot.config.get("owner_id")
         owner = self.guild.get_member(owner_id)
+        embed = None
 
-        embed = discord.Embed(
-            title="Gratulacje!",
-            description=f"Twoje konto zostało pomyślnie zasilone {payment_data.amount}{CURRENCY_UNIT}!",
-            color=discord.Color.green(),
-        )
+        # 1. Najpierw przydziel role tymczasowe na podstawie oryginalnej kwoty
+        await self.assign_temporary_roles(session, member, original_amount)
+
+        # 2. Sprawdź czy kwota podlega konwersji legacy
+        legacy_config = self.bot.config.get("legacy_system", {})
+        if legacy_config.get("enabled", False):
+            legacy_amounts = legacy_config.get("amounts", {})
+            logger.info(f"Checking legacy conversion for amount {original_amount}")
+            logger.info(f"Available legacy amounts: {legacy_amounts}")
+
+            # Sprawdź czy kwota jest w legacy_amounts
+            if original_amount in legacy_amounts:
+                # Losowo decyduj czy dodać 1 do kwoty (50/50 szansa)
+                add_one = random.choice([True, False])
+                converted_amount = legacy_amounts[original_amount] + (1 if add_one else 0)
+                amount = converted_amount  # Użyj przekonwertowanej kwoty do operacji premium
+                logger.info(
+                    f"Legacy amount converted: {original_amount} -> {converted_amount} (add_one={add_one})"
+                )
+
+                # Dodatkowy log dla debugowania
+                logger.info(f"Using converted amount {amount} for premium role check")
+
+        # 3. Sprawdź role premium
+        # Najpierw sprawdź przekonwertowaną kwotę, jeśli istnieje
+        if converted_amount is not None:
+            for role_config in self.bot.config["premium_roles"]:
+                if converted_amount in [role_config["price"], role_config["price"] + 1]:
+                    premium_role = role_config
+                    logger.info(
+                        f"Found matching premium role: {role_config['name']} for converted amount {converted_amount}"
+                    )
+                    break
+
+        # Jeśli nie znaleziono roli premium dla przekonwertowanej kwoty, sprawdź oryginalną
+        if premium_role is None:
+            for role_config in self.bot.config["premium_roles"]:
+                if amount in [role_config["price"], role_config["price"] + 1]:
+                    premium_role = role_config
+                    logger.info(
+                        f"Found matching premium role: {role_config['name']} for amount {amount}"
+                    )
+                    break
+
+        # 4. Przetwórz rolę premium jeśli została znaleziona
+        if premium_role:
+            logger.info(f"Processing premium role: {premium_role['name']}")
+            role = discord.utils.get(self.guild.roles, name=premium_role["name"])
+            if not role:
+                logger.error(f"Role {premium_role['name']} not found")
+                embed = discord.Embed(
+                    title="Błąd",
+                    description="Wystąpił błąd podczas przydzielania roli premium. Skontaktuj się z administracją.",
+                    color=discord.Color.red(),
+                )
+            else:
+                current_premium_role = await RoleQueries.get_member_role(
+                    session, member.id, role.id
+                )
+
+                # Sprawdź czy to przedłużenie tej samej roli
+                if current_premium_role and role in member.roles:
+                    logger.info(
+                        f"Found existing premium role {role.name} for member {member.display_name}"
+                    )
+                    days_left = (
+                        current_premium_role.expiration_date - datetime.now(timezone.utc)
+                    ).days
+                    logger.info(f"Current premium role {role.name} has {days_left} days left")
+
+                    # Sprawdź czy to kwota upgradu i czy rola kwalifikuje się do upgradu
+                    can_upgrade = False
+                    if role.name == "zG50" and amount == 50 and 29 <= days_left <= 33:
+                        # Próba upgradu do zG100
+                        upgrade_role = discord.utils.get(self.guild.roles, name="zG100")
+                        if upgrade_role:
+                            await member.remove_roles(role)
+                            await RoleQueries.delete_member_role(session, member.id, role.id)
+                            await member.add_roles(upgrade_role)
+                            await RoleQueries.add_role_to_member(
+                                session, member.id, upgrade_role.id, timedelta(days=days_left)
+                            )
+                            await session.commit()
+                            embed = discord.Embed(
+                                title="Gratulacje!",
+                                description=f"Ulepszono twoją rolę z {role.name} na zG100!",
+                                color=discord.Color.green(),
+                            )
+                            can_upgrade = True
+                    elif role.name == "zG100" and amount == 400 and 29 <= days_left <= 33:
+                        # Próba upgradu do zG500 (bo 99 + 400 = 499)
+                        upgrade_role = discord.utils.get(self.guild.roles, name="zG500")
+                        if upgrade_role:
+                            await member.remove_roles(role)
+                            await RoleQueries.delete_member_role(session, member.id, role.id)
+                            await member.add_roles(upgrade_role)
+                            await RoleQueries.add_role_to_member(
+                                session, member.id, upgrade_role.id, timedelta(days=days_left)
+                            )
+                            await session.commit()
+                            embed = discord.Embed(
+                                title="Gratulacje!",
+                                description=f"Ulepszono twoją rolę z {role.name} na zG500!",
+                                color=discord.Color.green(),
+                            )
+                            can_upgrade = True
+                    elif role.name == "zG500" and amount == 500 and 29 <= days_left <= 33:
+                        # Próba upgradu do zG1000 (bo 499 + 500 = 999)
+                        upgrade_role = discord.utils.get(self.guild.roles, name="zG1000")
+                        if upgrade_role:
+                            await member.remove_roles(role)
+                            await RoleQueries.delete_member_role(session, member.id, role.id)
+                            await member.add_roles(upgrade_role)
+                            await RoleQueries.add_role_to_member(
+                                session, member.id, upgrade_role.id, timedelta(days=days_left)
+                            )
+                            await session.commit()
+                            embed = discord.Embed(
+                                title="Gratulacje!",
+                                description=f"Ulepszono twoją rolę z {role.name} na zG1000!",
+                                color=discord.Color.green(),
+                            )
+                            can_upgrade = True
+
+                    # Jeśli nie można zrobić upgradu, sprawdź czy to przedłużenie
+                    if not can_upgrade:
+                        # Sprawdź czy kwota odpowiada przedłużeniu aktualnej roli
+                        role_extension_amounts = {
+                            "zG50": [49, 50],  # 50 przedłuża jeśli nie można zrobić upgradu
+                            "zG100": [99, 100],  # 100 przedłuża i daje +1G
+                            "zG500": [499, 500],  # 500 przedłuża i daje +1G
+                            "zG1000": [999, 1000],  # 1000 przedłuża i daje +1G
+                        }
+
+                        if amount in role_extension_amounts.get(role.name, []):
+                            logger.info(
+                                f"Amount {amount} matches extension amount for role {role.name}"
+                            )
+                            logger.info(
+                                f"Checking extension days for role {role.name}. Current days_left: {days_left}"
+                            )
+                            extension_days = 33 if days_left < 1 or days_left >= 29 else 30
+                            logger.info(
+                                f"Decided to extend role {role.name} by {extension_days} days (days_left < 1: {days_left < 1}, days_left > 29: {days_left > 29})"
+                            )
+
+                            await RoleQueries.update_role_expiration_date(
+                                session, member.id, role.id, timedelta(days=extension_days)
+                            )
+
+                            # Dodaj 1G jeśli zapłacił więcej
+                            bonus_msg = ""
+                            if amount > premium_role["price"]:
+                                await MemberQueries.add_to_wallet_balance(session, member.id, 1)
+                                bonus_msg = f" Dodatkowo otrzymujesz 1{CURRENCY_UNIT}."
+
+                            await session.commit()
+
+                            bonus_time_msg = " (10% czasu gratis!)" if extension_days == 33 else ""
+                            embed = discord.Embed(
+                                title="Gratulacje!",
+                                description=f"Przedłużyłeś rolę {role.name} o {extension_days} dni{bonus_time_msg}!{bonus_msg}",
+                                color=discord.Color.green(),
+                            )
+
+                # Standardowe nadanie roli jeśli nie ma żadnej
+                elif role not in member.roles:
+                    await RoleQueries.add_role_to_member(
+                        session, member.id, role.id, timedelta(days=30)
+                    )
+
+                    # Dodaj 1G tylko jeśli zapłacił więcej niż cena roli
+                    bonus_msg = ""
+                    if amount > premium_role["price"]:
+                        await MemberQueries.add_to_wallet_balance(session, member.id, 1)
+                        bonus_msg = f" Dodatkowo otrzymujesz 1{CURRENCY_UNIT}."
+
+                    await member.add_roles(role)
+                    await session.commit()
+
+                    embed = discord.Embed(
+                        title="Gratulacje!",
+                        description=f"Zakupiłeś rolę {role.name}!{bonus_msg}",
+                        color=discord.Color.green(),
+                    )
+
+                await self.remove_mute_roles(member)
+
+        # Jeśli nie ma roli premium lub embed nie został ustawiony
+        if embed is None:
+            # Użyj przekonwertowanej kwoty w wiadomości jeśli była konwersja
+            amount_to_display = (
+                converted_amount if converted_amount is not None else original_amount
+            )
+            logger.info(
+                f"Handling payment for {member.display_name} with amount {amount_to_display}G"
+            )
+            embed = discord.Embed(
+                title="Gratulacje!",
+                description=f"Twoje konto zostało pomyślnie zasilone {amount_to_display}{CURRENCY_UNIT}!",
+                color=discord.Color.green(),
+            )
+
         embed.set_image(url=self.bot.config["gifs"]["donation"])
 
         view = discord.ui.View()
@@ -116,20 +326,8 @@ class OnPaymentEvent(commands.Cog):
         if owner:
             await message.reply(f"{owner.mention}")
 
-    async def assign_temporary_roles(self, session, member, amount_g):
+    async def assign_temporary_roles(self, session, member, amount):
         """Assign all applicable temporary roles based on donation amount"""
-        # Sprawdź i usuń nieaktualne role z bazy danych
-        premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
-        for member_role, role in premium_roles:
-            if role.id not in [r.id for r in member.roles]:
-                # Jeśli rola jest w bazie, ale nie ma jej na Discord, usuń z bazy
-                await session.delete(member_role)
-        await session.flush()
-
-        # Create a set of role IDs the member currently has
-        member_role_ids = {role.id for role in member.roles}
-
-        # Log the member's roles before assignment for debugging
         logger.info(
             f"Member {member.display_name} roles before assignment: {[r.name for r in member.roles]}"
         )
@@ -144,34 +342,42 @@ class OnPaymentEvent(commands.Cog):
             (640, "$128"),
         ]
 
-        delay_after_roles = ["$4", "$8"]
         last_assigned_role = None
-
-        for amount, role_name in roles_tiers:
-            logger.info("Checking if %d >= %d for role %s", amount_g, amount, role_name)
-            if amount_g >= amount:
+        for amount_required, role_name in roles_tiers:
+            logger.info(f"Checking if {amount} >= {amount_required} for role {role_name}")
+            if amount >= amount_required:
                 role = discord.utils.get(self.guild.roles, name=role_name)
                 if role:
-                    logger.info("Found role %s for %s", role_name, member.display_name)
+                    logger.info(f"Found role {role_name} for {member.display_name}")
                     try:
-                        await RoleQueries.add_or_update_role_to_member(
-                            session, member.id, role.id, timedelta(days=30)
+                        # Sprawdź czy rola już istnieje i ile dni zostało
+                        current_role = await RoleQueries.get_member_role(
+                            session, member.id, role.id
                         )
-                        if role.id not in member_role_ids:
-                            try:
-                                await member.add_roles(role)
+                        days_to_add = 30
+
+                        if current_role and role in member.roles:
+                            days_left = (
+                                current_role.expiration_date - datetime.now(timezone.utc)
+                            ).days
+                            if days_left < 1 or days_left > 29:
+                                days_to_add = 33
                                 logger.info(
-                                    "Assigned role %s to member %s", role_name, member.display_name
+                                    f"Role {role_name} has {days_left} days left, extending by {days_to_add} days"
                                 )
-                            except Exception as e:
-                                logger.error(
-                                    f"Error adding role {role_name} to member {member.display_name}: {str(e)}"
-                                )
+
+                        await RoleQueries.add_or_update_role_to_member(
+                            session, member.id, role.id, timedelta(days=days_to_add)
+                        )
+
+                        if role not in member.roles:
+                            await member.add_roles(role)
+                            logger.info(
+                                f"Assigned role {role_name} to member {member.display_name}"
+                            )
                         else:
                             logger.info(
-                                "Updated expiration for role %s of member %s",
-                                role_name,
-                                member.display_name,
+                                f"Updated expiration for role {role_name} of member {member.display_name} to {days_to_add} days"
                             )
                         last_assigned_role = role_name
                     except Exception as e:
@@ -179,18 +385,15 @@ class OnPaymentEvent(commands.Cog):
                             f"Error assigning/updating role {role_name} to member {member.display_name}: {str(e)}"
                         )
                 else:
-                    logger.error("Role %s not found in the guild", role_name)
+                    logger.error(f"Role {role_name} not found in the guild")
             else:
-                logger.info("Amount %d is not enough for role %s", amount_g, role_name)
+                logger.info(f"Amount {amount} is not enough for role {role_name}")
 
-            if last_assigned_role in delay_after_roles:
-                await self.delay_before_next_role()
+            # Czekaj 5 sekund tylko po rolach $4 i $8
+            if last_assigned_role in ["$4", "$8"]:
+                logger.info("Waiting 5 seconds before assigning the next roles.")
+                await asyncio.sleep(5)
                 last_assigned_role = None
-
-    async def delay_before_next_role(self):
-        """Wait for 5 seconds before assigning the next roles."""
-        logger.info("Waiting 5 seconds before assigning the next roles.")
-        await asyncio.sleep(5)
 
     async def remove_mute_roles(self, member):
         """Remove mute roles from a member if they have any temporary roles assigned"""

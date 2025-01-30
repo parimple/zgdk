@@ -4,6 +4,15 @@ guild_id: 960665311701528596
 donate_url: "https://tipply.pl/u/zagadka"
 owner_id: 956602391891947592
 
+# Konfiguracja systemu legacy - do usunięcia po migracji
+legacy_system:
+  enabled: true
+  amounts:
+    15: 49  # zG50
+    25: 99  # zG100
+    45: 499  # zG500
+    85: 999  # zG1000
+
 channels:
   on_join: 1105588284555546634
   lounge: 1143990867946913845
@@ -114,12 +123,12 @@ premium_roles:
     usd: 29
     features:
       - "Rola na samej górze serwera"
-      - "Kanał drużynowy dla maksymalnie 15 osób"
+      - "Kanał drużynowy dla 15 osób"
       - "Kanał Git Plus do tworzenia kanałów głosowych"
       - "Moderator kanału głosowego"
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "100% więcej punktów do aktywności"
-    team_size: 10
+    team_size: 15
     moderator_count: 2
     points_multiplier: 100  # +100% punktów
     emojis_access: false     # Dostęp do emotek
@@ -159,7 +168,7 @@ premium_roles:
       - "Moliwość dodania odznaki emotki całej drużynie"
       - "300% więcej punktów do aktywności"
       - "Autokick 3 osób na każdym kanale"
-    team_size: 50
+    team_size: 45
     moderator_count: 5
     points_multiplier: 400  # +400% punktów
     emojis_access: false     # Dostęp do emotek

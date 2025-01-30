@@ -2,7 +2,7 @@
 import json
 import logging
 import re
-from collections import namedtuple
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -21,10 +21,15 @@ TIPPLY_API_URL = (
 )
 logger = logging.getLogger(__name__)
 
-PaymentData = namedtuple(
-    "PaymentData",
-    ["name", "amount", "paid_at", "payment_type"],
-)
+
+@dataclass
+class PaymentData:
+    """Data class for payment information."""
+
+    name: str
+    amount: int
+    paid_at: datetime
+    payment_type: str
 
 
 class PremiumManager:
