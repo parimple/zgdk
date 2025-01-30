@@ -21,7 +21,7 @@ class ShopCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
-    # @commands.has_permissions(administrator=True)
+    @commands.has_permissions(administrator=True)
     async def shop(self, ctx: Context):
         viewer = ctx.author
 

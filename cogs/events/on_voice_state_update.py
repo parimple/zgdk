@@ -59,7 +59,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             try:
                 # Find the owner who has autokick on this member
                 owner = None
-                for owner_id in self.autokick_manager._autokick_cache[member.id]:
+                for owner_id in self.autokick_manager._autokick_cache.get(member.id, []):
                     potential_owner = channel.guild.get_member(owner_id)
                     if potential_owner and potential_owner in channel.members:
                         owner = potential_owner

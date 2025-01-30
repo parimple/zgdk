@@ -91,60 +91,38 @@ class OnPaymentEvent(commands.Cog):
 
         # Initialize variables
         original_amount = payment_data.amount
-        amount = original_amount
-        converted_amount = None
-        premium_role = None  # Initialize premium_role here
+        final_amount = (
+            payment_data.converted_amount
+            if payment_data.converted_amount is not None
+            else original_amount
+        )
+        premium_role = None
+        logger.info(
+            f"Processing payment for {member.display_name} - original: {original_amount}, final: {final_amount}"
+        )
 
         # Initialize owner and embed variables
         owner_id = self.bot.config.get("owner_id")
         owner = self.guild.get_member(owner_id)
         embed = None
 
-        # 1. Najpierw przydziel role tymczasowe na podstawie oryginalnej kwoty
-        await self.assign_temporary_roles(session, member, original_amount)
-
-        # 2. Sprawdź czy kwota podlega konwersji legacy
-        legacy_config = self.bot.config.get("legacy_system", {})
-        if legacy_config.get("enabled", False):
-            legacy_amounts = legacy_config.get("amounts", {})
-            logger.info(f"Checking legacy conversion for amount {original_amount}")
-            logger.info(f"Available legacy amounts: {legacy_amounts}")
-
-            # Sprawdź czy kwota jest w legacy_amounts
-            if original_amount in legacy_amounts:
-                # Losowo decyduj czy dodać 1 do kwoty (50/50 szansa)
-                add_one = random.choice([True, False])
-                converted_amount = legacy_amounts[original_amount] + (1 if add_one else 0)
-                amount = converted_amount  # Użyj przekonwertowanej kwoty do operacji premium
+        # 1. Najpierw sprawdź role premium (zmiana kolejności - premium przed tymczasowymi)
+        for role_config in self.bot.config["premium_roles"]:
+            if final_amount in [role_config["price"], role_config["price"] + 1]:
+                premium_role = role_config
                 logger.info(
-                    f"Legacy amount converted: {original_amount} -> {converted_amount} (add_one={add_one})"
+                    f"Found matching premium role: {role_config['name']} for amount {final_amount}"
                 )
+                break
 
-                # Dodatkowy log dla debugowania
-                logger.info(f"Using converted amount {amount} for premium role check")
+        # 2. Jeśli nie znaleziono roli premium, przydziel role tymczasowe
+        if not premium_role:
+            logger.info(
+                f"No premium role found for amount {final_amount}, assigning temporary roles"
+            )
+            await self.assign_temporary_roles(session, member, original_amount)
 
-        # 3. Sprawdź role premium
-        # Najpierw sprawdź przekonwertowaną kwotę, jeśli istnieje
-        if converted_amount is not None:
-            for role_config in self.bot.config["premium_roles"]:
-                if converted_amount in [role_config["price"], role_config["price"] + 1]:
-                    premium_role = role_config
-                    logger.info(
-                        f"Found matching premium role: {role_config['name']} for converted amount {converted_amount}"
-                    )
-                    break
-
-        # Jeśli nie znaleziono roli premium dla przekonwertowanej kwoty, sprawdź oryginalną
-        if premium_role is None:
-            for role_config in self.bot.config["premium_roles"]:
-                if amount in [role_config["price"], role_config["price"] + 1]:
-                    premium_role = role_config
-                    logger.info(
-                        f"Found matching premium role: {role_config['name']} for amount {amount}"
-                    )
-                    break
-
-        # 4. Przetwórz rolę premium jeśli została znaleziona
+        # 3. Przetwórz rolę premium jeśli została znaleziona
         if premium_role:
             logger.info(f"Processing premium role: {premium_role['name']}")
             role = discord.utils.get(self.guild.roles, name=premium_role["name"])
@@ -172,7 +150,7 @@ class OnPaymentEvent(commands.Cog):
 
                     # Sprawdź czy to kwota upgradu i czy rola kwalifikuje się do upgradu
                     can_upgrade = False
-                    if role.name == "zG50" and amount == 50 and 29 <= days_left <= 33:
+                    if role.name == "zG50" and final_amount == 50 and 29 <= days_left <= 33:
                         # Próba upgradu do zG100
                         upgrade_role = discord.utils.get(self.guild.roles, name="zG100")
                         if upgrade_role:
@@ -189,7 +167,7 @@ class OnPaymentEvent(commands.Cog):
                                 color=discord.Color.green(),
                             )
                             can_upgrade = True
-                    elif role.name == "zG100" and amount == 400 and 29 <= days_left <= 33:
+                    elif role.name == "zG100" and final_amount == 400 and 29 <= days_left <= 33:
                         # Próba upgradu do zG500 (bo 99 + 400 = 499)
                         upgrade_role = discord.utils.get(self.guild.roles, name="zG500")
                         if upgrade_role:
@@ -206,7 +184,7 @@ class OnPaymentEvent(commands.Cog):
                                 color=discord.Color.green(),
                             )
                             can_upgrade = True
-                    elif role.name == "zG500" and amount == 500 and 29 <= days_left <= 33:
+                    elif role.name == "zG500" and final_amount == 500 and 29 <= days_left <= 33:
                         # Próba upgradu do zG1000 (bo 499 + 500 = 999)
                         upgrade_role = discord.utils.get(self.guild.roles, name="zG1000")
                         if upgrade_role:
@@ -234,9 +212,9 @@ class OnPaymentEvent(commands.Cog):
                             "zG1000": [999, 1000],  # 1000 przedłuża i daje +1G
                         }
 
-                        if amount in role_extension_amounts.get(role.name, []):
+                        if final_amount in role_extension_amounts.get(role.name, []):
                             logger.info(
-                                f"Amount {amount} matches extension amount for role {role.name}"
+                                f"Amount {final_amount} matches extension amount for role {role.name}"
                             )
                             logger.info(
                                 f"Checking extension days for role {role.name}. Current days_left: {days_left}"
@@ -252,7 +230,7 @@ class OnPaymentEvent(commands.Cog):
 
                             # Dodaj 1G jeśli zapłacił więcej
                             bonus_msg = ""
-                            if amount > premium_role["price"]:
+                            if final_amount > premium_role["price"]:
                                 await MemberQueries.add_to_wallet_balance(session, member.id, 1)
                                 bonus_msg = f" Dodatkowo otrzymujesz 1{CURRENCY_UNIT}."
 
@@ -273,7 +251,7 @@ class OnPaymentEvent(commands.Cog):
 
                     # Dodaj 1G tylko jeśli zapłacił więcej niż cena roli
                     bonus_msg = ""
-                    if amount > premium_role["price"]:
+                    if final_amount > premium_role["price"]:
                         await MemberQueries.add_to_wallet_balance(session, member.id, 1)
                         bonus_msg = f" Dodatkowo otrzymujesz 1{CURRENCY_UNIT}."
 
@@ -291,9 +269,7 @@ class OnPaymentEvent(commands.Cog):
         # Jeśli nie ma roli premium lub embed nie został ustawiony
         if embed is None:
             # Użyj przekonwertowanej kwoty w wiadomości jeśli była konwersja
-            amount_to_display = (
-                converted_amount if converted_amount is not None else original_amount
-            )
+            amount_to_display = final_amount
             logger.info(
                 f"Handling payment for {member.display_name} with amount {amount_to_display}G"
             )

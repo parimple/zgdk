@@ -1,6 +1,7 @@
 """Module for managing premium payments and wallet"""
 import json
 import logging
+import random
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -30,6 +31,7 @@ class PaymentData:
     amount: int
     paid_at: datetime
     payment_type: str
+    converted_amount: Optional[int] = None
 
 
 class PremiumManager:
@@ -142,8 +144,35 @@ class PremiumManager:
                 )
                 logger.info("payment: %s", payment)
                 await MemberQueries.get_or_add_member(session, member.id)
-                await MemberQueries.add_to_wallet_balance(session, member.id, payment_data.amount)
-                logger.info("add_to_wallet_balance: %s", payment_data.amount)
+
+                # Najpierw sprawdź konwersję legacy i ustal finalną kwotę
+                final_amount = payment_data.amount
+                if self.bot.config.get("legacy_system", {}).get("enabled", False):
+                    legacy_amounts = self.bot.config.get("legacy_system", {}).get("amounts", {})
+                    if final_amount in legacy_amounts:
+                        add_one = random.choice([True, False])
+                        final_amount = legacy_amounts[final_amount] + (1 if add_one else 0)
+                        payment_data.converted_amount = final_amount
+                        logger.info(
+                            f"Legacy amount converted: {payment_data.amount} -> {final_amount} (add_one={add_one})"
+                        )
+
+                # Sprawdź czy finalna kwota pasuje do jakiejś roli premium
+                is_premium_payment = False
+                for role_config in self.bot.config["premium_roles"]:
+                    if final_amount in [role_config["price"], role_config["price"] + 1]:
+                        is_premium_payment = True
+                        logger.info(f"Found premium role match for amount {final_amount}")
+                        break
+
+                # Dodaj do portfela tylko jeśli to nie jest płatność za rolę premium
+                if not is_premium_payment:
+                    logger.info(
+                        f"No premium role match for amount {final_amount}, adding to wallet: {payment_data.amount}"
+                    )
+                    await MemberQueries.add_to_wallet_balance(
+                        session, member.id, payment_data.amount
+                    )
             else:
                 logger.warning("Member not found for payment: %s", payment_data.name)
                 payment = await HandledPaymentQueries.add_payment(
@@ -165,7 +194,7 @@ class PremiumManager:
         except Exception as e:
             logger.error(f"Unexpected error during payment processing: {str(e)}")
             await session.rollback()
-            # Handle other exceptionsi
+            # Handle other exceptions
 
     async def notify_unban(self, member):
         """Send notification about unban"""

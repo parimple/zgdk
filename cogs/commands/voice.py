@@ -55,7 +55,7 @@ class VoiceCog(commands.Cog):
         }
 
     @commands.hybrid_command(aliases=["s"])
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_speak="Ustaw uprawnienie mówienia (+ lub -)",
@@ -70,7 +70,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["speak"].execute(self, ctx, target, can_speak)
 
     @commands.hybrid_command(aliases=["v"])
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_view="Ustaw uprawnienie wyświetlania (+ lub -)",
@@ -85,7 +85,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["view"].execute(self, ctx, target, can_view)
 
     @commands.hybrid_command(aliases=["c"])
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_connect="Ustaw uprawnienie połączenia (+ lub -)",
@@ -100,7 +100,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["connect"].execute(self, ctx, target, can_connect)
 
     @commands.hybrid_command(aliases=["t"])
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_message="Ustaw uprawnienie pisania (+ lub -)",
@@ -115,7 +115,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["text"].execute(self, ctx, target, can_message)
 
     @commands.hybrid_command(aliases=["lv"])
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_stream="Ustaw uprawnienie streamowania (+ lub -)",
@@ -130,7 +130,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["live"].execute(self, ctx, target, can_stream)
 
     @commands.hybrid_command(aliases=["m"])
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         target="Użytkownik do dodania lub usunięcia jako moderator kanału",
         can_manage="Dodaj (+) lub usuń (-) uprawnienia moderatora kanału",
@@ -163,7 +163,7 @@ class VoiceCog(commands.Cog):
         await self.channel_manager.join_channel(ctx)
 
     @commands.hybrid_command(aliases=["l"])
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         max_members="Maksymalna liczba członków (1-99 dla konkretnej wartości)"
     )
@@ -172,7 +172,7 @@ class VoiceCog(commands.Cog):
         await self.channel_manager.set_channel_limit(ctx, max_members)
 
     @commands.hybrid_command(aliases=["vc"])
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         target="Użytkownik do sprawdzenia kanału głosowego (ID, wzmianka lub nazwa użytkownika)",
     )
@@ -205,7 +205,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["autokick"].execute(self, ctx, target, action)
 
     @commands.hybrid_command(aliases=["r"])
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         target="Użytkownik, którego uprawnienia mają zostać zresetowane (opcjonalne)",
     )
