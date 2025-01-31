@@ -22,13 +22,14 @@ class ShopCog(commands.Cog):
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
     @commands.has_permissions(administrator=True)
-    async def shop(self, ctx: Context):
+    async def shop(self, ctx: Context, member: discord.Member = None):
         viewer = ctx.author
+        target_member = member or viewer
 
         async with self.bot.get_db() as session:
             db_viewer = await MemberQueries.get_or_add_member(session, viewer.id)
             balance = db_viewer.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(session, viewer.id)
+            premium_roles = await RoleQueries.get_member_premium_roles(session, target_member.id)
             await session.commit()
 
         view = RoleShopView(
@@ -38,7 +39,7 @@ class ShopCog(commands.Cog):
             balance,
             page=1,
             viewer=viewer,
-            member=viewer,
+            member=target_member,
         )
         embed = await create_shop_embed(
             ctx,
@@ -47,7 +48,7 @@ class ShopCog(commands.Cog):
             premium_roles,
             page=1,
             viewer=viewer,
-            member=viewer,
+            member=target_member,
         )
         await ctx.reply(embed=embed, view=view, mention_author=False)
 

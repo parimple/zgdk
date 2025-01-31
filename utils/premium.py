@@ -150,8 +150,12 @@ class PremiumManager:
                 if self.bot.config.get("legacy_system", {}).get("enabled", False):
                     legacy_amounts = self.bot.config.get("legacy_system", {}).get("amounts", {})
                     if final_amount in legacy_amounts:
+                        # Najpierw konwertuj na nową kwotę
+                        final_amount = legacy_amounts[final_amount]
+                        # Losowo dodaj +1 (50% szans)
                         add_one = random.choice([True, False])
-                        final_amount = legacy_amounts[final_amount] + (1 if add_one else 0)
+                        if add_one:
+                            final_amount += 1
                         payment_data.converted_amount = final_amount
                         logger.info(
                             f"Legacy amount converted: {payment_data.amount} -> {final_amount} (add_one={add_one})"

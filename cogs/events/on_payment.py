@@ -5,12 +5,14 @@ On Payments Event Cog
 import asyncio
 import logging
 import os
-import random
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import discord
 from discord.ext import commands, tasks
 
+from cogs.ui.shop_embeds import create_shop_embed
+from cogs.views.shop_views import RoleShopView
 from datasources.queries import MemberQueries, RoleQueries
 from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager, TipplyDataProvider
@@ -24,6 +26,34 @@ LEGACY_SYSTEM_ENABLED = True
 
 # Mapowanie starych kwot na nowe
 LEGACY_AMOUNTS = {15: 49, 25: 99, 45: 499, 85: 999}  # zG50  # zG100  # zG500  # zG1000
+
+# Mapowanie kwot do dni przedłużenia dla poszczególnych ról premium
+PARTIAL_EXTENSIONS = {
+    "zG100": {
+        49: int(49 / 99 * 30),  # ~15 dni (49/99 * 30)
+        50: int(50 / 99 * 30),  # ~15 dni (50/99 * 30)
+        99: 30,
+        100: 30,
+    },
+    "zG500": {
+        49: int(49 / 499 * 30),  # ~3 dni (49/499 * 30)
+        50: int(50 / 499 * 30),  # ~3 dni (50/499 * 30)
+        99: int(99 / 499 * 30),  # ~6 dni (99/499 * 30)
+        100: int(100 / 499 * 30),  # ~6 dni (100/499 * 30)
+        499: 30,
+        500: 30,
+    },
+    "zG1000": {
+        49: int(49 / 999 * 30),  # ~1 dzień (49/999 * 30)
+        50: int(50 / 999 * 30),  # ~1 dzień (50/999 * 30)
+        99: int(99 / 999 * 30),  # ~3 dni (99/999 * 30)
+        100: int(100 / 999 * 30),  # ~3 dni (100/999 * 30)
+        499: int(499 / 999 * 30),  # ~15 dni (499/999 * 30)
+        500: int(500 / 999 * 30),  # ~15 dni (500/999 * 30)
+        999: 30,
+        1000: 30,
+    },
+}
 
 
 class OnPaymentEvent(commands.Cog):
@@ -75,6 +105,59 @@ class OnPaymentEvent(commands.Cog):
         if not self.guild:
             logger.error("Guild not found")
 
+    async def extend_existing_role_partially(
+        self, session, member: discord.Member, final_amount: int
+    ) -> Optional[discord.Embed]:
+        """
+        Używane WYŁĄCZNIE, gdy użytkownik już ma zG100 / zG1000 (albo inne z PARTIAL_EXTENSIONS).
+        Jeśli final_amount pasuje do PARTIAL_EXTENSIONS[rola], to przedłużamy dokładnie o days_to_add.
+        W przeciwnym razie zwracamy None.
+        """
+        await self.remove_mute_roles(member)
+        logger.info(
+            f"Checking partial extension for {member.display_name} with amount {final_amount}"
+        )
+
+        # Przejrzyj wszystkie role premium, które obsługujemy w PARTIAL_EXTENSIONS
+        for role_name, amounts_map in PARTIAL_EXTENSIONS.items():
+            role_obj = discord.utils.get(self.guild.roles, name=role_name)
+            if not role_obj:
+                logger.error(f"Role {role_name} not found in the guild")
+                continue
+
+            # Jeśli user ma tę rolę
+            if role_obj in member.roles:
+                # Pobierz liczbę dni z amounts_map (domyślnie 0, jeśli brak)
+                days_to_add = amounts_map.get(final_amount, 0)
+                if days_to_add > 0:
+                    # Znajdź w bazie, czy user ma MemberRole
+                    current_member_role = await RoleQueries.get_member_role(
+                        session, member.id, role_obj.id
+                    )
+                    if current_member_role:
+                        # Przedłuż
+                        await RoleQueries.update_role_expiration_date(
+                            session, member.id, role_obj.id, timedelta(days=days_to_add)
+                        )
+                        logger.info(
+                            f"Extended role {role_name} for {member.display_name} by {days_to_add} days (partial extension)"
+                        )
+
+                        # Przygotuj embed z informacją
+                        embed = discord.Embed(
+                            title="Gratulacje!",
+                            description=f"Przedłużyłeś rolę {role_name} o {days_to_add} dni i zdjęto ci muta!",
+                            color=discord.Color.green(),
+                        )
+                        return embed
+                    else:
+                        logger.warning(
+                            f"No DB entry found for {role_name} - user {member.display_name} has the role on Discord, but not in DB"
+                        )
+
+        # Jeśli doszliśmy tutaj, to znaczy że nie było przedłużenia
+        return None
+
     async def handle_payment(self, session, payment_data):
         """Handle a single payment and send notification"""
         channel_id = self.bot.config["channels"]["donation"]
@@ -106,7 +189,7 @@ class OnPaymentEvent(commands.Cog):
         owner = self.guild.get_member(owner_id)
         embed = None
 
-        # 1. Najpierw sprawdź role premium (zmiana kolejności - premium przed tymczasowymi)
+        # 1. Najpierw sprawdź standardowe role premium
         for role_config in self.bot.config["premium_roles"]:
             if final_amount in [role_config["price"], role_config["price"] + 1]:
                 premium_role = role_config
@@ -115,14 +198,7 @@ class OnPaymentEvent(commands.Cog):
                 )
                 break
 
-        # 2. Jeśli nie znaleziono roli premium, przydziel role tymczasowe
-        if not premium_role:
-            logger.info(
-                f"No premium role found for amount {final_amount}, assigning temporary roles"
-            )
-            await self.assign_temporary_roles(session, member, original_amount)
-
-        # 3. Przetwórz rolę premium jeśli została znaleziona
+        # 2. Jeśli znaleziono rolę premium, przetwórz ją
         if premium_role:
             logger.info(f"Processing premium role: {premium_role['name']}")
             role = discord.utils.get(self.guild.roles, name=premium_role["name"])
@@ -266,18 +342,31 @@ class OnPaymentEvent(commands.Cog):
 
                 await self.remove_mute_roles(member)
 
-        # Jeśli nie ma roli premium lub embed nie został ustawiony
-        if embed is None:
-            # Użyj przekonwertowanej kwoty w wiadomości jeśli była konwersja
-            amount_to_display = final_amount
-            logger.info(
-                f"Handling payment for {member.display_name} with amount {amount_to_display}G"
-            )
-            embed = discord.Embed(
-                title="Gratulacje!",
-                description=f"Twoje konto zostało pomyślnie zasilone {amount_to_display}{CURRENCY_UNIT}!",
-                color=discord.Color.green(),
-            )
+        # 3. Jeśli nie znaleziono roli premium, sprawdź partial extension
+        if not premium_role:
+            embed_partial = await self.extend_existing_role_partially(session, member, final_amount)
+            if embed_partial:
+                embed = embed_partial
+            else:
+                # 4. Jeśli nie ma roli premium ani partial extension, dodaj do portfela i przydziel role tymczasowe
+                # Dodaj do portfela
+                await MemberQueries.add_to_wallet_balance(session, member.id, final_amount)
+
+                # Przydziel role tymczasowe tylko jeśli user nie ma żadnej roli premium
+                has_premium = any(role.name in PARTIAL_EXTENSIONS for role in member.roles)
+                if not has_premium:
+                    await self.assign_temporary_roles(session, member, original_amount)
+
+                # Użyj przekonwertowanej kwoty w wiadomości
+                amount_to_display = final_amount
+                logger.info(
+                    f"Handling payment for {member.display_name} with amount {amount_to_display}G"
+                )
+                embed = discord.Embed(
+                    title="Gratulacje!",
+                    description=f"Twoje konto zostało pomyślnie zasilone {amount_to_display}{CURRENCY_UNIT}!\nMożesz teraz kupić rangę w sklepie(unmute gratis!), klikając przycisk poniżej.",
+                    color=discord.Color.green(),
+                )
 
         embed.set_image(url=self.bot.config["gifs"]["donation"])
 
