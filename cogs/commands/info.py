@@ -95,7 +95,9 @@ class InfoCog(commands.Cog):
         else:
             await ctx.send(f"Guild ID: {guild}")
 
-    @commands.hybrid_command(name="profile", description="Wyświetla profil użytkownika.")
+    @commands.hybrid_command(
+        name="profile", aliases=["p"], description="Wyświetla profil użytkownika."
+    )
     @commands.has_permissions(administrator=True)
     async def profile(self, ctx: commands.Context, member: Optional[discord.Member] = None):
         """Sends user profile when profile is used as a command."""
@@ -112,6 +114,7 @@ class InfoCog(commands.Cog):
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, member.id)
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+            bypass_until = await MemberQueries.get_voice_bypass_status(session, member.id)
 
         current_time = datetime.now(timezone.utc)
         logger.info(f"Current time: {current_time}")
@@ -130,6 +133,13 @@ class InfoCog(commands.Cog):
         embed.add_field(name="ID:", value=member.id)
         embed.add_field(name="Nazwa na serwerze:", value=member.display_name)
         embed.add_field(name="Saldo portfela:", value=f"{db_member.wallet_balance}{CURRENCY_UNIT}")
+
+        # Add bypass time info if active
+        if bypass_until and bypass_until > current_time:
+            time_left = bypass_until - current_time
+            hours = int(time_left.total_seconds() / 3600)
+            embed.add_field(name="Saldo VC:", value=f"{hours}T")
+
         embed.add_field(name="Konto od:", value=discord.utils.format_dt(member.created_at, "D"))
         embed.add_field(
             name="Dołączył:",
@@ -174,6 +184,29 @@ class InfoCog(commands.Cog):
                 inline=False,
             )
         await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="bypass", description="Zarządza czasem bypassa (T) użytkownika.")
+    @commands.has_permissions(administrator=True)
+    async def bypass(
+        self, ctx: commands.Context, member: discord.Member, hours: Optional[int] = None
+    ):
+        """
+        Zarządza czasem bypassa (T) użytkownika.
+        :param member: Użytkownik, któremu chcemy zmienić czas bypassa
+        :param hours: Liczba godzin bypassa. Jeśli nie podano, bypass zostanie usunięty.
+        """
+        current_time = datetime.now(timezone.utc)
+
+        async with self.bot.get_db() as session:
+            if hours is None or hours == 0:
+                # Zerowanie bypassa
+                await MemberQueries.set_voice_bypass_status(session, member.id, None)
+                await ctx.send(f"Usunięto bypass dla {member.mention}.")
+            else:
+                # Dodawanie nowego bypassa
+                bypass_until = current_time + timedelta(hours=hours)
+                await MemberQueries.set_voice_bypass_status(session, member.id, bypass_until)
+                await ctx.send(f"Ustawiono bypass dla {member.mention} na {hours}T.")
 
 
 class ProfileView(discord.ui.View):

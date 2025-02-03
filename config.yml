@@ -101,6 +101,84 @@ max_channels_categories:
   - 1325440479499649075  # max4
   - 1325440557161648160  # max5
 
+# Role i uprawnienia
+roles:
+  # Role premium (dają pełny dostęp do komend głosowych)
+  premium:
+    - name: "zG50"
+      moderator_count: 1
+    - name: "zG100"
+      moderator_count: 2
+    - name: "zG500"
+      moderator_count: 5
+    - name: "zG1000"
+      moderator_count: 10
+
+  # Role boosterów (wymagają T > 0 do użycia komend głosowych)
+  boosters:
+    - "♵"  # nitro booster
+    - "♼"  # server booster
+
+# Konfiguracja komend głosowych
+voice_commands:
+  # Komendy wymagające premium lub (roli boostera + T > 0)
+  view:
+    require_bypass_if_no_role: true
+    description: "Zarządzanie widocznością kanału"
+  speak:
+    require_bypass_if_no_role: true
+    description: "Zarządzanie uprawnieniami do mówienia"
+  connect:
+    require_bypass_if_no_role: true
+    description: "Zarządzanie uprawnieniami do połączenia"
+  text:
+    require_bypass_if_no_role: true
+    description: "Zarządzanie uprawnieniami do pisania"
+  live:
+    require_bypass_if_no_role: true
+    description: "Zarządzanie uprawnieniami do streamowania"
+
+  # Komendy wymagające tylko premium (bez możliwości użycia T)
+  mod:
+    require_bypass_if_no_role: false
+    description: "Zarządzanie moderatorami kanału"
+    allowed_roles: ["zG50", "zG100", "zG500", "zG1000"]
+
+  # Komendy wymagające wysokiego premium
+  autokick:
+    require_bypass_if_no_role: false
+    description: "Zarządzanie automatycznym wyrzucaniem"
+    allowed_roles: ["zG500", "zG1000"]
+
+# Konfiguracja systemu T (bypass)
+bypass:
+  duration:
+    bump: 12  # godziny dodawane za bump
+    activity: 6  # godziny dodawane za aktywność
+
+mute_roles:
+  - id: 960665311760248873
+    name: "⚠︎"
+    description: "stream_off"
+  - id: 960665311953174559
+    name: "⌀"
+    description: "send_messages_off"
+  - id: 960665311953174558
+    name: "☢︎"
+    description: "attach_files_off"
+  - id: 960665311760248877
+    name: "♺"
+    description: "points_off"
+
+color_roles:
+  blue: 960665311730868235
+  green: 960665311730868236
+  red: 960665311730868237
+
+admin_roles:
+  mod: 960665311953174564  # ID roli moderatora (✪)
+  admin: 960665311953174565  # ID roli administratora (✪)
+
 premium_roles:
   - name: "zG50"
     premium: "Git"
@@ -175,26 +253,46 @@ premium_roles:
     override_limit: false
     auto_kick: 3
 
+# Konfiguracja uprawnień głosowych
+voice_permissions:
+  # Role boosterów (wymagają T > 0 do użycia komend głosowych)
+  boosters:
+    - "♵"  # nitro booster
+    - "♼"  # server booster
 
-mute_roles:
-  - id: 960665311760248873
-    name: "⚠︎"
-    description: "stream_off"
-  - id: 960665311953174559
-    name: "⌀"
-    description: "send_messages_off"
-  - id: 960665311953174558
-    name: "☢︎"
-    description: "attach_files_off"
-  - id: 960665311760248877
-    name: "♺"
-    description: "points_off"
+  # Konfiguracja komend głosowych
+  commands:
+    # Komendy wymagające premium lub (roli boostera + T > 0)
+    view:
+      require_bypass_if_no_role: true
+      description: "Zarządzanie widocznością kanału"
+    speak:
+      require_bypass_if_no_role: true
+      description: "Zarządzanie uprawnieniami do mówienia"
+    connect:
+      require_bypass_if_no_role: true
+      description: "Zarządzanie uprawnieniami do połączenia"
+    text:
+      require_bypass_if_no_role: true
+      description: "Zarządzanie uprawnieniami do pisania"
+    live:
+      require_bypass_if_no_role: true
+      description: "Zarządzanie uprawnieniami do streamowania"
 
-color_roles:
-  blue: 960665311730868235
-  green: 960665311730868236
-  red: 960665311730868237
+    # Komendy wymagające tylko premium (bez możliwości użycia T)
+    mod:
+      require_bypass_if_no_role: false
+      description: "Zarządzanie moderatorami kanału"
+      allowed_roles: ["zG50", "zG100", "zG500", "zG1000"]
 
-admin_roles:
-  mod: 960665311953174564  # ID roli moderatora (✪)
-  admin: 960665311953174565  # ID roli administratora (✪)
+    # Komendy wymagające wysokiego premium
+    autokick:
+      require_bypass_if_no_role: false
+      description: "Zarządzanie automatycznym wyrzucaniem"
+      allowed_roles: ["zG500", "zG1000"]
+
+  # Konfiguracja systemu T (bypass)
+  bypass:
+    duration:
+      bump: 12  # godziny dodawane za bump
+      activity: 6  # godziny dodawane za aktywność

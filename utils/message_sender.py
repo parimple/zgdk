@@ -883,3 +883,42 @@ class MessageSender:
         await MessageSender.build_and_send_embed(
             ctx, title="Brak Uprawnień", base_text=base_text, color="error", channel=channel
         )
+
+    async def send_bypass_expired(self, ctx):
+        """Send message when user's bypass (T) has expired."""
+        base_text = "Twój czas T (bypass) wygasł!\nUżyj `/bump`, aby przedłużyć ten czas."
+        channel = ctx.author.voice.channel if ctx.author.voice else None
+        await self.build_and_send_embed(
+            ctx,
+            title="Czas T Wygasł",
+            base_text=base_text,
+            color="error",
+            channel=channel,
+            reply=True,
+        )
+
+    async def send_premium_required(self, ctx):
+        """Send message when premium role is required."""
+        base_text = "Aby użyć tej komendy, potrzebujesz rangi premium!"
+        channel = ctx.author.voice.channel if ctx.author.voice else None
+        await self.build_and_send_embed(
+            ctx,
+            title="Wymagana Ranga Premium",
+            base_text=base_text,
+            color="error",
+            channel=channel,
+            reply=True,
+        )
+
+    async def send_specific_roles_required(self, ctx, allowed_roles):
+        """Send message when specific premium roles are required."""
+        base_text = f"Ta komenda wymaga jednej z rang: {', '.join(allowed_roles)}"
+        channel = ctx.author.voice.channel if ctx.author.voice else None
+        await self.build_and_send_embed(
+            ctx,
+            title="Wymagana Ranga Premium",
+            base_text=base_text,
+            color="error",
+            channel=channel,
+            reply=True,
+        )

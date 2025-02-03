@@ -35,6 +35,7 @@ class Member(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     rejoined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     wallet_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    voice_bypass_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     first_inviter: Mapped["Member"] = relationship(
         "Member",

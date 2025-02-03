@@ -9,6 +9,7 @@ from discord.ext import commands
 
 from utils.database.voice_manager import DatabaseManager
 from utils.message_sender import MessageSender
+from utils.premium_checker import PremiumChecker
 from utils.voice.autokick import AutoKickManager
 from utils.voice.channel import ChannelModManager, VoiceChannelManager
 from utils.voice.permissions import BasePermissionCommand, PermissionChecker, VoicePermissionManager
@@ -28,6 +29,7 @@ class VoiceCog(commands.Cog):
         self.db_manager = DatabaseManager(bot)
         self.permission_checker = PermissionChecker(bot)
         self.autokick_manager = AutoKickManager(bot)
+        self.premium_checker = PremiumChecker(bot)
 
         # Initialize permission commands
         self.permission_commands = {
@@ -56,6 +58,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["s"])
     @PermissionChecker.voice_command()
+    @PremiumChecker.requires_premium("speak")
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_speak="Ustaw uprawnienie mówienia (+ lub -)",
@@ -71,9 +74,10 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["v"])
     @PermissionChecker.voice_command()
+    @PremiumChecker.requires_premium("view")
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
-        can_view="Ustaw uprawnienie wyświetlania (+ lub -)",
+        can_view="Ustaw uprawnienie widzenia kanału (+ lub -)",
     )
     async def view(
         self,
@@ -86,6 +90,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["c"])
     @PermissionChecker.voice_command()
+    @PremiumChecker.requires_premium("connect")
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_connect="Ustaw uprawnienie połączenia (+ lub -)",
@@ -101,6 +106,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["t"])
     @PermissionChecker.voice_command()
+    @PremiumChecker.requires_premium("text")
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_message="Ustaw uprawnienie pisania (+ lub -)",
@@ -116,6 +122,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["lv"])
     @PermissionChecker.voice_command()
+    @PremiumChecker.requires_premium("live")
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_stream="Ustaw uprawnienie streamowania (+ lub -)",
@@ -131,6 +138,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["m"])
     @PermissionChecker.voice_command(requires_owner=True)
+    @PremiumChecker.requires_premium("mod")
     @discord.app_commands.describe(
         target="Użytkownik do dodania lub usunięcia jako moderator kanału",
         can_manage="Dodaj (+) lub usuń (-) uprawnienia moderatora kanału",
@@ -224,6 +232,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["ak"])
     @PermissionChecker.voice_command()
+    @PremiumChecker.requires_premium("autokick")
     @discord.app_commands.describe(
         target="Użytkownik do dodania/usunięcia z listy autokick",
         action="Dodaj (+) lub usuń (-) użytkownika z listy autokick",
