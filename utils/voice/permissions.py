@@ -120,38 +120,60 @@ class BasePermissionCommand:
             )
             return
 
+        # Get current permissions and determine new value
+        current_perms = voice_channel.overwrites_for(target)
+        final_value = cog.permission_manager._determine_new_permission_value(
+            current_perms,
+            self.permission_name,
+            permission_value,
+            self.default_to_true,
+            self.toggle,
+            ctx=ctx,
+            target=target,
+        )
+
+        # Check if target has blocking roles when trying to enable permission
+        if isinstance(target, discord.Member) and final_value is True:
+            mute_roles = ctx.bot.config.get("mute_roles", [])
+            for role_config in mute_roles:
+                role = ctx.guild.get_role(role_config["id"])
+                if role and role in target.roles:
+                    if (
+                        role_config["description"] == "stream_off"
+                        and self.permission_name == "stream"
+                    ):
+                        await cog.message_sender.send_error(
+                            ctx,
+                            f"Nie można nadać uprawnień do streamowania - użytkownik {target.mention} ma rolę {role.name}!",
+                        )
+                        return
+                    elif (
+                        role_config["description"] == "send_messages_off"
+                        and self.permission_name == "send_messages"
+                    ):
+                        await cog.message_sender.send_error(
+                            ctx,
+                            f"Nie można nadać uprawnień do pisania - użytkownik {target.mention} ma rolę {role.name}!",
+                        )
+                        return
+
         # Check mod limit when adding a new moderator
-        if self.permission_name == "manage_messages":
-            current_perms = voice_channel.overwrites_for(target)
-
-            # Determine the final permission value that will be set
-            final_value = cog.permission_manager._determine_new_permission_value(
-                current_perms,
-                self.permission_name,
-                permission_value,
-                self.default_to_true,
-                self.toggle,
-                ctx=ctx,
-                target=target,
-            )
-
-            # Only check mod limit if we're actually adding a new moderator (final_value is True)
-            if final_value is True:
-                if not await cog.mod_manager.can_add_mod(ctx.author, voice_channel):
-                    mod_limit = 0
-                    for role in reversed(cog.bot.config["premium_roles"]):
-                        if any(r.name == role["name"] for r in ctx.author.roles):
-                            mod_limit = role["moderator_count"]
-                            break
-                    current_mods = [
-                        t
-                        for t, overwrite in voice_channel.overwrites.items()
-                        if isinstance(t, discord.Member)
-                        and overwrite.manage_messages is True
-                        and not overwrite.priority_speaker
-                    ]
-                    await cog.message_sender.send_mod_limit_exceeded(ctx, mod_limit, current_mods)
-                    return
+        if self.permission_name == "manage_messages" and final_value is True:
+            if not await cog.mod_manager.can_add_mod(ctx.author, voice_channel):
+                mod_limit = 0
+                for role in reversed(cog.bot.config["premium_roles"]):
+                    if any(r.name == role["name"] for r in ctx.author.roles):
+                        mod_limit = role["moderator_count"]
+                        break
+                current_mods = [
+                    t
+                    for t, overwrite in voice_channel.overwrites.items()
+                    if isinstance(t, discord.Member)
+                    and overwrite.manage_messages is True
+                    and not overwrite.priority_speaker
+                ]
+                await cog.message_sender.send_mod_limit_exceeded(ctx, mod_limit, current_mods)
+                return
 
         # Check if user can modify target's permissions
         if not await cog.permission_checker.can_modify_permissions(voice_channel, ctx, target):
