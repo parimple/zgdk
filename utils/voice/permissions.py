@@ -5,6 +5,7 @@ from typing import Literal, Optional
 
 import discord
 from discord import Member, PermissionOverwrite, Permissions
+from discord.ext import commands
 
 from datasources.queries import ChannelPermissionQueries
 from utils.message_sender import MessageSender
@@ -13,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class BasePermissionCommand:
-    """Base class for permission-related commands."""
+    """
+    Base class for permission-related commands.
+    Handles permission modification in voice channels based on owner/mod status.
+    """
 
     def __init__(
         self,
@@ -33,10 +37,27 @@ class BasePermissionCommand:
         self.logger = logging.getLogger(__name__)
 
     async def execute(self, cog, ctx, target, permission_value):
-        """Execute the permission command."""
+        """
+        Execute the permission command.
+
+        The execution flow is:
+        1. Check if user is in voice channel
+        2. Check if user has required permissions (owner/mod)
+        3. Parse and validate target
+        4. Check if user can modify target's permissions
+        5. Apply the permission change
+        """
         self.logger.info(
             f"Executing permission command: {self.permission_name} for target={target}, value={permission_value}"
         )
+
+        # Block priority_speaker modification
+        if self.permission_name == "priority_speaker":
+            self.logger.warning("Attempted to modify priority_speaker permission")
+            await cog.message_sender.send_no_permission(
+                ctx, "modyfikacji uprawnień priority_speaker!"
+            )
+            return
 
         if self.is_reset:
             if not await cog.permission_checker.check_voice_channel(ctx):
@@ -44,14 +65,14 @@ class BasePermissionCommand:
 
             voice_channel = ctx.author.voice.channel
             if not await cog.permission_checker.check_channel_owner(voice_channel, ctx):
-                await cog.message_sender.send_no_mod_permission(ctx)
+                await cog.message_sender.send_no_permission(
+                    ctx, "resetowania uprawnień (wymagany właściciel kanału)!"
+                )
                 return
 
             if target:
-                # Reset specific user permissions
                 await cog.reset_user_permissions(ctx, target)
             else:
-                # Reset entire channel permissions
                 await cog.reset_channel_permissions(ctx)
             return
 
@@ -60,90 +81,97 @@ class BasePermissionCommand:
                 await cog.autokick_manager.list_autokicks(ctx)
                 return
 
-            if permission_value is None:
-                permission_value = "+"  # domyślnie dodajemy do listy
-
+            permission_value = permission_value or "+"  # domyślnie dodajemy do listy
             if permission_value == "+":
                 await cog.autokick_manager.add_autokick(ctx, target)
             elif permission_value == "-":
                 await cog.autokick_manager.remove_autokick(ctx, target)
             return
 
-        # Sprawdź czy użytkownik jest na kanale głosowym
-        if not ctx.author.voice:
-            self.logger.info("User not in voice channel")
-            await cog.message_sender.send_not_in_voice_channel(ctx)
+        # Check if user is in voice channel
+        if not await cog.permission_checker.check_voice_channel(ctx):
             return
 
         voice_channel = ctx.author.voice.channel
-        if not voice_channel:
-            self.logger.info("User not in voice channel")
-            await cog.message_sender.send_not_in_voice_channel(ctx)
+        permission_level = await cog.permission_checker.check_permission_level(voice_channel, ctx)
+        self.logger.info(f"User permission level: {permission_level}")
+
+        # Check if user has required permissions
+        if self.requires_owner and permission_level != "owner":
+            self.logger.info("Command requires owner permission")
+            await cog.message_sender.send_no_permission(
+                ctx, "tej komendy (wymagany właściciel kanału)!"
+            )
             return
 
-        self.logger.info(f"Voice channel: {voice_channel.name} (ID: {voice_channel.id})")
-
-        # Sprawdź uprawnienia
-        is_owner = await cog.permission_checker.check_channel_owner(voice_channel, ctx)
-        is_mod = await cog.permission_checker.check_channel_mod(voice_channel, ctx)
-        has_permission = is_owner or (is_mod and not self.requires_owner)
-        self.logger.info(
-            f"Permission check: is_owner={is_owner}, is_mod={is_mod}, has_permission={has_permission}"
+        # Parse target and permission value
+        target, permission_value = cog.permission_checker.parse_command_args(
+            ctx, target, permission_value
         )
-
-        if not has_permission:
-            self.logger.info("User lacks required permissions")
-            await cog.message_sender.send_no_mod_permission(ctx)
+        if not target:
+            self.logger.warning("Invalid target specified")
+            await cog.message_sender.send_invalid_target(ctx)
             return
 
-        # Jeśli nie ma argumentów, przełącz uprawnienie dla @everyone
-        if target is None and permission_value is None:
-            target = ctx.guild.default_role
-            # Sprawdź aktualne uprawnienie
-            current_perms = voice_channel.overwrites_for(target)
-            current_value = getattr(current_perms, self.permission_name, None)
-            # Przełącz na przeciwne (None lub True -> "-", False -> "+")
-            permission_value = "+" if current_value is False else "-"
-            self.logger.info(
-                f"Toggling permission for @everyone: current_value={current_value}, new_value={permission_value}"
+        # Block setting manage_messages for @everyone
+        if self.permission_name == "manage_messages" and target == ctx.guild.default_role:
+            await cog.message_sender.send_error(
+                ctx, "Nie można ustawić uprawnień moderatora dla @everyone!"
             )
+            return
 
-        # Jeśli target to "-", ustaw dla @everyone
-        elif isinstance(target, str) and target == "-":
-            target = ctx.guild.default_role
-            permission_value = "-" if permission_value is None else permission_value
-            self.logger.info(f"Setting permission for @everyone: value={permission_value}")
-
-        # Przetwórz argumenty dla komend tekstowych
-        if target is not None or permission_value is not None:
-            target, permission_value = self._handle_text_command_permission(
-                ctx, target, permission_value
-            )
-            self.logger.info(
-                f"After handling text command: target={target}, permission_value={permission_value}"
-            )
-
-        # Sprawdź czy moderator (nie właściciel) próbuje modyfikować uprawnienia właściciela lub innych moderatorów
-        if not is_owner and is_mod:
-            if target != ctx.guild.default_role:  # Pomijamy sprawdzanie dla @everyone
-                target_perms = voice_channel.overwrites_for(target)
-                if target_perms:
-                    if target_perms.priority_speaker:
-                        self.logger.info("Mod attempting to modify owner permissions")
-                        await cog.message_sender.send_cant_modify_owner_permissions(ctx)
-                        return
-                    if target_perms.manage_messages:
-                        self.logger.info("Mod attempting to modify other mod permissions")
-                        await cog.message_sender.send_cant_modify_mod_permissions(ctx)
-                        return
-
-        # Dla komendy mod sprawdź dodatkowe warunki
+        # Check mod limit when adding a new moderator
         if self.permission_name == "manage_messages":
-            if not await cog.mod_manager.validate_channel_mod(ctx, target, permission_value):
-                self.logger.info("Mod validation failed")
-                return
+            current_perms = voice_channel.overwrites_for(target)
 
-        # Modify channel permission with default_to_true and toggle parameters
+            # Determine the final permission value that will be set
+            final_value = cog.permission_manager._determine_new_permission_value(
+                current_perms,
+                self.permission_name,
+                permission_value,
+                self.default_to_true,
+                self.toggle,
+                ctx=ctx,
+                target=target,
+            )
+
+            # Only check mod limit if we're actually adding a new moderator (final_value is True)
+            if final_value is True:
+                if not await cog.mod_manager.can_add_mod(ctx.author, voice_channel):
+                    mod_limit = 0
+                    for role in reversed(cog.bot.config["premium_roles"]):
+                        if any(r.name == role["name"] for r in ctx.author.roles):
+                            mod_limit = role["moderator_count"]
+                            break
+                    current_mods = [
+                        t
+                        for t, overwrite in voice_channel.overwrites.items()
+                        if isinstance(t, discord.Member)
+                        and overwrite.manage_messages is True
+                        and not overwrite.priority_speaker
+                    ]
+                    await cog.message_sender.send_mod_limit_exceeded(ctx, mod_limit, current_mods)
+                    return
+
+        # Check if user can modify target's permissions
+        if not await cog.permission_checker.can_modify_permissions(voice_channel, ctx, target):
+            self.logger.info("User cannot modify target permissions")
+            if permission_level == "mod":
+                if await cog.permission_checker.check_channel_owner(voice_channel, target):
+                    await cog.message_sender.send_cant_modify_owner_permissions(ctx)
+                elif await cog.permission_checker.check_channel_mod(voice_channel, target):
+                    await cog.message_sender.send_cant_modify_mod_permissions(ctx)
+                else:
+                    await cog.message_sender.send_no_permission(
+                        ctx, "modyfikacji uprawnień tego użytkownika!"
+                    )
+            else:
+                await cog.message_sender.send_no_permission(
+                    ctx, "zarządzania uprawnieniami na tym kanale!"
+                )
+            return
+
+        # Apply permission change
         await cog.permission_manager.modify_channel_permission(
             ctx,
             target,
@@ -154,55 +182,51 @@ class BasePermissionCommand:
             self.toggle,
         )
 
-    def _handle_text_command_permission(self, ctx, target, permission_value):
-        """Handle text command permission parsing for voice commands."""
-        if not ctx.interaction:  # This means it's a text command, not a slash command
-            message_parts = ctx.message.content.split()
-            logger.info(f"Processing text command parts: {message_parts}")
-
-            if len(message_parts) > 1:
-                # Sprawdź drugi argument
-                second_arg = message_parts[1]
-
-                # Jeśli drugi argument to + lub - i nie ma trzeciego argumentu
-                if second_arg in ["+", "-"] and len(message_parts) == 2:
-                    target = ctx.guild.default_role
-                    permission_value = second_arg
-                    self.logger.info(f"Setting @everyone permission to {permission_value}")
-
-                # Jeśli drugi argument to + lub - i jest trzeci argument (mention)
-                elif second_arg in ["+", "-"] and len(message_parts) > 2:
-                    mention = message_parts[2]
-                    user_id = "".join(filter(str.isdigit, mention))
-                    target = ctx.guild.get_member(int(user_id)) if user_id else None
-                    permission_value = second_arg
-                    logger.info(f"Setting permission {permission_value} for user {target}")
-
-                # Jeśli drugi argument to mention
-                elif second_arg.startswith("<@"):
-                    user_id = "".join(filter(str.isdigit, second_arg))
-                    target = ctx.guild.get_member(int(user_id)) if user_id else None
-                    # Sprawdź czy jest trzeci argument (+ lub -)
-                    if len(message_parts) > 2 and message_parts[2] in ["+", "-"]:
-                        permission_value = message_parts[2]
-                    logger.info(f"Setting permission for user {target} to {permission_value}")
-
-            elif len(message_parts) == 1:
-                # Jeśli jest tylko komenda, domyślnie dla @everyone
-                target = ctx.guild.default_role
-                permission_value = None
-                self.logger.info("No arguments provided, defaulting to @everyone toggle")
-
-        logger.info(f"Final target: {target}, permission_value: {permission_value}")  # Debug log
-        return target, permission_value
-
 
 class PermissionChecker:
-    """Handles permission checking logic."""
+    """
+    Handles permission checking logic for voice commands.
+    This class is responsible for checking channel-level permissions:
+    - Owner: has priority_speaker permission in channel overwrites
+    - Mod: has manage_messages permission in channel overwrites
+    """
 
     def __init__(self, bot):
         self.bot = bot
         self.message_sender = MessageSender()
+        self.logger = logging.getLogger(__name__)
+
+    def voice_command(requires_owner: bool = False):
+        """
+        Decorator for voice commands that enforces channel permission requirements.
+
+        Args:
+            requires_owner (bool): If True, only channel owner (priority_speaker) can use the command.
+                                 If False, both owner and mod can use the command.
+        """
+
+        async def predicate(ctx):
+            checker = ctx.cog.permission_checker
+
+            # Check if user is in voice channel
+            if not await checker.check_voice_channel(ctx):
+                return False
+
+            voice_channel = ctx.author.voice.channel
+            permission_level = await checker.check_permission_level(voice_channel, ctx)
+
+            if requires_owner and permission_level != "owner":
+                await checker.message_sender.send_no_permission(
+                    ctx, "tej komendy (wymagany właściciel kanału)!"
+                )
+                return False
+            elif permission_level == "none":
+                await checker.message_sender.send_no_permission(ctx, "zarządzania tym kanałem!")
+                return False
+
+            return True
+
+        return commands.check(predicate)
 
     async def check_voice_channel(self, ctx) -> bool:
         """Check if user is in voice channel."""
@@ -212,32 +236,128 @@ class PermissionChecker:
         return True
 
     async def check_channel_owner(self, channel, ctx) -> bool:
-        """Check if user is the channel owner (has priority_speaker)."""
+        """Check if user has priority_speaker permission in channel overwrites."""
         if not channel:
             return False
-
         perms = channel.overwrites_for(ctx.author)
-        return perms and perms.priority_speaker
+        return perms and perms.priority_speaker is True
 
     async def check_channel_mod(self, channel, ctx) -> bool:
-        """Check if user is a channel mod (has manage_messages)."""
+        """Check if user has manage_messages (but not priority_speaker) in channel overwrites."""
+        if not channel:
+            return False
+        perms = channel.overwrites_for(ctx.author)
+        return perms and perms.manage_messages is True and not perms.priority_speaker
+
+    async def check_permission_level(self, channel, ctx) -> Literal["owner", "mod", "none"]:
+        """
+        Check user's permission level in the channel based on overwrites.
+
+        Returns:
+            - "owner" if user has priority_speaker
+            - "mod" if user has manage_messages (but not priority_speaker)
+            - "none" otherwise
+        """
+        if not channel:
+            return "none"
+        perms = channel.overwrites_for(ctx.author)
+        if not perms:
+            return "none"
+
+        if perms.priority_speaker:
+            return "owner"
+        elif perms.manage_messages:
+            return "mod"
+        return "none"
+
+    async def can_modify_permissions(self, channel, ctx, target=None) -> bool:
+        """
+        Check if user can modify permissions.
+
+        Rules:
+        - Owner (priority_speaker) can modify all permissions except priority_speaker
+        - Mod (manage_messages) can modify regular user permissions only
+        - Regular users cannot modify any permissions
+        """
         if not channel:
             return False
 
-        perms = channel.overwrites_for(ctx.author)
-        return perms and perms.manage_messages
+        permission_level = await self.check_permission_level(channel, ctx)
 
-    async def check_channel_mod_or_owner(self, channel, ctx) -> bool:
-        """Check if user is either channel owner or mod."""
-        if not channel:
-            return False
+        if permission_level == "owner":
+            return True
+        elif permission_level == "mod" and target:
+            target_perms = channel.overwrites_for(target)
+            # Mods cannot modify owner or other mod permissions
+            if target_perms and (target_perms.priority_speaker or target_perms.manage_messages):
+                return False
+            return True
+        return False
 
-        perms = channel.overwrites_for(ctx.author)
-        return perms and (perms.priority_speaker or perms.manage_messages)
+    def parse_command_args(
+        self, ctx, target, permission_value
+    ) -> tuple[discord.Member | discord.Role, Optional[Literal["+", "-"]]]:
+        """
+        Parse command arguments for both text and slash commands.
+        Only handles user mentions and @everyone role.
+
+        Returns:
+            tuple: (target object, permission value)
+                target is either Member or the @everyone role
+                permission_value is either "+", "-" or None for toggle
+        """
+        if not ctx.interaction:  # Text command
+            message_parts = ctx.message.content.split()
+
+            if len(message_parts) > 1:
+                second_arg = message_parts[1]
+
+                # Handle +/- with or without target
+                if second_arg in ["+", "-"]:
+                    if len(message_parts) == 2:
+                        return ctx.guild.default_role, second_arg
+                    else:
+                        mention = message_parts[2]
+                        if mention.startswith("<@") and not mention.startswith("<@&"):
+                            user_id = "".join(filter(str.isdigit, mention))
+                            target = ctx.guild.get_member(int(user_id)) if user_id else None
+                        else:
+                            target = ctx.guild.default_role
+                        return target, second_arg
+
+                # Handle target with optional +/-
+                elif second_arg.startswith("<@") and not second_arg.startswith("<@&"):
+                    user_id = "".join(filter(str.isdigit, second_arg))
+                    target = ctx.guild.get_member(int(user_id)) if user_id else None
+                    permission_value = (
+                        message_parts[2]
+                        if len(message_parts) > 2 and message_parts[2] in ["+", "-"]
+                        else None
+                    )
+                    return target, permission_value
+
+            # Default to @everyone toggle
+            return ctx.guild.default_role, None
+
+        # Slash command - arguments already properly parsed
+        return target, permission_value
 
 
 class VoicePermissionManager:
     """Manages voice channel permissions."""
+
+    # Permission value mapping tables
+    TOGGLE_MAP = {
+        True: lambda pf: None if pf == "manage_messages" else False,
+        False: lambda _: True,
+        None: lambda _: True,
+    }
+
+    DIRECT_MAP = {
+        "+": lambda _: True,
+        "-": lambda pf: None if pf == "manage_messages" else False,
+        None: None,  # Special case - handled separately
+    }
 
     def __init__(self, bot):
         self.bot = bot
@@ -419,39 +539,59 @@ class VoicePermissionManager:
         toggle=False,
         ctx=None,
         target=None,
-    ):
-        """Determines the new permission value based on inputs."""
+    ) -> Optional[bool]:
+        """
+        Determines the new permission value based on inputs.
+        Uses mapping tables to simplify logic.
+
+        The logic is:
+        1. For toggle mode: True -> False/None, False/None -> True
+        2. For direct mode (+/-): + -> True, - -> False/None
+        3. For None value: Check @everyone permissions or use defaults
+
+        Args:
+            current_perms: Current permission overwrite
+            permission_flag: The permission being modified
+            value: Direct value to set (+ or -)
+            default_to_true: Whether to default to True for manage_messages
+            toggle: Whether to toggle the current value
+            ctx: Command context (for checking @everyone perms)
+            target: Target member/role
+
+        Returns:
+            Optional[bool]: The new permission value
+                - True: Allow permission
+                - False: Deny permission
+                - None: Reset permission (for manage_messages)
+        """
         current_value = getattr(current_perms, permission_flag, None)
         self.logger.info(f"Current permission value: {current_value}")
 
+        # Handle toggle mode
         if toggle:
-            if current_value is True:
-                return None if permission_flag == "manage_messages" else False
-            return True
+            return self.TOGGLE_MAP[bool(current_value)](permission_flag)
 
-        if value is None:
-            if current_value is None:
-                if permission_flag == "manage_messages":
-                    # Dla manage_messages (mod) używamy default_to_true
-                    return True if default_to_true else False
-                else:
-                    # Dla innych uprawnień sprawdzamy @everyone
-                    everyone_perms = ctx.author.voice.channel.overwrites_for(ctx.guild.default_role)
-                    everyone_value = getattr(everyone_perms, permission_flag, None)
-                    self.logger.info(f"@everyone permission value: {everyone_value}")
+        # Handle direct value (+/-)
+        if value in self.DIRECT_MAP:
+            if self.DIRECT_MAP[value] is not None:
+                return self.DIRECT_MAP[value](permission_flag)
 
-                    # Jeśli @everyone ma jawne uprawnienie lub brak uprawnienia (None = dozwolone)
-                    if everyone_value is None or everyone_value:
-                        return False  # Ograniczamy uprawnienie
-                    return True  # Zezwalamy na uprawnienie
-            if current_value is True:
-                return None if permission_flag == "manage_messages" else False
-            return True
+        # Handle None value (no explicit +/-)
+        if current_value is None:
+            if permission_flag == "manage_messages":
+                return True if default_to_true else False
 
-        if value == "+":
-            return True
-        if value == "-":
-            return None if permission_flag == "manage_messages" else False
+            # Check @everyone permissions
+            if ctx and ctx.author.voice and ctx.author.voice.channel:
+                everyone_perms = ctx.author.voice.channel.overwrites_for(ctx.guild.default_role)
+                everyone_value = getattr(everyone_perms, permission_flag, None)
+                self.logger.info(f"@everyone permission value: {everyone_value}")
+
+                # If @everyone has explicit permission or no restriction
+                return False if (everyone_value is None or everyone_value) else True
+
+        # Default toggle behavior
+        return self.TOGGLE_MAP[bool(current_value)](permission_flag)
 
     async def _update_channel_permission(self, ctx, target, current_perms, permission_name):
         """Updates the channel permissions."""

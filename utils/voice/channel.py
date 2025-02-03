@@ -90,6 +90,7 @@ class ChannelModManager:
         self.bot = bot
         self.permission_manager = VoicePermissionManager(bot)
         self.message_sender = MessageSender()
+        self.logger = logging.getLogger(__name__)
 
     async def show_mod_status(self, ctx, voice_channel, mod_limit):
         """Shows current mod status."""
@@ -134,22 +135,26 @@ class ChannelModManager:
 
         return True
 
-    async def check_mod_limit(self, ctx, target, mod_limit, can_manage):
-        """Checks if the mod limit would be exceeded by this action."""
-        logger.info(f"Checking mod limit. Current limit: {mod_limit}")
-        logger.info(f"Can manage value: {can_manage}")
+    async def can_add_mod(self, user: discord.Member, voice_channel: discord.VoiceChannel) -> bool:
+        """
+        Check if user can add another moderator (limit not exceeded).
 
-        # Nie sprawdzamy limitu przy usuwaniu moda
-        if can_manage == "-":
-            logger.info("Skipping mod limit check for removal operation")
-            return False
+        Args:
+            user: The user trying to add a moderator
+            voice_channel: The voice channel to check
 
-        if mod_limit <= 0:
-            premium_channel_id = self.bot.config["channels"]["premium_info"]
-            await self.message_sender.send_no_premium_role(ctx, premium_channel_id)
-            return True
+        Returns:
+            bool: True if user can add another mod, False if limit reached
+        """
+        # Get user's mod limit from their highest premium role
+        mod_limit = 0
+        for role in reversed(self.bot.config["premium_roles"]):
+            if any(r.name == role["name"] for r in user.roles):
+                mod_limit = role["moderator_count"]
+                self.logger.info("Found matching role: %s, limit: %d", role, mod_limit)
+                break
 
-        voice_channel = ctx.author.voice.channel
+        # Count current mods (excluding owner)
         current_mods = [
             t
             for t, overwrite in voice_channel.overwrites.items()
@@ -158,29 +163,21 @@ class ChannelModManager:
             and not overwrite.priority_speaker
         ]
 
-        current_mods_count = len(current_mods)
-        logger.info(f"Current mods count: {current_mods_count}")
-        logger.info(f"Current mods: {[m.name for m in current_mods]}")
-
-        # Sprawdzamy limit tylko przy dodawaniu moda
-        if can_manage == "+" or (
-            can_manage is None
-            and not await self.permission_manager.can_manage_channel(target, voice_channel)
-        ):
-            if current_mods_count >= mod_limit:
-                await self.message_sender.send_mod_limit_exceeded(ctx, mod_limit, current_mods)
-                return True
-
-        return False
+        return len(current_mods) < mod_limit
 
     async def validate_channel_mod(self, ctx, target, can_manage):
         """Validates prerequisites and mod limit for channel mod action."""
         if not await self.check_prerequisites(ctx, target, can_manage):
             return False
 
-        mod_limit = await self.permission_manager.get_premium_role_limit(ctx.author)
-        logger.info(f"Got mod limit: {mod_limit}")
-        if await self.check_mod_limit(ctx, target, mod_limit, can_manage):
+        # Nie sprawdzamy limitu przy usuwaniu moda
+        if can_manage == "-":
+            return True
+
+        # Sprawdzamy limit tylko przy dodawaniu moda
+        if not await self.can_add_mod(ctx.author, ctx.author.voice.channel):
+            mod_limit = await self.permission_manager.get_premium_role_limit(ctx.author)
+            logger.info(f"Mod limit exceeded. Current limit: {mod_limit}")
             return False
 
         return True

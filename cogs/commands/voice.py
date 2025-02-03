@@ -55,7 +55,7 @@ class VoiceCog(commands.Cog):
         }
 
     @commands.hybrid_command(aliases=["s"])
-    # @commands.has_permissions(administrator=True)
+    @PermissionChecker.voice_command()
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_speak="Ustaw uprawnienie mówienia (+ lub -)",
@@ -70,7 +70,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["speak"].execute(self, ctx, target, can_speak)
 
     @commands.hybrid_command(aliases=["v"])
-    # @commands.has_permissions(administrator=True)
+    @PermissionChecker.voice_command()
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_view="Ustaw uprawnienie wyświetlania (+ lub -)",
@@ -85,7 +85,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["view"].execute(self, ctx, target, can_view)
 
     @commands.hybrid_command(aliases=["c"])
-    # @commands.has_permissions(administrator=True)
+    @PermissionChecker.voice_command()
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_connect="Ustaw uprawnienie połączenia (+ lub -)",
@@ -100,7 +100,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["connect"].execute(self, ctx, target, can_connect)
 
     @commands.hybrid_command(aliases=["t"])
-    # @commands.has_permissions(administrator=True)
+    @PermissionChecker.voice_command()
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_message="Ustaw uprawnienie pisania (+ lub -)",
@@ -115,7 +115,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["text"].execute(self, ctx, target, can_message)
 
     @commands.hybrid_command(aliases=["lv"])
-    # @commands.has_permissions(administrator=True)
+    @PermissionChecker.voice_command()
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_stream="Ustaw uprawnienie streamowania (+ lub -)",
@@ -130,7 +130,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["live"].execute(self, ctx, target, can_stream)
 
     @commands.hybrid_command(aliases=["m"])
-    # @commands.has_permissions(administrator=True)
+    @PermissionChecker.voice_command(requires_owner=True)
     @discord.app_commands.describe(
         target="Użytkownik do dodania lub usunięcia jako moderator kanału",
         can_manage="Dodaj (+) lub usuń (-) uprawnienia moderatora kanału",
@@ -142,15 +142,30 @@ class VoiceCog(commands.Cog):
         can_manage: Optional[Literal["+", "-"]] = None,
     ):
         """Add or remove channel moderator permissions for the selected user."""
-        if not await self.permission_checker.check_voice_channel(ctx):
-            return
+        # If no arguments provided, show current mod status
+        if target is None and can_manage is None:
+            voice_channel = ctx.author.voice.channel
+            # Get mod limit from user's roles
+            mod_limit = 0
+            for role in reversed(self.bot.config["premium_roles"]):
+                if any(r.name == role["name"] for r in ctx.author.roles):
+                    mod_limit = role["moderator_count"]
+                    break
 
-        voice_channel = ctx.author.voice.channel
-        mod_limit = await self.permission_manager.get_premium_role_limit(ctx.author)
+            # Get current mods
+            current_mods = [
+                t
+                for t, overwrite in voice_channel.overwrites.items()
+                if isinstance(t, discord.Member)
+                and overwrite.manage_messages is True
+                and not overwrite.priority_speaker
+            ]
+            current_mods_mentions = ", ".join(member.mention for member in current_mods)
+            remaining_slots = max(0, mod_limit - len(current_mods))
 
-        # If no target is provided, just show current mod information
-        if target is None:
-            await self.mod_manager.show_mod_status(ctx, voice_channel, mod_limit)
+            await self.message_sender.send_mod_info(
+                ctx, current_mods_mentions, mod_limit, remaining_slots
+            )
             return
 
         await self.permission_commands["mod"].execute(self, ctx, target, can_manage)
@@ -163,7 +178,7 @@ class VoiceCog(commands.Cog):
         await self.channel_manager.join_channel(ctx)
 
     @commands.hybrid_command(aliases=["l"])
-    # @commands.has_permissions(administrator=True)
+    @PermissionChecker.voice_command()
     @discord.app_commands.describe(
         max_members="Maksymalna liczba członków (1-99 dla konkretnej wartości)"
     )
@@ -172,25 +187,43 @@ class VoiceCog(commands.Cog):
         await self.channel_manager.set_channel_limit(ctx, max_members)
 
     @commands.hybrid_command(aliases=["vc"])
-    # @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
         target="Użytkownik do sprawdzenia kanału głosowego (ID, wzmianka lub nazwa użytkownika)",
     )
     async def voicechat(self, ctx, target: Optional[Member] = None):
-        """Wyślij link do kanału głosowego użytkownika i informacje o uprawnieniach."""
-        member = target or ctx.author
+        """
+        Wyślij link do kanału głosowego użytkownika i informacje o uprawnieniach.
+        Jeśli nie podano targetu, sprawdza kanał aktualnie wywołującego.
+        """
+        # 1. Jeśli **nie ma** targetu => używamy starej logiki
+        if target is None:
+            # W tej sytuacji chcemy wymagać, by wywołujący był na kanale
+            if not ctx.author.voice or not ctx.author.voice.channel:
+                await self.message_sender.send_not_in_voice_channel(ctx)
+                return
 
-        if not member.voice or not member.voice.channel:
-            await self.message_sender.send_not_in_voice_channel(ctx)
+            channel = ctx.author.voice.channel
+            info = await self.channel_manager.get_channel_info(channel, ctx.author)
+            await self.message_sender.send_voice_channel_info(
+                ctx, info["channel"], info["owner"], info["mods"], info["disabled_perms"]
+            )
             return
 
-        channel = member.voice.channel
-        info = await self.channel_manager.get_channel_info(channel, member)
+        # 2. Jeśli **jest** target => sprawdzamy kanał, w którym on jest
+        if not target.voice or not target.voice.channel:
+            # Jeśli target w ogóle nie jest na kanale
+            await self.message_sender.send_not_in_voice_channel(ctx, target)
+            return
+
+        # 3. Pobieramy kanał docelowy i wyświetlamy informacje
+        channel = target.voice.channel
+        info = await self.channel_manager.get_channel_info(channel, target)
         await self.message_sender.send_voice_channel_info(
-            ctx, info["channel"], info["owner"], info["mods"], info["disabled_perms"]
+            ctx, info["channel"], info["owner"], info["mods"], info["disabled_perms"], target
         )
 
     @commands.hybrid_command(aliases=["ak"])
+    @PermissionChecker.voice_command()
     @discord.app_commands.describe(
         target="Użytkownik do dodania/usunięcia z listy autokick",
         action="Dodaj (+) lub usuń (-) użytkownika z listy autokick",
@@ -205,7 +238,7 @@ class VoiceCog(commands.Cog):
         await self.permission_commands["autokick"].execute(self, ctx, target, action)
 
     @commands.hybrid_command(aliases=["r"])
-    # @commands.has_permissions(administrator=True)
+    @PermissionChecker.voice_command(requires_owner=True)
     @discord.app_commands.describe(
         target="Użytkownik, którego uprawnienia mają zostać zresetowane (opcjonalne)",
     )
