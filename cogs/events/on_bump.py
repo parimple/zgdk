@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from sqlalchemy import select
 
-from datasources.models import Member
+from datasources.models import Member, NotificationLog
 from datasources.queries import MemberQueries, NotificationLogQueries
 
 logger = logging.getLogger(__name__)
@@ -1073,13 +1073,10 @@ class OnBumpEvent(commands.Cog):
                             channel = self.bot.get_channel(self.notification_channel_id)
                             if channel:
                                 # Get all users who used this service
-                                stmt = select(NotificationLogQueries.NotificationLog).where(
-                                    NotificationLogQueries.NotificationLog.notification_tag
-                                    == service_name,
-                                    NotificationLogQueries.NotificationLog.member_id
+                                stmt = select(NotificationLog).where(
+                                    NotificationLog.notification_tag == service_name,
+                                    NotificationLog.member_id
                                     != self.bot.guild_id,  # Exclude guild_id logs
-                                    NotificationLogQueries.NotificationLog.member_id
-                                    != self.system_user_id,  # Exclude system logs
                                 )
                                 user_logs = (await session.execute(stmt)).scalars().all()
 
