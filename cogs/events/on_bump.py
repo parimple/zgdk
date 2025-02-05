@@ -846,7 +846,7 @@ class OnBumpEvent(commands.Cog):
         emojis = {
             "disboard": "<:botDisboard:1336275527241044069>",
             "dzik": "<:botDzik:1336275532991565824>",
-            "discadia": "<:botDiscardia:1336275880703561758>",
+            "discadia": "<:botDiscadia:1336275880703561758>",
             "discordservers": "<:botDiscordServers:1336322514170806383>",
             "dsme": "<:botDSME:1336311501765476352>",
         }
@@ -870,7 +870,7 @@ class OnBumpEvent(commands.Cog):
                 "command": "/bump",
             },
             "discadia": {
-                "name": "Discardia",
+                "name": "Discadia",
                 "cooldown": "24h",
                 "cooldown_type": "👤",
                 "reward": "6T",

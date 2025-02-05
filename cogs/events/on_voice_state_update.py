@@ -19,7 +19,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.guild = bot.get_guild(self.bot.config["guild_id"])
+        self.guild = None
         self.logger = logging.getLogger(__name__)
         self.message_sender = MessageSender(bot)
         self.permission_manager = VoicePermissionManager(bot)
@@ -27,6 +27,17 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
         self.channels_create = self.bot.config["channels_create"]
         self.vc_categories = self.bot.config["vc_categories"]
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Set guild when bot is ready"""
+        self.guild = self.bot.get_guild(self.bot.guild_id)
+        if not self.guild:
+            logger.error("Cannot find guild with ID %d", self.bot.guild_id)
+            return
+
+        logger.info("Setting guild for VoicePermissionManager in OnVoiceStateUpdateEvent")
+        self.permission_manager.guild = self.guild
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
