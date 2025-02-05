@@ -77,7 +77,6 @@ class OnBumpEvent(commands.Cog):
         self.notification_channel_id = 1336368306940018739
         self.system_user_id = bot.guild_id
         self.test_mode = True  # Flaga do kontrolowania trybu testowego
-        self.check_bump_availability.start()  # pylint: disable=no-member
 
     def get_service_duration(self, service: str) -> int:
         """Get duration for a service"""
@@ -1051,75 +1050,6 @@ class OnBumpEvent(commands.Cog):
                     "cooldown": cooldown,
                     "duration": duration,
                 }
-
-    @tasks.loop(minutes=5)
-    async def check_bump_availability(self):
-        """Check and notify about available bumps/votes"""
-        logger.info("Checking bump availability")
-        now = datetime.now(timezone.utc)
-
-        async with self.bot.get_db() as session:
-            # Get all services from config
-            services = ["disboard", "dzik", "discadia", "discordservers", "dsme"]
-
-            for service_name in services:
-                cooldown = self.get_service_cooldown(service_name)
-                # Get last bump time for this service
-                log = await NotificationLogQueries.get_notification_log(
-                    session,
-                    self.bot.guild_id if service_name in GLOBAL_SERVICES else self.system_user_id,
-                    service_name,
-                )
-
-                if not log or now - log.sent_at > timedelta(hours=cooldown):
-                    # Service is available for bump/vote
-                    notification_message = self.bot.config["bypass"]["notifications"][
-                        "messages"
-                    ].get(service_name)
-                    if notification_message:
-                        # Check if we haven't notified recently
-                        notification_log = await NotificationLogQueries.get_notification_log(
-                            session, self.system_user_id, f"{service_name}_available"
-                        )
-
-                        if not notification_log or now - notification_log.sent_at > timedelta(
-                            minutes=30
-                        ):
-                            # Send notification to appropriate channel
-                            channel = self.bot.get_channel(self.notification_channel_id)
-                            if channel:
-                                # Get all users who used this service
-                                stmt = select(NotificationLog).where(
-                                    NotificationLog.notification_tag == service_name,
-                                    NotificationLog.member_id
-                                    != self.bot.guild_id,  # Exclude guild_id logs
-                                )
-                                user_logs = (await session.execute(stmt)).scalars().all()
-
-                                # Filter users whose cooldown has expired
-                                available_users = []
-                                for user_log in user_logs:
-                                    if now - user_log.sent_at > timedelta(hours=cooldown):
-                                        member = self.bot.guild.get_member(user_log.member_id)
-                                        if member:
-                                            available_users.append(member)
-
-                                if available_users:
-                                    # Format message with mentions of all available users
-                                    mentions = ", ".join(
-                                        member.mention for member in available_users
-                                    )
-                                    formatted_message = notification_message.format(
-                                        mention=mentions
-                                    )
-                                    await channel.send(formatted_message)
-                                    await NotificationLogQueries.add_or_update_notification_log(
-                                        session, self.system_user_id, f"{service_name}_available"
-                                    )
-                                    await session.commit()
-                                    logger.info(
-                                        f"Sent availability notification for {service_name} to {len(available_users)} users"
-                                    )
 
     async def send_notification(self, member, message):
         """Send notification based on test_mode setting"""
