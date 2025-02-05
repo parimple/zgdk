@@ -155,6 +155,27 @@ bypass:
   duration:
     bump: 12  # godziny dodawane za bump
     activity: 6  # godziny dodawane za aktywność
+    # Czasy T za głosowanie/bump na różnych serwisach
+    services:
+      disboard: 3      # 3T za bump na Disboard
+      dzik: 3          # 3T za bump na Dziku
+      discadia: 6      # 6T za głos na Discadia
+      discordservers: 6  # 6T za głos na DiscordServers
+      dsme: 3          # 3T za głos na DSME
+  cooldown:
+    disboard: 2      # globalny cooldown w godzinach
+    dzik: 3          # cooldown per user w godzinach
+    discadia: 24     # cooldown per user w godzinach
+    discordservers: 12  # cooldown per user w godzinach
+    dsme: 6          # cooldown per user w godzinach
+  notifications:
+    check_interval: 5  # jak często sprawdzać dostępność (w minutach)
+    messages:
+      disboard: "{mention} Możesz już zbumpować serwer na Disboard! Użyj `/bump` aby otrzymać 3T ❤️"
+      dzik: "{mention} Możesz już zbumpować serwer na Dziku! Użyj `/bump` aby otrzymać 3T ❤️"
+      discadia: "{mention} Możesz już zagłosować na Discadia! Odwiedź stronę: https://discadia.com/vote/polska/ aby otrzymać 6T ❤️"
+      discordservers: "{mention} Możesz już zagłosować na DiscordServers! Odwiedź stronę: https://discordservers.com/server/960665311701528596/bump aby otrzymać 6T ❤️"
+      dsme: "{mention} Możesz już zagłosować na DSME! Odwiedź stronę: https://discords.com/servers/960665311701528596/upvote aby otrzymać 3T ❤️"
 
 mute_roles:
   - id: 960665311760248873

@@ -3,6 +3,7 @@ SQLAlchemy models for the database.
 """
 
 from datetime import datetime, timezone
+from typing import List, Optional
 
 from sqlalchemy import (
     BigInteger,
@@ -153,6 +154,7 @@ class NotificationLog(Base):
     sent_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)
     )
+    notification_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     opted_out: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     member: Mapped[Member] = relationship("Member", backref="notification_logs")
@@ -162,7 +164,7 @@ class NotificationLog(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<NotificationLog(member_id={self.member_id}, notification_tag={self.notification_tag}, sent_at={self.sent_at}, opted_out={self.opted_out})>"
+        return f"<NotificationLog(member_id={self.member_id}, notification_tag={self.notification_tag}, sent_at={self.sent_at}, notification_count={self.notification_count}, opted_out={self.opted_out})>"
 
 
 class Message(Base):

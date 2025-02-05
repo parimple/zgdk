@@ -32,7 +32,7 @@ def load_config():
 
 
 class Zagadka(commands.Bot):
-    """Main class for Zagadka bot"""
+    """Bot class."""
 
     def __init__(self, config, **kwargs):
         load_dotenv()
@@ -109,6 +109,11 @@ class Zagadka(commands.Bot):
                     except (commands.ExtensionError, commands.CommandError) as error:
                         logging.error("Failed to load cog: %s, error: %s", cog, error)
 
+    async def setup_hook(self):
+        """Setup hook."""
+        if not self.test:
+            await self.load_cogs()
+
     async def on_ready(self):
         """On ready event"""
         logging.info("Event on_ready started")
@@ -136,7 +141,6 @@ class Zagadka(commands.Bot):
                 self.guild = guild
 
         if not self.test:
-            await self.load_cogs()
             await self.tree.sync(guild=discord.Object(id=self.guild_id))
             logging.info("Slash commands synchronized")
 
@@ -150,6 +154,16 @@ class Zagadka(commands.Bot):
                 "Missing bot token. Ensure that ZAGADKA_TOKEN is set in the environment variables."
             )
         super().run(token, reconnect=True)
+
+    @property
+    def force_channel_notifications(self):
+        """Get global notification setting"""
+        return self.config.get("force_channel_notifications", True)
+
+    @force_channel_notifications.setter
+    def force_channel_notifications(self, value: bool):
+        """Set global notification setting"""
+        self.config["force_channel_notifications"] = value
 
 
 def setup_logging():

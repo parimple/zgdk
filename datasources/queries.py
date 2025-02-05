@@ -4,7 +4,7 @@ Queries for the database.
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy import asc, delete, desc, select, update
 from sqlalchemy.exc import IntegrityError
@@ -133,6 +133,21 @@ class MemberQueries:
         except Exception as e:
             logger.error(f"Failed to clear voice bypass for member {member_id}: {str(e)}")
             return False
+
+    @staticmethod
+    async def add_bypass_time(session: AsyncSession, user_id: int, hours: int) -> Optional[Member]:
+        """Add bypass time to a member"""
+        member = await session.get(Member, user_id)
+        if not member:
+            return None
+
+        now = datetime.now(timezone.utc)
+        if not member.voice_bypass_until or member.voice_bypass_until < now:
+            member.voice_bypass_until = now + timedelta(hours=hours)
+        else:
+            member.voice_bypass_until += timedelta(hours=hours)
+
+        return member
 
 
 class RoleQueries:
@@ -528,37 +543,59 @@ class ChannelPermissionQueries:
 class NotificationLogQueries:
     """Class for Notification Log Queries"""
 
+    GLOBAL_SERVICES = ["disboard"]  # tylko Disboard jest globalny
+    MAX_NOTIFICATION_COUNT = 3
+
     @staticmethod
     async def add_or_update_notification_log(
         session: AsyncSession,
         member_id: int,
         notification_tag: str,
-        opted_out: Optional[bool] = None,
+        reset_notification_count: bool = False,
     ) -> NotificationLog:
-        # logger.info(
-        #     f"Adding/updating notification log: Member ID: {member_id}, Tag: {notification_tag}"
-        # )
+        """
+        Add or update a notification log entry.
+        For global services (bumps), member_id should be guild_id.
+        For user-specific services, member_id should be user_id.
+        """
         notification_log = await session.get(NotificationLog, (member_id, notification_tag))
 
         if notification_log is None:
-            # logger.info("Creating new notification log")
             notification_log = NotificationLog(
                 member_id=member_id,
                 notification_tag=notification_tag,
                 sent_at=datetime.now(timezone.utc),
-                opted_out=False if opted_out is None else opted_out,
+                notification_count=0,
+                opted_out=False,
             )
             session.add(notification_log)
         else:
-            # logger.info(
-            #     f"Updating existing notification log. Old sent_at: {notification_log.sent_at}"
-            # )
             notification_log.sent_at = datetime.now(timezone.utc)
-            if opted_out is not None:
-                notification_log.opted_out = opted_out
+            if reset_notification_count:
+                notification_log.notification_count = 0
 
-        # logger.info(f"Notification log after update: {notification_log}")
         return notification_log
+
+    @staticmethod
+    async def increment_notification_count(
+        session: AsyncSession, member_id: int, notification_tag: str
+    ) -> Tuple[NotificationLog, bool]:
+        """
+        Increment notification count and return if max count reached.
+        Returns (notification_log, should_opt_out)
+        """
+        notification_log = await session.get(NotificationLog, (member_id, notification_tag))
+        if not notification_log:
+            return None, False
+
+        notification_log.notification_count += 1
+        should_opt_out = (
+            notification_log.notification_count >= NotificationLogQueries.MAX_NOTIFICATION_COUNT
+        )
+        if should_opt_out:
+            notification_log.opted_out = True
+
+        return notification_log, should_opt_out
 
     @staticmethod
     async def get_notification_log(
@@ -568,50 +605,93 @@ class NotificationLogQueries:
         return await session.get(NotificationLog, (member_id, notification_tag))
 
     @staticmethod
-    async def get_notification_logs(
-        session: AsyncSession, member_id: int, notification_tag: Optional[str] = None
-    ) -> List[NotificationLog]:
-        """Get all notification logs for a specific member"""
-        query = select(NotificationLog).where(NotificationLog.member_id == member_id)
-        if notification_tag:
-            query = query.where(NotificationLog.notification_tag == notification_tag)
+    async def get_service_notification_log(
+        session: AsyncSession, service: str, guild_id: int, user_id: Optional[int] = None
+    ) -> Optional[NotificationLog]:
+        """Get notification log for a service, handling both global and user-specific services"""
+        # For global services (bumps), use guild_id as member_id
+        member_id = guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
+        if member_id is None:
+            return None
+
+        return await session.get(NotificationLog, (member_id, service))
+
+    @staticmethod
+    async def get_service_users(
+        session: AsyncSession, service: str, guild_id: Optional[int] = None
+    ) -> List[int]:
+        """Get all users who have used a service"""
+        query = (
+            select(NotificationLog.member_id)
+            .where(NotificationLog.notification_tag == service)
+            .distinct()
+        )
+
+        if guild_id is not None:
+            query = query.where(NotificationLog.member_id != guild_id)
+
         result = await session.execute(query)
         return result.scalars().all()
 
     @staticmethod
-    async def get_member_roles_with_notifications(
+    async def can_use_service(
         session: AsyncSession,
-        expiration_threshold: datetime,
-        role_ids: Optional[list[int]] = None,
-        notification_tag: Optional[str] = None,
-    ) -> list[tuple[MemberRole, Optional[NotificationLog]]]:
-        query = (
-            select(MemberRole, NotificationLog)
-            .options(joinedload(MemberRole.role))
-            .outerjoin(
-                NotificationLog,
-                (MemberRole.member_id == NotificationLog.member_id)
-                & (NotificationLog.notification_tag == notification_tag),
-            )
-            .join(Role, MemberRole.role_id == Role.id)
-            .where(
-                (MemberRole.expiration_date <= expiration_threshold) & (Role.role_type == "premium")
-            )
+        service: str,
+        guild_id: int,
+        user_id: Optional[int] = None,
+        cooldown_hours: int = 24,
+    ) -> bool:
+        """Check if service can be used based on cooldown"""
+        # For global services (bumps), use guild_id as member_id
+        member_id = guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
+        if member_id is None:
+            return False
+
+        log = await session.get(NotificationLog, (member_id, service))
+        if not log:
+            return True
+
+        now = datetime.now(timezone.utc)
+        return (now - log.sent_at) >= timedelta(hours=cooldown_hours)
+
+    @staticmethod
+    async def process_service_usage(
+        session: AsyncSession,
+        service: str,
+        guild_id: int,
+        user_id: int,
+        cooldown_hours: int,
+        dry_run: bool = False,
+    ) -> Tuple[bool, Optional[NotificationLog]]:
+        """
+        Process service usage and update notification log.
+        If dry_run is True, only check if service can be used without updating the log.
+        """
+        # Get current notification log
+        log = await NotificationLogQueries.get_service_notification_log(
+            session, service, guild_id, user_id
         )
 
-        if role_ids:
-            query = query.where(MemberRole.role_id.in_(role_ids))
+        # If no log exists, service can be used
+        if not log:
+            if not dry_run:
+                log = await NotificationLogQueries.add_or_update_notification_log(
+                    session, user_id, service
+                )
+            return True, log
 
-        logger.info(f"SQL Query: {query.compile(compile_kwargs={'literal_binds': True})}")
-        result = await session.execute(query)
-        roles_with_notifications = result.all()
-        for role, notification in roles_with_notifications:
-            logger.info(
-                f"Found role: Member ID: {role.member_id}, Role ID: {role.role_id}, "
-                f"Expiration Date: {role.expiration_date}, "
-                f"Notification: {notification.notification_tag if notification else 'None'}"
+        # Check if cooldown has passed
+        current_time = datetime.now(timezone.utc)
+        if log.sent_at and log.sent_at + timedelta(hours=cooldown_hours) > current_time:
+            return False, log
+
+        # Service can be used - update log if not dry run
+        if not dry_run:
+            log = await NotificationLogQueries.add_or_update_notification_log(
+                session, user_id, service
             )
-        return roles_with_notifications
+
+        return True, log
 
 
 class MessageQueries:

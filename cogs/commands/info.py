@@ -137,8 +137,9 @@ class InfoCog(commands.Cog):
         # Add bypass time info if active
         if bypass_until and bypass_until > current_time:
             time_left = bypass_until - current_time
-            hours = int(time_left.total_seconds() / 3600)
-            embed.add_field(name="Saldo VC:", value=f"{hours}T")
+            # Convert to hours and round down to nearest integer
+            hours = int(time_left.total_seconds() // 3600)
+            embed.add_field(name="Ilość czasu:", value=f"{hours}T")
 
         embed.add_field(name="Konto od:", value=discord.utils.format_dt(member.created_at, "D"))
         embed.add_field(
@@ -207,6 +208,12 @@ class InfoCog(commands.Cog):
                 bypass_until = current_time + timedelta(hours=hours)
                 await MemberQueries.set_voice_bypass_status(session, member.id, bypass_until)
                 await ctx.send(f"Ustawiono bypass dla {member.mention} na {hours}T.")
+
+    @commands.hybrid_command(name="pomoc", description="Wyświetla listę dostępnych komend")
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    async def help_command(self, ctx: commands.Context):
+        """Wyświetla listę dostępnych komend"""
+        await ctx.send_help()
 
 
 class ProfileView(discord.ui.View):

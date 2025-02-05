@@ -1,5 +1,6 @@
 """On Member Join Event"""
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -20,10 +21,69 @@ class OnMemberJoinEvent(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.guild = bot.guild
-        self.invites = bot.invites
-        self.channel = bot.guild.get_channel(bot.channels.get("on_join"))
-        self.clean_invites.start()
+        self.guild = None
+        self.invites = {}
+        self.welcome_channel = None
+        self.rules_channel = None
+        self.setup_channels.start()  # pylint: disable=no-member
+        self.setup_guild.start()  # pylint: disable=no-member
+        # clean_invites will be started after guild is set up
+
+    @tasks.loop(count=1)
+    async def setup_guild(self):
+        """Setup guild and invites after bot is ready"""
+        logger.info("Waiting for bot to be ready...")
+        await self.bot.wait_until_ready()
+
+        # Wait for guild to be set
+        while self.bot.guild is None:
+            logger.info("Waiting for guild to be set...")
+            await asyncio.sleep(1)
+
+        logger.info("Bot is ready and guild is set, setting up guild and invites")
+
+        self.guild = self.bot.guild
+        self.invites = {invite.id: invite for invite in await self.guild.invites()}
+
+        # Start clean_invites task only after guild is set up
+        self.clean_invites.start()  # pylint: disable=no-member
+
+    async def cog_unload(self):
+        """Clean up tasks when cog is unloaded"""
+        self.setup_channels.cancel()
+        self.setup_guild.cancel()
+        self.clean_invites.cancel()
+
+    @tasks.loop(count=1)
+    async def setup_channels(self):
+        """Setup channels after bot is ready"""
+        logger.info("Waiting for bot to be ready...")
+        await self.bot.wait_until_ready()
+
+        # Wait for guild to be set
+        while self.bot.guild is None:
+            logger.info("Waiting for guild to be set...")
+            await asyncio.sleep(1)
+
+        logger.info("Bot is ready and guild is set, setting up channels")
+
+        # Now we can safely get channels
+        welcome_channel_id = self.bot.channels.get("on_join")
+        rules_channel_id = self.bot.channels.get("rules")
+
+        logger.info(f"Getting welcome channel with ID: {welcome_channel_id}")
+        logger.info(f"Getting rules channel with ID: {rules_channel_id}")
+
+        self.welcome_channel = self.bot.get_channel(welcome_channel_id)
+        self.rules_channel = self.bot.get_channel(rules_channel_id)
+
+        logger.info(f"Welcome channel set: {self.welcome_channel}")
+        logger.info(f"Rules channel set: {self.rules_channel}")
+
+        if not self.welcome_channel:
+            logger.error(f"Failed to get welcome channel with ID {welcome_channel_id}")
+        if not self.rules_channel:
+            logger.error(f"Failed to get rules channel with ID {rules_channel_id}")
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -37,27 +97,60 @@ class OnMemberJoinEvent(commands.Cog):
 
         :param member: The member who joined the guild
         """
-        # Fetch the current invites
-        new_invites = await member.guild.invites()
+        logger.info(f"Member join event triggered for {member} ({member.id})")
 
-        # Convert the new invites to a dictionary
-        new_invites_dict = {invite.id: invite for invite in new_invites}
+        if member.guild.id != self.bot.guild_id:
+            logger.info(
+                f"Member joined different guild: {member.guild.id} (expected {self.bot.guild_id})"
+            )
+            return
 
-        # Find the used invite
-        used_invite = None
-        for invite_id, new_invite in new_invites_dict.items():
-            old_invite = self.invites.get(invite_id)
-            if old_invite and old_invite.uses < new_invite.uses:
-                used_invite = new_invite
-                await self.process_invite(member, new_invite)
-                break
+        # Check if we have invites dictionary initialized
+        if not self.invites:
+            logger.warning("Invites dictionary is empty, initializing...")
+            self.invites = {invite.id: invite for invite in await member.guild.invites()}
 
-        # Handle the case when no invite was identified
-        if used_invite is None:
+        # Log current state
+        logger.info(f"Current invites count: {len(self.invites)}")
+
+        try:
+            # Fetch the current invites
+            new_invites = await member.guild.invites()
+            logger.info(f"New invites count: {len(new_invites)}")
+
+            # Convert the new invites to a dictionary
+            new_invites_dict = {invite.id: invite for invite in new_invites}
+
+            # Find the used invite
+            used_invite = None
+            for invite_id, new_invite in new_invites_dict.items():
+                old_invite = self.invites.get(invite_id)
+                if old_invite:
+                    logger.debug(
+                        f"Comparing invite {invite_id}: old uses={old_invite.uses}, new uses={new_invite.uses}"
+                    )
+                    if old_invite.uses < new_invite.uses:
+                        used_invite = new_invite
+                        logger.info(
+                            f"Found used invite: {invite_id} (uses: {new_invite.uses}, inviter: {new_invite.inviter})"
+                        )
+                        await self.process_invite(member, new_invite)
+                        break
+                else:
+                    logger.debug(f"New invite found: {invite_id} (uses: {new_invite.uses})")
+
+            # Handle the case when no invite was identified
+            if used_invite is None:
+                logger.info(f"No invite identified for member {member}, processing as unknown")
+                await self.process_unknown_invite(member)
+
+            # Update the invites dictionary
+            self.invites = new_invites_dict
+
+        except Exception as e:
+            logger.error(f"Error processing member join for {member}: {str(e)}", exc_info=True)
+            # Still try to process as unknown invite if something went wrong
             await self.process_unknown_invite(member)
-
-        # Update the invites dictionary
-        self.invites = new_invites_dict
 
     async def process_invite(self, member, invite):
         """
@@ -97,11 +190,21 @@ class OnMemberJoinEvent(commands.Cog):
                 logger.error(f"Error processing invite for member {member.id}: {str(e)}")
                 await session.rollback()
 
-        await self.channel.send(
-            f"{member.mention} {member.display_name} zaproszony przez {invite.inviter.mention} "
-            f"Kod: {invite.code}, Użycia: {invite.uses}",
-            allowed_mentions=AllowedMentions(users=False),
-        )
+        # Check if welcome_channel is None and try to get it again
+        if self.welcome_channel is None:
+            self.welcome_channel = self.bot.get_channel(self.bot.channels.get("on_join"))
+            logger.info(f"Re-fetched welcome channel: {self.welcome_channel}")
+
+        if self.welcome_channel:
+            await self.welcome_channel.send(
+                f"{member.mention} {member.display_name} zaproszony przez {invite.inviter.mention} "
+                f"Kod: {invite.code}, Użycia: {invite.uses}",
+                allowed_mentions=AllowedMentions(users=False),
+            )
+        else:
+            logger.error(
+                f"Welcome channel is still None, could not send welcome message for {member}"
+            )
 
     async def process_unknown_invite(self, member):
         """
@@ -117,11 +220,21 @@ class OnMemberJoinEvent(commands.Cog):
             )
             await session.commit()
 
-        await self.channel.send(
-            f"{member.mention} {member.display_name} zaproszony przez {self.bot.user.mention} "
-            f"Kod: {self.guild.vanity_url_code}",
-            allowed_mentions=AllowedMentions(users=False),
-        )
+        # Check if welcome_channel is None and try to get it again
+        if self.welcome_channel is None:
+            self.welcome_channel = self.bot.get_channel(self.bot.channels.get("on_join"))
+            logger.info(f"Re-fetched welcome channel: {self.welcome_channel}")
+
+        if self.welcome_channel:
+            await self.welcome_channel.send(
+                f"{member.mention} {member.display_name} zaproszony przez {self.bot.user.mention} "
+                f"Kod: {self.guild.vanity_url_code}",
+                allowed_mentions=AllowedMentions(users=False),
+            )
+        else:
+            logger.error(
+                f"Welcome channel is still None, could not send welcome message for {member}"
+            )
 
     @commands.Cog.listener()
     async def on_invite_create(self, invite):
@@ -307,7 +420,11 @@ class OnMemberJoinEvent(commands.Cog):
 
     @clean_invites.before_loop
     async def before_clean_invites(self):
-        await self.bot.wait_until_ready()
+        """Ensure guild is set before starting clean_invites task"""
+        if not self.guild:
+            logger.info("Waiting for guild to be set before starting clean_invites...")
+            while not self.guild:
+                await asyncio.sleep(1)
 
     async def notify_invite_deleted(self, user_id: int, invite_id: str):
         user = self.guild.get_member(user_id)

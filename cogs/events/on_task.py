@@ -2,6 +2,7 @@
 On Task Event
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -21,6 +22,14 @@ class OnTaskEvent(commands.Cog):
         self.bot = bot
         self.check_premium_expiry.start()  # pylint: disable=no-member
         self.remove_expired_roles.start()  # pylint: disable=no-member
+        self.notification_channel_id = 1336368306940018739
+        # Set default channel notifications to True
+        self.bot.force_channel_notifications = True
+
+    @property
+    def force_channel_notifications(self):
+        """Get global notification setting from bot"""
+        return self.bot.force_channel_notifications
 
     @tasks.loop(hours=1)
     async def check_premium_expiry(self):
@@ -94,26 +103,36 @@ class OnTaskEvent(commands.Cog):
                 )
 
             logger.info("Sending expiry notification to %s (%d)", member.display_name, member.id)
-            await member.send(
+
+            message = (
                 f"Twoja rola premium {role.name} wygaśnie {expiration_str}. \n"
                 f"{price_message}\n"
                 f"Zasil swoje konto, aby ją przedłużyć: {self.bot.config['donate_url']}\n"
                 "Wpisując **TYLKO** swoje id w polu - Twój nick."
             )
-            await member.send(f"```{member.id}```")
+            id_message = f"```{member.id}```"
+
+            if not self.force_channel_notifications:
+                await member.send(message)
+                await member.send(id_message)
+            else:
+                await self.notify_in_channel(member, expiration_str, price_message)
+
         except discord.Forbidden:
             logger.warning("Could not send DM to %s (%d).", member.display_name, member.id)
             await self.notify_in_channel(member, expiration_str, price_message)
 
     async def notify_in_channel(self, member, expiration_str, price_message):
-        """Notify in the channel if DM cannot be sent"""
-        channel_id = self.bot.config["channels"]["donation"]
-        channel = self.bot.get_channel(channel_id)
+        """Notify in the channel if DM cannot be sent or if forced to use channel"""
+        channel = self.bot.get_channel(self.notification_channel_id)
         if channel:
             logger.info("Sending channel notification to %s (%d)", member.display_name, member.id)
+
+            # Add prefix to indicate if this is a forced channel message or DM fallback
+            prefix = "[Kanał]" if self.force_channel_notifications else "[DM nie działa]"
+
             await channel.send(
-                f"{member.mention}, Twoja rola premium wygaśnie {expiration_str}, "
-                f"ale nie mogłem wysłać do Ciebie wiadomości prywatnej. \n"
+                f"{prefix} {member.mention}, Twoja rola premium wygaśnie {expiration_str}. \n"
                 f"{price_message}\n"
                 f"Zasil swoje konto, aby ją przedłużyć: {self.bot.config['donate_url']}\n"
                 "Wpisując **TYLKO** swoje id w polu - Twój nick."
@@ -182,7 +201,6 @@ class OnTaskEvent(commands.Cog):
     async def notify_premium_removal(self, member, member_role, role):
         """Notify user about removed premium membership"""
         try:
-            # Get the price of the role
             role_price = next(
                 (r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role.name),
                 None,
@@ -199,13 +217,21 @@ class OnTaskEvent(commands.Cog):
             expiration_date = discord.utils.format_dt(member_role.expiration_date, "R")
 
             logger.info("Sending removal notification to %s (%d)", member.display_name, member.id)
-            await member.send(
+
+            message = (
                 f"Twoja rola premium {role.name} wygasła {expiration_date}. \n"
                 f"{price_message}\n"
                 f"Zasil swoje konto, aby ją odnowić: {self.bot.config['donate_url']}\n"
                 "Wpisując **TYLKO** swoje id w polu - Twój nick."
             )
-            await member.send(f"```{member.id}```")
+            id_message = f"```{member.id}```"
+
+            if not self.force_channel_notifications:
+                await member.send(message)
+                await member.send(id_message)
+            else:
+                await self.notify_in_channel(member, "już wygasła", price_message)
+
         except discord.Forbidden:
             logger.warning("Could not send DM to %s (%d).", member.display_name, member.id)
             await self.notify_in_channel(member, "już wygasła", price_message)
@@ -234,9 +260,16 @@ class OnTaskEvent(commands.Cog):
     @check_premium_expiry.before_loop
     @remove_expired_roles.before_loop
     async def before_tasks(self):
+        """Wait for bot to be ready and guild to be set before starting tasks"""
         logger.info("Waiting for bot to be ready before starting tasks")
         await self.bot.wait_until_ready()
-        logger.info("Bot is ready, starting tasks")
+
+        # Wait for guild to be set
+        while self.bot.guild is None:
+            logger.info("Waiting for guild to be set...")
+            await asyncio.sleep(1)
+
+        logger.info("Bot is ready and guild is set, starting tasks")
 
     @commands.command()
     @commands.is_owner()

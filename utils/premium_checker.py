@@ -83,6 +83,10 @@ class PremiumChecker:
         """
 
         async def predicate(ctx):
+            # Skip checks for help command and help context
+            if ctx.command.name == "help" or ctx.invoked_with == "help":
+                return True
+
             checker = PremiumChecker(ctx.bot)
             return await checker.check_premium_requirement(ctx, command_name)
 

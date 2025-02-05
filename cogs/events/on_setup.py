@@ -1,6 +1,7 @@
 """
 On Setup Event
 """
+import asyncio
 import logging
 
 import discord
@@ -51,13 +52,23 @@ class OnSetupEvent(commands.Cog):
                 )
             await session.commit()
 
-    @tasks.loop(count=1)  # Run this task only once
+    @tasks.loop(count=1)
     async def setup_roles(self):
-        """Setup roles"""
-        await self.bot.wait_until_ready()
+        """Setup roles after bot is ready"""
         logger.info("Setting up roles")
-        # Premium roles
-        premium_roles = self.bot.config["premium_roles"]
+
+        # Wait for bot to be ready
+        await self.bot.wait_until_ready()
+
+        # Wait for guild to be set
+        while self.bot.guild is None:
+            logger.info("Waiting for guild to be set...")
+            await asyncio.sleep(1)
+
+        logger.info("Bot is ready and guild is set, setting up roles")
+
+        # Get roles from config
+        premium_roles = self.bot.config.get("premium_roles", [])
         await self.ensure_roles_in_db_and_guild(premium_roles, "premium")
         # Ranking roles
         rank_role_names = [{"name": str(i)} for i in range(1, 101)]

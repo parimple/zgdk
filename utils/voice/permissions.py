@@ -228,6 +228,10 @@ class PermissionChecker:
         """
 
         async def predicate(ctx):
+            # Skip checks for help command and help context
+            if ctx.command.name == "help" or ctx.invoked_with == "help":
+                return True
+
             checker = ctx.cog.permission_checker
 
             # Check if user is in voice channel
