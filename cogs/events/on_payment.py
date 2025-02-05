@@ -92,18 +92,27 @@ class OnPaymentEvent(commands.Cog):
 
     @check_payments.before_loop
     async def before_check_payments(self):
-        """Before Check Payments"""
+        """Wait for bot to be ready and guild to be set before starting payments check"""
+        logger.info("Waiting for bot to be ready...")
         await self.bot.wait_until_ready()
-        if self.guild is None:
-            logger.info("Guild is not set, fetching from bot")
-            self.guild = self.bot.get_guild(self.bot.guild_id)
+
+        # Wait for guild to be set
+        while not self.guild:
+            logger.info("Waiting for guild to be set...")
+            await asyncio.sleep(1)
+
+        logger.info("Bot is ready and guild is set, starting payment checks")
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Set guild when bot is ready"""
-        self.guild = self.bot.get_guild(self.bot.config["guild_id"])
+        self.guild = self.bot.get_guild(self.bot.guild_id)
         if not self.guild:
-            logger.error("Guild not found")
+            logger.error("Cannot find guild with ID %d", self.bot.guild_id)
+            return
+
+        logger.info("Setting guild for PremiumManager in OnPaymentEvent")
+        self.premium_manager.set_guild(self.guild)
 
     async def extend_existing_role_partially(
         self, session, member: discord.Member, final_amount: int
@@ -189,7 +198,14 @@ class OnPaymentEvent(commands.Cog):
         owner = self.guild.get_member(owner_id)
         embed = None
 
-        # 1. Najpierw sprawdź standardowe role premium
+        # Najpierw dodaj do portfela
+        await MemberQueries.add_to_wallet_balance(session, member.id, final_amount)
+
+        # Jeśli kwota >= 15, nadaj odpowiednie role tymczasowe
+        if final_amount >= 15:
+            await self.assign_temporary_roles(session, member, final_amount)
+
+        # Sprawdź standardowe role premium
         for role_config in self.bot.config["premium_roles"]:
             if final_amount in [role_config["price"], role_config["price"] + 1]:
                 premium_role = role_config
@@ -198,7 +214,7 @@ class OnPaymentEvent(commands.Cog):
                 )
                 break
 
-        # 2. Jeśli znaleziono rolę premium, przetwórz ją
+        # Jeśli znaleziono rolę premium, przetwórz ją
         if premium_role:
             logger.info(f"Processing premium role: {premium_role['name']}")
             role = discord.utils.get(self.guild.roles, name=premium_role["name"])
@@ -341,22 +357,12 @@ class OnPaymentEvent(commands.Cog):
                     )
 
                 await self.remove_mute_roles(member)
-
-        # 3. Jeśli nie znaleziono roli premium, sprawdź partial extension
-        if not premium_role:
+        else:
+            # Jeśli nie znaleziono roli premium, sprawdź partial extension
             embed_partial = await self.extend_existing_role_partially(session, member, final_amount)
             if embed_partial:
                 embed = embed_partial
             else:
-                # 4. Jeśli nie ma roli premium ani partial extension, dodaj do portfela i przydziel role tymczasowe
-                # Dodaj do portfela
-                await MemberQueries.add_to_wallet_balance(session, member.id, final_amount)
-
-                # Przydziel role tymczasowe tylko jeśli user nie ma żadnej roli premium
-                has_premium = any(role.name in PARTIAL_EXTENSIONS for role in member.roles)
-                if not has_premium:
-                    await self.assign_temporary_roles(session, member, original_amount)
-
                 # Użyj przekonwertowanej kwoty w wiadomości
                 amount_to_display = final_amount
                 logger.info(
@@ -392,7 +398,11 @@ class OnPaymentEvent(commands.Cog):
             await message.reply(f"{owner.mention}")
 
     async def assign_temporary_roles(self, session, member, amount):
-        """Assign all applicable temporary roles based on donation amount"""
+        """
+        Assign all applicable temporary roles based on donation amount.
+        After $4 and $8 roles, wait 5 seconds.
+        After all roles are assigned, wait additional 5 seconds.
+        """
         logger.info(
             f"Member {member.display_name} roles before assignment: {[r.name for r in member.roles]}"
         )
@@ -407,7 +417,6 @@ class OnPaymentEvent(commands.Cog):
             (640, "$128"),
         ]
 
-        last_assigned_role = None
         for amount_required, role_name in roles_tiers:
             logger.info(f"Checking if {amount} >= {amount_required} for role {role_name}")
             if amount >= amount_required:
@@ -425,7 +434,7 @@ class OnPaymentEvent(commands.Cog):
                             days_left = (
                                 current_role.expiration_date - datetime.now(timezone.utc)
                             ).days
-                            if days_left < 1 or days_left > 29:
+                            if days_left < 1 or days_left >= 29:
                                 days_to_add = 33
                                 logger.info(
                                     f"Role {role_name} has {days_left} days left, extending by {days_to_add} days"
@@ -444,7 +453,12 @@ class OnPaymentEvent(commands.Cog):
                             logger.info(
                                 f"Updated expiration for role {role_name} of member {member.display_name} to {days_to_add} days"
                             )
-                        last_assigned_role = role_name
+
+                        # Po $4 i $8 odczekaj 5 sek
+                        if role_name in ["$4", "$8"]:
+                            logger.info("Waiting 5 seconds after assigning role %s.", role_name)
+                            await asyncio.sleep(5)
+
                     except Exception as e:
                         logger.error(
                             f"Error assigning/updating role {role_name} to member {member.display_name}: {str(e)}"
@@ -454,11 +468,9 @@ class OnPaymentEvent(commands.Cog):
             else:
                 logger.info(f"Amount {amount} is not enough for role {role_name}")
 
-            # Czekaj 5 sekund tylko po rolach $4 i $8
-            if last_assigned_role in ["$4", "$8"]:
-                logger.info("Waiting 5 seconds before assigning the next roles.")
-                await asyncio.sleep(5)
-                last_assigned_role = None
+        # Po zakończeniu nadawania wszystkich ról czekamy dodatkowe 5 sekund
+        logger.info("Finished assigning $ roles. Waiting 5 seconds before next steps.")
+        await asyncio.sleep(5)
 
     async def remove_mute_roles(self, member):
         """Remove mute roles from a member if they have any temporary roles assigned"""

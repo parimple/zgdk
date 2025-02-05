@@ -39,8 +39,13 @@ class PremiumManager:
 
     def __init__(self, bot):
         self.bot = bot
-        self.guild = bot.guild
+        self.guild = None  # Inicjalizujemy jako None, będzie ustawione później
         self.config = bot.config
+
+    def set_guild(self, guild: discord.Guild):
+        """Set the guild for the PremiumManager. Must be called before processing payments."""
+        logger.info("Setting guild for PremiumManager: %s", guild.id if guild else None)
+        self.guild = guild
 
     def extract_id(self, text: str) -> Optional[int]:
         """Extract ID from various formats"""
@@ -49,20 +54,37 @@ class PremiumManager:
 
     async def get_banned_member(self, name_or_id: str) -> Optional[discord.User]:
         """Get banned Member by ID or exact name"""
+        if not self.guild:
+            logger.error("Guild is not set in get_banned_member. Skipping ban check.")
+            return None
+
         user_id = self.extract_id(name_or_id)
         if user_id:
             try:
-                ban_entry = await self.guild.fetch_ban(discord.Object(id=user_id))
+                user = discord.Object(id=user_id)
+                ban_entry = await self.guild.fetch_ban(user)
                 if ban_entry:
                     logger.info("User is banned by ID: %s", ban_entry.user.id)
                     return ban_entry.user
             except discord.NotFound:
                 logger.info("User is not banned by ID: %s", user_id)
-        else:
-            async for ban_entry in self.guild.bans(limit=None):
+            except discord.Forbidden:
+                logger.error("Bot doesn't have permission to fetch bans")
+            except Exception as e:
+                logger.error("Error checking ban by ID: %s", str(e))
+            return None  # Jeśli nie znaleziono bana po ID, od razu zwracamy None
+
+        # Próbujemy po nazwie tylko jeśli nie podano ID
+        try:
+            bans = await self.guild.bans()
+            for ban_entry in bans:
                 if name_or_id.lower() == ban_entry.user.name.lower():
                     logger.info("Banned user found by exact name: %s", ban_entry.user.id)
                     return ban_entry.user
+        except discord.Forbidden:
+            logger.error("Bot doesn't have permission to fetch bans")
+        except Exception as e:
+            logger.error("Error fetching bans: %s", str(e))
 
         return None
 
@@ -114,7 +136,13 @@ class PremiumManager:
 
     async def process_data(self, session, payment_data: PaymentData) -> None:
         """Process Payment"""
-        logger.info("process payment: %s", payment_data)
+        if not self.guild:
+            logger.error(
+                "Guild is not set in process_data. Cannot process payment: %s", payment_data
+            )
+            return
+
+        logger.info("Processing payment: %s", payment_data)
         # First, try to find the banned member
         banned_member = await self.get_banned_member(payment_data.name)
         if banned_member:
