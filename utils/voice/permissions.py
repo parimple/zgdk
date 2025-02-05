@@ -229,7 +229,7 @@ class PermissionChecker:
 
         async def predicate(ctx):
             # Skip checks for help command and help context
-            if ctx.command.name == "help" or ctx.invoked_with == "help":
+            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
                 return True
 
             checker = ctx.cog.permission_checker

@@ -84,7 +84,16 @@ class PremiumChecker:
 
         async def predicate(ctx):
             # Skip checks for help command and help context
-            if ctx.command.name == "help" or ctx.invoked_with == "help":
+            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
+                return True
+
+            # Skip checks for non-voice commands that don't require premium
+            if (
+                command_name
+                not in PremiumChecker.VOICE_COMMANDS
+                + PremiumChecker.MOD_COMMANDS
+                + PremiumChecker.AUTOKICK_COMMANDS
+            ):
                 return True
 
             checker = PremiumChecker(ctx.bot)

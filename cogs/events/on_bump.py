@@ -815,13 +815,29 @@ class OnBumpEvent(commands.Cog):
         embed.set_footer(text=f"Posiadasz {current_t}")
 
         try:
-            await channel.send(embed=embed)
-            logger.info(
-                f"Sent marketing message with bump status for {service} to channel {channel.id}"
-            )
+            # Try to send to voice channel if user is in one
+            if user.voice and user.voice.channel:
+                try:
+                    await user.voice.channel.send(embed=embed)
+                    logger.info(f"Sent marketing message to voice channel {user.voice.channel.id}")
+                    return
+                except discord.HTTPException as e:
+                    logger.error(f"Failed to send to voice channel: {e}")
+
+            # If not in voice channel or sending failed, send to bots channel
+            bots_channel = self.bot.get_channel(self.bot.channels.get("bots"))
+            if bots_channel:
+                await bots_channel.send(embed=embed)
+                logger.info(f"Sent marketing message to bots channel {bots_channel.id}")
+            else:
+                logger.error("Could not find bots channel")
+                # Fallback to original channel
+                await channel.send(embed=embed)
+                logger.info(f"Sent marketing message to original channel {channel.id}")
+
         except discord.HTTPException as e:
             logger.error(f"Failed to send marketing message: {e}")
-            # Fallback to simple message if embed fails
+            # Fallback to simple message
             message = f"{user.mention} Dzięki za użycie serwisu {service}! 🎉\nDostałeś/aś {self.get_service_duration(service)}T!"
             await channel.send(message)
 
