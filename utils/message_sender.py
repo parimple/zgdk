@@ -1,5 +1,7 @@
 """Message sender utility for sending formatted messages."""
 
+import random
+
 import discord
 from discord import AllowedMentions
 
@@ -96,9 +98,9 @@ class MessageSender:
         premium_channel_id = ctx.bot.config["channels"]["premium_info"]
         premium_channel = ctx.guild.get_channel(premium_channel_id)
         premium_text = (
-            f"**Rangi Premium:** {premium_channel.mention}"
+            f"**Wybierz swój** {premium_channel.mention}"
             if premium_channel
-            else f"**Rangi Premium:** <#{premium_channel_id}>"
+            else f"**Wybierz swój** <#{premium_channel_id}>"
         )
 
         # Check if we already have channel info in the description
@@ -130,9 +132,9 @@ class MessageSender:
           - channel: optional channel to mention
         """
         if channel:
-            base_text += f"\n\n**Kanał:** {channel.mention}"
+            base_text += f"\n**Kanał:** {channel.mention}"
         else:
-            base_text += "\n\n**Kanał:** brak"
+            base_text += f"\n**Kanał:** brak"
 
         return MessageSender._with_premium_link(base_text, ctx)
 
@@ -161,19 +163,15 @@ class MessageSender:
     async def send_permission_update(ctx, target, permission_flag, new_value):
         mention_str = target.mention if isinstance(target, discord.Member) else "wszystkich"
         value_str = "+" if new_value else "-"
-        base_text = (
-            f"Ustawiono uprawnienie **{permission_flag}** na **{value_str}** " f"dla {mention_str}."
-        )
+        command_name = ctx.command.name if ctx.command else permission_flag
+        base_text = f"Ustawiono **{command_name}** na **{value_str}** dla {mention_str}"
 
         channel = ctx.author.voice.channel if (ctx.author.voice) else None
-        await MessageSender.build_and_send_embed(
-            ctx,
-            title="Aktualizacja Uprawnień",
-            base_text=base_text,
-            color="success",
-            channel=channel,
-            reply=True,
-        )
+        # Używamy koloru użytkownika jeśli ma ustawiony, w przeciwnym razie zielony
+        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.green()
+        embed = discord.Embed(color=embed_color)
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
+        await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
     async def send_user_not_found(ctx):
@@ -214,15 +212,10 @@ class MessageSender:
 
     @staticmethod
     async def send_member_limit_set(ctx, voice_channel, limit_text):
-        base_text = f"Limit członków na kanale {voice_channel.mention} ustawiony na {limit_text}."
-        await MessageSender.build_and_send_embed(
-            ctx,
-            title="Limit Członków",
-            base_text=base_text,
-            color="success",
-            channel=voice_channel,
-            reply=True,
-        )
+        base_text = f"Limit członków ustawiony na {limit_text}"
+        embed = discord.Embed(color=discord.Color.green())
+        embed.description = MessageSender.build_description(base_text, ctx, voice_channel)
+        await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
     async def send_no_mod_permission(ctx):
@@ -307,23 +300,20 @@ class MessageSender:
             ("Limit Moderatorów", str(mod_limit), True),
         ]
 
-        base_text = f"{target.mention} {action} moderatora kanału."
-        await MessageSender.build_and_send_embed(
-            ctx,
-            title="Aktualizacja Moderatorów",
-            base_text=base_text,
-            color="success",
-            fields=fields,
-            channel=voice_channel,
-            reply=True,
-        )
+        base_text = f"{target.mention} {action} moderatora kanału"
+        embed = discord.Embed(color=discord.Color.green())
+        embed.description = MessageSender.build_description(base_text, ctx, voice_channel)
+
+        for name, value, inline in fields:
+            embed.add_field(name=name, value=value, inline=inline)
+
+        await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
     async def send_voice_channel_info(ctx, channel, owner, mods, disabled_perms, target=None):
         """Send voice channel information."""
         # Owner field
         owner_value = owner.mention if owner else "brak"
-
         # Moderators field
         mods_value = ", ".join(mod.mention for mod in mods) if mods else "brak"
 
@@ -342,33 +332,13 @@ class MessageSender:
         else:
             perms_value = "brak"
 
-        fields = [
-            ("Właściciel", owner_value, False),
-            ("Moderatorzy", mods_value, False),
-            ("Wyłączone uprawnienia", perms_value, False),
-        ]
+        # Tworzymy treść wiadomości
+        base_text = f"**Właściciel:** {owner_value} • **Moderatorzy:** {mods_value}\n**Wyłączone uprawnienia:** {perms_value}"
 
-        # Jeśli sprawdzamy kanał innego użytkownika, dodajemy informację o tym
-        if target and target != ctx.author:
-            description = (
-                f"Szczegółowe informacje o kanale użytkownika {target.mention}.\n\n"
-                f"**Kanał:** {channel.mention}"
-            )
-        else:
-            description = (
-                f"Szczegółowe informacje o kanale {channel.mention}.\n\n"
-                f"**Kanał:** {channel.mention}"
-            )
-
-        description = MessageSender._with_premium_link(description, ctx)
-
-        embed = MessageSender._create_embed(
-            title="Informacje o Kanale",
-            description=description,
-            color="info",
-            fields=fields,
-            ctx=ctx,
-        )
+        # Tworzymy embed
+        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
+        embed = discord.Embed(color=embed_color)
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
@@ -422,27 +392,11 @@ class MessageSender:
     @staticmethod
     async def send_no_autokick_permission(ctx, premium_channel_id):
         """Sends a message when user doesn't have required role for autokick."""
-        premium_channel = ctx.guild.get_channel(premium_channel_id)
-        mention_text = premium_channel.mention if premium_channel else f"<#{premium_channel_id}>"
-
-        channel_mention = (
-            ctx.author.voice.channel.mention
-            if (ctx.author.voice and ctx.author.voice.channel)
-            else "brak (nie jesteś na kanale)"
-        )
-
-        description = (
-            "Nie posiadasz wymaganych uprawnień do używania autokicka.\n"
-            "Aby móc używać autokicka, musisz posiadać rangę zG500 (1 slot) lub zG1000 (3 sloty).\n\n"
-            f"**Kanał:** {channel_mention} • **Rangi Premium:** {mention_text}"
-        )
-
-        embed = MessageSender._create_embed(
-            title="Brak Uprawnień Autokick",
-            description=description,
-            color="warning",
-            ctx=ctx,
-        )
+        base_text = "Ta komenda wymaga jednej z rang: zG500, zG1000"
+        channel = ctx.author.voice.channel if ctx.author.voice else None
+        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
+        embed = discord.Embed(color=embed_color)
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
@@ -678,31 +632,23 @@ class MessageSender:
             reply=True,
         )
 
-    async def send_permission_reset(self, ctx, target):
+    @staticmethod
+    async def send_permission_reset(ctx, target):
         """Send message confirming user permissions reset."""
-        base_text = f"Zresetowano wszystkie uprawnienia dla {target.mention} na tym kanale."
+        base_text = f"Zresetowano wszystkie uprawnienia dla {target.mention}"
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        await MessageSender.build_and_send_embed(
-            ctx,
-            title="Reset Uprawnień",
-            base_text=base_text,
-            color="success",
-            channel=channel,
-            reply=True,
-        )
+        embed = discord.Embed(color=discord.Color.green())
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
+        await MessageSender._send_embed(ctx, embed, reply=True)
 
-    async def send_channel_reset(self, ctx):
+    @staticmethod
+    async def send_channel_reset(ctx):
         """Send message confirming channel permissions reset."""
-        base_text = "Zresetowano wszystkie uprawnienia na tym kanale do ustawień domyślnych."
+        base_text = "Zresetowano wszystkie uprawnienia do ustawień domyślnych"
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        await MessageSender.build_and_send_embed(
-            ctx,
-            title="Reset Kanału",
-            base_text=base_text,
-            color="success",
-            channel=channel,
-            reply=True,
-        )
+        embed = discord.Embed(color=discord.Color.green())
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
+        await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
     async def send_error(ctx, message: str):
@@ -757,115 +703,37 @@ class MessageSender:
     async def send_channel_creation_info(self, channel, owner):
         """
         Send channel creation info message.
-
-        Since this method is called during channel creation (not from a command),
-        we create a FakeContext with the channel owner as the author.
-        This ensures consistent embed styling (author name/avatar) with other messages.
-        Note: We can't use build_and_send_embed here because FakeContext doesn't have send method,
-        so we create the embed manually and send it directly to the channel.
         """
+        prefix = self.bot.config["prefix"]
+
+        # Tworzymy treść wiadomości
+        base_text = (
+            "**Komendy do zarządzania uprawnieniami**\n"
+            f"• `{prefix}speak @użytkownik +` – nadaj prawo mówienia\n"
+            f"• `{prefix}speak @użytkownik -` – zabierz prawo mówienia\n"
+            f"• `{prefix}speak +` – włącz wszystkim prawo mówienia\n"
+            f"• Tak samo działają komendy `{prefix}connect`, `{prefix}live`, `{prefix}view`, `{prefix}text`, `{prefix}mod`, `{prefix}autokick`\n\n"
+            "**Dodatkowe**\n"
+            f"• `{prefix}voicechat` – Informacje o kanale\n"
+            f"• `{prefix}reset` – Resetuje wszystkie uprawnienia\n"
+            f"• `{prefix}limit <liczba>` – Ustaw limit użytkowników (1–99)"
+        )
+
+        # Tworzymy embed
+        embed_color = owner.color if owner.color.value != 0 else discord.Color.blue()
+        embed = discord.Embed(color=embed_color)
+
         # Get premium channel info
         premium_channel_id = self.bot.config["channels"]["premium_info"]
         premium_channel = channel.guild.get_channel(premium_channel_id)
         premium_text = (
-            f"**Rangi Premium:** {premium_channel.mention}"
+            f"**Wybierz swój** {premium_channel.mention}"
             if premium_channel
-            else f"**Rangi Premium:** <#{premium_channel_id}>"
+            else f"**Wybierz swój** <#{premium_channel_id}>"
         )
 
-        # Get current mods from channel overwrites
-        current_mods = [
-            t
-            for t, overwrite in channel.overwrites.items()
-            if isinstance(t, discord.Member)
-            and overwrite.manage_messages is True
-            and not overwrite.priority_speaker
-        ]
-
-        # Get mod limit from owner's roles
-        mod_limit = 0
-        for role in reversed(self.bot.config["premium_roles"]):
-            if any(r.name == role["name"] for r in owner.roles):
-                mod_limit = role["moderator_count"]
-                break
-
-        current_mods_mentions = ", ".join(m.mention for m in current_mods) or "brak"
-        remaining_slots = max(0, mod_limit - len(current_mods))
-
-        # Get disabled permissions for @everyone
-        everyone_perms = channel.overwrites_for(channel.guild.default_role)
-        perm_to_cmd = {
-            "connect": "connect",
-            "speak": "speak",
-            "stream": "live",
-            "view_channel": "view",
-            "send_messages": "text",
-        }
-        disabled_perms = []
-        for perm_name, cmd_name in perm_to_cmd.items():
-            if getattr(everyone_perms, perm_name) is False:
-                disabled_perms.append(f"`{cmd_name}`")
-
-        prefix = self.bot.config["prefix"]
-
-        # Create a fake context-like object that has the required attributes for embed styling
-        class FakeContext:
-            def __init__(self, member, bot):
-                self.author = member
-                self.guild = member.guild
-                self.bot = bot
-
-        ctx = FakeContext(owner, self.bot)
-
-        fields = [
-            ("Moderatorzy", current_mods_mentions, False),
-            ("Limit Moderatorów", str(mod_limit), True),
-            ("Pozostałe Sloty", str(remaining_slots), True),
-        ]
-
-        # Add disabled permissions field if any exist
-        if disabled_perms:
-            fields.append(("Wyłączone uprawnienia", ", ".join(disabled_perms), False))
-
-        fields.extend(
-            [
-                (
-                    "Komendy",
-                    f"• `{prefix}speak <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do mówienia\n"
-                    f"• `{prefix}live <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do streamowania\n"
-                    f"• `{prefix}connect <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do dołączania\n"
-                    f"• `{prefix}view <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do widzenia kanału\n"
-                    f"• `{prefix}text <@użytkownik> [+/-]` - Zarządzaj uprawnieniami do pisania\n"
-                    f"• `{prefix}mod <@użytkownik> [+/-]` - Dodaj/usuń moderatora kanału\n"
-                    f"• `{prefix}limit <liczba>` - Ustaw limit użytkowników (0-99)\n"
-                    f"• `{prefix}reset` - Zresetuj wszystkie uprawnienia",
-                    False,
-                ),
-                (
-                    "Globalne Uprawnienia",
-                    "Aby zmienić uprawnienia dla wszystkich użytkowników:\n"
-                    f"• Użyj komendy bez oznaczania użytkownika, np. `{prefix}live +` włączy streamowanie dla wszystkich\n"
-                    "• Możesz użyć `+` aby włączyć lub `-` aby wyłączyć uprawnienie\n"
-                    "• Użycie komendy bez `+/-` przełączy uprawnienie na przeciwne",
-                    False,
-                ),
-                (
-                    "Uwaga",
-                    f"Komenda `{prefix}limit` jest dostępna dla wszystkich.",
-                    False,
-                ),
-            ]
-        )
-
-        base_text = f"Utworzono nowy kanał głosowy dla {owner.mention}"
-        description = MessageSender.build_description(base_text, ctx, channel)
-        embed = MessageSender._create_embed(
-            title="Kanał Głosowy Utworzony",
-            description=description,
-            color="success",
-            fields=fields,
-            ctx=ctx,
-        )
+        # Dodajemy treść i kanał z premium
+        embed.description = f"{base_text}\n\n**Kanał:** {channel.mention} • {premium_text}"
         await channel.send(embed=embed, allowed_mentions=AllowedMentions(users=False, roles=False))
 
     @staticmethod
@@ -879,46 +747,37 @@ class MessageSender:
 
         base_text = f"Nie masz uprawnień do {reason}"
         channel = ctx.author.voice.channel if ctx.author.voice else None
+        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
+        embed = discord.Embed(color=embed_color)
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
+        await MessageSender._send_embed(ctx, embed)
 
-        await MessageSender.build_and_send_embed(
-            ctx, title="Brak Uprawnień", base_text=base_text, color="error", channel=channel
-        )
-
-    async def send_bypass_expired(self, ctx):
+    @staticmethod
+    async def send_bypass_expired(ctx):
         """Send message when user's bypass (T) has expired."""
         base_text = "Twój czas T (bypass) wygasł!\nUżyj `/bump`, aby przedłużyć ten czas."
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        await self.build_and_send_embed(
-            ctx,
-            title="Czas T Wygasł",
-            base_text=base_text,
-            color="error",
-            channel=channel,
-            reply=True,
-        )
+        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
+        embed = discord.Embed(color=embed_color)
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
+        await MessageSender._send_embed(ctx, embed, reply=True)
 
-    async def send_premium_required(self, ctx):
+    @staticmethod
+    async def send_premium_required(ctx):
         """Send message when premium role is required."""
         base_text = "Aby użyć tej komendy, potrzebujesz rangi premium!"
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        await self.build_and_send_embed(
-            ctx,
-            title="Wymagana Ranga Premium",
-            base_text=base_text,
-            color="error",
-            channel=channel,
-            reply=True,
-        )
+        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
+        embed = discord.Embed(color=embed_color)
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
+        await MessageSender._send_embed(ctx, embed, reply=True)
 
-    async def send_specific_roles_required(self, ctx, allowed_roles):
+    @staticmethod
+    async def send_specific_roles_required(ctx, allowed_roles):
         """Send message when specific premium roles are required."""
         base_text = f"Ta komenda wymaga jednej z rang: {', '.join(allowed_roles)}"
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        await self.build_and_send_embed(
-            ctx,
-            title="Wymagana Ranga Premium",
-            base_text=base_text,
-            color="error",
-            channel=channel,
-            reply=True,
-        )
+        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
+        embed = discord.Embed(color=embed_color)
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
+        await MessageSender._send_embed(ctx, embed, reply=True)
