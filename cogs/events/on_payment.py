@@ -203,7 +203,7 @@ class OnPaymentEvent(commands.Cog):
 
         # Jeśli kwota >= 15, nadaj odpowiednie role tymczasowe
         if final_amount >= 15:
-            await self.assign_temporary_roles(session, member, final_amount)
+            await self.assign_temporary_roles(session, member, original_amount)
 
         # Sprawdź standardowe role premium
         for role_config in self.bot.config["premium_roles"]:
