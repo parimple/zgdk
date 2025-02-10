@@ -427,159 +427,108 @@ class MessageSender:
     @staticmethod
     async def send_autokick_already_exists(ctx, target):
         """Sends a message when target is already on autokick list."""
-        channel_mention = (
-            ctx.author.voice.channel.mention
-            if (ctx.author.voice and ctx.author.voice.channel)
-            else "brak (nie jesteś na kanale)"
-        )
+        base_text = f"{target.mention} jest już na twojej liście autokick"
+        channel = ctx.author.voice.channel if ctx.author.voice else None
 
-        description = (
-            f"{target.mention} jest już na twojej liście autokick.\n\n"
-            f"**Kanał:** {channel_mention}"
+        embed = discord.Embed(
+            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.yellow()
         )
-        description = MessageSender._with_premium_link(description, ctx)
-
-        embed = MessageSender._create_embed(
-            title="Autokick",
-            description=description,
-            color="warning",
-            ctx=ctx,
-        )
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
     async def send_autokick_added(ctx, target):
         """Sends a message when target is added to autokick list."""
-        channel_mention = (
-            ctx.author.voice.channel.mention
-            if (ctx.author.voice and ctx.author.voice.channel)
-            else "brak (nie jesteś na kanale)"
-        )
+        base_text = f"Dodano {target.mention} do twojej listy autokick"
+        channel = ctx.author.voice.channel if ctx.author.voice else None
 
-        description = (
-            f"Dodano {target.mention} do twojej listy autokick.\n\n" f"**Kanał:** {channel_mention}"
+        embed = discord.Embed(
+            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.green()
         )
-        description = MessageSender._with_premium_link(description, ctx)
-
-        embed = MessageSender._create_embed(
-            title="Autokick",
-            description=description,
-            color="success",
-            ctx=ctx,
-        )
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
     async def send_autokick_not_found(ctx, target):
         """Sends a message when target is not on autokick list."""
-        channel_mention = (
-            ctx.author.voice.channel.mention
-            if (ctx.author.voice and ctx.author.voice.channel)
-            else "brak (nie jesteś na kanale)"
-        )
+        base_text = f"{target.mention} nie jest na twojej liście autokick"
+        channel = ctx.author.voice.channel if ctx.author.voice else None
 
-        description = (
-            f"{target.mention} nie jest na twojej liście autokick.\n\n"
-            f"**Kanał:** {channel_mention}"
+        embed = discord.Embed(
+            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
         )
-        description = MessageSender._with_premium_link(description, ctx)
-
-        embed = MessageSender._create_embed(
-            title="Autokick",
-            description=description,
-            color="error",
-            ctx=ctx,
-        )
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
     async def send_autokick_removed(ctx, target):
         """Sends a message when target is removed from autokick list."""
-        channel_mention = (
-            ctx.author.voice.channel.mention
-            if (ctx.author.voice and ctx.author.voice.channel)
-            else "brak (nie jesteś na kanale)"
-        )
+        base_text = f"Usunięto {target.mention} z twojej listy autokick"
+        channel = ctx.author.voice.channel if ctx.author.voice else None
 
-        description = (
-            f"Usunięto {target.mention} z twojej listy autokick.\n\n"
-            f"**Kanał:** {channel_mention}"
+        embed = discord.Embed(
+            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.green()
         )
-        description = MessageSender._with_premium_link(description, ctx)
-
-        embed = MessageSender._create_embed(
-            title="Autokick",
-            description=description,
-            color="success",
-            ctx=ctx,
-        )
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
     async def send_autokick_list_empty(ctx):
         """Sends a message when autokick list is empty."""
-        channel_mention = (
-            ctx.author.voice.channel.mention
-            if (ctx.author.voice and ctx.author.voice.channel)
-            else "brak (nie jesteś na kanale)"
-        )
+        base_text = "Twoja lista autokick jest pusta"
+        channel = ctx.author.voice.channel if ctx.author.voice else None
 
-        description = f"Twoja lista autokick jest pusta.\n\n**Kanał:** {channel_mention}"
-        description = MessageSender._with_premium_link(description, ctx)
-
-        embed = MessageSender._create_embed(
-            title="Lista Autokick",
-            description=description,
-            color="info",
-            ctx=ctx,
+        embed = discord.Embed(
+            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
         )
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
     async def send_autokick_list(ctx, user_autokicks, max_autokicks):
         """Sends an embed with the user's autokick list."""
-        fields = []
+        base_text = []
         for target_id in user_autokicks:
             member = ctx.guild.get_member(target_id)
             if member:
-                fields.append((member.display_name, f"{member.mention}\nID: {member.id}", False))
+                base_text.append(f"• {member.mention} ({member.display_name})")
 
-        base_text = (
-            "Lista użytkowników, którzy będą automatycznie wyrzucani z kanałów głosowych.\n"
-            f"**Wykorzystano:** {len(user_autokicks)}/{max_autokicks} dostępnych slotów"
-        )
+        if base_text:
+            base_text = "\n".join(base_text)
+            base_text = f"Lista użytkowników na autokick ({len(user_autokicks)}/{max_autokicks}):\n{base_text}"
+        else:
+            base_text = "Lista autokick jest pusta"
+
         channel = ctx.author.voice.channel if ctx.author.voice else None
-
-        await MessageSender.build_and_send_embed(
-            ctx,
-            title="Twoja Lista Autokick",
-            base_text=base_text,
-            color="info",
-            fields=fields,
-            channel=channel,
+        embed = discord.Embed(
+            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
         )
+        embed.description = MessageSender.build_description(base_text, ctx, channel)
+        await MessageSender._send_embed(ctx, embed)
 
-    @staticmethod
-    async def send_autokick_notification(channel, target, owner):
+    async def send_autokick_notification(self, channel, target, owner):
         """
         Sends a notification when a member is autokicked.
         Note: This method is special as it sends to channel directly, not through ctx.
         """
+        base_text = f"{target.mention} został wyrzucony z kanału, ponieważ {owner.mention} ma go na liście autokick"
 
-        # Create a fake context for consistent embed styling
-        class FakeContext:
-            def __init__(self, guild):
-                self.guild = guild
-                self.bot = guild.me._state.http._state.client
+        # Get premium channel info
+        if self.bot:
+            premium_channel_id = self.bot.config["channels"]["premium_info"]
+            premium_channel = channel.guild.get_channel(premium_channel_id)
+            premium_text = (
+                f"**Wybierz swój** {premium_channel.mention}"
+                if premium_channel
+                else f"**Wybierz swój** <#{premium_channel_id}>"
+            )
+        else:
+            premium_text = ""
 
-        ctx = FakeContext(channel.guild)
-        base_text = f"{target.mention} został wyrzucony z kanału, ponieważ {owner.mention} ma go na liście autokick."
-
-        embed = MessageSender._create_embed(
-            title="Autokick",
-            description=MessageSender.build_description(base_text, ctx, channel),
-            color="info",
-        )
+        embed = discord.Embed(color=owner.color if owner.color.value != 0 else discord.Color.blue())
+        embed.description = f"{base_text}\n**Kanał:** {channel.mention}"
+        if premium_text:
+            embed.description += f" • {premium_text}"
         await channel.send(embed=embed, allowed_mentions=AllowedMentions(users=False, roles=False))
 
     @staticmethod
@@ -755,7 +704,7 @@ class MessageSender:
     @staticmethod
     async def send_bypass_expired(ctx):
         """Send message when user's bypass (T) has expired."""
-        base_text = "Twój czas T (bypass) wygasł!\nUżyj `/bump`, aby przedłużyć ten czas."
+        base_text = "Twój czas T (bypass) wygasł! Użyj `/bump`, aby przedłużyć ten czas."
         channel = ctx.author.voice.channel if ctx.author.voice else None
         embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
         embed = discord.Embed(color=embed_color)

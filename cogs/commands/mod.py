@@ -158,17 +158,45 @@ class ModCog(commands.Cog):
         target_id: Optional[int] = None,
         images_only: bool = False,
     ):
-        logger.info(
-            f"_delete_messages called with hours={hours}, target_id={target_id}, images_only={images_only}"
-        )
         time_threshold = ctx.message.created_at - timedelta(hours=hours)
-        logger.info(f"Time threshold set to {time_threshold}")
 
         def is_message_to_delete(message):
             if message.id == ctx.message.id:
                 return False
-            if target_id is not None and message.author.id != target_id:
-                return False
+
+            if target_id is not None:
+                target_id_str = str(target_id)
+                target_member = ctx.guild.get_member(target_id)
+                target_name = target_member.name.lower() if target_member else None
+
+                # Check regular messages
+                if not message.webhook_id:
+                    if message.author.id != target_id:
+                        # Check if it's the specific bot with embeds
+                        if (
+                            message.author.id == 489377322042916885
+                            and message.embeds
+                            and target_name
+                        ):
+                            for embed in message.embeds:
+                                if embed.title and target_name in embed.title.lower():
+                                    return True
+                        return False
+                    return True
+
+                # Check webhook messages and their content
+                else:
+                    found_in_content = target_id_str in message.content
+                    found_in_attachments = any(
+                        target_id_str in attachment.url or target_id_str in attachment.filename
+                        for attachment in message.attachments
+                    )
+                    found_in_webhook = target_id_str in str(message.author)
+
+                    if not (found_in_content or found_in_attachments or found_in_webhook):
+                        return False
+                    return True
+
             if images_only:
                 has_image = bool(message.attachments)
                 has_link = bool(re.search(r"http[s]?://\S+", message.content))
@@ -228,23 +256,50 @@ class ModCog(commands.Cog):
         target_id: Optional[int] = None,
         images_only: bool = False,
     ):
-        logger.info(
-            f"_delete_messages_all_channels called with hours={hours}, target_id={target_id}, images_only={images_only}"
-        )
         time_threshold = ctx.message.created_at - timedelta(hours=hours)
         total_deleted = 0
         status_message = await ctx.send("Rozpoczynam usuwanie wiadomości na wszystkich kanałach...")
 
         for channel in ctx.guild.text_channels:
             if not channel.permissions_for(ctx.guild.me).manage_messages:
-                logger.info(f"Skipping channel {channel.id}: no manage messages permission")
                 continue
 
             def is_message_to_delete(message):
                 if message.created_at < time_threshold:
                     return False
-                if target_id is not None and message.author.id != target_id:
-                    return False
+                if target_id is not None:
+                    target_id_str = str(target_id)
+                    target_member = ctx.guild.get_member(target_id)
+                    target_name = target_member.name.lower() if target_member else None
+
+                    # Check regular messages
+                    if not message.webhook_id:
+                        if message.author.id != target_id:
+                            # Check if it's the specific bot with embeds
+                            if (
+                                message.author.id == 489377322042916885
+                                and message.embeds
+                                and target_name
+                            ):
+                                for embed in message.embeds:
+                                    if embed.title and target_name in embed.title.lower():
+                                        return True
+                            return False
+                        return True
+
+                    # Check webhook messages and their content
+                    else:
+                        found_in_content = target_id_str in message.content
+                        found_in_attachments = any(
+                            target_id_str in attachment.url or target_id_str in attachment.filename
+                            for attachment in message.attachments
+                        )
+                        found_in_webhook = target_id_str in str(message.author)
+
+                        if not (found_in_content or found_in_attachments or found_in_webhook):
+                            return False
+                        return True
+
                 if images_only:
                     has_image = bool(message.attachments)
                     has_link = bool(re.search(r"http[s]?://\S+", message.content))
@@ -265,27 +320,18 @@ class ModCog(commands.Cog):
                             await message.delete()
                             total_deleted += 1
                         except discord.NotFound:
-                            logger.warning(
-                                f"Message {message.id} not found in channel {channel.id}, probably already deleted"
-                            )
+                            pass
                         except discord.Forbidden:
-                            logger.error(
-                                f"No permission to delete message {message.id} in channel {channel.id}"
-                            )
+                            pass
                         except Exception as e:
-                            logger.error(
-                                f"Error deleting message {message.id} in channel {channel.id}: {e}"
-                            )
+                            pass
 
-                logger.info(f"Deleted {total_deleted} messages in channel {channel.id}")
                 await status_message.edit(
                     content=f"Usunięto łącznie {total_deleted} wiadomości. Trwa sprawdzanie kolejnych kanałów..."
                 )
             except discord.Forbidden:
-                logger.error(f"Forbidden error while purging messages in channel {channel.id}")
                 continue
-            except discord.HTTPException as e:
-                logger.error(f"HTTP exception while purging messages in channel {channel.id}: {e}")
+            except discord.HTTPException:
                 continue
 
         await status_message.delete()
