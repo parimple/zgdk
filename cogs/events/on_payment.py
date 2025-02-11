@@ -96,10 +96,19 @@ class OnPaymentEvent(commands.Cog):
         logger.info("Waiting for bot to be ready...")
         await self.bot.wait_until_ready()
 
-        # Wait for guild to be set
-        while not self.guild:
-            logger.info("Waiting for guild to be set...")
-            await asyncio.sleep(1)
+        # Wait for guild to be set with timeout
+        retry_count = 0
+        max_retries = 30
+        while not self.guild and retry_count < max_retries:
+            self.guild = self.bot.get_guild(self.bot.guild_id)
+            if not self.guild:
+                retry_count += 1
+                logger.info(f"Waiting for guild to be set... (attempt {retry_count}/{max_retries})")
+                await asyncio.sleep(1)
+
+        if not self.guild:
+            logger.error(f"Failed to set guild after {max_retries} attempts")
+            return
 
         logger.info("Bot is ready and guild is set, starting payment checks")
 
@@ -201,167 +210,186 @@ class OnPaymentEvent(commands.Cog):
         # Najpierw dodaj do portfela
         await MemberQueries.add_to_wallet_balance(session, member.id, final_amount)
 
-        # Jeśli kwota >= 15, nadaj odpowiednie role tymczasowe
+        # Define premium role priority
+        premium_priority = {"zG50": 1, "zG100": 2, "zG500": 3, "zG1000": 4}
+
+        # Check user's highest premium role
+        user_highest_priority = 0
+        for role_name, priority in premium_priority.items():
+            role_obj = discord.utils.get(member.guild.roles, name=role_name)
+            if role_obj and role_obj in member.roles:
+                user_highest_priority = max(user_highest_priority, priority)
+
+        logger.info(f"User's highest premium role priority: {user_highest_priority}")
+
+        # Jeśli kwota >= 15, nadaj odpowiednie role tymczasowe (zawsze, niezależnie od premium)
         if final_amount >= 15:
             await self.assign_temporary_roles(session, member, original_amount)
+            await self.remove_mute_roles(member)  # Zawsze zdejmuj muty po nadaniu ról $
 
-        # Sprawdź standardowe role premium
-        for role_config in self.bot.config["premium_roles"]:
-            if final_amount in [role_config["price"], role_config["price"] + 1]:
-                premium_role = role_config
-                logger.info(
-                    f"Found matching premium role: {role_config['name']} for amount {final_amount}"
-                )
-                break
-
-        # Jeśli znaleziono rolę premium, przetwórz ją
-        if premium_role:
-            logger.info(f"Processing premium role: {premium_role['name']}")
-            role = discord.utils.get(self.guild.roles, name=premium_role["name"])
-            if not role:
-                logger.error(f"Role {premium_role['name']} not found")
-                embed = discord.Embed(
-                    title="Błąd",
-                    description="Wystąpił błąd podczas przydzielania roli premium. Skontaktuj się z administracją.",
-                    color=discord.Color.red(),
-                )
-            else:
-                current_premium_role = await RoleQueries.get_member_role(
-                    session, member.id, role.id
-                )
-
-                # Sprawdź czy to przedłużenie tej samej roli
-                if current_premium_role and role in member.roles:
-                    logger.info(
-                        f"Found existing premium role {role.name} for member {member.display_name}"
-                    )
-                    days_left = (
-                        current_premium_role.expiration_date - datetime.now(timezone.utc)
-                    ).days
-                    logger.info(f"Current premium role {role.name} has {days_left} days left")
-
-                    # Sprawdź czy to kwota upgradu i czy rola kwalifikuje się do upgradu
-                    can_upgrade = False
-                    if role.name == "zG50" and final_amount == 50 and 29 <= days_left <= 33:
-                        # Próba upgradu do zG100
-                        upgrade_role = discord.utils.get(self.guild.roles, name="zG100")
-                        if upgrade_role:
-                            await member.remove_roles(role)
-                            await RoleQueries.delete_member_role(session, member.id, role.id)
-                            await member.add_roles(upgrade_role)
-                            await RoleQueries.add_role_to_member(
-                                session, member.id, upgrade_role.id, timedelta(days=days_left)
-                            )
-                            await session.commit()
-                            embed = discord.Embed(
-                                title="Gratulacje!",
-                                description=f"Ulepszono twoją rolę z {role.name} na zG100!",
-                                color=discord.Color.green(),
-                            )
-                            can_upgrade = True
-                    elif role.name == "zG100" and final_amount == 400 and 29 <= days_left <= 33:
-                        # Próba upgradu do zG500 (bo 99 + 400 = 499)
-                        upgrade_role = discord.utils.get(self.guild.roles, name="zG500")
-                        if upgrade_role:
-                            await member.remove_roles(role)
-                            await RoleQueries.delete_member_role(session, member.id, role.id)
-                            await member.add_roles(upgrade_role)
-                            await RoleQueries.add_role_to_member(
-                                session, member.id, upgrade_role.id, timedelta(days=days_left)
-                            )
-                            await session.commit()
-                            embed = discord.Embed(
-                                title="Gratulacje!",
-                                description=f"Ulepszono twoją rolę z {role.name} na zG500!",
-                                color=discord.Color.green(),
-                            )
-                            can_upgrade = True
-                    elif role.name == "zG500" and final_amount == 500 and 29 <= days_left <= 33:
-                        # Próba upgradu do zG1000 (bo 499 + 500 = 999)
-                        upgrade_role = discord.utils.get(self.guild.roles, name="zG1000")
-                        if upgrade_role:
-                            await member.remove_roles(role)
-                            await RoleQueries.delete_member_role(session, member.id, role.id)
-                            await member.add_roles(upgrade_role)
-                            await RoleQueries.add_role_to_member(
-                                session, member.id, upgrade_role.id, timedelta(days=days_left)
-                            )
-                            await session.commit()
-                            embed = discord.Embed(
-                                title="Gratulacje!",
-                                description=f"Ulepszono twoją rolę z {role.name} na zG1000!",
-                                color=discord.Color.green(),
-                            )
-                            can_upgrade = True
-
-                    # Jeśli nie można zrobić upgradu, sprawdź czy to przedłużenie
-                    if not can_upgrade:
-                        # Sprawdź czy kwota odpowiada przedłużeniu aktualnej roli
-                        role_extension_amounts = {
-                            "zG50": [49, 50],  # 50 przedłuża jeśli nie można zrobić upgradu
-                            "zG100": [99, 100],  # 100 przedłuża i daje +1G
-                            "zG500": [499, 500],  # 500 przedłuża i daje +1G
-                            "zG1000": [999, 1000],  # 1000 przedłuża i daje +1G
-                        }
-
-                        if final_amount in role_extension_amounts.get(role.name, []):
-                            logger.info(
-                                f"Amount {final_amount} matches extension amount for role {role.name}"
-                            )
-                            logger.info(
-                                f"Checking extension days for role {role.name}. Current days_left: {days_left}"
-                            )
-                            extension_days = 33 if days_left < 1 or days_left >= 29 else 30
-                            logger.info(
-                                f"Decided to extend role {role.name} by {extension_days} days (days_left < 1: {days_left < 1}, days_left > 29: {days_left > 29})"
-                            )
-
-                            await RoleQueries.update_role_expiration_date(
-                                session, member.id, role.id, timedelta(days=extension_days)
-                            )
-
-                            # Dodaj 1G jeśli zapłacił więcej
-                            bonus_msg = ""
-                            if final_amount > premium_role["price"]:
-                                await MemberQueries.add_to_wallet_balance(session, member.id, 1)
-                                bonus_msg = f" Dodatkowo otrzymujesz 1{CURRENCY_UNIT}."
-
-                            await session.commit()
-
-                            bonus_time_msg = " (10% czasu gratis!)" if extension_days == 33 else ""
-                            embed = discord.Embed(
-                                title="Gratulacje!",
-                                description=f"Przedłużyłeś rolę {role.name} o {extension_days} dni{bonus_time_msg}!{bonus_msg}",
-                                color=discord.Color.green(),
-                            )
-
-                # Standardowe nadanie roli jeśli nie ma żadnej
-                elif role not in member.roles:
-                    await RoleQueries.add_role_to_member(
-                        session, member.id, role.id, timedelta(days=30)
-                    )
-
-                    # Dodaj 1G tylko jeśli zapłacił więcej niż cena roli
-                    bonus_msg = ""
-                    if final_amount > premium_role["price"]:
-                        await MemberQueries.add_to_wallet_balance(session, member.id, 1)
-                        bonus_msg = f" Dodatkowo otrzymujesz 1{CURRENCY_UNIT}."
-
-                    await member.add_roles(role)
-                    await session.commit()
-
-                    embed = discord.Embed(
-                        title="Gratulacje!",
-                        description=f"Zakupiłeś rolę {role.name}!{bonus_msg}",
-                        color=discord.Color.green(),
-                    )
-
-                await self.remove_mute_roles(member)
+        # Try partial extension first
+        embed_partial = await self.extend_existing_role_partially(session, member, final_amount)
+        if embed_partial:
+            logger.info("Using partial extension")
+            embed = embed_partial
         else:
-            # Jeśli nie znaleziono roli premium, sprawdź partial extension
-            embed_partial = await self.extend_existing_role_partially(session, member, final_amount)
-            if embed_partial:
-                embed = embed_partial
+            # Then try to find matching premium role
+            for role_config in self.bot.config["premium_roles"]:
+                if final_amount in [role_config["price"], role_config["price"] + 1]:
+                    # Check if user already has higher role
+                    role_priority = premium_priority.get(role_config["name"], 0)
+                    if role_priority < user_highest_priority:
+                        logger.info(
+                            f"User already has higher role (priority {user_highest_priority}), ignoring new role {role_config['name']} (priority {role_priority})"
+                        )
+                        continue
+                    premium_role = role_config
+                    break
+
+            if premium_role:
+                logger.info(f"Found matching premium role: {premium_role['name']}")
+                role = discord.utils.get(self.guild.roles, name=premium_role["name"])
+                if not role:
+                    logger.error(f"Role {premium_role['name']} not found")
+                    embed = discord.Embed(
+                        title="Błąd",
+                        description="Wystąpił błąd podczas przydzielania roli premium. Skontaktuj się z administracją.",
+                        color=discord.Color.red(),
+                    )
+                else:
+                    current_premium_role = await RoleQueries.get_member_role(
+                        session, member.id, role.id
+                    )
+
+                    # Sprawdź czy to przedłużenie tej samej roli
+                    if current_premium_role and role in member.roles:
+                        logger.info(
+                            f"Found existing premium role {role.name} for member {member.display_name}"
+                        )
+                        days_left = (
+                            current_premium_role.expiration_date - datetime.now(timezone.utc)
+                        ).days
+                        logger.info(f"Current premium role {role.name} has {days_left} days left")
+
+                        # Sprawdź czy to kwota upgradu i czy rola kwalifikuje się do upgradu
+                        can_upgrade = False
+                        if role.name == "zG50" and final_amount == 50 and 29 <= days_left <= 33:
+                            # Próba upgradu do zG100
+                            upgrade_role = discord.utils.get(self.guild.roles, name="zG100")
+                            if upgrade_role:
+                                await member.remove_roles(role)
+                                await RoleQueries.delete_member_role(session, member.id, role.id)
+                                await member.add_roles(upgrade_role)
+                                await RoleQueries.add_role_to_member(
+                                    session, member.id, upgrade_role.id, timedelta(days=days_left)
+                                )
+                                await session.commit()
+                                embed = discord.Embed(
+                                    title="Gratulacje!",
+                                    description=f"Ulepszono twoją rolę z {role.name} na zG100!",
+                                    color=discord.Color.green(),
+                                )
+                                can_upgrade = True
+                        elif role.name == "zG100" and final_amount == 400 and 29 <= days_left <= 33:
+                            # Próba upgradu do zG500 (bo 99 + 400 = 499)
+                            upgrade_role = discord.utils.get(self.guild.roles, name="zG500")
+                            if upgrade_role:
+                                await member.remove_roles(role)
+                                await RoleQueries.delete_member_role(session, member.id, role.id)
+                                await member.add_roles(upgrade_role)
+                                await RoleQueries.add_role_to_member(
+                                    session, member.id, upgrade_role.id, timedelta(days=days_left)
+                                )
+                                await session.commit()
+                                embed = discord.Embed(
+                                    title="Gratulacje!",
+                                    description=f"Ulepszono twoją rolę z {role.name} na zG500!",
+                                    color=discord.Color.green(),
+                                )
+                                can_upgrade = True
+                        elif role.name == "zG500" and final_amount == 500 and 29 <= days_left <= 33:
+                            # Próba upgradu do zG1000 (bo 499 + 500 = 999)
+                            upgrade_role = discord.utils.get(self.guild.roles, name="zG1000")
+                            if upgrade_role:
+                                await member.remove_roles(role)
+                                await RoleQueries.delete_member_role(session, member.id, role.id)
+                                await member.add_roles(upgrade_role)
+                                await RoleQueries.add_role_to_member(
+                                    session, member.id, upgrade_role.id, timedelta(days=days_left)
+                                )
+                                await session.commit()
+                                embed = discord.Embed(
+                                    title="Gratulacje!",
+                                    description=f"Ulepszono twoją rolę z {role.name} na zG1000!",
+                                    color=discord.Color.green(),
+                                )
+                                can_upgrade = True
+
+                        # Jeśli nie można zrobić upgradu, sprawdź czy to przedłużenie
+                        if not can_upgrade:
+                            # Sprawdź czy kwota odpowiada przedłużeniu aktualnej roli
+                            role_extension_amounts = {
+                                "zG50": [49, 50],  # 50 przedłuża jeśli nie można zrobić upgradu
+                                "zG100": [99, 100],  # 100 przedłuża i daje +1G
+                                "zG500": [499, 500],  # 500 przedłuża i daje +1G
+                                "zG1000": [999, 1000],  # 1000 przedłuża i daje +1G
+                            }
+
+                            if final_amount in role_extension_amounts.get(role.name, []):
+                                logger.info(
+                                    f"Amount {final_amount} matches extension amount for role {role.name}"
+                                )
+                                logger.info(
+                                    f"Checking extension days for role {role.name}. Current days_left: {days_left}"
+                                )
+                                extension_days = 33 if days_left < 1 or days_left >= 29 else 30
+                                logger.info(
+                                    f"Decided to extend role {role.name} by {extension_days} days (days_left < 1: {days_left < 1}, days_left > 29: {days_left > 29})"
+                                )
+
+                                await RoleQueries.update_role_expiration_date(
+                                    session, member.id, role.id, timedelta(days=extension_days)
+                                )
+
+                                # Dodaj 1G jeśli zapłacił więcej
+                                bonus_msg = ""
+                                if final_amount > premium_role["price"]:
+                                    await MemberQueries.add_to_wallet_balance(session, member.id, 1)
+                                    bonus_msg = f" Dodatkowo otrzymujesz 1{CURRENCY_UNIT}."
+
+                                await session.commit()
+
+                                bonus_time_msg = (
+                                    " (10% czasu gratis!)" if extension_days == 33 else ""
+                                )
+                                embed = discord.Embed(
+                                    title="Gratulacje!",
+                                    description=f"Przedłużyłeś rolę {role.name} o {extension_days} dni{bonus_time_msg}!{bonus_msg}",
+                                    color=discord.Color.green(),
+                                )
+
+                    # Standardowe nadanie roli jeśli nie ma żadnej
+                    elif role not in member.roles:
+                        await RoleQueries.add_role_to_member(
+                            session, member.id, role.id, timedelta(days=30)
+                        )
+
+                        # Dodaj 1G tylko jeśli zapłacił więcej niż cena roli
+                        bonus_msg = ""
+                        if final_amount > premium_role["price"]:
+                            await MemberQueries.add_to_wallet_balance(session, member.id, 1)
+                            bonus_msg = f" Dodatkowo otrzymujesz 1{CURRENCY_UNIT}."
+
+                        await member.add_roles(role)
+                        await session.commit()
+
+                        embed = discord.Embed(
+                            title="Gratulacje!",
+                            description=f"Zakupiłeś rolę {role.name}!{bonus_msg}",
+                            color=discord.Color.green(),
+                        )
+
+                    await self.remove_mute_roles(member)
             else:
                 # Użyj przekonwertowanej kwoty w wiadomości
                 amount_to_display = final_amount
@@ -374,6 +402,7 @@ class OnPaymentEvent(commands.Cog):
                     color=discord.Color.green(),
                 )
 
+        # Add image and send message
         embed.set_image(url=self.bot.config["gifs"]["donation"])
 
         view = discord.ui.View()

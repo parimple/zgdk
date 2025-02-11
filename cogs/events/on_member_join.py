@@ -24,7 +24,6 @@ class OnMemberJoinEvent(commands.Cog):
         self.guild = None
         self.invites = {}
         self.welcome_channel = None
-        self.rules_channel = None
         self.setup_channels.start()  # pylint: disable=no-member
         self.setup_guild.start()  # pylint: disable=no-member
         # clean_invites will be started after guild is set up
@@ -69,21 +68,15 @@ class OnMemberJoinEvent(commands.Cog):
 
         # Now we can safely get channels
         welcome_channel_id = self.bot.channels.get("on_join")
-        rules_channel_id = self.bot.channels.get("rules")
 
         logger.info(f"Getting welcome channel with ID: {welcome_channel_id}")
-        logger.info(f"Getting rules channel with ID: {rules_channel_id}")
 
         self.welcome_channel = self.bot.get_channel(welcome_channel_id)
-        self.rules_channel = self.bot.get_channel(rules_channel_id)
 
         logger.info(f"Welcome channel set: {self.welcome_channel}")
-        logger.info(f"Rules channel set: {self.rules_channel}")
 
         if not self.welcome_channel:
             logger.error(f"Failed to get welcome channel with ID {welcome_channel_id}")
-        if not self.rules_channel:
-            logger.error(f"Failed to get rules channel with ID {rules_channel_id}")
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
