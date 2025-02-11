@@ -132,14 +132,14 @@ class InfoCog(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(name="ID:", value=member.id)
         embed.add_field(name="Nazwa na serwerze:", value=member.display_name)
-        embed.add_field(name="Saldo portfela:", value=f"{db_member.wallet_balance}{CURRENCY_UNIT}")
+        embed.add_field(name="Saldo G:", value=f"{db_member.wallet_balance}{CURRENCY_UNIT}")
 
         # Add bypass time info if active
         if bypass_until and bypass_until > current_time:
             time_left = bypass_until - current_time
             # Convert to hours and round down to nearest integer
             hours = int(time_left.total_seconds() // 3600)
-            embed.add_field(name="Ilość czasu:", value=f"{hours}T")
+            embed.add_field(name="Saldo T:", value=f"{hours}T")
 
         embed.add_field(name="Konto od:", value=discord.utils.format_dt(member.created_at, "D"))
         embed.add_field(

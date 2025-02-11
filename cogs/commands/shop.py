@@ -52,7 +52,7 @@ class ShopCog(commands.Cog):
         )
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
-    @commands.command(name="add", description="Dodaje środki do portfela użytkownika.")
+    @commands.command(name="add", description="Dodaje środki G.")
     @commands.has_permissions(administrator=True)
     async def add_balance(self, ctx: Context, user: discord.User, amount: int):
         """Add balance to a user's wallet."""
