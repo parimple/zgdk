@@ -131,13 +131,31 @@ class OnPaymentEvent(commands.Cog):
         Jeśli final_amount pasuje do PARTIAL_EXTENSIONS[rola], to przedłużamy dokładnie o days_to_add.
         W przeciwnym razie zwracamy None.
         """
-        await self.remove_mute_roles(member)
+        # Sprawdź czy użytkownik ma muty
+        if not self.has_mute_roles(member):
+            logger.info(f"User {member.display_name} has no mute roles, skipping partial extension")
+            return None
+
+        # Określ najwyższą rangę użytkownika
+        premium_priority = {"zG50": 1, "zG100": 2, "zG500": 3, "zG1000": 4}
+        user_highest_priority = 0
+        for role_name, priority in premium_priority.items():
+            role_obj = discord.utils.get(self.guild.roles, name=role_name)
+            if role_obj and role_obj in member.roles:
+                user_highest_priority = max(user_highest_priority, priority)
+
         logger.info(
             f"Checking partial extension for {member.display_name} with amount {final_amount}"
         )
 
         # Przejrzyj wszystkie role premium, które obsługujemy w PARTIAL_EXTENSIONS
         for role_name, amounts_map in PARTIAL_EXTENSIONS.items():
+            # Sprawdź czy ranga z PARTIAL_EXTENSIONS nie jest wyższa od aktualnej rangi usera
+            role_priority = premium_priority.get(role_name, 0)
+            if role_priority > user_highest_priority:
+                logger.info(f"Role {role_name} is higher than user's current role, skipping")
+                continue
+
             role_obj = discord.utils.get(self.guild.roles, name=role_name)
             if not role_obj:
                 logger.error(f"Role {role_name} not found in the guild")
@@ -225,9 +243,8 @@ class OnPaymentEvent(commands.Cog):
         # Jeśli kwota >= 15, nadaj odpowiednie role tymczasowe (zawsze, niezależnie od premium)
         if final_amount >= 15:
             await self.assign_temporary_roles(session, member, original_amount)
-            await self.remove_mute_roles(member)  # Zawsze zdejmuj muty po nadaniu ról $
 
-        # Try partial extension first
+        # Try partial extension first - BEFORE removing mute roles
         embed_partial = await self.extend_existing_role_partially(session, member, final_amount)
         if embed_partial:
             logger.info("Using partial extension")
@@ -389,7 +406,6 @@ class OnPaymentEvent(commands.Cog):
                             color=discord.Color.green(),
                         )
 
-                    await self.remove_mute_roles(member)
             else:
                 # Użyj przekonwertowanej kwoty w wiadomości
                 amount_to_display = final_amount
@@ -421,6 +437,9 @@ class OnPaymentEvent(commands.Cog):
                 url=self.bot.config["donate_url"],
             )
         )
+
+        # Remove mute roles at the very end, after all role processing is complete
+        await self.remove_mute_roles(member)
 
         message = await channel.send(content=f"{member.mention}", embed=embed, view=view)
         if owner:
@@ -509,6 +528,11 @@ class OnPaymentEvent(commands.Cog):
         if roles_to_remove:
             await member.remove_roles(*roles_to_remove)
             logger.info("Removed mute roles from %s", member.display_name)
+
+    def has_mute_roles(self, member: discord.Member) -> bool:
+        """Check if the member currently has any mute roles."""
+        mute_roles_names = [role["name"] for role in self.bot.config["mute_roles"]]
+        return any(role.name in mute_roles_names for role in member.roles)
 
 
 class BuyRoleButton(discord.ui.Button):
