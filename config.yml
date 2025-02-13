@@ -4,6 +4,10 @@ guild_id: 960665311701528596
 donate_url: "https://tipply.pl/u/zagadka"
 owner_id: 956602391891947592
 
+# Emoji configuration
+emojis:
+  proxy_bunny: "<a:bunnyProxy:1301144820349403157>"
+
 # Konfiguracja systemu legacy - do usunięcia po migracji
 legacy_system:
   enabled: true

@@ -14,6 +14,14 @@ from utils.voice.permissions import VoicePermissionManager
 logger = logging.getLogger(__name__)
 
 
+class FakeContext:
+    """A fake context class to provide bot and guild attributes."""
+
+    def __init__(self, bot, guild):
+        self.bot = bot
+        self.guild = guild
+
+
 class OnVoiceStateUpdateEvent(commands.Cog):
     """Class for handling the event when a member's voice state is updated."""
 
@@ -205,8 +213,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         # Move member to the new channel
         await member.move_to(new_channel)
 
-        # Send channel creation info
-        await self.message_sender.send_channel_creation_info(new_channel, member)
+        # Create fake context and send channel creation info
+        fake_ctx = FakeContext(self.bot, member.guild)
+        await self.message_sender.send_channel_creation_info(new_channel, fake_ctx, owner=member)
 
     async def handle_channel_leave(self, before):
         """

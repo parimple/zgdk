@@ -168,12 +168,39 @@ class VoiceCog(commands.Cog):
                 and overwrite.manage_messages is True
                 and not overwrite.priority_speaker
             ]
-            current_mods_mentions = ", ".join(member.mention for member in current_mods)
+            # Convert Member objects to mentions string with display names
+            current_mods_mentions = (
+                ", ".join(f"{member.mention} ({member.display_name})" for member in current_mods)
+                or "brak"
+            )
             remaining_slots = max(0, mod_limit - len(current_mods))
 
             await self.message_sender.send_mod_info(
                 ctx, current_mods_mentions, mod_limit, remaining_slots
             )
+            return
+
+        # Get mod limit from user's roles
+        mod_limit = 0
+        for role in reversed(self.bot.config["premium_roles"]):
+            if any(r.name == role["name"] for r in ctx.author.roles):
+                mod_limit = role["moderator_count"]
+                break
+
+        # Get current mods count
+        voice_channel = ctx.author.voice.channel
+        current_mods = [
+            t
+            for t, overwrite in voice_channel.overwrites.items()
+            if isinstance(t, discord.Member)
+            and overwrite.manage_messages is True
+            and not overwrite.priority_speaker
+            and t != target  # Don't count the target if they're already a mod
+        ]
+
+        # Check if adding would exceed limit
+        if can_manage == "+" and len(current_mods) >= mod_limit:
+            await self.message_sender.send_mod_limit_exceeded(ctx, mod_limit, current_mods)
             return
 
         await self.permission_commands["mod"].execute(self, ctx, target, can_manage)
@@ -258,6 +285,20 @@ class VoiceCog(commands.Cog):
     ):
         """Reset channel permissions or specific user permissions."""
         await self.permission_commands["reset"].execute(self, ctx, target, None)
+
+    async def reset_channel_permissions(self, ctx):
+        """Reset all channel permissions to default."""
+        await self.permission_manager.reset_channel_permissions(
+            ctx.author.voice.channel, ctx.author
+        )
+        await self.message_sender.send_channel_reset(ctx)
+
+    async def reset_user_permissions(self, ctx, target):
+        """Reset permissions for a specific user."""
+        await self.permission_manager.reset_user_permissions(
+            ctx.author.voice.channel, ctx.author, target
+        )
+        await self.message_sender.send_permission_reset(ctx, target)
 
 
 async def setup(bot):

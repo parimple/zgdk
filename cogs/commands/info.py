@@ -250,6 +250,18 @@ class InfoCog(commands.Cog):
         )
         await message.edit(embed=final_embed, view=view)
 
+    @commands.command(name="addt", description="Dodaje czas T użytkownikowi.")
+    @commands.has_permissions(administrator=True)
+    async def add_t(self, ctx: commands.Context, user: discord.User, hours: int):
+        """Add T balance to a user."""
+        async with self.bot.get_db() as session:
+            member = await MemberQueries.add_bypass_time(session, user.id, hours)
+            if member and member.voice_bypass_until:
+                await session.commit()
+                await ctx.reply(f"Dodano {hours}T do konta {user.mention}.")
+            else:
+                await ctx.reply(f"Nie udało się dodać T do konta {user.mention}.")
+
 
 class ProfileView(discord.ui.View):
     """Profile view."""
