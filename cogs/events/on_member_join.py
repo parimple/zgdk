@@ -199,35 +199,48 @@ class OnMemberJoinEvent(commands.Cog):
                 f"Welcome channel is still None, could not send welcome message for {member}"
             )
 
-    async def process_unknown_invite(self, member):
-        """
-        Process an unknown invite. Adds the member to the database
-        with a characteristic ID and sends a notification.
-        """
-        characteristic_id = self.guild.id
+    async def process_unknown_invite(self, member: discord.Member):
+        """Process member join when invite is unknown"""
+        logger.info(
+            "No invite identified for member %s, processing as unknown", member.display_name
+        )
 
         async with self.bot.get_db() as session:
-            # Add the member with the characteristic ID
-            await MemberQueries.get_or_add_member(
-                session, member.id, first_inviter_id=characteristic_id
-            )
-            await session.commit()
+            try:
+                # First ensure guild exists in members table
+                guild_id = self.bot.guild_id
+                await MemberQueries.get_or_add_member(session, guild_id)
+                await session.flush()
 
-        # Check if welcome_channel is None and try to get it again
-        if self.welcome_channel is None:
-            self.welcome_channel = self.bot.get_channel(self.bot.channels.get("on_join"))
-            logger.info(f"Re-fetched welcome channel: {self.welcome_channel}")
+                # Then add the new member
+                await MemberQueries.get_or_add_member(
+                    session,
+                    member.id,
+                    first_inviter_id=guild_id,  # Use guild_id as inviter for unknown invites
+                    joined_at=member.joined_at,
+                )
+                await session.commit()
 
-        if self.welcome_channel:
-            await self.welcome_channel.send(
-                f"{member.mention} {member.display_name} zaproszony przez {self.bot.user.mention} "
-                f"Kod: {self.guild.vanity_url_code}",
-                allowed_mentions=AllowedMentions(users=False),
-            )
-        else:
-            logger.error(
-                f"Welcome channel is still None, could not send welcome message for {member}"
-            )
+                # Check if welcome_channel is None and try to get it again
+                if self.welcome_channel is None:
+                    self.welcome_channel = self.bot.get_channel(self.bot.channels.get("on_join"))
+                    logger.info(f"Re-fetched welcome channel: {self.welcome_channel}")
+
+                if self.welcome_channel:
+                    await self.welcome_channel.send(
+                        f"{member.mention} {member.display_name} zaproszony przez {self.bot.user.mention} "
+                        f"Kod: {self.guild.vanity_url_code or 'nieznany'}",
+                        allowed_mentions=AllowedMentions(users=False),
+                    )
+                else:
+                    logger.error(
+                        f"Welcome channel is still None, could not send welcome message for {member}"
+                    )
+
+            except Exception as e:
+                logger.error("Error processing member join for %s: %s", member.display_name, str(e))
+                await session.rollback()
+                raise
 
     @commands.Cog.listener()
     async def on_invite_create(self, invite):

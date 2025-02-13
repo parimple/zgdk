@@ -316,11 +316,27 @@ class RoleQueries:
     @staticmethod
     async def update_role_expiration_date(
         session: AsyncSession, member_id: int, role_id: int, duration: timedelta
-    ):
+    ) -> Optional[MemberRole]:
         """Update the expiration date of the role for the member."""
-        member_role = await session.get(MemberRole, (member_id, role_id))
-        if member_role:
-            member_role.expiration_date += duration
+        try:
+            # Get the current member role
+            member_role = await session.get(MemberRole, (member_id, role_id))
+            if member_role:
+                old_expiry = member_role.expiration_date
+                member_role.expiration_date = member_role.expiration_date + duration
+                logger.info(
+                    f"[ROLE_UPDATE] Extending role {role_id} for member {member_id}:"
+                    f"\n - Old expiry: {old_expiry}"
+                    f"\n - Duration to add: {duration}"
+                    f"\n - New expiry: {member_role.expiration_date}"
+                )
+
+                # Return the updated role object without flushing
+                return member_role
+            return None
+        except Exception as e:
+            logger.error(f"Error updating role expiration date: {str(e)}")
+            raise
 
     @staticmethod
     async def get_all_premium_roles(session: AsyncSession) -> List[MemberRole]:

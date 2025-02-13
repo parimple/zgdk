@@ -98,7 +98,7 @@ class InfoCog(commands.Cog):
     @commands.hybrid_command(
         name="profile", aliases=["p"], description="Wyświetla profil użytkownika."
     )
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
     async def profile(self, ctx: commands.Context, member: Optional[discord.Member] = None):
         """Sends user profile when profile is used as a command."""
         if not member:
@@ -215,6 +215,41 @@ class InfoCog(commands.Cog):
         """Wyświetla listę dostępnych komend"""
         await ctx.send_help()
 
+    @commands.hybrid_command(
+        name="games", description="Wyświetla listę aktywnych gier na serwerze wraz z liczbą graczy."
+    )
+    async def games(self, ctx: commands.Context):
+        """Wyświetla listę gier, w które aktualnie grają członkowie serwera."""
+        # Send initial message
+        loading_embed = discord.Embed(
+            title="Ładowanie...",
+            description="Trwa zbieranie informacji o grach...",
+            color=discord.Color.blue(),
+        )
+        message = await ctx.send(embed=loading_embed)
+
+        games_data = {}
+        online_members = [m for m in ctx.guild.members if m.status != discord.Status.offline]
+        total_online = len(online_members)
+
+        for member in online_members:
+            if member.activities:
+                for activity in member.activities:
+                    if activity.type == discord.ActivityType.playing:
+                        game_name = activity.name
+                        games_data[game_name] = games_data.get(game_name, 0) + 1
+
+        if not games_data:
+            await message.edit(content="Aktualnie nikt nie gra w żadne gry.", embed=None)
+            return
+
+        view = GameListView(games_data)
+        final_embed = view.create_embed()
+        final_embed.set_footer(
+            text=f"{final_embed.footer.text} | Przeanalizowano {total_online} użytkowników online"
+        )
+        await message.edit(embed=final_embed, view=view)
+
 
 class ProfileView(discord.ui.View):
     """Profile view."""
@@ -278,28 +313,45 @@ class SellRoleButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         member = interaction.user
         role_price_map = {role["name"]: role["price"] for role in self.bot.config["premium_roles"]}
-        last_member_role, last_role = self.premium_roles[0]
-        role_price = role_price_map.get(last_role.name)
 
-        if not role_price:
-            await interaction.response.send_message("Nie można znaleźć ceny dla tej roli.")
-            return
-
-        refund_amount = calculate_refund(last_member_role.expiration_date, role_price)
+        # Disable the button immediately to prevent multiple clicks
+        self.disabled = True
+        await interaction.message.edit(view=self.view)
 
         async with self.bot.get_db() as session:
             try:
-                await MemberQueries.get_or_add_member(session, member.id)
-                await RoleQueries.delete_member_role(session, member.id, last_role.id)
-                await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
+                # Get current premium roles again to ensure they still exist
+                current_premium_roles = await RoleQueries.get_member_premium_roles(
+                    session, member.id
+                )
+                if not current_premium_roles:
+                    await interaction.response.send_message(
+                        "Nie masz już żadnej roli premium do sprzedania."
+                    )
+                    return
+
+                for member_role, role in current_premium_roles:
+                    role_price = role_price_map.get(role.name)
+                    if not role_price:
+                        continue
+
+                    refund_amount = calculate_refund(member_role.expiration_date, role_price)
+
+                    # Remove role from Discord
+                    await member.remove_roles(role)
+                    # Remove role from database
+                    await RoleQueries.delete_member_role(session, member.id, role.id)
+                    # Add refund to wallet
+                    await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
+
+                    await interaction.response.send_message(
+                        f"Sprzedano rolę {role.name} za {refund_amount}{CURRENCY_UNIT}. "
+                        f"Kwota zwrotu została dodana do twojego salda."
+                    )
+                    break  # Only sell one role at a time
+
                 await session.commit()
 
-                await member.remove_roles(last_role)
-
-                await interaction.response.send_message(
-                    f"Sprzedano rolę {last_role.name} za {refund_amount}{CURRENCY_UNIT}. "
-                    f"Kwota zwrotu została dodana do twojego salda."
-                )
             except discord.DiscordException as error:
                 logger.error("Error while selling role: %s", error, exc_info=True)
                 await interaction.response.send_message(
@@ -430,6 +482,105 @@ class InviteListView(discord.ui.View):
             text=f"Strona {self.current_page + 1}/{self.total_pages} | Sortowanie: {self.sort_by}, Kolejność: {self.order}"
         )
         return embed
+
+
+class GameListView(discord.ui.View):
+    """View for displaying and sorting game list."""
+
+    def __init__(self, games_data):
+        super().__init__(timeout=60)
+        self.games_data = games_data
+        self.sort_by_count = True
+        self.current_page = 0
+        self.per_page = 15  # Number of games per page
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.clear_items()
+        self.add_item(
+            discord.ui.Button(
+                label="◀",
+                style=discord.ButtonStyle.primary,
+                custom_id="prev",
+                disabled=self.current_page == 0,
+            )
+        )
+        self.add_item(
+            discord.ui.Button(
+                label="Sortuj po liczbie graczy"
+                if not self.sort_by_count
+                else "Sortuj alfabetycznie",
+                style=discord.ButtonStyle.primary,
+                custom_id="toggle_sort",
+            )
+        )
+        sorted_games = self.sort_games()
+        max_pages = (len(sorted_games) - 1) // self.per_page + 1
+        self.add_item(
+            discord.ui.Button(
+                label="▶",
+                style=discord.ButtonStyle.primary,
+                custom_id="next",
+                disabled=self.current_page >= max_pages - 1,
+            )
+        )
+
+    def sort_games(self):
+        if self.sort_by_count:
+            return sorted(self.games_data.items(), key=lambda x: (-x[1], x[0].lower()))
+        else:
+            return sorted(self.games_data.items(), key=lambda x: x[0].lower())
+
+    def create_embed(self) -> discord.Embed:
+        sorted_games = self.sort_games()
+        total_games = len(sorted_games)
+        max_pages = (total_games - 1) // self.per_page + 1
+
+        start_idx = self.current_page * self.per_page
+        end_idx = min(start_idx + self.per_page, total_games)
+        current_games = sorted_games[start_idx:end_idx]
+
+        embed = discord.Embed(
+            title="Aktywne gry na serwerze",
+            color=discord.Color.blue(),
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        total_players = sum(count for _, count in self.games_data.items())
+        description = f"Łącznie graczy: {total_players}\nŁącznie gier: {total_games}\n\n"
+
+        for game_name, player_count in current_games:
+            description += (
+                f"**{game_name}**: {player_count} {'gracz' if player_count == 1 else 'graczy'}\n"
+            )
+
+        embed.description = description
+
+        # Footer will be extended in the games command with the total processed users
+        embed.set_footer(
+            text=f"Strona {self.current_page + 1}/{max_pages} | "
+            f"Sortowanie: {'Liczba graczy' if self.sort_by_count else 'Alfabetycznie'}"
+        )
+        return embed
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.data["custom_id"] == "toggle_sort":
+            self.sort_by_count = not self.sort_by_count
+            self.current_page = 0  # Reset to first page when sorting changes
+        elif interaction.data["custom_id"] == "prev":
+            self.current_page = max(0, self.current_page - 1)
+        elif interaction.data["custom_id"] == "next":
+            sorted_games = self.sort_games()
+            max_pages = (len(sorted_games) - 1) // self.per_page + 1
+            self.current_page = min(self.current_page + 1, max_pages - 1)
+
+        self.update_buttons()
+        embed = self.create_embed()
+        # Preserve the extended footer if it exists
+        if interaction.message.embeds[0].footer.text.endswith("użytkowników"):
+            embed.set_footer(text=interaction.message.embeds[0].footer.text)
+        await interaction.response.edit_message(embed=embed, view=self)
+        return True
 
 
 async def setup(bot: commands.Bot):

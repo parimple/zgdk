@@ -76,8 +76,8 @@ class PremiumManager:
 
         # Próbujemy po nazwie tylko jeśli nie podano ID
         try:
-            bans = await self.guild.bans()
-            for ban_entry in bans:
+            ban_list = [entry async for entry in self.guild.bans()]
+            for ban_entry in ban_list:
                 if name_or_id.lower() == ban_entry.user.name.lower():
                     logger.info("Banned user found by exact name: %s", ban_entry.user.id)
                     return ban_entry.user

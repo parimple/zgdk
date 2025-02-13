@@ -1,6 +1,7 @@
 """Shop cog for the Zagadka bot."""
 import logging
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 
 import discord
 from discord.ext import commands
@@ -12,6 +13,16 @@ from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQuerie
 from utils.premium import PaymentData
 
 logger = logging.getLogger(__name__)
+
+
+def is_zagadka_owner():
+    async def predicate(ctx):
+        if ctx.author.id != ctx.bot.config["owner_id"]:
+            await ctx.reply("Nie masz uprawnień do użycia tej komendy!")
+            return False
+        return True
+
+    return commands.check(predicate)
 
 
 class ShopCog(commands.Cog):
@@ -53,7 +64,7 @@ class ShopCog(commands.Cog):
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
     @commands.command(name="add", description="Dodaje środki G.")
-    @commands.has_permissions(administrator=True)
+    @is_zagadka_owner()
     async def add_balance(self, ctx: Context, user: discord.User, amount: int):
         """Add balance to a user's wallet."""
         payment_data = PaymentData(
@@ -130,7 +141,7 @@ class ShopCog(commands.Cog):
         await ctx.send(embed=embed, view=view)
 
     @commands.command(
-        name="set_role_expiry", description="Ustawia czas wygaśnięcia roli (tylko dla testów)."
+        name="set_role_expiry", description="Ustawia czas wygaśnięcia roli", aliases=["sr"]
     )
     @commands.has_permissions(administrator=True)
     async def set_role_expiry(self, ctx: Context, member: discord.Member, hours: int):
