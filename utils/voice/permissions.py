@@ -8,6 +8,7 @@ from discord import Member, PermissionOverwrite, Permissions
 from discord.ext import commands
 
 from datasources.queries import ChannelPermissionQueries
+from utils.channel_permissions import ChannelPermissionManager
 from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
@@ -400,6 +401,7 @@ class VoicePermissionManager:
         self.db_manager = None  # Will be set after import to avoid circular dependency
         self.message_sender = MessageSender()
         self.logger = logging.getLogger(__name__)
+        self.channel_perm_manager = ChannelPermissionManager(bot)
 
     def get_default_permission_overwrites(
         self, guild: discord.Guild, owner: discord.Member
@@ -849,3 +851,13 @@ class VoicePermissionManager:
                     self.logger.info(f"Added to remaining overwrites for {target}")
 
         return remaining_overwrites
+
+    async def reset_channel_permissions(self, channel: discord.VoiceChannel, owner: discord.Member):
+        """Deleguje do channel_perm_manager."""
+        await self.channel_perm_manager.reset_channel_permissions(channel, owner)
+
+    async def reset_user_permissions(
+        self, channel: discord.VoiceChannel, owner: discord.Member, target: discord.Member
+    ):
+        """Deleguje do channel_perm_manager."""
+        await self.channel_perm_manager.reset_user_permissions(channel, owner, target)
