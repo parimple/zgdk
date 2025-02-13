@@ -347,6 +347,8 @@ class PermissionChecker:
                         if mention.startswith("<@") and not mention.startswith("<@&"):
                             user_id = "".join(filter(str.isdigit, mention))
                             target = ctx.guild.get_member(int(user_id)) if user_id else None
+                        elif mention.isdigit():  # Handle raw user ID
+                            target = ctx.guild.get_member(int(mention))
                         else:
                             target = ctx.guild.default_role
                         return target, second_arg
@@ -355,6 +357,14 @@ class PermissionChecker:
                 elif second_arg.startswith("<@") and not second_arg.startswith("<@&"):
                     user_id = "".join(filter(str.isdigit, second_arg))
                     target = ctx.guild.get_member(int(user_id)) if user_id else None
+                    permission_value = (
+                        message_parts[2]
+                        if len(message_parts) > 2 and message_parts[2] in ["+", "-"]
+                        else None
+                    )
+                    return target, permission_value
+                elif second_arg.isdigit():  # Handle raw user ID
+                    target = ctx.guild.get_member(int(second_arg))
                     permission_value = (
                         message_parts[2]
                         if len(message_parts) > 2 and message_parts[2] in ["+", "-"]
