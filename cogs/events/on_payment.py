@@ -207,42 +207,15 @@ class OnPaymentEvent(commands.Cog):
 
                     if final_amount in [role_price, rounded_price]:
                         try:
-                            # Get current role if exists
-                            role = discord.utils.get(self.guild.roles, name=role_name)
-                            if not role:
-                                logger.error(f"Role {role_name} not found")
-                                continue
-
-                            current_role = await RoleQueries.get_member_role(
-                                session, member.id, role.id
+                            # Use PremiumRoleManager to handle role assignment/extension
+                            embed, refund = await self.role_manager.assign_or_extend_premium_role(
+                                session=session,
+                                member=member,
+                                role_name=role_name,
+                                amount=final_amount,
+                                duration_days=30,
+                                source="payment",
                             )
-
-                            if current_role and role in member.roles:
-                                # Extend existing role
-                                extend_days = 30  # Monthly duration
-                                current_role.expiration_date = (
-                                    current_role.expiration_date + timedelta(days=extend_days)
-                                )
-                                await session.flush()
-
-                                embed = discord.Embed(
-                                    title="Gratulacje!",
-                                    description=f"Przedłużyłeś rolę {role_name} o {extend_days} dni!",
-                                    color=discord.Color.green(),
-                                )
-                            else:
-                                # New role assignment
-                                await RoleQueries.add_role_to_member(
-                                    session, member.id, role.id, timedelta(days=30)
-                                )
-                                await session.flush()
-                                await member.add_roles(role)
-
-                                embed = discord.Embed(
-                                    title="Gratulacje!",
-                                    description=f"Zakupiłeś rolę {role_name}!",
-                                    color=discord.Color.green(),
-                                )
 
                             # Handle wallet balance
                             amount_to_add = final_amount - role_price
