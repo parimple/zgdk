@@ -1,9 +1,13 @@
 """Message sender utility for sending formatted messages."""
 
 import random
+from datetime import datetime, timezone
 
 import discord
 from discord import AllowedMentions
+
+from datasources.models import Member
+from utils.bump_checker import BumpChecker
 
 
 class MessageSender:
@@ -28,21 +32,34 @@ class MessageSender:
 
     @staticmethod
     def _create_embed(
-        title: str,
+        title: str = None,
         description: str = None,
         color: str = "info",
         fields: list = None,
         footer: str = None,
         ctx=None,
+        add_author: bool = False,
     ) -> discord.Embed:
         """
         Creates a consistent embed with the given parameters.
-        Also sets embed author if 'ctx' is provided.
+        Also sets embed author if 'ctx' is provided and add_author is True.
         """
+        # Get user's color if available
+        embed_color = None
+        if ctx:
+            if isinstance(ctx, discord.Member):
+                embed_color = ctx.color if ctx.color.value != 0 else None
+            elif hasattr(ctx, "author"):
+                embed_color = ctx.author.color if ctx.author.color.value != 0 else None
+
+        # If no user color, use dark theme color
+        if not embed_color:
+            embed_color = discord.Color.from_rgb(47, 49, 54)
+
         embed = discord.Embed(
             title=title,
             description=description or "",
-            color=MessageSender.COLORS.get(color, MessageSender.COLORS["info"]),
+            color=embed_color,
         )
 
         if fields:
@@ -52,20 +69,16 @@ class MessageSender:
         if footer:
             embed.set_footer(text=footer)
 
-        # Add author's avatar and name if context or member is provided
-        if ctx:
+        # Add author's avatar and name if requested
+        if add_author and ctx:
             if isinstance(ctx, discord.Member):
                 # If ctx is a Member object (e.g. from channel creation)
                 embed.set_author(name=ctx.display_name, icon_url=ctx.display_avatar.url)
-                if ctx.color.value != 0:
-                    embed.colour = ctx.color
             elif hasattr(ctx, "author"):
                 # If ctx is a Context object (from commands)
                 embed.set_author(
                     name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url
                 )
-                if ctx.author.color.value != 0:
-                    embed.colour = ctx.author.color
 
         return embed
 
@@ -255,11 +268,18 @@ class MessageSender:
     @staticmethod
     async def send_mod_limit_exceeded(ctx, mod_limit, current_mods):
         """Sends a message when the mod limit is exceeded."""
-        base_text = f"Osiągnięto limit {mod_limit} moderatorów kanału."
         channel = ctx.author.voice.channel if ctx.author.voice else None
 
-        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.yellow()
-        embed = discord.Embed(color=embed_color)
+        embed = MessageSender._create_embed(ctx=ctx, add_author=False)
+
+        # Check if user has zG1000
+        has_zg1000 = any(role.name == "zG1000" for role in ctx.author.roles)
+
+        current_mods_count = len(current_mods)
+        if has_zg1000:
+            base_text = f"Osiągnięto limit moderatorów ({current_mods_count}/{mod_limit}). Usuń któregoś z aktualnych moderatorów przed dodaniem nowego."
+        else:
+            base_text = f"Osiągnięto limit moderatorów ({current_mods_count}/{mod_limit}). Wybierz wyższy plan, aby móc dodać więcej moderatorów."
 
         # Add base text first
         embed.description = base_text.rstrip()
@@ -268,11 +288,8 @@ class MessageSender:
 
         # Create fields content
         fields_content = []
-        # Convert Member objects to mentions string with display names
-        current_mods_mentions = (
-            ", ".join(f"{member.mention} ({member.display_name})" for member in current_mods)
-            or "brak"
-        )
+        # Convert Member objects to mentions string (without display names)
+        current_mods_mentions = ", ".join(member.mention for member in current_mods) or "brak"
         fields_content.append(
             {"name": "Aktualni Moderatorzy", "value": current_mods_mentions, "inline": False}
         )
@@ -612,8 +629,7 @@ class MessageSender:
         base_text = "Lista aktualnych moderatorów kanału."
         channel = ctx.author.voice.channel if ctx.author.voice else None
 
-        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
-        embed = discord.Embed(color=embed_color)
+        embed = MessageSender._create_embed(ctx=ctx, add_author=False)
 
         # Add base text first
         embed.description = base_text.rstrip()
@@ -766,37 +782,71 @@ class MessageSender:
 
         base_text = f"Nie masz uprawnień do {reason}"
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
-        embed = discord.Embed(color=embed_color)
+        embed = MessageSender._create_embed(ctx=ctx, add_author=False)
         embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
     async def send_bypass_expired(ctx):
         """Send message when user's bypass (T) has expired."""
-        base_text = "Twój czas T (bypass) wygasł! Użyj `/bump`, aby przedłużyć ten czas."
+        services = ["disboard", "dzik", "discadia", "discordservers", "dsme"]
+        available_services = []
+
+        for service in services:
+            status = await BumpChecker(ctx.bot).get_service_status(service, ctx.author.id)
+            if status["available"]:
+                available_services.append((service, status))
+
+        embed = MessageSender._create_embed(
+            description="Aby użyć tej komendy, wybierz plan, zaproś znajomych na serwer lub zbumpuj serwer!",
+            ctx=ctx,
+            add_author=False,
+        )
+
+        # Add available services
+        if available_services:
+            available_text = ""
+            for service, status in available_services:
+                emoji = BumpChecker.get_service_emoji(service)
+                details = BumpChecker.get_service_details(service)
+                available_text += f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']}\n"
+                if "command" in details:
+                    available_text += f"Komenda: {details['command']}\n"
+                elif "url" in details:
+                    available_text += f"[Zagłosuj]({details['url']})\n"
+
+            if available_text:
+                embed.add_field(name="✅ Dostępne teraz", value=available_text.strip(), inline=False)
+
+        # Add channel info using build_description
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
-        embed = discord.Embed(color=embed_color)
-        embed.description = MessageSender.build_description(base_text, ctx, channel)
+        if channel and hasattr(ctx, "bot") and hasattr(ctx.bot, "config"):
+            proxy_bunny = ctx.bot.config.get("emojis", {}).get("proxy_bunny", "")
+            premium_channel_id = ctx.bot.config["channels"]["premium_info"]
+            premium_channel = ctx.guild.get_channel(premium_channel_id)
+            premium_text = (
+                f"**Wybierz swój** {proxy_bunny}{premium_channel.mention}"
+                if premium_channel
+                else f"**Wybierz swój** {proxy_bunny}<#{premium_channel_id}>"
+            )
+            embed.add_field(name="Kanał", value=f"{channel.mention} • {premium_text}", inline=False)
+
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
     async def send_premium_required(ctx):
         """Send message when premium role is required."""
-        base_text = "Aby użyć tej komendy, potrzebujesz rangi premium!"
+        base_text = "Aby użyć tej komendy, wybierz plan lub zaproś 4 znajomych na serwer (ranga ♵)!"
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
-        embed = discord.Embed(color=embed_color)
+        embed = MessageSender._create_embed(ctx=ctx, add_author=False)
         embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
     async def send_specific_roles_required(ctx, allowed_roles):
         """Send message when specific premium roles are required."""
-        base_text = f"Ta komenda wymaga jednej z rang: {', '.join(allowed_roles)}"
+        base_text = f"Ta komenda wymaga jednej z rang premium: {', '.join(allowed_roles)}. Wybierz swój plan!"
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        embed_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
-        embed = discord.Embed(color=embed_color)
+        embed = MessageSender._create_embed(ctx=ctx, add_author=False)
         embed.description = MessageSender.build_description(base_text, ctx, channel)
         await MessageSender._send_embed(ctx, embed, reply=True)
