@@ -197,7 +197,7 @@ class OnPaymentEvent(commands.Cog):
                 # If amount >= 15, assign temporary roles based on original amount
                 if original_amount >= 15:
                     await self.role_manager.assign_temporary_roles(session, member, original_amount)
-                    await session.flush()  # Flush after role assignment
+                    await session.flush()
 
                 # Try to find matching premium role
                 for role_config in self.bot.config["premium_roles"]:
@@ -216,6 +216,10 @@ class OnPaymentEvent(commands.Cog):
                                 duration_days=30,
                                 source="payment",
                             )
+                            await session.flush()
+
+                            # Remove mute roles regardless of the role assignment result
+                            await self.role_manager.remove_mute_roles(member)
 
                             # Handle wallet balance
                             amount_to_add = final_amount - role_price
@@ -226,7 +230,9 @@ class OnPaymentEvent(commands.Cog):
                                 await session.flush()
                             break
                         except Exception as e:
-                            logger.error(f"Error processing role assignment: {str(e)}")
+                            logger.error(
+                                f"Error processing role assignment: {str(e)}", exc_info=True
+                            )
                             raise
 
                 # Jeśli nie znaleziono pasującej roli, dodaj całą kwotę do portfela
@@ -234,6 +240,8 @@ class OnPaymentEvent(commands.Cog):
                     try:
                         await MemberQueries.add_to_wallet_balance(session, member.id, amount_to_add)
                         await session.flush()
+                        # Remove mute roles even if no role was purchased
+                        await self.role_manager.remove_mute_roles(member)
                     except Exception as e:
                         logger.error(f"Error adding balance to wallet: {str(e)}")
                         raise

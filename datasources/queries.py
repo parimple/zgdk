@@ -372,9 +372,9 @@ class RoleQueries:
     ) -> Optional[MemberRole]:
         """Get a specific member role"""
         result = await session.execute(
-            select(MemberRole).where(
-                and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id)
-            )
+            select(MemberRole)
+            .options(joinedload(MemberRole.role))
+            .where(and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id))
         )
         return result.scalar_one_or_none()
 
