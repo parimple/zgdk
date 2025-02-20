@@ -4,6 +4,8 @@ Premium role and bypass checking functionality.
 
 import logging
 from datetime import datetime, timezone
+from enum import IntEnum
+from functools import wraps
 from typing import List, Optional, Tuple
 
 from discord.ext import commands
@@ -15,23 +17,51 @@ from utils.message_sender import MessageSender
 logger = logging.getLogger(__name__)
 
 
+class CommandTier(IntEnum):
+    """Enum representing command access tiers."""
+
+    TIER_0 = 0  # Available to everyone without any requirements
+    TIER_T = 1  # Requires only T>0
+    TIER_1 = 2  # Requires (booster/invite role + T>0) or any premium
+    TIER_2 = 3  # Requires any premium role (zG50+)
+    TIER_3 = 4  # Requires high premium role (zG500+)
+
+
 class PremiumChecker:
     """Class for checking premium role requirements and bypass status."""
 
-    # Command categories
-    BASIC_VOICE_COMMANDS = ["speak", "connect", "view"]
-    MOD_COMMANDS = ["text", "mod", "live"]
-    AUTOKICK_COMMANDS = ["autokick"]
-    LIMIT_COMMAND = ["limit"]
+    # Command tiers
+    COMMAND_TIERS = {
+        # TIER_0 - Available to everyone without any requirements
+        CommandTier.TIER_0: ["voicechat"],
+        # TIER_T - Requires only T>0
+        CommandTier.TIER_T: ["limit"],
+        # TIER_1 - Requires (booster/invite role + T>0) or any premium
+        CommandTier.TIER_1: ["speak", "connect", "view", "reset"],
+        # TIER_2 - Requires any premium role (zG50+)
+        CommandTier.TIER_2: ["text", "mod", "live"],
+        # TIER_3 - Requires high premium role (zG500+)
+        CommandTier.TIER_3: ["autokick"],
+    }
 
     # Role IDs
     BOOSTER_ROLE_ID = 1052692705718829117  # ♼
     INVITE_ROLE_ID = 960665311760248879  # ♵
 
+    # Premium role levels
+    PREMIUM_ROLE_LEVELS = {"zG50": 1, "zG100": 2, "zG500": 3, "zG1000": 4}
+
     def __init__(self, bot):
         self.bot = bot
         self.config = bot.config.get("voice_permission_levels", {})
         self.message_sender = MessageSender()
+
+    def get_command_tier(self, command_name: str) -> Optional[CommandTier]:
+        """Get the tier level for a given command."""
+        for tier, commands in self.COMMAND_TIERS.items():
+            if command_name in commands:
+                return tier
+        return None
 
     async def has_active_bypass(self, ctx: commands.Context) -> bool:
         """Check if user has active T (bypass)."""
@@ -46,11 +76,23 @@ class PremiumChecker:
         )
 
     def has_premium_role(self, ctx: commands.Context, min_tier: str = "zG50") -> bool:
-        """Check if user has required premium role or higher."""
-        premium_roles = ["zG50", "zG100", "zG500", "zG1000"]
-        min_index = premium_roles.index(min_tier)
+        """
+        Check if user has required premium role or higher.
+        Args:
+            ctx: Command context
+            min_tier: Minimum required tier (e.g. "zG50", "zG500")
+        Returns:
+            bool: True if user has the required tier or higher
+        """
+        min_level = self.PREMIUM_ROLE_LEVELS.get(min_tier, 0)
         user_roles = [role.name for role in ctx.author.roles]
-        return any(role in user_roles for role in premium_roles[min_index:])
+
+        # Check if user has any premium role at or above the required level
+        for role_name, level in self.PREMIUM_ROLE_LEVELS.items():
+            if level >= min_level and role_name in user_roles:
+                return True
+
+        return False
 
     @staticmethod
     def requires_voice_access(command_name: str):
@@ -59,62 +101,84 @@ class PremiumChecker:
         """
 
         async def predicate(ctx):
-            checker = PremiumChecker(ctx.bot)
-
-            # Skip checks for help command
+            # Skip checks for help/pomoc command
             if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
                 return True
 
+            # Skip checks for help context
+            if getattr(ctx, "help_command", None):
+                return True
+
+            checker = PremiumChecker(ctx.bot)
+            command_tier = checker.get_command_tier(command_name)
+            if command_tier is None:
+                logger.warning(f"Command {command_name} has no defined tier")
+                await checker.message_sender.send_no_permission(ctx)
+                return False
+
+            has_booster = checker.has_booster_roles(ctx)
             has_bypass = await checker.has_active_bypass(ctx)
             has_premium = checker.has_premium_role(ctx)
+            has_high_premium = checker.has_premium_role(ctx, "zG500")
 
-            # Special case for limit command - available to everyone with T>0
-            if command_name in checker.LIMIT_COMMAND:
-                if not (has_premium or has_bypass):
-                    # Get current T value for the message
-                    current_t = "0T"
-                    async with ctx.bot.get_db() as session:
-                        db_member = await session.get(Member, ctx.author.id)
-                        if db_member and db_member.voice_bypass_until:
-                            now = datetime.now(timezone.utc)
-                            if db_member.voice_bypass_until > now:
-                                remaining = db_member.voice_bypass_until - now
-                                current_t = f"{int(remaining.total_seconds() // 3600)}T"
+            # TIER_0 - Available to everyone without any requirements
+            if command_tier == CommandTier.TIER_0:
+                return True
 
-                    if current_t == "0T":
-                        await checker.message_sender.send_bypass_expired(ctx)
+            # TIER_T - Requires only T>0
+            if command_tier == CommandTier.TIER_T:
+                if not has_bypass and not has_premium:
+                    await checker.message_sender.send_bypass_expired(ctx)
                     return False
                 return True
 
-            # Commands requiring zG500+
-            if command_name in checker.AUTOKICK_COMMANDS:
-                if not checker.has_premium_role(ctx, "zG500"):
-                    await checker.message_sender.send_specific_roles_required(
-                        ctx, ["zG500", "zG1000"]
-                    )
-                    return False
-                return True
+            # Check if user is in voice channel first (for all tiers above TIER_T)
+            if not ctx.author.voice or not ctx.author.voice.channel:
+                await checker.message_sender.send_not_in_voice_channel(ctx)
+                return False
 
-            # Commands requiring zG50+
-            if command_name in checker.MOD_COMMANDS:
-                if not checker.has_premium_role(ctx, "zG50"):
+            # Check if user is channel mod
+            is_channel_mod = False
+            voice_channel = ctx.author.voice.channel
+            if voice_channel:
+                perms = voice_channel.overwrites_for(ctx.author)
+                is_channel_mod = (
+                    perms and perms.manage_messages is True and not perms.priority_speaker
+                )
+
+            # TIER_1 - Requires (booster/invite role + T>0) or any premium or (channel mod + T>0)
+            if command_tier == CommandTier.TIER_1:
+                if has_premium:
+                    return True
+                if (has_booster or is_channel_mod) and has_bypass:
+                    return True
+                if has_booster or is_channel_mod:
+                    await checker.message_sender.send_bypass_expired(ctx)
+                else:
+                    await checker.message_sender.send_premium_required(ctx)
+                return False
+
+            # TIER_2 - Requires any premium role
+            if command_tier == CommandTier.TIER_2:
+                if not has_premium:
                     await checker.message_sender.send_specific_roles_required(
                         ctx, ["zG50", "zG100", "zG500", "zG1000"]
                     )
                     return False
                 return True
 
-            # Basic voice commands require booster/invite role or premium role
-            if command_name in checker.BASIC_VOICE_COMMANDS:
-                if not (checker.has_booster_roles(ctx) or checker.has_premium_role(ctx)):
-                    await checker.message_sender.send_premium_required(ctx)
-                    return False
-                if not has_bypass and not checker.has_premium_role(ctx):
-                    await checker.message_sender.send_bypass_expired(ctx)
+            # TIER_3 - Requires high premium role
+            if command_tier == CommandTier.TIER_3:
+                if not has_high_premium:
+                    await checker.message_sender.send_specific_roles_required(
+                        ctx, ["zG500", "zG1000"]
+                    )
                     return False
                 return True
 
-            return True
+            # Default case - deny access
+            await checker.message_sender.send_no_permission(ctx)
+            return False
 
         return commands.check(predicate)
 

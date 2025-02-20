@@ -1,22 +1,22 @@
-"""Utility for checking bump status and service availability."""
+"""Utility for checking bump service statuses."""
 
 import logging
 from datetime import datetime, timedelta, timezone
-
-from datasources.queries import NotificationLogQueries
 
 logger = logging.getLogger(__name__)
 
 
 class BumpChecker:
-    """Class for checking bump status and service availability."""
+    """Class for checking bump service statuses."""
+
+    GLOBAL_SERVICES = ["disboard"]  # tylko Disboard jest globalny
 
     def __init__(self, bot):
         self.bot = bot
 
     @staticmethod
     def get_service_emoji(service: str) -> str:
-        """Get emoji for a service."""
+        """Get emoji for a service"""
         emojis = {
             "disboard": "<:botDisboard:1336275527241044069>",
             "dzik": "<:botDzik:1336275532991565824>",
@@ -28,8 +28,8 @@ class BumpChecker:
 
     @staticmethod
     def get_service_details(service: str) -> dict:
-        """Get details for a service."""
-        details = {
+        """Get details for a service"""
+        return {
             "disboard": {
                 "name": "Disboard",
                 "cooldown": "2h",
@@ -65,30 +65,33 @@ class BumpChecker:
                 "reward": "3T",
                 "url": "https://discords.com/servers/960665311701528596/upvote",
             },
-        }
-        return details.get(service, {})
+        }[service]
 
     async def get_service_status(self, service: str, user_id: int) -> dict:
-        """Get status for a service."""
+        """Get status of a bump service for a user"""
+        now = datetime.now(timezone.utc)
+        cooldown = self.bot.config["bypass"]["cooldown"].get(service, 24)
+        duration = self.bot.config["bypass"]["duration"]["services"].get(service, 3)
+
         async with self.bot.get_db() as session:
-            # For global services (like Disboard), use guild_id instead of user_id
-            member_id = (
-                self.bot.guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
-            )
+            # For global services, use guild_id instead of user ID
+            check_id = self.bot.guild_id if service in self.GLOBAL_SERVICES else user_id
+            from datasources.queries import NotificationLogQueries
 
-            log = await NotificationLogQueries.get_service_notification_log(
-                session, service, self.bot.guild_id, user_id
-            )
+            log = await NotificationLogQueries.get_notification_log(session, check_id, service)
 
-            now = datetime.now(timezone.utc)
-            details = self.get_service_details(service)
-            cooldown_hours = int(details["cooldown"].rstrip("h"))
-
-            if not log or not log.sent_at:
-                return {"available": True, "next_available": now}
-
-            next_available = log.sent_at + timedelta(hours=cooldown_hours)
-            return {
-                "available": next_available <= now,
-                "next_available": next_available,
-            }
+            if not log or now - log.sent_at > timedelta(hours=cooldown):
+                return {
+                    "available": True,
+                    "next_available": now,
+                    "cooldown": cooldown,
+                    "duration": duration,
+                }
+            else:
+                next_available = log.sent_at + timedelta(hours=cooldown)
+                return {
+                    "available": False,
+                    "next_available": next_available,
+                    "cooldown": cooldown,
+                    "duration": duration,
+                }

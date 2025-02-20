@@ -149,6 +149,28 @@ class MemberQueries:
 
         return member
 
+    @staticmethod
+    async def set_voice_bypass_status(
+        session: AsyncSession, member_id: int, expiration: datetime
+    ) -> Optional[Member]:
+        """
+        Set the voice bypass status for a member.
+        Args:
+            session: The database session
+            member_id: The ID of the member
+            expiration: The expiration datetime for the bypass
+        Returns:
+            The updated Member object or None if failed
+        """
+        try:
+            member = await MemberQueries.get_or_add_member(session, member_id)
+            member.voice_bypass_until = expiration
+            await session.flush()
+            return member
+        except Exception as e:
+            logger.error(f"Failed to set voice bypass status for member {member_id}: {str(e)}")
+            return None
+
 
 class RoleQueries:
     """Class for Role Queries"""

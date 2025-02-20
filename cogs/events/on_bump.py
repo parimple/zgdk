@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from datasources.models import Member, NotificationLog
 from datasources.queries import MemberQueries, NotificationLogQueries
+from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
 
@@ -308,14 +309,15 @@ class OnBumpEvent(commands.Cog):
                 if command_user:
                     # Create a fake context with necessary attributes
                     class FakeContext:
-                        def __init__(self, channel, author):
-                            self.channel = channel
-                            self.author = author
+                        def __init__(self, bot, guild):
+                            self.bot = bot
+                            self.guild = guild
+                            self.channel = message.channel
 
                         async def send(self, *args, **kwargs):
                             return await self.channel.send(*args, **kwargs)
 
-                    ctx = FakeContext(message.channel, command_user)
+                    ctx = FakeContext(self.bot, message.guild)
                     await self.send_bump_marketing(ctx, "dsme", command_user)
                 return True
 
@@ -740,6 +742,32 @@ class OnBumpEvent(commands.Cog):
 
     async def send_bump_marketing(self, channel, service: str, user: discord.Member):
         """Send marketing message about service usage and show all bump statuses."""
+        # Get target channel
+        target_channel = None
+        if user.voice and user.voice.channel:
+            # If user is in a voice channel, send it there
+            target_channel = user.voice.channel
+        else:
+            # If user is not in a voice channel, send to the bots channel
+            target_channel = self.bot.get_channel(self.bot.config["channels"]["bots"])
+
+        if not target_channel:
+            logger.warning(f"Could not find target channel for user {user.id}")
+            return
+
+        # Create fake context for MessageSender
+        class FakeContext:
+            def __init__(self, bot, guild, channel):
+                self.bot = bot
+                self.guild = guild
+                self.channel = channel
+                self.author = user
+
+            async def send(self, *args, **kwargs):
+                return await self.channel.send(*args, **kwargs)
+
+        ctx = FakeContext(self.bot, target_channel.guild, target_channel)
+
         # Get status of all services for the user
         services = ["disboard", "dzik", "discadia", "discordservers", "dsme"]
         available_services = []
@@ -766,79 +794,74 @@ class OnBumpEvent(commands.Cog):
                     current_t = f"{int(remaining.total_seconds() // 3600)}T"
 
         # Create embed
-        embed = discord.Embed(
-            title="Status Bumpów",
-            description=f"{user.mention} Dzięki za użycie serwisu {service}! 🎉\n"
-            f"Dostałeś/aś {self.get_service_duration(service)}T!",
-            color=discord.Color.from_rgb(47, 49, 54),  # Dark theme color
-        )
+        embed = discord.Embed(title="Status Bumpów", color=user.color)
 
         # Set author with user avatar
         embed.set_author(name=user.display_name, icon_url=user.display_avatar.url)
 
+        # Get "Wybierz swój plan" text first but don't set it yet
+        _, plan_text = MessageSender._get_premium_text(ctx, None)
+
         # Add waiting services first
         if waiting_services:
-            waiting_text = ""
+            waiting_text = []
             for service, status in waiting_services:
                 emoji = self.get_service_emoji(service)
                 details = self.get_service_details(service)
                 next_time = discord.utils.format_dt(status["next_available"], "R")
-                waiting_text += f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']}\n"
+                service_text = f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']}"
                 if "command" in details:
-                    waiting_text += f"Dostępne: {next_time} • Komenda: {details['command']}\n"
+                    service_text += f"\nDostępne: {next_time} • `{details['command']}`"
                 elif "url" in details:
-                    waiting_text += f"Dostępne: {next_time} • [Zagłosuj]({details['url']})\n"
+                    service_text += f"\nDostępne: {next_time} • [Zagłosuj]({details['url']})"
+                waiting_text.append(service_text)
 
             if waiting_text:
-                embed.add_field(name="⏳ Oczekujące", value=waiting_text.strip(), inline=False)
+                embed.add_field(name="⏳ Oczekujące", value="\n".join(waiting_text), inline=False)
 
         # Add available services
         if available_services:
-            available_text = ""
+            available_text = []
             for service, status in available_services:
                 emoji = self.get_service_emoji(service)
                 details = self.get_service_details(service)
-                available_text += f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']}\n"
+                service_text = f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']} • "
                 if "command" in details:
-                    available_text += f"Komenda: {details['command']}\n"
+                    service_text += f"`{details['command']}`"
                 elif "url" in details:
-                    available_text += f"[Zagłosuj]({details['url']})\n"
+                    service_text += f"[Zagłosuj]({details['url']})"
+                available_text.append(service_text)
 
             if available_text:
-                if waiting_services:
-                    embed.add_field(name="", value="", inline=False)
+                embed.add_field(
+                    name="✅ Dostępne teraz", value="\n".join(available_text), inline=False
+                )
 
-                embed.add_field(name="✅ Dostępne teraz", value=available_text.strip(), inline=False)
+        # Create view with buttons for voting services
+        view = None
+        if available_services:
+            view = discord.ui.View()
+            for service, status in available_services:
+                details = self.get_service_details(service)
+                if "url" in details:
+                    emoji = self.get_service_emoji(service)
+                    button = discord.ui.Button(
+                        style=discord.ButtonStyle.link,
+                        label=details["name"],
+                        emoji=emoji,
+                        url=details["url"],
+                    )
+                    view.add_item(button)
 
         # Set footer with T count
         embed.set_footer(text=f"Posiadasz {current_t}")
 
-        try:
-            # Try to send to voice channel if user is in one
-            if user.voice and user.voice.channel:
-                try:
-                    await user.voice.channel.send(embed=embed)
-                    logger.info(f"Sent marketing message to voice channel {user.voice.channel.id}")
-                    return
-                except discord.HTTPException as e:
-                    logger.error(f"Failed to send to voice channel: {e}")
+        # Add "Wybierz swój plan" text as the last element
+        if plan_text:
+            embed.add_field(name="\u200b", value=plan_text, inline=False)
 
-            # If not in voice channel or sending failed, send to bots channel
-            bots_channel = self.bot.get_channel(self.bot.channels.get("bots"))
-            if bots_channel:
-                await bots_channel.send(embed=embed)
-                logger.info(f"Sent marketing message to bots channel {bots_channel.id}")
-            else:
-                logger.error("Could not find bots channel")
-                # Fallback to original channel
-                await channel.send(embed=embed)
-                logger.info(f"Sent marketing message to original channel {channel.id}")
-
-        except discord.HTTPException as e:
-            logger.error(f"Failed to send marketing message: {e}")
-            # Fallback to simple message
-            message = f"{user.mention} Dzięki za użycie serwisu {service}! 🎉\nDostałeś/aś {self.get_service_duration(service)}T!"
-            await channel.send(message)
+        # Send the embed
+        await target_channel.send(embed=embed, view=view)
 
     def get_service_emoji(self, service: str) -> str:
         """Get emoji for a service"""
@@ -928,54 +951,74 @@ class OnBumpEvent(commands.Cog):
         # Sort waiting services by remaining time (longest first)
         waiting_services.sort(key=lambda x: x[1]["next_available"], reverse=True)
 
-        embed = discord.Embed(
-            title="Status Bumpów", color=discord.Color.from_rgb(47, 49, 54)  # Dark theme color
-        )
+        embed = discord.Embed(title="Status Bumpów", color=ctx.author.color)
 
         # Set author with user avatar
         embed.set_author(name=target.display_name, icon_url=target.display_avatar.url)
 
+        # Get "Wybierz swój plan" text first but don't set it yet
+        _, plan_text = MessageSender._get_premium_text(ctx, None)
+
         # Add waiting services first
         if waiting_services:
-            waiting_text = ""
+            waiting_text = []
             for service, status in waiting_services:
                 emoji = self.get_service_emoji(service)
                 details = self.get_service_details(service)
                 next_time = discord.utils.format_dt(status["next_available"], "R")
-                waiting_text += f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']}\n"
+                service_text = f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']}"
                 if "command" in details:
-                    waiting_text += f"Dostępne: {next_time} • Komenda: {details['command']}\n"
+                    service_text += f"\nDostępne: {next_time} • `{details['command']}`"
                 elif "url" in details:
-                    waiting_text += f"Dostępne: {next_time} • [Zagłosuj]({details['url']})\n"
+                    service_text += f"\nDostępne: {next_time} • [Zagłosuj]({details['url']})"
+                waiting_text.append(service_text)
 
             if waiting_text:
-                embed.add_field(name="⏳ Oczekujące", value=waiting_text.strip(), inline=False)
+                embed.add_field(name="⏳ Oczekujące", value="\n".join(waiting_text), inline=False)
 
         # Add available services
         if available_services:
-            available_text = ""
+            available_text = []
             for service, status in available_services:
                 emoji = self.get_service_emoji(service)
                 details = self.get_service_details(service)
-                available_text += f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']}\n"
+                service_text = f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']} • "
                 if "command" in details:
-                    available_text += f"Komenda: {details['command']}\n"
+                    service_text += f"`{details['command']}`"
                 elif "url" in details:
-                    available_text += f"[Zagłosuj]({details['url']})\n"
+                    service_text += f"[Zagłosuj]({details['url']})"
+                available_text.append(service_text)
 
             if available_text:
-                if waiting_services:
-                    embed.add_field(name="", value="", inline=False)
+                embed.add_field(
+                    name="✅ Dostępne teraz", value="\n".join(available_text), inline=False
+                )
 
-                embed.add_field(name="✅ Dostępne teraz", value=available_text.strip(), inline=False)
+        # Create view with buttons for voting services
+        view = None
+        if available_services:
+            view = discord.ui.View()
+            for service, status in available_services:
+                details = self.get_service_details(service)
+                if "url" in details:
+                    emoji = self.get_service_emoji(service)
+                    button = discord.ui.Button(
+                        style=discord.ButtonStyle.link,
+                        label=details["name"],
+                        emoji=emoji,
+                        url=details["url"],
+                    )
+                    view.add_item(button)
 
-        # Set footer
-        embed.set_footer(
-            text=f"Wywołane przez {ctx.author} • {current_t}",
-            icon_url=ctx.author.display_avatar.url,
-        )
+        # Set footer with T count
+        embed.set_footer(text=f"Posiadasz {current_t}")
 
-        await ctx.send(embed=embed)
+        # Add "Wybierz swój plan" text as the last field
+        if plan_text:
+            embed.add_field(name="\u200b", value=plan_text, inline=False)
+
+        # Send the embed in the channel where the command was used
+        await ctx.send(embed=embed, view=view)
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):

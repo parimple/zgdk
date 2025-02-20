@@ -10,6 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from datasources.queries import RoleQueries
+from utils.permissions import is_admin, is_mod_or_admin, is_owner_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class ModCog(commands.Cog):
     @commands.hybrid_command(
         name="clear", description="Usuwa wiadomości użytkownika z ostatnich X godzin."
     )
-    @commands.has_role("✪")
+    @is_mod_or_admin()
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
         user="Użytkownik lub ID użytkownika, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
@@ -74,7 +75,7 @@ class ModCog(commands.Cog):
         name="clearall",
         description="Usuwa wiadomości użytkownika z ostatnich X godzin na wszystkich kanałach.",
     )
-    @commands.has_role("✪")
+    @is_mod_or_admin()
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
         user="Użytkownik lub ID użytkownika, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
@@ -87,7 +88,7 @@ class ModCog(commands.Cog):
     @commands.hybrid_command(
         name="clearimg", description="Usuwa linki i obrazki użytkownika z ostatnich X godzin."
     )
-    @commands.has_role("✪")
+    @is_mod_or_admin()
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
         user="Użytkownik lub ID użytkownika, którego linki i obrazki mają być usunięte (opcjonalnie dla administratorów)",
@@ -366,7 +367,7 @@ class ModCog(commands.Cog):
             return False
 
     @commands.command()
-    @commands.is_owner()
+    @is_owner_or_admin()
     async def modsync(self, ctx):
         logger.info("modsync command called")
         try:
@@ -377,26 +378,14 @@ class ModCog(commands.Cog):
             logger.error(f"Error during command synchronization: {e}", exc_info=True)
             await ctx.send(f"Wystąpił błąd podczas synchronizacji ModCog: {e}")
 
-    def has_mod_admin_perms():
-        async def predicate(ctx):
-            # Check if user has moderator or admin role
-            has_mod_role = discord.utils.get(
-                ctx.author.roles, id=ctx.bot.config["admin_roles"]["mod"]
-            )
-            has_admin_role = discord.utils.get(
-                ctx.author.roles, id=ctx.bot.config["admin_roles"]["admin"]
-            )
-            return bool(has_mod_role or has_admin_role)
-
-        return commands.check(predicate)
-
     @commands.hybrid_group(name="mute", description="Komendy związane z wyciszaniem użytkowników.")
-    @has_mod_admin_perms()
+    @is_mod_or_admin()
     async def mute(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             await ctx.send("Użyj jednej z podkomend: nick")
 
     @mute.command(name="nick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę.")
+    @is_mod_or_admin()
     @discord.app_commands.describe(user="Użytkownik z niewłaściwym nickiem")
     async def mute_nick(self, ctx: commands.Context, user: discord.Member):
         """Handle inappropriate nickname by removing color roles and applying punishment."""
@@ -405,12 +394,13 @@ class ModCog(commands.Cog):
     @commands.hybrid_group(
         name="unmute", description="Komendy związane z odwyciszaniem użytkowników."
     )
-    @has_mod_admin_perms()
+    @is_mod_or_admin()
     async def unmute(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             await ctx.send("Użyj jednej z podkomend: nick")
 
     @unmute.command(name="nick", description="Przywraca możliwość zmiany nicku użytkownikowi.")
+    @is_mod_or_admin()
     @discord.app_commands.describe(user="Użytkownik do odmutowania nicku")
     async def unmute_nick(self, ctx: commands.Context, user: discord.Member):
         """Handle unmuting nickname."""
@@ -419,7 +409,7 @@ class ModCog(commands.Cog):
     @commands.command(
         name="mutenick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę."
     )
-    @has_mod_admin_perms()
+    @is_mod_or_admin()
     async def mutenick_prefix(self, ctx: commands.Context, user: discord.Member):
         """Handle inappropriate nickname by removing color roles and applying punishment."""
         await self.handle_bad_nickname_logic(ctx, user)
@@ -427,7 +417,7 @@ class ModCog(commands.Cog):
     @commands.command(
         name="unmutenick", description="Przywraca możliwość zmiany nicku użytkownikowi."
     )
-    @has_mod_admin_perms()
+    @is_mod_or_admin()
     async def unmutenick_prefix(self, ctx: commands.Context, user: discord.Member):
         """Handle unmuting nickname."""
         await self.handle_unmute_nickname_logic(ctx, user)
@@ -479,7 +469,7 @@ class ModCog(commands.Cog):
                 )
                 await session.commit()
 
-            await ctx.send(
+            await ctx.reply(
                 f"Nałożono karę na {user.mention}. "
                 f"Aby odzyskać możliwość zmiany nicku, udaj się na <#{self.config['channels']['premium_info']}> "
                 f"i zakup dowolną rangę premium."
@@ -490,14 +480,14 @@ class ModCog(commands.Cog):
             try:
                 await user.edit(nick="random", reason="Niewłaściwy nick")
             except discord.Forbidden:
-                await ctx.send("Nie mogę zmienić nicku tego użytkownika.")
+                await ctx.reply("Nie mogę zmienić nicku tego użytkownika.")
             except Exception as e:
                 logger.error(f"Error changing nickname for user {user.id}: {e}")
-                await ctx.send("Wystąpił błąd podczas zmiany nicku.")
+                await ctx.reply("Wystąpił błąd podczas zmiany nicku.")
 
         except Exception as e:
             logger.error(f"Error handling bad nickname for user {user.id}: {e}", exc_info=True)
-            await ctx.send("Wystąpił błąd podczas nakładania kary.")
+            await ctx.reply("Wystąpił błąd podczas nakładania kary.")
 
     async def handle_unmute_nickname_logic(self, ctx: commands.Context, user: discord.Member):
         """Common logic for handling nickname unmuting."""

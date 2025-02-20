@@ -1,7 +1,6 @@
 """Shop cog for the Zagadka bot."""
 import logging
 from datetime import datetime, timedelta, timezone
-from functools import wraps
 
 import discord
 from discord.ext import commands
@@ -10,19 +9,10 @@ from discord.ext.commands import Context
 from cogs.ui.shop_embeds import create_shop_embed
 from cogs.views.shop_views import PaymentsView, RoleShopView
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
+from utils.permissions import is_admin, is_zagadka_owner
 from utils.premium import PaymentData
 
 logger = logging.getLogger(__name__)
-
-
-def is_zagadka_owner():
-    async def predicate(ctx):
-        if ctx.author.id != ctx.bot.config["owner_id"]:
-            await ctx.reply("Nie masz uprawnień do użycia tej komendy!")
-            return False
-        return True
-
-    return commands.check(predicate)
 
 
 class ShopCog(commands.Cog):
@@ -32,7 +22,7 @@ class ShopCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     async def shop(self, ctx: Context, member: discord.Member = None):
         viewer = ctx.author
         target_member = member or viewer
@@ -90,7 +80,7 @@ class ShopCog(commands.Cog):
         await ctx.reply(f"Dodano {amount} do portfela {user.mention}.")
 
     @commands.command(name="assign_payment")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     async def assign_payment(self, ctx: Context, payment_id: int, user: discord.Member):
         """Assign a payment ID to a user."""
         async with self.bot.get_db() as session:
@@ -119,7 +109,7 @@ class ShopCog(commands.Cog):
                 await ctx.send(f"Nie znaleziono płatności o ID: {payment_id}")
 
     @commands.hybrid_command(name="payments", description="Wyświetla wszystkie płatności")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     async def all_payments(self, ctx: Context):
         """Fetch and display the initial set of payments."""
         async with self.bot.get_db() as session:
@@ -143,7 +133,7 @@ class ShopCog(commands.Cog):
     @commands.command(
         name="set_role_expiry", description="Ustawia czas wygaśnięcia roli", aliases=["sr"]
     )
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     async def set_role_expiry(self, ctx: Context, member: discord.Member, hours: int):
         """
         Ustawia czas wygaśnięcia roli dla użytkownika.
@@ -174,7 +164,7 @@ class ShopCog(commands.Cog):
             )
 
     @commands.command(name="force_check_roles")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     async def force_check_roles(self, ctx: Context):
         """Wymusza sprawdzenie i usunięcie wygasłych ról."""
         now = datetime.now(timezone.utc)
