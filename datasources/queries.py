@@ -577,6 +577,30 @@ class ChannelPermissionQueries:
         )
         await session.commit()
 
+    @staticmethod
+    async def remove_mod_permissions_for_target(session: AsyncSession, target_id: int):
+        """
+        Remove all moderator permissions where a user is the target.
+        This ensures that when a user loses premium status, they also lose moderator status on other channels.
+        """
+        permissions = await ChannelPermissionQueries.get_permissions_for_target(session, target_id)
+        
+        # Sprawdź, które uprawnienia zawierają "manage_messages"
+        for permission in permissions:
+            # Bit 15 to manage_messages w Discord Permissions
+            if permission.allow_permissions_value & (1 << 15):
+                # Usuń uprawnienie moderatora
+                await session.execute(
+                    delete(ChannelPermission).where(
+                        and_(
+                            ChannelPermission.member_id == permission.member_id,
+                            ChannelPermission.target_id == target_id
+                        )
+                    )
+                )
+        
+        await session.commit()
+
 
 class NotificationLogQueries:
     """Class for Notification Log Queries"""

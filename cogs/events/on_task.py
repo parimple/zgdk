@@ -9,7 +9,13 @@ from datetime import datetime, timedelta, timezone
 import discord
 from discord.ext import commands, tasks
 
-from datasources.queries import NotificationLogQueries, RoleQueries
+from datasources.queries import (
+    HandledPaymentQueries,
+    MemberQueries,
+    NotificationLogQueries,
+    RoleQueries,
+    ChannelPermissionQueries,
+)
 from utils.currency import CURRENCY_UNIT, g_to_pln
 
 logger = logging.getLogger(__name__)
@@ -167,6 +173,28 @@ class OnTaskEvent(commands.Cog):
                                 member.display_name,
                                 member.id,
                             )
+                            
+                            # Usunięcie uprawnień moderatorów przypisanych do tego użytkownika
+                            try:
+                                # Usuń wszystkie uprawnienia moderatora z bazy danych
+                                await ChannelPermissionQueries.remove_all_permissions(session, member.id)
+                                
+                                # Usuń również uprawnienia moderatora gdzie użytkownik jest celem (target_id)
+                                await ChannelPermissionQueries.remove_mod_permissions_for_target(session, member.id)
+                                
+                                logger.info(
+                                    "Successfully removed all moderator permissions for %s (%d)",
+                                    member.display_name,
+                                    member.id,
+                                )
+                            except Exception as e:
+                                logger.error(
+                                    "Failed to remove moderator permissions for %s (%d) - %s",
+                                    member.display_name,
+                                    member.id,
+                                    str(e),
+                                )
+                            
                             if (
                                 db_role
                             ):  # Powiadom tylko jeśli rola wygasła (a nie gdy jej brak w DB)
