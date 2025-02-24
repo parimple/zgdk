@@ -201,14 +201,6 @@ class OnTaskEvent(commands.Cog):
                                 member.display_name,
                                 member.id,
                             )
-                            
-                            # Usuń wszystkie uprawnienia moderatora, gdzie ten użytkownik jest celem
-                            await ChannelPermissionQueries.remove_mod_permissions_for_target(session, member.id)
-                            logger.info(
-                                "Removed all moderator permissions where %s (%d) is the target",
-                                member.display_name,
-                                member.id,
-                            )
 
                     await session.commit()
 
