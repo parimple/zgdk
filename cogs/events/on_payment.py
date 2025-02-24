@@ -208,7 +208,11 @@ class OnPaymentEvent(commands.Cog):
                     if final_amount in [role_price, rounded_price]:
                         try:
                             # Use PremiumRoleManager to handle role assignment/extension
-                            embed, refund = await self.role_manager.assign_or_extend_premium_role(
+                            (
+                                embed,
+                                refund,
+                                add_to_wallet,
+                            ) = await self.role_manager.assign_or_extend_premium_role(
                                 session=session,
                                 member=member,
                                 role_name=role_name,
@@ -221,13 +225,17 @@ class OnPaymentEvent(commands.Cog):
                             # Remove mute roles regardless of the role assignment result
                             await self.role_manager.remove_mute_roles(member)
 
-                            # Handle wallet balance
-                            amount_to_add = final_amount - role_price
-                            if amount_to_add > 0:
-                                await MemberQueries.add_to_wallet_balance(
-                                    session, member.id, amount_to_add
-                                )
-                                await session.flush()
+                            # Handle wallet balance - only add if not explicitly set to False
+                            if add_to_wallet is not False:
+                                amount_to_add = final_amount
+                                if add_to_wallet is None:  # Default behavior - add remainder
+                                    amount_to_add = final_amount - role_price
+
+                                if amount_to_add > 0:
+                                    await MemberQueries.add_to_wallet_balance(
+                                        session, member.id, amount_to_add
+                                    )
+                                    await session.flush()
                             break
                         except Exception as e:
                             logger.error(
@@ -235,7 +243,7 @@ class OnPaymentEvent(commands.Cog):
                             )
                             raise
 
-                # Jeśli nie znaleziono pasującej roli, dodaj całą kwotę do portfela
+                # Jeśli nie znaleziono pasującej roli lub użytkownik ma wyższą rolę, dodaj całą kwotę do portfela
                 if amount_to_add == final_amount:
                     try:
                         await MemberQueries.add_to_wallet_balance(session, member.id, amount_to_add)

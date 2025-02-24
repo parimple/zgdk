@@ -19,6 +19,12 @@ YEARLY_DURATION = 365  # Base duration for yearly subscription
 BONUS_DAYS = 3  # Number of bonus days for monthly subscription
 YEARLY_MONTHS = 10  # Number of months to pay for yearly subscription (2 months free)
 
+# Okresy przedłużenia dla różnych poziomów ról przy wpłacie "zG50"
+ZG50_EXTENSION = 30  # Standardowe przedłużenie dla zG50
+ZG100_EXTENSION = 15  # Przedłużenie dla zG100 przy wpłacie 49/50
+ZG500_EXTENSION = 3  # Przedłużenie dla zG500 przy wpłacie 49/50
+ZG1000_EXTENSION = 1  # Przedłużenie dla zG1000 przy wpłacie 49/50
+
 # Mapowanie kwot do dni przedłużenia dla poszczególnych ról premium
 PARTIAL_EXTENSIONS = {}  # Will be initialized in PremiumRoleManager
 
@@ -138,6 +144,19 @@ class PremiumRoleManager:
                 user_highest_priority = max(user_highest_priority, priority)
         return user_highest_priority
 
+    def get_user_highest_role_name(self, member: discord.Member) -> Optional[str]:
+        """Get the name of highest premium role a member has."""
+        highest_priority = 0
+        highest_role_name = None
+
+        for role_name, priority in PREMIUM_PRIORITY.items():
+            role_obj = discord.utils.get(self.guild.roles, name=role_name)
+            if role_obj and role_obj in member.roles and priority > highest_priority:
+                highest_priority = priority
+                highest_role_name = role_name
+
+        return highest_role_name
+
     async def check_partial_extension(
         self, session, member: discord.Member, role_name: str, amount: int, current_role=None
     ) -> Optional[Tuple[discord.Embed, int]]:
@@ -235,10 +254,12 @@ class PremiumRoleManager:
         amount: int,
         duration_days: int = MONTHLY_DURATION,
         source: str = "shop",
-    ) -> Tuple[discord.Embed, Optional[int]]:
+    ) -> Tuple[discord.Embed, Optional[int], Optional[bool]]:
         """
         Main function to handle all premium role operations.
-        Returns (embed, refund_amount) where refund_amount is None if no refund is needed.
+        Returns (embed, refund_amount, add_to_wallet) where:
+        - refund_amount is None if no refund is needed
+        - add_to_wallet is True if the amount should be added to wallet, False otherwise, None if default logic should be used
         """
         role = discord.utils.get(self.guild.roles, name=role_name)
         if not role:
@@ -249,10 +270,73 @@ class PremiumRoleManager:
                     color=discord.Color.red(),
                 ),
                 None,
+                None,
             )
 
         # Get current role if exists
         current_role = await RoleQueries.get_member_role(session, member.id, role.id)
+
+        # Get user's highest role
+        highest_role_name = self.get_user_highest_role_name(member)
+        highest_role_priority = (
+            PREMIUM_PRIORITY.get(highest_role_name, 0) if highest_role_name else 0
+        )
+        current_role_priority = PREMIUM_PRIORITY.get(role_name, 0)
+
+        # Special case for payment == 49/50 - remove mute and extend role based on current highest role
+        is_zg50_payment = role_name == "zG50" and amount in [49, 50]
+
+        if is_zg50_payment and self.has_mute_roles(member):
+            await self.remove_mute_roles(member)
+
+            # If user already has a premium role, extend it based on their highest role
+            if highest_role_name:
+                role_to_extend = discord.utils.get(self.guild.roles, name=highest_role_name)
+                if role_to_extend:
+                    # Get the role database entry
+                    db_role = await RoleQueries.get_member_role(
+                        session, member.id, role_to_extend.id
+                    )
+
+                    # Calculate days to extend based on highest role
+                    if highest_role_name == "zG50":
+                        days_to_add = ZG50_EXTENSION
+                    elif highest_role_name == "zG100":
+                        days_to_add = ZG100_EXTENSION
+                    elif highest_role_name == "zG500":
+                        days_to_add = ZG500_EXTENSION
+                    elif highest_role_name == "zG1000":
+                        days_to_add = ZG1000_EXTENSION
+                    else:
+                        days_to_add = ZG50_EXTENSION  # Default
+
+                    # Update expiration date
+                    updated_role = await RoleQueries.update_role_expiration_date(
+                        session, member.id, role_to_extend.id, timedelta(days=days_to_add)
+                    )
+
+                    if updated_role:
+                        await session.flush()
+                        embed = discord.Embed(
+                            title="Gratulacje!",
+                            description=f"Przedłużyłeś rolę {highest_role_name} o {days_to_add} dni i zdjęto ci muta!",
+                            color=discord.Color.green(),
+                        )
+                        return embed, None, False  # Nie dodawaj do portfela
+
+        # If user has a higher role than the one they're trying to buy, add to wallet instead
+        if highest_role_priority > current_role_priority and source == "payment":
+            logger.info(
+                f"User {member.display_name} has higher role ({highest_role_name}) than {role_name}. "
+                f"Adding amount to wallet instead."
+            )
+            embed = discord.Embed(
+                title="Doładowanie konta",
+                description=f"Posiadasz już wyższą rolę ({highest_role_name}). "
+                f"Kwota została dodana do Twojego portfela.",
+                color=discord.Color.blue(),
+            )
+            return embed, None, True  # Dodaj do portfela
 
         # Check extension type
         extension_type, extension_value, new_role_name = await self.get_extension_type(
@@ -272,7 +356,7 @@ class PremiumRoleManager:
                     description=f"Przedłużyłeś rolę {role_name} o {days_to_add} dni i zdjęto ci muta!",
                     color=discord.Color.green(),
                 )
-                return embed, None
+                return embed, None, False
             else:
                 raise ValueError(f"Failed to update role expiration for {role_name}")
 
@@ -297,7 +381,7 @@ class PremiumRoleManager:
                 description=f"Ulepszono twoją rolę z {role_name} na {new_role_name}!",
                 color=discord.Color.green(),
             )
-            return embed, None
+            return embed, None, None
 
         else:  # ExtensionType.NORMAL
             if current_role and role in member.roles:
@@ -326,7 +410,7 @@ class PremiumRoleManager:
                     embed = discord.Embed(
                         title="Gratulacje!", description=description, color=discord.Color.green()
                     )
-                    return embed, None
+                    return embed, None, None
                 else:
                     raise ValueError(f"Failed to update role expiration for {role_name}")
             else:
@@ -342,7 +426,7 @@ class PremiumRoleManager:
                     description=f"Zakupiłeś rolę {role_name}!",
                     color=discord.Color.green(),
                 )
-                return embed, None
+                return embed, None, None
 
     async def assign_temporary_roles(self, session, member: discord.Member, amount: int):
         """Assign temporary roles based on donation amount."""
