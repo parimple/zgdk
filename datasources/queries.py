@@ -577,6 +577,41 @@ class ChannelPermissionQueries:
         )
 
     @staticmethod
+    async def remove_mod_permissions_granted_by_member(session: AsyncSession, owner_id: int):
+        """
+        Remove only moderator permissions granted by a specific member.
+        
+        This method finds and removes permissions where:
+        1. The specified user is the owner (member_id)
+        2. The permission includes manage_messages (moderator permission)
+        
+        This preserves all other permissions the user has granted.
+        
+        Args:
+            session: The database session
+            owner_id: The ID of the member who granted the permissions
+        """
+        # Znajdujemy wszystkie uprawnienia gdzie użytkownik jest właścicielem (member_id)
+        permissions = await session.execute(
+            select(ChannelPermission).where(ChannelPermission.member_id == owner_id)
+        )
+        permissions = permissions.scalars().all()
+        
+        # Sprawdzamy każde uprawnienie, czy zawiera manage_messages (bit 15 w Discord Permissions)
+        mod_permissions_removed = 0
+        for permission in permissions:
+            # Sprawdź czy uprawnienie zawiera manage_messages (0x00002000)
+            if permission.allow_permissions_value & 0x00002000:
+                # Usuń uprawnienie, które zawiera manage_messages
+                await session.delete(permission)
+                mod_permissions_removed += 1
+                logger.info(
+                    f"Removed moderator permission granted by {owner_id} to target {permission.target_id}"
+                )
+        
+        logger.info(f"Total moderator permissions removed for owner {owner_id}: {mod_permissions_removed}")
+
+    @staticmethod
     async def remove_mod_permissions_for_target(session: AsyncSession, target_id: int):
         """
         Remove all moderator permissions for a specific target.

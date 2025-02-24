@@ -194,10 +194,10 @@ class OnTaskEvent(commands.Cog):
                                 session, member.id, "premium_role_expired"
                             )
                             
-                            # Usuń wszystkie uprawnienia, gdzie ten użytkownik jest właścicielem
-                            await ChannelPermissionQueries.remove_all_permissions(session, member.id)
+                            # Usuń tylko uprawnienia moderatorów nadane przez tego użytkownika
+                            await ChannelPermissionQueries.remove_mod_permissions_granted_by_member(session, member.id)
                             logger.info(
-                                "Removed all channel permissions where %s (%d) is the owner",
+                                "Removed all moderator permissions granted by %s (%d)",
                                 member.display_name,
                                 member.id,
                             )
