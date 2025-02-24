@@ -11,6 +11,7 @@ from discord.ext import commands, tasks
 
 from datasources.queries import NotificationLogQueries, RoleQueries, ChannelPermissionQueries
 from utils.currency import CURRENCY_UNIT, g_to_pln
+from cogs.commands.info import remove_premium_role_mod_permissions
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +196,7 @@ class OnTaskEvent(commands.Cog):
                             )
                             
                             # Usuń tylko uprawnienia moderatorów nadane przez tego użytkownika
-                            await ChannelPermissionQueries.remove_mod_permissions_granted_by_member(session, member.id)
+                            await remove_premium_role_mod_permissions(session, self.bot, member.id)
                             logger.info(
                                 "Removed all moderator permissions granted by %s (%d)",
                                 member.display_name,

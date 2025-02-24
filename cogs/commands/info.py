@@ -8,13 +8,38 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from datasources.queries import InviteQueries, MemberQueries, RoleQueries
+from datasources.queries import InviteQueries, MemberQueries, RoleQueries, ChannelPermissionQueries
 from utils.currency import CURRENCY_UNIT
 from utils.permissions import is_admin
 from utils.premium import PremiumManager
 from utils.refund import calculate_refund
 
 logger = logging.getLogger(__name__)
+
+
+async def remove_premium_role_mod_permissions(session, bot, member_id: int):
+    """
+    Usuwa uprawnienia moderatora nadane przez użytkownika po utracie roli premium.
+    
+    Ta funkcja powinna być wywołana w każdym miejscu, gdzie użytkownik traci rolę premium,
+    czy to przez wygaśnięcie, czy przez sprzedaż.
+    
+    Args:
+        session: Sesja bazy danych
+        bot: Instancja bota
+        member_id: ID użytkownika, który traci rolę premium
+    """
+    # Usuń tylko uprawnienia moderatorów nadane przez tego użytkownika
+    await ChannelPermissionQueries.remove_mod_permissions_granted_by_member(session, member_id)
+    
+    # Loguj informację o usunięciu uprawnień
+    member = bot.guild.get_member(member_id)
+    display_name = member.display_name if member else f"User {member_id}"
+    logger.info(
+        "Removed all moderator permissions granted by %s (%d) [via helper function]",
+        display_name,
+        member_id,
+    )
 
 
 class InfoCog(commands.Cog):
@@ -434,6 +459,10 @@ class SellRoleButton(discord.ui.Button):
             async with self.bot.get_db() as session:
                 # Remove role from database
                 await RoleQueries.delete_member_role(session, interaction.user.id, role.id)
+                
+                # Usuń uprawnienia moderatora nadane przez użytkownika
+                await remove_premium_role_mod_permissions(session, self.bot, interaction.user.id)
+                
                 # Add refund to wallet
                 await MemberQueries.add_to_wallet_balance(
                     session, interaction.user.id, refund_amount
@@ -443,7 +472,7 @@ class SellRoleButton(discord.ui.Button):
             # Remove role from member
             await interaction.user.remove_roles(role)
             await interaction.response.edit_message(
-                content=f"Sprzedano rangę {role.name} za {refund_amount}{CURRENCY_UNIT}.",
+                content=f"Sprzedano rangę {role.name} za {refund_amount}{CURRENCY_UNIT}. Usunięto wszystkie nadane uprawnienia moderatora.",
                 embed=None,
                 view=None,
             )
