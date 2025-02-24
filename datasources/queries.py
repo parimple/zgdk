@@ -575,31 +575,34 @@ class ChannelPermissionQueries:
         await session.execute(
             delete(ChannelPermission).where(ChannelPermission.member_id == owner_id)
         )
-        await session.commit()
 
     @staticmethod
     async def remove_mod_permissions_for_target(session: AsyncSession, target_id: int):
         """
-        Remove all moderator permissions where a user is the target.
-        This ensures that when a user loses premium status, they also lose moderator status on other channels.
+        Remove all moderator permissions for a specific target.
+        
+        This method removes all permissions where the user (target_id) has been 
+        granted manage_messages permission (moderator permission) by any channel owner.
+        
+        Args:
+            session: The database session
+            target_id: The ID of the user whose moderator permissions should be removed
         """
-        permissions = await ChannelPermissionQueries.get_permissions_for_target(session, target_id)
+        # Znajdujemy wszystkie uprawnienia gdzie użytkownik jest celem (target_id)
+        permissions = await session.execute(
+            select(ChannelPermission).where(ChannelPermission.target_id == target_id)
+        )
+        permissions = permissions.scalars().all()
         
-        # Sprawdź, które uprawnienia zawierają "manage_messages"
+        # Sprawdzamy każde uprawnienie, czy zawiera manage_messages (bit 15 w Discord Permissions)
         for permission in permissions:
-            # Bit 15 to manage_messages w Discord Permissions
-            if permission.allow_permissions_value & (1 << 15):
-                # Usuń uprawnienie moderatora
-                await session.execute(
-                    delete(ChannelPermission).where(
-                        and_(
-                            ChannelPermission.member_id == permission.member_id,
-                            ChannelPermission.target_id == target_id
-                        )
-                    )
+            # Sprawdź czy uprawnienie zawiera manage_messages (0x00002000)
+            if permission.allow_permissions_value & 0x00002000:
+                # Usuń uprawnienie, które zawiera manage_messages
+                await session.delete(permission)
+                logger.info(
+                    f"Removed moderator permission for target {target_id} from owner {permission.member_id}"
                 )
-        
-        await session.commit()
 
 
 class NotificationLogQueries:

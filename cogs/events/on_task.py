@@ -9,13 +9,7 @@ from datetime import datetime, timedelta, timezone
 import discord
 from discord.ext import commands, tasks
 
-from datasources.queries import (
-    HandledPaymentQueries,
-    MemberQueries,
-    NotificationLogQueries,
-    RoleQueries,
-    ChannelPermissionQueries,
-)
+from datasources.queries import NotificationLogQueries, RoleQueries, ChannelPermissionQueries
 from utils.currency import CURRENCY_UNIT, g_to_pln
 
 logger = logging.getLogger(__name__)
@@ -173,28 +167,6 @@ class OnTaskEvent(commands.Cog):
                                 member.display_name,
                                 member.id,
                             )
-                            
-                            # Usunięcie uprawnień moderatorów przypisanych do tego użytkownika
-                            try:
-                                # Usuń wszystkie uprawnienia moderatora z bazy danych
-                                await ChannelPermissionQueries.remove_all_permissions(session, member.id)
-                                
-                                # Usuń również uprawnienia moderatora gdzie użytkownik jest celem (target_id)
-                                await ChannelPermissionQueries.remove_mod_permissions_for_target(session, member.id)
-                                
-                                logger.info(
-                                    "Successfully removed all moderator permissions for %s (%d)",
-                                    member.display_name,
-                                    member.id,
-                                )
-                            except Exception as e:
-                                logger.error(
-                                    "Failed to remove moderator permissions for %s (%d) - %s",
-                                    member.display_name,
-                                    member.id,
-                                    str(e),
-                                )
-                            
                             if (
                                 db_role
                             ):  # Powiadom tylko jeśli rola wygasła (a nie gdy jej brak w DB)
@@ -220,6 +192,22 @@ class OnTaskEvent(commands.Cog):
                             await RoleQueries.delete_member_role(session, member.id, role.id)
                             await NotificationLogQueries.add_or_update_notification_log(
                                 session, member.id, "premium_role_expired"
+                            )
+                            
+                            # Usuń wszystkie uprawnienia, gdzie ten użytkownik jest właścicielem
+                            await ChannelPermissionQueries.remove_all_permissions(session, member.id)
+                            logger.info(
+                                "Removed all channel permissions where %s (%d) is the owner",
+                                member.display_name,
+                                member.id,
+                            )
+                            
+                            # Usuń wszystkie uprawnienia moderatora, gdzie ten użytkownik jest celem
+                            await ChannelPermissionQueries.remove_mod_permissions_for_target(session, member.id)
+                            logger.info(
+                                "Removed all moderator permissions where %s (%d) is the target",
+                                member.display_name,
+                                member.id,
                             )
 
                     await session.commit()
