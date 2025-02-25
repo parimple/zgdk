@@ -37,9 +37,9 @@ class PremiumChecker:
         # TIER_T - Requires only T>0
         CommandTier.TIER_T: ["limit"],
         # TIER_1 - Requires (booster/invite role + T>0) or any premium
-        CommandTier.TIER_1: ["speak", "connect", "text", "reset"],
+        CommandTier.TIER_1: ["speak", "connect", "text"],
         # TIER_2 - Requires any premium role (zG50+)
-        CommandTier.TIER_2: ["view", "mod", "live"],
+        CommandTier.TIER_2: ["view", "mod", "live", "reset"],
         # TIER_3 - Requires high premium role (zG500+)
         CommandTier.TIER_3: ["autokick"],
     }
@@ -121,17 +121,6 @@ class PremiumChecker:
             has_premium = checker.has_premium_role(ctx)
             has_high_premium = checker.has_premium_role(ctx, "zG500")
 
-            # TIER_0 - Available to everyone without any requirements
-            if command_tier == CommandTier.TIER_0:
-                return True
-
-            # TIER_T - Requires only T>0
-            if command_tier == CommandTier.TIER_T:
-                if not has_bypass and not has_premium:
-                    await checker.message_sender.send_bypass_expired(ctx)
-                    return False
-                return True
-
             # Check if user is in voice channel first (for all tiers above TIER_T)
             if not ctx.author.voice or not ctx.author.voice.channel:
                 await checker.message_sender.send_not_in_voice_channel(ctx)
@@ -146,7 +135,18 @@ class PremiumChecker:
                     perms and perms.manage_messages is True and not perms.priority_speaker
                 )
 
-            # TIER_1 - Requires (booster/invite role + T>0) or any premium or (channel mod + T>0)
+            # TIER_0 - Available to everyone without any requirements
+            if command_tier == CommandTier.TIER_0:
+                return True
+
+            # TIER_T - Requires only T>0
+            if command_tier == CommandTier.TIER_T:
+                if not has_bypass and not has_premium:
+                    await checker.message_sender.send_bypass_expired(ctx)
+                    return False
+                return True
+
+            # TIER_1 - Requires (booster/invite role + T>0) or any premium
             if command_tier == CommandTier.TIER_1:
                 if has_premium:
                     return True
@@ -160,6 +160,11 @@ class PremiumChecker:
 
             # TIER_2 - Requires any premium role
             if command_tier == CommandTier.TIER_2:
+                # Special case for view and live - allow channel mods with active bypass
+                if command_name in ["view", "live"] and is_channel_mod and has_bypass:
+                    return True
+                
+                # For all TIER_2 commands, require premium unless exception above
                 if not has_premium:
                     await checker.message_sender.send_specific_roles_required(
                         ctx, ["zG50", "zG100", "zG500", "zG1000"]
