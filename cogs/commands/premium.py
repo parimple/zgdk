@@ -39,17 +39,33 @@ class PremiumCog(commands.Cog):
             # Tworzenie/aktualizacja roli użytkownika
             await self.update_user_color_role(ctx.author, discord_color)
             
+            # Tworzenie podstawowego opisu
+            description = f"Zmieniono kolor twojej roli na {color}."
+            
+            # Dodanie informacji o planie premium (nawet gdy nie jesteśmy na kanale głosowym)
+            _, premium_text = self.message_sender._get_premium_text(ctx)
+            if premium_text:
+                description = f"{description}\n{premium_text}"
+            
             # Wysłanie potwierdzenia z kolorem wybranym przez użytkownika
             embed = self.message_sender._create_embed(
-                description=f"Zmieniono kolor twojej roli na {color}.",
+                description=description,
                 color=discord_color,  # Używamy wybranego koloru zamiast "success"
                 ctx=ctx
             )
             await self.message_sender._send_embed(ctx, embed, reply=True)
             
         except ValueError as e:
+            # Tworzenie opisu błędu
+            description = f"Błąd: {str(e)}"
+            
+            # Dodanie informacji o planie premium (nawet gdy nie jesteśmy na kanale głosowym)
+            _, premium_text = self.message_sender._get_premium_text(ctx)
+            if premium_text:
+                description = f"{description}\n{premium_text}"
+            
             embed = self.message_sender._create_embed(
-                description=f"Błąd: {str(e)}",
+                description=description,
                 color="error",
                 ctx=ctx
             )
