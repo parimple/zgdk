@@ -95,6 +95,81 @@ class PremiumChecker:
         return False
 
     @staticmethod
+    def requires_premium_tier(command_name: str):
+        """
+        Decorator to check premium access requirements WITHOUT requiring voice channel.
+        This is suitable for commands that need premium status but don't need a voice channel.
+        """
+
+        async def predicate(ctx):
+            # Skip checks for help/pomoc command
+            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
+                return True
+
+            # Skip checks for help context
+            if getattr(ctx, "help_command", None):
+                return True
+
+            checker = PremiumChecker(ctx.bot)
+            command_tier = checker.get_command_tier(command_name)
+            if command_tier is None:
+                logger.warning(f"Command {command_name} has no defined tier")
+                await checker.message_sender.send_no_permission(ctx)
+                return False
+
+            has_booster = checker.has_booster_roles(ctx)
+            has_bypass = await checker.has_active_bypass(ctx)
+            has_premium = checker.has_premium_role(ctx)
+            has_high_premium = checker.has_premium_role(ctx, "zG500")
+
+            # TIER_0 - Available to everyone without any requirements
+            if command_tier == CommandTier.TIER_0:
+                return True
+
+            # TIER_T - Requires only T>0
+            if command_tier == CommandTier.TIER_T:
+                if not has_bypass and not has_premium:
+                    await checker.message_sender.send_bypass_expired(ctx)
+                    return False
+                return True
+
+            # TIER_1 - Requires (booster/invite role + T>0) or any premium
+            if command_tier == CommandTier.TIER_1:
+                if has_premium:
+                    return True
+                if has_booster and has_bypass:
+                    return True
+                if has_booster:
+                    await checker.message_sender.send_bypass_expired(ctx)
+                else:
+                    await checker.message_sender.send_premium_required(ctx)
+                return False
+
+            # TIER_2 - Requires any premium role
+            if command_tier == CommandTier.TIER_2:
+                if not has_premium:
+                    await checker.message_sender.send_specific_roles_required(
+                        ctx, ["zG50", "zG100", "zG500", "zG1000"]
+                    )
+                    return False
+                return True
+
+            # TIER_3 - Requires high premium role
+            if command_tier == CommandTier.TIER_3:
+                if not has_high_premium:
+                    await checker.message_sender.send_specific_roles_required(
+                        ctx, ["zG500", "zG1000"]
+                    )
+                    return False
+                return True
+
+            # Default case - deny access
+            await checker.message_sender.send_no_permission(ctx)
+            return False
+
+        return commands.check(predicate)
+
+    @staticmethod
     def requires_voice_access(command_name: str):
         """
         Decorator to check voice command access requirements.
