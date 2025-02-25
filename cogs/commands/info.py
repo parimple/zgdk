@@ -472,7 +472,7 @@ class SellRoleButton(discord.ui.Button):
             # Remove role from member
             await interaction.user.remove_roles(role)
             await interaction.response.edit_message(
-                content=f"Sprzedano rangę {role.name} za {refund_amount}{CURRENCY_UNIT}. Usunięto wszystkie nadane uprawnienia moderatora.",
+                content=f"Sprzedano rangę {role.name} za {refund_amount}{CURRENCY_UNIT}.",
                 embed=None,
                 view=None,
             )
