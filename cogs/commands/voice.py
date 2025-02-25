@@ -260,8 +260,7 @@ class VoiceCog(commands.Cog):
         )
 
     @commands.hybrid_command(aliases=["ak"])
-    @PermissionChecker.voice_command()
-    @PremiumChecker.requires_voice_access("autokick")
+    @PremiumChecker.requires_premium_tier("autokick")
     @discord.app_commands.describe(
         target="Użytkownik do dodania/usunięcia z listy autokick",
         action="Dodaj (+) lub usuń (-) użytkownika z listy autokick",

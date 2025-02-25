@@ -828,6 +828,11 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
+        else:
+            # Add premium plan text even when not in a voice channel
+            _, premium_text = MessageSender._get_premium_text(ctx)
+            if premium_text:
+                base_text = f"{base_text}\n{premium_text}"
 
         embed = MessageSender._create_embed(description=base_text, ctx=ctx)
         await MessageSender._send_embed(ctx, embed, reply=True)

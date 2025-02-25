@@ -5,6 +5,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from typing import Optional
+from colour import Color
 
 from utils.message_sender import MessageSender
 from utils.premium_checker import PremiumChecker
@@ -23,8 +24,8 @@ class PremiumCog(commands.Cog):
         # ID roli nad którą będą umieszczane role kolorowe
         self.base_role_id = self.bot.config.get("color", {}).get("base_role_id", 960665311772803184)
         
-    @commands.hybrid_command(aliases=["c"])
-    @PremiumChecker.requires_voice_access("color")
+    @commands.hybrid_command(aliases=["colour", "kolor"])
+    @PremiumChecker.requires_premium_tier("color")
     @app_commands.describe(
         color="Kolor roli (angielska nazwa, hex lub polska nazwa)"
     )
@@ -38,10 +39,10 @@ class PremiumCog(commands.Cog):
             # Tworzenie/aktualizacja roli użytkownika
             await self.update_user_color_role(ctx.author, discord_color)
             
-            # Wysłanie potwierdzenia
+            # Wysłanie potwierdzenia z kolorem wybranym przez użytkownika
             embed = self.message_sender._create_embed(
                 description=f"Zmieniono kolor twojej roli na {color}.",
-                color="success",
+                color=discord_color,  # Używamy wybranego koloru zamiast "success"
                 ctx=ctx
             )
             await self.message_sender._send_embed(ctx, embed, reply=True)
@@ -56,76 +57,58 @@ class PremiumCog(commands.Cog):
             
     async def parse_color(self, color_string: str) -> discord.Color:
         """Konwertuje string koloru na obiekt discord.Color."""
-        # Jeśli to hex
-        if color_string.startswith("#"):
-            try:
-                return discord.Color.from_str(color_string)
-            except ValueError:
-                raise ValueError(f"Niepoprawny format koloru HEX: {color_string}")
-        
-        # Angielskie nazwy kolorów
-        english_colors = {
-            "red": discord.Color.red(),
-            "green": discord.Color.green(),
-            "blue": discord.Color.blue(),
-            "yellow": discord.Color.yellow(),
-            "orange": discord.Color.orange(),
-            "purple": discord.Color.purple(),
-            "black": discord.Color.default(),
-            "white": discord.Color.from_rgb(255, 255, 255),
-            "pink": discord.Color.from_rgb(255, 105, 180),
-            "gray": discord.Color.from_rgb(128, 128, 128),
-            "brown": discord.Color.from_rgb(165, 42, 42),
-            "cyan": discord.Color.from_rgb(0, 255, 255),
-            "magenta": discord.Color.from_rgb(255, 0, 255),
-            "teal": discord.Color.teal(),
-            "gold": discord.Color.gold()
-        }
-        
-        # Polskie nazwy kolorów
+        # Polskie nazwy kolorów (nadal obsługujemy)
         polish_colors = {
-            "czerwony": discord.Color.red(),
-            "zielony": discord.Color.green(),
-            "niebieski": discord.Color.blue(),
-            "żółty": discord.Color.yellow(),
-            "pomarańczowy": discord.Color.orange(),
-            "fioletowy": discord.Color.purple(),
-            "czarny": discord.Color.default(),
-            "biały": discord.Color.from_rgb(255, 255, 255),
-            "różowy": discord.Color.from_rgb(255, 105, 180),
-            "szary": discord.Color.from_rgb(128, 128, 128),
-            "brązowy": discord.Color.from_rgb(165, 42, 42),
-            "turkusowy": discord.Color.from_rgb(0, 255, 255),
-            "magenta": discord.Color.from_rgb(255, 0, 255),
-            "morski": discord.Color.teal(),
-            "złoty": discord.Color.gold()
+            "czerwony": "red",
+            "zielony": "green",
+            "niebieski": "blue",
+            "żółty": "yellow",
+            "pomarańczowy": "orange",
+            "fioletowy": "purple",
+            "czarny": "black",
+            "biały": "white",
+            "różowy": "pink",
+            "szary": "gray",
+            "brązowy": "brown",
+            "turkusowy": "cyan",
+            "magenta": "magenta",
+            "morski": "teal",
+            "złoty": "gold"
         }
         
-        # Sprawdź czy kolor jest w słownikach
+        # Sprawdź czy jest to polska nazwa koloru
         color_lower = color_string.lower()
-        if color_lower in english_colors:
-            return english_colors[color_lower]
         if color_lower in polish_colors:
-            return polish_colors[color_lower]
+            color_string = polish_colors[color_lower]
         
-        # Jeśli to liczba hex bez #
+        # Próba konwersji przy użyciu biblioteki colour
         try:
-            hex_value = int(color_string, 16)
-            return discord.Color(hex_value)
+            # Używamy biblioteki colour do parsowania nazwy/kodu koloru
+            new_color = Color(color_string)
+            hex_string = new_color.hex_l.replace("#", "")
+            return discord.Color(int(hex_string, 16))
         except ValueError:
-            pass
-        
-        # Jeśli nic nie pasuje
-        raise ValueError(f"Nieznany kolor: {color_string}. Użyj nazwy angielskiej, polskiej lub kodu HEX (np. #FF5733).")
+            # Jeśli to nie działa, spróbujmy jeszcze sprawdzić hex bez #
+            try:
+                if not color_string.startswith('#'):
+                    # Próba interpretacji jako liczby szesnastkowej
+                    hex_value = int(color_string, 16)
+                    return discord.Color(hex_value)
+            except ValueError:
+                pass
+            
+            # Jeśli wszystkie próby zawiodły
+            raise ValueError(f"Nieznany kolor: {color_string}. Użyj nazwy angielskiej, polskiej lub kodu HEX (np. #FF5733).")
         
     async def update_user_color_role(self, member: discord.Member, color: discord.Color):
         """Tworzy lub aktualizuje rolę kolorową użytkownika."""
-        role_name = f"{self.color_role_name} {member.display_name}"
+        # Użyj samej nazwy roli bez dodawania nazwy użytkownika
+        role_name = self.color_role_name
         
         # Sprawdź, czy użytkownik już ma rolę kolorową
         existing_role = None
         for role in member.roles:
-            if role.name.startswith(self.color_role_name):
+            if role.name == self.color_role_name:
                 existing_role = role
                 break
         
@@ -157,7 +140,7 @@ class PremiumCog(commands.Cog):
     # Tutaj można dodać kolejne komendy premium w przyszłości
     # Na przykład:
     # @commands.hybrid_command()
-    # @PremiumChecker.requires_voice_access("badge")
+    # @PremiumChecker.requires_premium_tier("badge")
     # async def badge(self, ctx, ...):
     #    """Komenda do zarządzania odznakami dla użytkowników premium."""
     #    pass
