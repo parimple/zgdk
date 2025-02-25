@@ -322,3 +322,8 @@ voice_permissions:
     duration:
       bump: 12  # godziny dodawane za bump
       activity: 6  # godziny dodawane za aktywność
+
+# Konfiguracja dla modułu kolorów
+color:
+  role_name: "✎"  # Nazwa roli kolorowej
+  base_role_id: 960665311772803184  # ID roli, nad którą będzie umieszczana rola kolorowa
