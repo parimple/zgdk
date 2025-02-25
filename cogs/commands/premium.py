@@ -42,8 +42,10 @@ class PremiumCog(commands.Cog):
             # Tworzenie podstawowego opisu
             description = f"Zmieniono kolor twojej roli na {color}."
             
-            # Dodanie informacji o planie premium (nawet gdy nie jesteśmy na kanale głosowym)
-            _, premium_text = self.message_sender._get_premium_text(ctx)
+            # Dodanie informacji o planie premium
+            # Sprawdzamy czy użytkownik jest na kanale głosowym
+            channel = ctx.author.voice.channel if ctx.author.voice else None
+            _, premium_text = self.message_sender._get_premium_text(ctx, channel)
             if premium_text:
                 description = f"{description}\n{premium_text}"
             
@@ -59,8 +61,10 @@ class PremiumCog(commands.Cog):
             # Tworzenie opisu błędu
             description = f"Błąd: {str(e)}"
             
-            # Dodanie informacji o planie premium (nawet gdy nie jesteśmy na kanale głosowym)
-            _, premium_text = self.message_sender._get_premium_text(ctx)
+            # Dodanie informacji o planie premium
+            # Sprawdzamy czy użytkownik jest na kanale głosowym
+            channel = ctx.author.voice.channel if ctx.author.voice else None
+            _, premium_text = self.message_sender._get_premium_text(ctx, channel)
             if premium_text:
                 description = f"{description}\n{premium_text}"
             
