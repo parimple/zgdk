@@ -192,10 +192,10 @@ class MessageSender:
             base_text = "Nie jesteś na żadnym kanale głosowym!"
             channel = ctx.author.voice.channel if (ctx.author.voice) else None
 
-        if channel:
-            _, channel_text = MessageSender._get_premium_text(ctx, channel)
-            if channel_text:
-                base_text = f"{base_text}\n{channel_text}"
+        # Get premium text regardless of whether the user is in a voice channel
+        _, premium_text = MessageSender._get_premium_text(ctx, channel)
+        if premium_text:
+            base_text = f"{base_text}\n{premium_text}"
 
         embed = MessageSender._create_embed(description=base_text, ctx=ctx)
         await MessageSender._send_embed(ctx, embed, reply=True)

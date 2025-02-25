@@ -40,7 +40,7 @@ class PremiumCog(commands.Cog):
             await self.update_user_color_role(ctx.author, discord_color)
             
             # Tworzenie podstawowego opisu
-            description = f"Zmieniono kolor twojej roli na {color}."
+            description = f"Zmieniono kolor twojej roli na `{color}`."
             
             # Dodanie informacji o planie premium
             # Sprawdzamy czy użytkownik jest na kanale głosowym
@@ -58,8 +58,20 @@ class PremiumCog(commands.Cog):
             await self.message_sender._send_embed(ctx, embed, reply=True)
             
         except ValueError as e:
-            # Tworzenie opisu błędu
-            description = f"Błąd: {str(e)}"
+            # Tworzenie opisu błędu - zamiana oryginalnego komunikatu błędu na wersję z backticks
+            error_msg = str(e)
+            if "Nieznany kolor:" in error_msg:
+                # Wyciągamy nazwę koloru z komunikatu błędu
+                color_start = error_msg.find("Nieznany kolor:") + len("Nieznany kolor:")
+                color_end = error_msg.find(".", color_start)
+                if color_end != -1:
+                    color_name = error_msg[color_start:color_end].strip()
+                    formatted_error = f"Nieznany kolor: `{color_name}`. Użyj nazwy angielskiej, polskiej lub kodu HEX (np. `#FF5733`)."
+                    description = f"Błąd: {formatted_error}"
+                else:
+                    description = f"Błąd: {error_msg}"
+            else:
+                description = f"Błąd: {error_msg}"
             
             # Dodanie informacji o planie premium
             # Sprawdzamy czy użytkownik jest na kanale głosowym
@@ -118,7 +130,7 @@ class PremiumCog(commands.Cog):
                 pass
             
             # Jeśli wszystkie próby zawiodły
-            raise ValueError(f"Nieznany kolor: {color_string}. Użyj nazwy angielskiej, polskiej lub kodu HEX (np. #FF5733).")
+            raise ValueError(f"Nieznany kolor: `{color_string}`. Użyj nazwy angielskiej, polskiej lub kodu HEX (np. `#FF5733`).")
         
     async def update_user_color_role(self, member: discord.Member, color: discord.Color):
         """Tworzy lub aktualizuje rolę kolorową użytkownika."""
