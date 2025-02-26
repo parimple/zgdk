@@ -238,7 +238,7 @@ class PremiumChecker:
                 # Special case for view and live - allow channel mods with active bypass
                 if command_name in ["view", "live"] and is_channel_mod and has_bypass:
                     return True
-                
+
                 # For all TIER_2 commands, require premium unless exception above
                 if not has_premium:
                     await checker.message_sender.send_specific_roles_required(
@@ -282,3 +282,33 @@ class PremiumChecker:
             return await MemberQueries.extend_voice_bypass(
                 session, member_id, timedelta(hours=hours)
             )
+
+    @staticmethod
+    def requires_specific_roles(required_roles: list[str]):
+        """
+        Decorator to check if a user has any of the specified roles.
+        Args:
+            required_roles: List of role names that grant access to the command
+        """
+
+        async def predicate(ctx):
+            # Skip checks for help/pomoc command
+            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
+                return True
+
+            # Skip checks for help context
+            if getattr(ctx, "help_command", None):
+                return True
+
+            checker = PremiumChecker(ctx.bot)
+
+            # Sprawdź czy użytkownik ma którąkolwiek z wymaganych ról
+            has_required_role = any(role.name in required_roles for role in ctx.author.roles)
+
+            if not has_required_role:
+                await checker.message_sender.send_specific_roles_required(ctx, required_roles)
+                return False
+
+            return True
+
+        return commands.check(predicate)

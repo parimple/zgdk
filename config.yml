@@ -232,7 +232,7 @@ premium_roles:
       - "Moderator kanału głosowego"
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "100% więcej punktów do aktywności"
-    team_size: 15
+    team_size: 10
     moderator_count: 2
     points_multiplier: 100  # +100% punktów
     emojis_access: false     # Dostęp do emotek
@@ -251,7 +251,7 @@ premium_roles:
       - "Dostęp do emotek i stickerów z każdego serwera"
       - "200% więcej punktów do aktywności"
       - "Autokick 1 osoby na każdym kanale"
-    team_size: 30
+    team_size: 20
     moderator_count: 3
     points_multiplier: 200  # +20% punktów
     emojis_access: false    # Dostęp do emotek
@@ -272,7 +272,7 @@ premium_roles:
       - "Moliwość dodania odznaki emotki całej drużynie"
       - "300% więcej punktów do aktywności"
       - "Autokick 3 osób na każdym kanale"
-    team_size: 45
+    team_size: 30
     moderator_count: 5
     points_multiplier: 400  # +400% punktów
     emojis_access: false     # Dostęp do emotek

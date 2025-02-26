@@ -9,9 +9,9 @@ from datetime import datetime, timedelta, timezone
 import discord
 from discord.ext import commands, tasks
 
-from datasources.queries import NotificationLogQueries, RoleQueries, ChannelPermissionQueries
-from utils.currency import CURRENCY_UNIT, g_to_pln
 from cogs.commands.info import remove_premium_role_mod_permissions
+from datasources.queries import ChannelPermissionQueries, NotificationLogQueries, RoleQueries
+from utils.currency import CURRENCY_UNIT, g_to_pln
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +194,7 @@ class OnTaskEvent(commands.Cog):
                             await NotificationLogQueries.add_or_update_notification_log(
                                 session, member.id, "premium_role_expired"
                             )
-                            
+
                             # Usuń tylko uprawnienia moderatorów nadane przez tego użytkownika
                             await remove_premium_role_mod_permissions(session, self.bot, member.id)
                             logger.info(

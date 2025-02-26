@@ -580,13 +580,13 @@ class ChannelPermissionQueries:
     async def remove_mod_permissions_granted_by_member(session: AsyncSession, owner_id: int):
         """
         Remove only moderator permissions granted by a specific member.
-        
+
         This method finds and removes permissions where:
         1. The specified user is the owner (member_id)
         2. The permission includes manage_messages (moderator permission)
-        
+
         This preserves all other permissions the user has granted.
-        
+
         Args:
             session: The database session
             owner_id: The ID of the member who granted the permissions
@@ -596,7 +596,7 @@ class ChannelPermissionQueries:
             select(ChannelPermission).where(ChannelPermission.member_id == owner_id)
         )
         permissions = permissions.scalars().all()
-        
+
         # Sprawdzamy każde uprawnienie, czy zawiera manage_messages (bit 15 w Discord Permissions)
         mod_permissions_removed = 0
         for permission in permissions:
@@ -608,17 +608,19 @@ class ChannelPermissionQueries:
                 logger.info(
                     f"Removed moderator permission granted by {owner_id} to target {permission.target_id}"
                 )
-        
-        logger.info(f"Total moderator permissions removed for owner {owner_id}: {mod_permissions_removed}")
+
+        logger.info(
+            f"Total moderator permissions removed for owner {owner_id}: {mod_permissions_removed}"
+        )
 
     @staticmethod
     async def remove_mod_permissions_for_target(session: AsyncSession, target_id: int):
         """
         Remove all moderator permissions for a specific target.
-        
-        This method removes all permissions where the user (target_id) has been 
+
+        This method removes all permissions where the user (target_id) has been
         granted manage_messages permission (moderator permission) by any channel owner.
-        
+
         Args:
             session: The database session
             target_id: The ID of the user whose moderator permissions should be removed
@@ -628,7 +630,7 @@ class ChannelPermissionQueries:
             select(ChannelPermission).where(ChannelPermission.target_id == target_id)
         )
         permissions = permissions.scalars().all()
-        
+
         # Sprawdzamy każde uprawnienie, czy zawiera manage_messages (bit 15 w Discord Permissions)
         for permission in permissions:
             # Sprawdź czy uprawnienie zawiera manage_messages (0x00002000)
