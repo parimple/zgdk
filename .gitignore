@@ -17,6 +17,7 @@ pg_log/
 
 # Ignore vscode
 .vscode
+.cursor
 zgdk.code-workspace
 
 # Ignore logs

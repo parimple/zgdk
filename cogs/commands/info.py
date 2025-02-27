@@ -397,7 +397,7 @@ class ProfileView(discord.ui.View):
         if viewer.id == member.id:
             self.add_item(BuyRoleButton(bot, member, viewer))
             if premium_roles:
-                self.add_item(SellRoleButton(bot, premium_roles))
+                self.add_item(SellRoleButton(bot, premium_roles, member.id))
 
 
 class BuyRoleButton(discord.ui.Button):
@@ -419,77 +419,205 @@ class BuyRoleButton(discord.ui.Button):
 class SellRoleButton(discord.ui.Button):
     """Button for selling roles."""
 
-    def __init__(self, bot, premium_roles, **kwargs):
+    def __init__(self, bot, premium_roles, owner_id: int, **kwargs):
         super().__init__(style=discord.ButtonStyle.red, label="Sprzedaj rangę", emoji="💰", **kwargs)
         self.bot = bot
         self.premium_roles = premium_roles
+        self.owner_id = owner_id
+        self.is_selling = False
 
     async def callback(self, interaction: discord.Interaction):
         """Handle button click."""
-        member_role, role = self.premium_roles[0]
-
-        # Get role price from config
-        role_price = next(
-            (r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role.name), None
-        )
-        if role_price is None:
+        # Verify if the user is the owner of the role
+        if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "Nie można znaleźć ceny roli. Skontaktuj się z administracją.", ephemeral=True
+                "Nie możesz sprzedać cudzej roli.", ephemeral=True
             )
             return
 
-        refund_amount = calculate_refund(member_role.expiration_date, role_price)
+        if self.is_selling:
+            await interaction.response.send_message(
+                "Transakcja jest już w toku. Poczekaj na jej zakończenie.", ephemeral=True
+            )
+            return
 
-        embed = discord.Embed(
-            title="Sprzedaż rangi",
-            description=f"Czy na pewno chcesz sprzedać rangę {role.name}?\n"
-            f"Otrzymasz zwrot w wysokości {refund_amount}{CURRENCY_UNIT}.",
-            color=discord.Color.red(),
-        )
+        self.is_selling = True
+        try:
+            member_role, role = self.premium_roles[0]
 
-        # Add confirmation buttons
-        confirm_button = discord.ui.Button(
-            style=discord.ButtonStyle.danger, label="Potwierdź", custom_id="confirm"
-        )
-        cancel_button = discord.ui.Button(
-            style=discord.ButtonStyle.secondary, label="Anuluj", custom_id="cancel"
-        )
-
-        async def confirm_callback(interaction: discord.Interaction):
-            async with self.bot.get_db() as session:
-                # Remove role from database
-                await RoleQueries.delete_member_role(session, interaction.user.id, role.id)
-
-                # Usuń uprawnienia moderatora nadane przez użytkownika
-                await remove_premium_role_mod_permissions(session, self.bot, interaction.user.id)
-
-                # Add refund to wallet
-                await MemberQueries.add_to_wallet_balance(
-                    session, interaction.user.id, refund_amount
+            # Verify if user still has the role by checking role IDs
+            user_role_ids = [r.id for r in interaction.user.roles]
+            if role.id not in user_role_ids:
+                await interaction.response.send_message(
+                    "Nie posiadasz już tej roli.", ephemeral=True
                 )
-                await session.commit()
+                return
 
-            # Remove role from member
-            await interaction.user.remove_roles(role)
-            await interaction.response.edit_message(
-                content=f"Sprzedano rangę {role.name} za {refund_amount}{CURRENCY_UNIT}.",
-                embed=None,
-                view=None,
+            # Get role price from config
+            role_price = next(
+                (r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role.name),
+                None,
+            )
+            if role_price is None:
+                await interaction.response.send_message(
+                    "Nie można znaleźć ceny roli. Skontaktuj się z administracją.", ephemeral=True
+                )
+                return
+
+            refund_amount = calculate_refund(member_role.expiration_date, role_price)
+
+            embed = discord.Embed(
+                title="Sprzedaż rangi",
+                description=f"Czy na pewno chcesz sprzedać rangę {role.name}?\n"
+                f"Otrzymasz zwrot w wysokości {refund_amount}{CURRENCY_UNIT}.",
+                color=discord.Color.red(),
             )
 
-        async def cancel_callback(interaction: discord.Interaction):
-            await interaction.response.edit_message(
-                content="Anulowano sprzedaż rangi.", embed=None, view=None
+            # Create a new view with a timeout
+            class ConfirmView(discord.ui.View):
+                """View for confirming role sale."""
+
+                def __init__(
+                    self,
+                    bot,
+                    owner_id: int,
+                    role: discord.Role,
+                    refund_amount: int,
+                    interaction: discord.Interaction,
+                ):
+                    super().__init__(timeout=60.0)
+                    self.bot = bot
+                    self.owner_id = owner_id
+                    self.role = role
+                    self.refund_amount = refund_amount
+                    self.original_interaction = interaction
+                    self.value = None
+                    self.message = None
+
+                async def on_timeout(self):
+                    if self.message:
+                        for item in self.children:
+                            item.disabled = True
+                        try:
+                            await self.message.edit(
+                                content="Czas na potwierdzenie minął.", embed=None, view=self
+                            )
+                        except:
+                            pass
+
+                @discord.ui.button(label="Potwierdź", style=discord.ButtonStyle.danger)
+                async def confirm(
+                    self, confirm_interaction: discord.Interaction, button: discord.ui.Button
+                ):
+                    if confirm_interaction.user.id != self.original_interaction.user.id:
+                        await confirm_interaction.response.send_message(
+                            "Nie możesz potwierdzić tej transakcji.", ephemeral=True
+                        )
+                        return
+
+                    # Disable all buttons
+                    for item in self.children:
+                        item.disabled = True
+
+                    # Verify again if user still has the role and is still the owner
+                    user_role_ids = [r.id for r in confirm_interaction.user.roles]
+                    if (
+                        self.role.id not in user_role_ids
+                        or confirm_interaction.user.id != self.owner_id
+                    ):
+                        await confirm_interaction.response.send_message(
+                            "Nie posiadasz już tej roli lub nie jesteś jej właścicielem.",
+                            ephemeral=True,
+                        )
+                        return
+
+                    try:
+                        async with self.bot.get_db() as session:
+                            # Verify in database that the user owns this role
+                            db_role = await RoleQueries.get_member_role(
+                                session, confirm_interaction.user.id, self.role.id
+                            )
+                            if not db_role:
+                                await confirm_interaction.response.send_message(
+                                    "Nie jesteś właścicielem tej roli w bazie danych.",
+                                    ephemeral=True,
+                                )
+                                return
+
+                            # Remove role from database
+                            await RoleQueries.delete_member_role(
+                                session, self.original_interaction.user.id, self.role.id
+                            )
+
+                            # Usuń uprawnienia moderatora nadane przez użytkownika
+                            await remove_premium_role_mod_permissions(
+                                session, self.bot, self.original_interaction.user.id
+                            )
+
+                            # Add refund to wallet
+                            await MemberQueries.add_to_wallet_balance(
+                                session, self.original_interaction.user.id, self.refund_amount
+                            )
+                            await session.commit()
+
+                        # Remove role from member
+                        await self.original_interaction.user.remove_roles(self.role)
+
+                        # Send success message
+                        await confirm_interaction.response.send_message(
+                            f"Sprzedano rangę {self.role.name} za {self.refund_amount}{CURRENCY_UNIT}.",
+                            ephemeral=True,
+                        )
+
+                        # Try to edit original message if possible
+                        if self.message:
+                            await self.message.edit(view=self)
+
+                        self.value = True
+                        self.stop()
+
+                    except Exception as e:
+                        await confirm_interaction.response.send_message(
+                            f"Wystąpił błąd podczas sprzedaży roli: {str(e)}", ephemeral=True
+                        )
+                        self.value = False
+                        self.stop()
+
+                @discord.ui.button(label="Anuluj", style=discord.ButtonStyle.secondary)
+                async def cancel(
+                    self, cancel_interaction: discord.Interaction, button: discord.ui.Button
+                ):
+                    if cancel_interaction.user.id != self.original_interaction.user.id:
+                        await cancel_interaction.response.send_message(
+                            "Nie możesz anulować tej transakcji.", ephemeral=True
+                        )
+                        return
+
+                    # Disable all buttons
+                    for item in self.children:
+                        item.disabled = True
+
+                    await cancel_interaction.response.send_message(
+                        "Anulowano sprzedaż rangi.", ephemeral=True
+                    )
+
+                    # Try to edit original message if possible
+                    if self.message:
+                        await self.message.edit(view=self)
+
+                    self.value = False
+                    self.stop()
+
+            view = ConfirmView(self.bot, self.owner_id, role, refund_amount, interaction)
+            message = await interaction.response.send_message(
+                embed=embed, view=view, ephemeral=True
             )
+            view.message = await interaction.original_response()
+            # Wait for the view to finish
+            await view.wait()
 
-        confirm_button.callback = confirm_callback
-        cancel_button.callback = cancel_callback
-
-        view = discord.ui.View()
-        view.add_item(confirm_button)
-        view.add_item(cancel_button)
-
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        finally:
+            self.is_selling = False
 
 
 class InviteInfo:
