@@ -10,6 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.permissions import is_zagadka_owner
+from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
 
@@ -25,24 +26,34 @@ class OwnerCog(commands.Cog):
         :type bot: commands.Bot
         """
         self.bot = bot
+        self.message_sender = MessageSender()
 
     @commands.hybrid_command(name="reboot", description="Restartuje całego bota.")
     @is_zagadka_owner()
     async def reboot(self, ctx: commands.Context):
         """
         Restartuje całego bota.
-
+        
         :param ctx: Context komendy
         :type ctx: commands.Context
         :return: None
         """
-        await ctx.send("🔄 Restartuję bota...")
-
+        base_text = "🔄 Restartuję bota..."
+        
+        # Dodaj informację o planie premium
+        channel = ctx.author.voice.channel if ctx.author.voice else None
+        _, premium_text = self.message_sender._get_premium_text(ctx, channel)
+        if premium_text:
+            base_text = f"{base_text}\n{premium_text}"
+            
+        embed = self.message_sender._create_embed(description=base_text, ctx=ctx)
+        await self.message_sender._send_embed(ctx, embed, reply=True)
+        
         # Zamknij połączenie z bazą danych
         await self.bot.close()
-
+        
         # Restartuj proces Pythona
-        os.execv(sys.executable, ["python"] + sys.argv)
+        os.execv(sys.executable, ['python'] + sys.argv)
 
     @commands.hybrid_command(name="reload", description="Przeładuj wybrane lub wszystkie cogi.")
     @is_zagadka_owner()
