@@ -8,6 +8,7 @@ from discord.ext.commands import Context
 from cogs.ui.shop_embeds import create_role_description_embed, create_shop_embed
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
 from utils.currency import CURRENCY_UNIT
+from utils.message_sender import MessageSender
 from utils.premium_logic import PARTIAL_EXTENSIONS, PREMIUM_PRIORITY, PremiumRoleManager
 from utils.refund import calculate_refund
 
@@ -85,6 +86,7 @@ class RoleShopView(discord.ui.View):
         self.member = member
         self.premium_roles = premium_roles
         self.premium_manager = PremiumRoleManager(bot, self.guild)
+        self.message_sender = MessageSender()
 
         # Tworzenie podstawowej mapy cen
         self.base_price_map = {role["name"]: role["price"] for role in premium_roles}
@@ -217,10 +219,13 @@ class RoleShopView(discord.ui.View):
                 # Check if member has enough balance
                 db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
                 if db_member.wallet_balance < price:
-                    await interaction.followup.send(
-                        f"Nie masz wystarczająco środków. Potrzebujesz {price}G, a masz {db_member.wallet_balance}G.",
-                        ephemeral=True,
-                    )
+                    # Get premium text
+                    _, premium_text = self.message_sender._get_premium_text(self.ctx)
+                    error_msg = f"Nie masz wystarczająco środków. Potrzebujesz {price}G, a masz {db_member.wallet_balance}G."
+                    if premium_text:
+                        error_msg = f"{error_msg}\n{premium_text}"
+
+                    await interaction.followup.send(error_msg, ephemeral=True)
                     return
 
                 # Get the role object
@@ -366,6 +371,10 @@ class RoleShopView(discord.ui.View):
                                     if member.color.value != 0
                                     else discord.Color.green()
                                 )
+                                # Add premium text to embed description
+                                _, premium_text = self.message_sender._get_premium_text(self.ctx)
+                                if premium_text:
+                                    embed.description = f"{embed.description}\n{premium_text}"
                                 embed.description = (
                                     f"Przedłużyłeś swoją rangę **{current_role.name}** "
                                     f"o {days_to_add} dni (usunięto wszystkie muty!)."
@@ -413,6 +422,10 @@ class RoleShopView(discord.ui.View):
                                     if member.color.value != 0
                                     else discord.Color.green()
                                 )
+                                # Add premium text to embed description
+                                _, premium_text = self.message_sender._get_premium_text(self.ctx)
+                                if premium_text:
+                                    embed.description = f"{embed.description}\n{premium_text}"
                                 embed.description = (
                                     f"{'Zamieniłeś' if view.value == 'buy_lower' else 'Ulepszyłeś'} "
                                     f"swoją rangę **{current_role.name}** na **{role_name}**. "
@@ -471,10 +484,12 @@ class RoleShopView(discord.ui.View):
 
                                 # Send confirmation
                                 embed = discord.Embed(color=discord.Color.green())
-                                if duration_days == MONTHLY_DURATION:
-                                    embed.description = f"Przedłużyłeś rolę **{role_name}** o {extend_days} dni (usunięto wszystkie muty)!"
+                                base_description = f"Przedłużyłeś rolę **{role_name}** o {extend_days} dni (usunięto wszystkie muty)!"
+                                _, premium_text = self.message_sender._get_premium_text(self.ctx)
+                                if premium_text:
+                                    embed.description = f"{base_description}\n{premium_text}"
                                 else:
-                                    embed.description = f"Przedłużyłeś rolę **{role_name}** o {extend_days} dni (12 miesięcy w cenie 10) (usunięto wszystkie muty)!"
+                                    embed.description = base_description
 
                                 await interaction.followup.send(embed=embed, ephemeral=False)
 
@@ -562,10 +577,12 @@ class RoleShopView(discord.ui.View):
                         embed = discord.Embed(
                             color=member.color if member.color.value != 0 else discord.Color.green()
                         )
-                        if duration_days == MONTHLY_DURATION:
-                            embed.description = f"Przedłużyłeś rolę **{role_name}** o {extend_days} dni (usunięto wszystkie muty)!"
+                        base_description = f"Przedłużyłeś rolę **{role_name}** o {extend_days} dni (usunięto wszystkie muty)!"
+                        _, premium_text = self.message_sender._get_premium_text(self.ctx)
+                        if premium_text:
+                            embed.description = f"{base_description}\n{premium_text}"
                         else:
-                            embed.description = f"Przedłużyłeś rolę **{role_name}** o {extend_days} dni (12 miesięcy w cenie 10) (usunięto wszystkie muty)!"
+                            embed.description = base_description
 
                         await interaction.followup.send(embed=embed, ephemeral=False)
 
@@ -627,10 +644,12 @@ class RoleShopView(discord.ui.View):
                 embed = discord.Embed(
                     color=member.color if member.color.value != 0 else discord.Color.green()
                 )
-                if duration_days == MONTHLY_DURATION:
-                    embed.description = f"Zakupiłeś rolę **{role_name}** na {MONTHLY_DURATION} dni (usunięto wszystkie muty)!"
+                base_description = f"Zakupiłeś rolę **{role_name}** na {MONTHLY_DURATION} dni (usunięto wszystkie muty)!"
+                _, premium_text = self.message_sender._get_premium_text(self.ctx)
+                if premium_text:
+                    embed.description = f"{base_description}\n{premium_text}"
                 else:
-                    embed.description = f"Zakupiłeś rolę **{role_name}** na {YEARLY_DURATION} dni (12 miesięcy w cenie 10) (usunięto wszystkie muty)!"
+                    embed.description = base_description
 
                 await interaction.followup.send(embed=embed, ephemeral=False)
 
@@ -646,8 +665,13 @@ class RoleShopView(discord.ui.View):
         """Go to the next page in the role shop."""
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
+            # Add premium text to the message
+            _, premium_text = self.message_sender._get_premium_text(self.ctx)
+            base_text = "Oto twój własny widok sklepu:"
+            if premium_text:
+                base_text = f"{base_text}\n{premium_text}"
             await interaction.response.send_message(
-                "Oto twój własny widok sklepu:", embed=embed, view=view, ephemeral=True
+                base_text, embed=embed, view=view, ephemeral=True
             )
             return
 
@@ -684,8 +708,13 @@ class RoleShopView(discord.ui.View):
         """Go to the previous page in the role shop."""
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
+            # Add premium text to the message
+            _, premium_text = self.message_sender._get_premium_text(self.ctx)
+            base_text = "Oto twój własny widok sklepu:"
+            if premium_text:
+                base_text = f"{base_text}\n{premium_text}"
             await interaction.response.send_message(
-                "Oto twój własny widok sklepu:", embed=embed, view=view, ephemeral=True
+                base_text, embed=embed, view=view, ephemeral=True
             )
             return
 
@@ -722,8 +751,13 @@ class RoleShopView(discord.ui.View):
         """Show the description of the role."""
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
+            # Add premium text to the message
+            _, premium_text = self.message_sender._get_premium_text(self.ctx)
+            base_text = "Oto twój własny widok sklepu:"
+            if premium_text:
+                base_text = f"{base_text}\n{premium_text}"
             await interaction.response.send_message(
-                "Oto twój własny widok sklepu:", embed=embed, view=view, ephemeral=True
+                base_text, embed=embed, view=view, ephemeral=True
             )
             return
 
@@ -780,6 +814,7 @@ class BuyRoleButton(discord.ui.Button):
         self.bot = bot
         self.member = member
         self.role_name = role_name
+        self.message_sender = MessageSender()
 
     async def callback(self, interaction: discord.Interaction):
         """Handle the button click."""
@@ -820,6 +855,7 @@ class RoleDescriptionView(discord.ui.View):
         self.balance = balance
         self.viewer = viewer
         self.member = member
+        self.message_sender = MessageSender()
 
         # Add buttons
         previous_button = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary)
@@ -882,8 +918,13 @@ class RoleDescriptionView(discord.ui.View):
         """Go to the next page in the role shop view."""
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
+            # Add premium text to the message
+            _, premium_text = self.message_sender._get_premium_text(self.ctx)
+            base_text = "Oto twój własny widok opisu ról:"
+            if premium_text:
+                base_text = f"{base_text}\n{premium_text}"
             await interaction.response.send_message(
-                "Oto twój własny widok opisu ról:", embed=embed, view=view, ephemeral=True
+                base_text, embed=embed, view=view, ephemeral=True
             )
             return
 
@@ -906,8 +947,13 @@ class RoleDescriptionView(discord.ui.View):
         """Go to the previous page in the role description view."""
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
+            # Add premium text to the message
+            _, premium_text = self.message_sender._get_premium_text(self.ctx)
+            base_text = "Oto twój własny widok opisu ról:"
+            if premium_text:
+                base_text = f"{base_text}\n{premium_text}"
             await interaction.response.send_message(
-                "Oto twój własny widok opisu ról:", embed=embed, view=view, ephemeral=True
+                base_text, embed=embed, view=view, ephemeral=True
             )
             return
 
@@ -930,8 +976,13 @@ class RoleDescriptionView(discord.ui.View):
         """Buy a role from description."""
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
+            # Add premium text to the message
+            _, premium_text = self.message_sender._get_premium_text(self.ctx)
+            base_text = "Oto twój własny widok opisu ról:"
+            if premium_text:
+                base_text = f"{base_text}\n{premium_text}"
             await interaction.response.send_message(
-                "Oto twój własny widok opisu ról:", embed=embed, view=view, ephemeral=True
+                base_text, embed=embed, view=view, ephemeral=True
             )
             return
 
@@ -951,8 +1002,13 @@ class RoleDescriptionView(discord.ui.View):
         """Go to the role shop view."""
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
+            # Add premium text to the message
+            _, premium_text = self.message_sender._get_premium_text(self.ctx)
+            base_text = "Oto twój własny widok opisu ról:"
+            if premium_text:
+                base_text = f"{base_text}\n{premium_text}"
             await interaction.response.send_message(
-                "Oto twój własny widok opisu ról:", embed=embed, view=view, ephemeral=True
+                base_text, embed=embed, view=view, ephemeral=True
             )
             return
 
