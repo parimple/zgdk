@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class PremiumCog(commands.Cog):
-    """Premium commands cog for various premium features."""
+    """Commands related to premium features."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -147,11 +147,16 @@ class PremiumCog(commands.Cog):
             )
 
     async def update_user_color_role(self, member: discord.Member, color: discord.Color):
-        """Tworzy lub aktualizuje rolę kolorową użytkownika."""
-        # Użyj samej nazwy roli bez dodawania nazwy użytkownika
+        """
+        Creates or updates a user's color role.
+        
+        :param member: The member to update the role for
+        :param color: The color to set for the role
+        """
+        # Use only the role name without adding the username
         role_name = self.color_role_name
 
-        # Sprawdź, czy użytkownik już ma rolę kolorową
+        # Check if the user already has a color role
         existing_role = None
         for role in member.roles:
             if role.name == self.color_role_name:
@@ -159,101 +164,101 @@ class PremiumCog(commands.Cog):
                 break
 
         if existing_role:
-            # Aktualizuj istniejącą rolę
+            # Update existing role
             await existing_role.edit(color=color)
         else:
-            # Stwórz nową rolę
+            # Create a new role
             base_role = member.guild.get_role(self.base_role_id)
             if not base_role:
-                raise ValueError(f"Nie znaleziono roli bazowej o ID {self.base_role_id}")
+                raise ValueError(f"Base role with ID {self.base_role_id} not found")
 
-            # Tworzenie roli
+            # Create the role
             new_role = await member.guild.create_role(
-                name=role_name, color=color, reason=f"Rola kolorowa dla {member.display_name}"
+                name=role_name, color=color, reason=f"Color role for {member.display_name}"
             )
 
-            # Przeniesienie roli nad bazową
+            # Move the role above the base role
             positions = {new_role: base_role.position + 1}
             await member.guild.edit_role_positions(positions=positions)
 
-            # Nadanie roli użytkownikowi
+            # Assign the role to the user
             await member.add_roles(new_role)
 
-    # Nowa metoda pomocnicza do wysyłania wiadomości z informacjami o planach premium
+    # Helper method for sending messages with premium plan information
     async def _send_premium_embed(self, ctx, title=None, description=None, color=None):
         """
-        Tworzy i wysyła embed z dodanymi informacjami o planach premium.
+        Creates and sends an embed with added premium plan information.
         
-        Args:
-            ctx: Context komendy
-            title: Tytuł embeda (opcjonalny)
-            description: Opis embeda
-            color: Kolor embeda (opcjonalny)
+        :param ctx: Command context
+        :param title: Embed title (optional)
+        :param description: Embed description
+        :param color: Embed color (optional)
+        :return: Sent message
         """
-        # Utwórz embed
+        # Create embed
         embed = discord.Embed(
             title=title,
             description=description,
             color=color or discord.Color.blue()
         )
         
-        # Dodaj informacje o planach premium
+        # Add premium plan information
         channel = ctx.author.voice.channel if ctx.author.voice else None
         _, premium_text = self.message_sender._get_premium_text(ctx, channel)
         if premium_text:
             embed.description += f"\n\n{premium_text}"
         
-        # Wyślij wiadomość
+        # Send the message
         return await ctx.send(embed=embed)
 
     @commands.group(invoke_without_command=True)
     @is_zagadka_owner()
     async def team(self, ctx):
-        """Zarządzanie teamem (klanem)."""
-        # Pobierz rolę teamu właściciela
+        """Team (clan) management."""
+        # Get the owner's team role
         team_role = await self._get_user_team_role(ctx.author)
 
         if not team_role:
-            # Tworzenie opisu
+            # Create description
             description = (
-                f"Nie masz teamu. Możesz go utworzyć za pomocą komendy:\n"
-                f"`{self.prefix}team create <nazwa>`\n\n"
-                f"Minimalne wymagania: posiadanie rangi **zG100**."
+                f"You don't have a team. You can create one using the command:\n"
+                f"`{self.prefix}team create <name>`\n\n"
+                f"Minimum requirements: having the **zG100** rank."
             )
             
-            # Użyj nowej metody do wysłania wiadomości
+            # Use the new method to send the message
             await self._send_premium_embed(ctx, title="Team", description=description, color=0xFF0000)
             return
 
-        # Pobierz informacje o teamie
+        # Get team information
         team_info = await self._get_team_info(team_role)
         await self._send_team_info(ctx, team_role, team_info)
 
     @team.command(name="create")
     @PremiumChecker.requires_specific_roles(["zG100", "zG500", "zG1000"])
     @app_commands.describe(
-        name="Nazwa teamu (klanu)",
-        color="Kolor teamu (opcjonalne, wymaga rangi zG500+)",
-        emoji="Emoji teamu (opcjonalne, wymaga rangi zG1000)",
+        name="Team (clan) name",
+        color="Team color (optional, requires zG500+ rank)",
+        emoji="Team emoji (optional, requires zG1000 rank)",
     )
     async def team_create(
         self, ctx, name: str, color: Optional[str] = None, emoji: Optional[str] = None
     ):
-        """Utwórz nowy team (klan)."""
-        # Sprawdź czy użytkownik już ma team
+        """Create a new team (clan)."""
+        # Check if the user already has a team
         existing_team = await self._get_user_team_role(ctx.author)
         if existing_team:
             return await self.message_sender.send_error(
-                ctx, f"Masz już team `{existing_team.name}`. Musisz go najpierw usunąć."
+                ctx, f"You already have a team `{existing_team.name}`. You must delete it first."
             )
 
-        # Sprawdź czy nazwa jest odpowiednia
+        # Check if the name is appropriate
         if len(name) < 3 or len(name) > 20:
             return await self.message_sender.send_error(
-                ctx, "Nazwa teamu musi mieć od 3 do 20 znaków."
+                ctx, "Team name must be between 3 and 20 characters."
             )
 
-        # Sprawdź czy team o takiej nazwie już istnieje
+        # Check if a team with this name already exists
         guild = ctx.guild
         team_symbol = self.team_config["symbol"]
         full_team_name = f"{team_symbol} {name}"
@@ -261,10 +266,10 @@ class PremiumCog(commands.Cog):
         existing_role = discord.utils.get(guild.roles, name=full_team_name)
         if existing_role:
             return await self.message_sender.send_error(
-                ctx, f"Team o nazwie `{name}` już istnieje."
+                ctx, f"A team with the name `{name}` already exists."
             )
 
-        # Sprawdź uprawnienia do koloru (zG500 lub zG1000)
+        # Check color permissions (zG500 or zG1000)
         discord_color = None
         if color:
             has_color_permission = any(
@@ -272,7 +277,7 @@ class PremiumCog(commands.Cog):
             )
             if not has_color_permission:
                 return await self.message_sender.send_error(
-                    ctx, "Tylko użytkownicy z rangą zG500 lub wyższą mogą ustawić kolor teamu."
+                    ctx, "Only users with zG500 rank or higher can set a team color."
                 )
 
             try:
@@ -280,7 +285,7 @@ class PremiumCog(commands.Cog):
             except ValueError as e:
                 return await self.message_sender.send_error(ctx, str(e))
 
-        # Sprawdź uprawnienia do emoji (tylko zG1000)
+        # Check emoji permissions (only zG1000)
         team_emoji = None
         if emoji:
             has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
@@ -289,19 +294,19 @@ class PremiumCog(commands.Cog):
                     ctx, "Tylko użytkownicy z rangą zG1000 mogą ustawić emoji teamu."
                 )
 
-            # Sprawdź czy to jest poprawne emoji
+            # Check if it's a valid emoji
             if not emoji_validator(emoji):
                 return await self.message_sender.send_error(
                     ctx, f"`{emoji}` nie jest poprawnym emoji."
                 )
 
             team_emoji = emoji
-            # Emoji będzie dodane do nazwy teamu
+            # Emoji will be added to the team name
             full_team_name = f"{team_symbol} {team_emoji} {name}"
 
-        # Tworzenie roli teamu
+        # Create team role
         try:
-            # Stwórz rolę
+            # Create role
             team_role = await guild.create_role(
                 name=full_team_name,
                 color=discord_color or discord.Color.default(),
@@ -309,10 +314,10 @@ class PremiumCog(commands.Cog):
                 reason=f"Utworzenie teamu przez {ctx.author.display_name}",
             )
 
-            # Dodaj rolę do użytkownika
+            # Assign role to user
             await ctx.author.add_roles(team_role)
 
-            # Stwórz kanał tekstowy w odpowiedniej kategorii
+            # Create text channel in appropriate category
             category = guild.get_channel(self.team_config["category_id"])
             if not category:
                 logger.error(
@@ -320,7 +325,7 @@ class PremiumCog(commands.Cog):
                 )
                 category = None
 
-            # Tworzenie uprawnień dla kanału
+            # Create channel permissions
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 team_role: discord.PermissionOverwrite(
@@ -338,7 +343,7 @@ class PremiumCog(commands.Cog):
                 ),
             }
 
-            # Stwórz kanał tekstowy
+            # Create text channel
             channel_name = full_team_name.lower().replace(" ", "-")
             team_channel = await guild.create_text_channel(
                 name=channel_name,
@@ -348,10 +353,10 @@ class PremiumCog(commands.Cog):
                 reason=f"Utworzenie kanału teamu przez {ctx.author.display_name}",
             )
 
-            # Zapisz rolę teamu do bazy danych
+            # Save team role to database
             await self._save_team_to_database(ctx.author.id, team_role.id)
 
-            # Wyślij informację o sukcesie
+            # Send success message
             description = (
                 f"Utworzono team {self.team_config['symbol']} {name}!\n\n"
                 f"• Kanał: {team_channel.mention}\n"
@@ -360,7 +365,7 @@ class PremiumCog(commands.Cog):
                 f"Możesz zarządzać członkami teamu za pomocą komendy {self.prefix}team member add/remove."
             )
             
-            # Użyj nowej metody do wysłania wiadomości
+            # Use the new method to send the message
             await self._send_premium_embed(ctx, description=description, color=team_role.color)
 
         except Exception as e:
@@ -699,55 +704,74 @@ class PremiumCog(commands.Cog):
             )
 
     async def _get_user_team_role(self, member: discord.Member):
-        """Pobierz rolę teamu użytkownika."""
+        """
+        Get the team role for a user.
+        
+        :param member: The member to find the team role for
+        :return: The team role or None if not found
+        """
+        # Get team roles that follow the pattern "☫ <name>"
         team_symbol = self.team_config["symbol"]
-        for role in member.roles:
-            if role.name.startswith(team_symbol):
-                return role
-        return None
+        team_roles = [
+            role
+            for role in member.roles
+            if role.name.startswith(team_symbol)
+            and len(role.name) > len(team_symbol)
+            and role.name[len(team_symbol)] == " "
+        ]
+
+        # Return the first team role found (there should only be one)
+        return team_roles[0] if team_roles else None
 
     async def _is_team_owner(self, user_id: int, role_id: int):
-        """Sprawdź czy użytkownik jest właścicielem teamu."""
+        """
+        Check if a user is the owner of a team.
+        
+        :param user_id: The user ID to check
+        :param role_id: The team role ID
+        :return: True if the user is the owner, False otherwise
+        """
         async with self.bot.get_db() as session:
             role = await session.get(DBRole, role_id)
-            if role and role.role_type == "team":
-                return role.name == str(user_id)
-        return False
+            return role and role.role_type == "team" and int(role.name) == user_id
 
     async def _save_team_to_database(self, owner_id: int, role_id: int):
-        """Zapisz team do bazy danych."""
+        """
+        Save team information to the database.
+        
+        :param owner_id: The ID of the team owner
+        :param role_id: The ID of the team role
+        """
         async with self.bot.get_db() as session:
-            # Sprawdź czy rola już istnieje w bazie
-            role = await session.get(DBRole, role_id)
-            if not role:
-                # Utwórz nową rolę w bazie
-                role = DBRole(
-                    id=role_id, name=str(owner_id), role_type="team"  # ID właściciela jako name
-                )
-                session.add(role)
-
-            # Przypisz rolę do właściciela (bez daty wygaśnięcia)
-            member_role = MemberRole(member_id=owner_id, role_id=role_id, expiration_date=None)
-            session.add(member_role)
-
+            role = DBRole(
+                id=role_id,
+                name=str(owner_id),
+                role_type="team",
+            )
+            session.add(role)
             await session.commit()
 
     async def _get_team_info(self, team_role: discord.Role):
-        """Pobierz informacje o teamie."""
+        """
+        Get information about a team.
+        
+        :param team_role: The team role to get information for
+        :return: A dictionary containing team information
+        """
         guild = team_role.guild
 
-        # Znajdź właściciela teamu
+        # Find the team owner
         async with self.bot.get_db() as session:
             role = await session.get(DBRole, team_role.id)
             owner_id = int(role.name) if role and role.role_type == "team" else None
 
-            # Pobierz obiekt członka
+            # Get the member object
             owner = guild.get_member(owner_id) if owner_id else None
 
-            # Znajdź członków teamu
+            # Find team members
             members = [member for member in guild.members if team_role in member.roles]
 
-            # Znajdź kanał teamu
+            # Find the team channel
             team_channel = None
             for channel in guild.channels:
                 if (
@@ -759,41 +783,60 @@ class PremiumCog(commands.Cog):
                     team_channel = channel
                     break
 
+            # Get maximum team size based on owner's roles
+            max_members = 10
+            if owner:
+                for role_config in reversed(self.bot.config["premium_roles"]):
+                    if any(r.name == role_config["name"] for r in owner.roles):
+                        max_members = role_config.get("team_size", 10)
+                        break
+
             return {
                 "owner": owner,
                 "members": members,
                 "channel": team_channel,
-                "member_count": len(members),
+                "max_members": max_members,
             }
 
     async def _send_team_info(self, ctx, team_role, team_info):
-        """Wyślij informacje o teamie."""
-        # Przygotuj opis
+        """
+        Send information about a team.
+        
+        :param ctx: Command context
+        :param team_role: The team role
+        :param team_info: Team information dictionary
+        """
+        # Prepare description
         description = (
             f"Team: {self.team_config['symbol']} {team_role.name[2:]}\n\n"
-            f"Właściciel: {team_info['owner'].mention}\n"
-            f"Liczba członków: {len(team_info['members'])}/{team_info['max_members']}\n"
-            f"Kanał: {team_info['channel'].mention}\n\n"
-            f"Członkowie: {' '.join(m.mention for m in team_info['members'])}"
+            f"Owner: {team_info['owner'].mention}\n"
+            f"Members: {len(team_info['members'])}/{team_info['max_members']}\n"
+            f"Channel: {team_info['channel'].mention}\n\n"
+            f"Members: {' '.join(m.mention for m in team_info['members'])}"
         )
         
-        # Użyj nowej metody do wysłania wiadomości
-        await self._send_premium_embed(ctx, title="Informacje o teamie", description=description, color=team_role.color)
+        # Use the new method to send the message
+        await self._send_premium_embed(ctx, title="Team Information", description=description, color=team_role.color)
 
 
-# Funkcje pomocnicze
+# Helper functions
 def emoji_validator(emoji_str: str) -> bool:
-    """Sprawdź czy string jest pojedynczym emoji."""
+    """
+    Check if a string is a single emoji.
+    
+    :param emoji_str: The string to check
+    :return: True if the string is a single emoji, False otherwise
+    """
     if not emoji_str:
         return False
 
-    # Używamy wbudowanej funkcji discord.py do walidacji emoji
-    # Sprawdzamy zarówno Unicode emoji jak i niestandardowe emoji Discorda
+    # Use Discord.py's built-in emoji validator
+    # Check both Unicode emojis and custom Discord emojis
     if len(emoji_str) == 1:
-        # Pojedynczy znak - sprawdź czy to Unicode emoji
+        # Single character - check if it's a Unicode emoji
         return bool(discord.utils.get_emoji_regex().match(emoji_str))
     elif emoji_str.startswith("<") and emoji_str.endswith(">"):
-        # Format niestandardowego emoji Discorda: <:name:id> lub <a:name:id>
+        # Custom Discord emoji format: <:name:id> or <a:name:id>
         return bool(discord.PartialEmoji.from_str(emoji_str))
     return False
 
