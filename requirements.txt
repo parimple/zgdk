@@ -6,6 +6,7 @@ httpx==0.24.0
 playwright
 beautifulsoup4
 colour
+emoji==2.14.1
 
 # database libraries
 SQLAlchemy==2.0.15
