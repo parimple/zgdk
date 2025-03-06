@@ -1,18 +1,20 @@
 """Premium commands cog for premium features like role colors and more."""
 
 import logging
-from typing import Literal, Optional
+import re
+from typing import Literal, Optional, Dict, List, Union, Tuple
 
 import discord
 from colour import Color
-from discord import app_commands
+from discord import app_commands, AllowedMentions, Embed
 from discord.ext import commands
+import emoji
 
 from datasources.models import MemberRole
 from datasources.models import Role as DBRole
 from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
-from utils.permissions import is_zagadka_owner
+from utils.permissions import is_zagadka_owner, is_admin
 from utils.premium_checker import PremiumChecker
 
 logger = logging.getLogger(__name__)
@@ -871,14 +873,15 @@ def emoji_validator(emoji_str: str) -> bool:
     if not emoji_str:
         return False
 
-    # Use Discord.py's built-in emoji validator
-    # Check both Unicode emojis and custom Discord emojis
-    if len(emoji_str) == 1:
-        # Single character - check if it's a Unicode emoji
-        return bool(discord.utils.get_emoji_regex().match(emoji_str))
-    elif emoji_str.startswith("<") and emoji_str.endswith(">"):
-        # Custom Discord emoji format: <:name:id> or <a:name:id>
-        return bool(discord.PartialEmoji.from_str(emoji_str))
+    # Check if it's a standard Unicode emoji using the emoji library
+    if emoji.is_emoji(emoji_str):
+        return True
+    
+    # Check for Discord custom emoji format: <:name:id> or <a:name:id>
+    if emoji_str.startswith("<") and emoji_str.endswith(">"):
+        parts = emoji_str.strip("<>").split(":")
+        return len(parts) >= 2 and all(part for part in parts)
+    
     return False
 
 
