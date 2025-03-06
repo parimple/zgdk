@@ -1,5 +1,6 @@
 """Premium commands cog for premium features like role colors and more."""
 
+import io
 import logging
 from typing import Literal, Optional
 
@@ -8,6 +9,9 @@ from colour import Color
 from discord import app_commands
 from discord.ext import commands
 import emoji
+import emoji_data_python
+from PIL import Image, ImageDraw, ImageFont
+import httpx
 
 from datasources.models import MemberRole
 from datasources.models import Role as DBRole
@@ -680,59 +684,64 @@ class PremiumCog(commands.Cog):
     @team.command(name="emoji")
     @app_commands.describe(emoji="Emoji teamu")
     async def team_emoji(self, ctx, emoji: str):
-        """Ustaw emoji teamu."""
-        # Sprawdź uprawnienia do emoji (tylko zG1000)
+        """Set team emoji as role icon."""
+        # Check if user has emoji permission (zG1000 only)
         has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
         if not has_emoji_permission:
-            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
                 ctx,
                 description="Tylko użytkownicy z rangą zG1000 mogą ustawić emoji teamu.",
                 color=0xFF0000,
             )
 
-        # Sprawdź czy to jest poprawne emoji
+        # Check if it's a valid emoji
         if not emoji_validator(emoji):
-            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
                 ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
             )
 
-        # Sprawdź czy użytkownik ma team
+        # Check if user has a team
         team_role = await self._get_user_team_role(ctx.author)
         if not team_role:
-            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
                 ctx,
                 description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.",
                 color=0xFF0000,
             )
 
-        # Sprawdź czy użytkownik jest właścicielem teamu
+        # Check if user is the team owner
         is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
         if not is_owner:
-            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
                 ctx, description="Tylko właściciel teamu może zmienić emoji teamu.", color=0xFF0000
             )
+            
+        # Check if server has the required boost level for role icons (Level 2)
+        if ctx.guild.premium_tier < 2:
+            return await self._send_premium_embed(
+                ctx, 
+                description="Serwer musi mieć minimum 7 boostów (Poziom 2), aby można było ustawić ikony ról.", 
+                color=0xFF0000
+            )
 
         try:
-            # Zachowanie aktualnej nazwy
+            # Get current name and team symbol
             current_name_parts = team_role.name.split(" ")
             team_symbol = self.team_config["symbol"]
-
-            # Jeśli team już ma emoji, zastąp je
+            
+            # Clean up current name if it has emoji in it
             if len(current_name_parts) >= 3 and emoji_validator(current_name_parts[1]):
-                # Format: "☫ 🔥 Nazwa" -> "☫ 🆕 Nazwa"
-                new_name = f"{team_symbol} {emoji} {' '.join(current_name_parts[2:])}"
+                new_name = f"{team_symbol} {' '.join(current_name_parts[2:])}"
             else:
-                # Format: "☫ Nazwa" -> "☫ 🔥 Nazwa"
-                new_name = f"{team_symbol} {emoji} {' '.join(current_name_parts[1:])}"
+                new_name = team_role.name
+                
+            # Convert emoji to role icon format
+            icon_bytes = await emoji_to_icon(emoji)
+            
+            # Update role with new icon and cleaned name
+            await team_role.edit(name=new_name, display_icon=icon_bytes)
 
-            # Aktualizuj rolę
-            await team_role.edit(name=new_name)
-
-            # Znajdź i zaktualizuj kanał
+            # Update channel name if exists
             team_channels = [c for c in ctx.guild.channels if isinstance(c, discord.TextChannel)]
             team_channel = None
 
@@ -746,19 +755,29 @@ class PremiumCog(commands.Cog):
                     break
 
             if team_channel:
-                # Aktualizuj nazwę kanału
+                # Update channel name but remove emoji from name
                 channel_name = new_name.lower().replace(" ", "-")
                 await team_channel.edit(name=channel_name)
 
-            # Wyślij informację o sukcesie
-            description = f"Zmieniono emoji teamu **{team_role.mention}** na **{emoji}**."
-
-            # Użyj nowej metody do wysłania wiadomości
+            # Send success message
+            description = f"Ustawiono emoji {emoji} jako ikonę teamu **{team_role.mention}**."
             await self._send_premium_embed(ctx, description=description)
 
+        except discord.Forbidden:
+            await self._send_premium_embed(
+                ctx,
+                description="Bot nie ma wystarczających uprawnień, aby zmienić ikonę roli.",
+                color=0xFF0000,
+            )
+        except discord.HTTPException as e:
+            logger.error(f"HTTP error during team emoji update: {str(e)}")
+            await self._send_premium_embed(
+                ctx,
+                description=f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}",
+                color=0xFF0000,
+            )
         except Exception as e:
-            logger.error(f"Błąd podczas zmiany emoji teamu: {str(e)}")
-            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            logger.error(f"Error during team emoji update: {str(e)}")
             await self._send_premium_embed(
                 ctx,
                 description=f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}",
@@ -882,6 +901,74 @@ def emoji_validator(emoji_str: str) -> bool:
         return len(parts) >= 2 and all(part for part in parts)
     
     return False
+
+
+async def emoji_to_icon(emoji_str: str) -> bytes:
+    """
+    Convert an emoji to an image format suitable for Discord role icon.
+    
+    :param emoji_str: The emoji string to convert
+    :return: Bytes representation of the image
+    """
+    # Check if it's a custom Discord emoji
+    if emoji_str.startswith("<") and emoji_str.endswith(">"):
+        # Custom emoji format: <:name:id> or <a:name:id>
+        emoji_id = emoji_str.split(":")[-1].replace(">", "")
+        is_animated = emoji_str.startswith("<a:")
+        
+        # Format the URL
+        ext = "gif" if is_animated else "png"
+        emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
+        
+        # Use httpx to get the emoji image
+        async with httpx.AsyncClient() as client:
+            response = await client.get(emoji_url)
+            if response.status_code == 200:
+                return response.content
+    
+    # For standard Unicode emojis, create an image
+    try:
+        # Find the emoji using emoji_data_python's built-in functions
+        found_emoji = None
+        
+        # Try finding by exact match first
+        for e in emoji_data_python.emoji_data:
+            if e.char == emoji_str:
+                found_emoji = e
+                break
+        
+        # If no exact match, try using the emoji library
+        if not found_emoji and emoji.is_emoji(emoji_str):
+            emoji_str = emoji_str  # Use as is
+        
+        # Create a blank image with transparent background
+        img = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        # Try to load a font that supports emoji
+        try:
+            # Try system fonts that might support emoji
+            font = ImageFont.truetype("NotoColorEmoji.ttf", 109)
+        except IOError:
+            # Fallback to default font
+            font = ImageFont.load_default()
+        
+        # Draw the emoji centered in the image
+        draw.text((64, 64), emoji_str, font=font, fill=(0, 0, 0, 255), anchor="mm")
+        
+        # Save to bytes
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        return buffer.read()
+    except Exception as e:
+        # In case of error, return a default image
+        logger.error(f"Error converting emoji to image: {str(e)}")
+        img = Image.new('RGBA', (128, 128), (255, 0, 0, 255))  # Red square as fallback
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        return buffer.read()
 
 
 async def setup(bot):
