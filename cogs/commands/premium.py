@@ -225,12 +225,24 @@ class PremiumCog(commands.Cog):
         # Get the owner's team role
         team_role = await self._get_user_team_role(ctx.author)
 
+        # Lista dostępnych komend
+        available_commands = (
+            f"**Dostępne komendy:**\n"
+            f"• `{self.prefix}team create <nazwa>` - Utwórz nowy team\n"
+            f"• `{self.prefix}team name <nazwa>` - Zmień nazwę swojego teamu\n"
+            f"• `{self.prefix}team member add <@użytkownik>` - Dodaj członka do teamu\n"
+            f"• `{self.prefix}team member remove <@użytkownik>` - Usuń członka z teamu\n"
+            f"• `{self.prefix}team color <kolor>` - Ustaw kolor teamu (wymaga rangi zG500+)\n"
+            f"• `{self.prefix}team emoji <emoji>` - Ustaw emoji teamu (wymaga rangi zG1000)"
+        )
+
         if not team_role:
             # Create description
             description = (
                 f"Nie masz teamu. Możesz go utworzyć za pomocą komendy:\n"
                 f"`{self.prefix}team create <nazwa>`\n\n"
-                f"Minimalne wymagania: posiadanie rangi **zG100**."
+                f"Minimalne wymagania: posiadanie rangi **zG100**.\n\n"
+                f"{available_commands}"
             )
             
             # Use the new method to send the message
@@ -239,7 +251,19 @@ class PremiumCog(commands.Cog):
 
         # Get team information
         team_info = await self._get_team_info(team_role)
-        await self._send_team_info(ctx, team_role, team_info)
+        
+        # Prepare description with team info
+        description = (
+            f"**Team**: {self.team_config['symbol']} {team_role.name[2:]}\n\n"
+            f"**Właściciel**: {team_info['owner'].mention}\n"
+            f"**Liczba członków**: {len(team_info['members'])}/{team_info['max_members']}\n"
+            f"**Kanał**: {team_info['channel'].mention}\n\n"
+            f"**Członkowie**: {' '.join(m.mention for m in team_info['members'])}\n\n"
+            f"{available_commands}"
+        )
+        
+        # Use the new method to send the message
+        await self._send_premium_embed(ctx, description=description)
 
     @team.command(name="create")
     @PremiumChecker.requires_specific_roles(["zG100", "zG500", "zG1000"])
@@ -804,26 +828,6 @@ class PremiumCog(commands.Cog):
                 "channel": team_channel,
                 "max_members": max_members,
             }
-
-    async def _send_team_info(self, ctx, team_role, team_info):
-        """
-        Send information about a team.
-        
-        :param ctx: Command context
-        :param team_role: The team role
-        :param team_info: Team information dictionary
-        """
-        # Prepare description
-        description = (
-            f"**Team**: {self.team_config['symbol']} {team_role.name[2:]}\n\n"
-            f"**Właściciel**: {team_info['owner'].mention}\n"
-            f"**Liczba członków**: {len(team_info['members'])}/{team_info['max_members']}\n"
-            f"**Kanał**: {team_info['channel'].mention}\n\n"
-            f"**Członkowie**: {' '.join(m.mention for m in team_info['members'])}"
-        )
-        
-        # Use the new method to send the message
-        await self._send_premium_embed(ctx, description=description)
 
 
 # Helper functions
