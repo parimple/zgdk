@@ -221,9 +221,9 @@ class PremiumCog(commands.Cog):
         if not team_role:
             # Create description
             description = (
-                f"You don't have a team. You can create one using the command:\n"
-                f"`{self.prefix}team create <name>`\n\n"
-                f"Minimum requirements: having the **zG100** rank."
+                f"Nie masz teamu. Możesz go utworzyć za pomocą komendy:\n"
+                f"`{self.prefix}team create <nazwa>`\n\n"
+                f"Minimalne wymagania: posiadanie rangi **zG100**."
             )
             
             # Use the new method to send the message
@@ -237,9 +237,9 @@ class PremiumCog(commands.Cog):
     @team.command(name="create")
     @PremiumChecker.requires_specific_roles(["zG100", "zG500", "zG1000"])
     @app_commands.describe(
-        name="Team (clan) name",
-        color="Team color (optional, requires zG500+ rank)",
-        emoji="Team emoji (optional, requires zG1000 rank)",
+        name="Nazwa teamu (klanu)",
+        color="Kolor teamu (opcjonalne, wymaga rangi zG500+)",
+        emoji="Emoji teamu (opcjonalne, wymaga rangi zG1000)",
     )
     async def team_create(
         self, ctx, name: str, color: Optional[str] = None, emoji: Optional[str] = None
@@ -249,13 +249,13 @@ class PremiumCog(commands.Cog):
         existing_team = await self._get_user_team_role(ctx.author)
         if existing_team:
             return await self.message_sender.send_error(
-                ctx, f"You already have a team `{existing_team.name}`. You must delete it first."
+                ctx, f"Masz już team `{existing_team.name}`. Musisz go najpierw usunąć."
             )
 
         # Check if the name is appropriate
         if len(name) < 3 or len(name) > 20:
             return await self.message_sender.send_error(
-                ctx, "Team name must be between 3 and 20 characters."
+                ctx, "Nazwa teamu musi mieć od 3 do 20 znaków."
             )
 
         # Check if a team with this name already exists
@@ -266,7 +266,7 @@ class PremiumCog(commands.Cog):
         existing_role = discord.utils.get(guild.roles, name=full_team_name)
         if existing_role:
             return await self.message_sender.send_error(
-                ctx, f"A team with the name `{name}` already exists."
+                ctx, f"Team o nazwie `{name}` już istnieje."
             )
 
         # Check color permissions (zG500 or zG1000)
@@ -277,7 +277,7 @@ class PremiumCog(commands.Cog):
             )
             if not has_color_permission:
                 return await self.message_sender.send_error(
-                    ctx, "Only users with zG500 rank or higher can set a team color."
+                    ctx, "Tylko użytkownicy z rangą zG500 lub wyższą mogą ustawić kolor teamu."
                 )
 
             try:
@@ -536,29 +536,29 @@ class PremiumCog(commands.Cog):
     @team_member.command(name="remove")
     @app_commands.describe(member="Użytkownik do usunięcia z teamu")
     async def team_member_remove(self, ctx, member: discord.Member):
-        """Usuń członka ze swojego teamu."""
-        # Sprawdź czy użytkownik ma team
+        """Remove a member from your team."""
+        # Check if the user has a team
         team_role = await self._get_user_team_role(ctx.author)
         if not team_role:
             return await self.message_sender.send_error(
                 ctx, "Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`."
             )
 
-        # Sprawdź czy użytkownik jest właścicielem teamu
+        # Check if the user is the team owner
         is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
         if not is_owner:
             return await self.message_sender.send_error(
                 ctx, "Tylko właściciel teamu może usuwać członków."
             )
 
-        # Sprawdź czy użytkownik nie próbuje usunąć samego siebie
+        # Check if the user is trying to remove themselves
         if member.id == ctx.author.id:
             return await self.message_sender.send_error(
                 ctx,
                 "Nie możesz usunąć siebie z teamu. Aby usunąć team, skontaktuj się z administracją.",
             )
 
-        # Sprawdź czy osoba jest w teamie
+        # Check if the person is in the team
         if team_role not in member.roles:
             return await self.message_sender.send_error(
                 ctx, f"{member.mention} nie jest członkiem teamu **{team_role.name}**."
@@ -583,22 +583,22 @@ class PremiumCog(commands.Cog):
     @team.command(name="color")
     @app_commands.describe(color="Kolor teamu (angielska nazwa, hex lub polska nazwa)")
     async def team_color(self, ctx, color: str):
-        """Zmień kolor swojego teamu."""
-        # Sprawdź uprawnienia do koloru (zG500 lub zG1000)
+        """Change your team's color."""
+        # Check color permissions (zG500 or zG1000)
         has_color_permission = any(role.name in ["zG500", "zG1000"] for role in ctx.author.roles)
         if not has_color_permission:
             return await self.message_sender.send_error(
                 ctx, "Tylko użytkownicy z rangą zG500 lub wyższą mogą ustawić kolor teamu."
             )
 
-        # Sprawdź czy użytkownik ma team
+        # Check if the user has a team
         team_role = await self._get_user_team_role(ctx.author)
         if not team_role:
             return await self.message_sender.send_error(
                 ctx, "Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`."
             )
 
-        # Sprawdź czy użytkownik jest właścicielem teamu
+        # Check if the user is the team owner
         is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
         if not is_owner:
             return await self.message_sender.send_error(
@@ -809,14 +809,14 @@ class PremiumCog(commands.Cog):
         # Prepare description
         description = (
             f"Team: {self.team_config['symbol']} {team_role.name[2:]}\n\n"
-            f"Owner: {team_info['owner'].mention}\n"
-            f"Members: {len(team_info['members'])}/{team_info['max_members']}\n"
-            f"Channel: {team_info['channel'].mention}\n\n"
-            f"Members: {' '.join(m.mention for m in team_info['members'])}"
+            f"Właściciel: {team_info['owner'].mention}\n"
+            f"Liczba członków: {len(team_info['members'])}/{team_info['max_members']}\n"
+            f"Kanał: {team_info['channel'].mention}\n\n"
+            f"Członkowie: {' '.join(m.mention for m in team_info['members'])}"
         )
         
         # Use the new method to send the message
-        await self._send_premium_embed(ctx, title="Team Information", description=description, color=team_role.color)
+        await self._send_premium_embed(ctx, title="Informacje o teamie", description=description, color=team_role.color)
 
 
 # Helper functions
