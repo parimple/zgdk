@@ -685,6 +685,9 @@ class PremiumCog(commands.Cog):
     @app_commands.describe(emoji="Emoji teamu")
     async def team_emoji(self, ctx, emoji: str):
         """Set team emoji as role icon."""
+        # Dokładne logowanie, co otrzymaliśmy
+        logger.info(f"team_emoji command with emoji string: '{emoji}', type: {type(emoji)}, length: {len(emoji)}")
+        
         # Check if user has emoji permission (zG1000 only)
         has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
         if not has_emoji_permission:
@@ -694,8 +697,9 @@ class PremiumCog(commands.Cog):
                 color=0xFF0000,
             )
 
-        # Check if it's a valid emoji
+        # Check if it's a custom emoji in wrong format (:name: instead of <:name:id>)
         if emoji.startswith(":") and emoji.endswith(":") and len(emoji) > 2:
+            logger.info(f"User provided emoji in :name: format: {emoji}")
             # User provided serwerowe emoji w formacie :nazwa: zamiast <:nazwa:id>
             return await self._send_premium_embed(
                 ctx, 
@@ -703,10 +707,36 @@ class PremiumCog(commands.Cog):
                 color=0xFF0000
             )
         
-        if not emoji_validator(emoji):
-            return await self._send_premium_embed(
-                ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
-            )
+        # Logujemy, czy emoji jest poprawne według walidatora
+        is_valid = emoji_validator(emoji)
+        logger.info(f"Emoji validation result for '{emoji}': {is_valid}")
+        
+        if not is_valid:
+            # Jeśli to emoji serwerowe, sprawdź jeszcze raz z poprawioną logiką
+            if emoji.startswith("<") and emoji.endswith(">"):
+                parts = emoji.strip("<>").split(":")
+                logger.info(f"Custom emoji parts: {parts}")
+                
+                # Sprawdź, czy to potencjalnie poprawne emoji serwerowe, którego nasz walidator nie przepuszcza
+                if len(parts) >= 3 and parts[1]:
+                    # Ostatnia część powinna być liczbą - ID emoji
+                    try:
+                        emoji_id = parts[-1]
+                        int(emoji_id)  # Sprawdź, czy to liczba
+                        logger.info(f"Emoji seems valid despite validator failure, ID: {emoji_id}")
+                        # Jeśli dotarliśmy tutaj, to wygląda na poprawne emoji, kontynuuj mimo błędu walidacji
+                    except (ValueError, IndexError):
+                        return await self._send_premium_embed(
+                            ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
+                        )
+                else:
+                    return await self._send_premium_embed(
+                        ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
+                    )
+            else:
+                return await self._send_premium_embed(
+                    ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
+                )
 
         # Check if user has a team
         team_role = await self._get_user_team_role(ctx.author)
@@ -742,12 +772,48 @@ class PremiumCog(commands.Cog):
                 new_name = f"{team_symbol} {' '.join(current_name_parts[2:])}"
             else:
                 new_name = team_role.name
-                
-            # Convert emoji to role icon format
-            icon_bytes = await emoji_to_icon(emoji)
             
-            # Update role with new icon and cleaned name
-            await team_role.edit(name=new_name, display_icon=icon_bytes)
+            # Log before conversion attempt
+            logger.info(f"Converting emoji '{emoji}' to role icon format")
+                
+            # Convert emoji to role icon format with better error handling
+            try:
+                icon_bytes = await emoji_to_icon(emoji)
+                logger.info(f"Successfully converted emoji to icon, size: {len(icon_bytes)} bytes")
+            except Exception as e:
+                logger.error(f"Failed to convert emoji to icon: {str(e)}")
+                return await self._send_premium_embed(
+                    ctx,
+                    description=f"Nie udało się przekonwertować emoji na format ikony roli: {str(e)}",
+                    color=0xFF0000,
+                )
+            
+            # Update role with new icon and cleaned name with better error handling
+            try:
+                logger.info(f"Updating role {team_role.id} with new icon")
+                await team_role.edit(name=new_name, display_icon=icon_bytes)
+                logger.info(f"Successfully updated role icon")
+            except discord.Forbidden as e:
+                logger.error(f"Forbidden error while updating role icon: {str(e)}")
+                return await self._send_premium_embed(
+                    ctx,
+                    description="Bot nie ma wystarczających uprawnień, aby zmienić ikonę roli.",
+                    color=0xFF0000,
+                )
+            except discord.HTTPException as e:
+                logger.error(f"HTTP error while updating role icon: {str(e)}")
+                return await self._send_premium_embed(
+                    ctx,
+                    description=f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}",
+                    color=0xFF0000,
+                )
+            except Exception as e:
+                logger.error(f"Unexpected error while updating role icon: {str(e)}")
+                return await self._send_premium_embed(
+                    ctx,
+                    description=f"Wystąpił nieoczekiwany błąd podczas zmiany emoji teamu: {str(e)}",
+                    color=0xFF0000,
+                )
 
             # Update channel name if exists
             team_channels = [c for c in ctx.guild.channels if isinstance(c, discord.TextChannel)]
@@ -772,6 +838,7 @@ class PremiumCog(commands.Cog):
             await self._send_premium_embed(ctx, description=description)
 
         except discord.Forbidden:
+            logger.error("Forbidden error during team emoji update")
             await self._send_premium_embed(
                 ctx,
                 description="Bot nie ma wystarczających uprawnień, aby zmienić ikonę roli.",
@@ -906,6 +973,14 @@ def emoji_validator(emoji_str: str) -> bool:
     # Check for Discord custom emoji format: <:name:id> or <a:name:id>
     if emoji_str.startswith("<") and emoji_str.endswith(">"):
         parts = emoji_str.strip("<>").split(":")
+        
+        # Dla emoji w formacie <:nazwa:id> mamy ['', 'nazwa', 'id'] 
+        # Dla emoji w formacie <a:nazwa:id> mamy ['a', 'nazwa', 'id']
+        # Upewnijmy się, że mamy co najmniej 3 części i druga oraz trzecia nie są puste
+        if len(parts) >= 3 and parts[1] and parts[2]:
+            return True
+        
+        # Dla innych formatów sprawdź czy wszystkie części są niepuste
         return len(parts) >= 2 and all(part for part in parts)
     
     # Special case for when user inputs :name: format instead of <:name:id>
@@ -927,20 +1002,30 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
     if emoji_str.startswith("<") and emoji_str.endswith(">"):
         # Custom emoji format: <:name:id> or <a:name:id>
         parts = emoji_str.split(":")
+        
+        # For emoji in format <:name:id> we get ['', 'name', 'id>']
+        # For emoji in format <a:name:id> we get ['<a', 'name', 'id>']
         if len(parts) >= 3:
+            # Extract the ID properly, removing the closing ">"
             emoji_id = parts[-1].replace(">", "")
+            # Check if it's an animated emoji
             is_animated = emoji_str.startswith("<a:")
             
             # Format the URL
             ext = "gif" if is_animated else "png"
             emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
             
+            logger.info(f"Fetching custom emoji from URL: {emoji_url}")
+            
             # Use httpx to get the emoji image
             try:
                 async with httpx.AsyncClient() as client:
                     response = await client.get(emoji_url)
                     if response.status_code == 200:
+                        logger.info(f"Successfully downloaded custom emoji image from {emoji_url}")
                         return response.content
+                    else:
+                        logger.error(f"Failed to download custom emoji image from {emoji_url}: HTTP {response.status_code}")
             except Exception as e:
                 logger.error(f"Error getting custom emoji from URL: {emoji_url}, error: {str(e)}")
     
@@ -949,12 +1034,17 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
         emoji_code = "-".join(f"{ord(c):x}" for c in emoji_str)
         emoji_url = f"https://twemoji.maxcdn.com/v/latest/72x72/{emoji_code}.png"
         
+        logger.info(f"Fetching Twemoji from URL: {emoji_url}")
+        
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(emoji_url)
                 if response.status_code == 200:
                     # Twemoji successfully found
+                    logger.info(f"Successfully downloaded Twemoji from {emoji_url}")
                     return response.content
+                else:
+                    logger.error(f"Failed to download Twemoji from {emoji_url}: HTTP {response.status_code}")
         except Exception as e:
             logger.error(f"Error getting Twemoji from URL: {emoji_url}, error: {str(e)}")
         
