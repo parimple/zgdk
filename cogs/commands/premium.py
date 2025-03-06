@@ -183,27 +183,30 @@ class PremiumCog(commands.Cog):
     @commands.group(invoke_without_command=True)
     @is_zagadka_owner()
     async def team(self, ctx):
-        """Komendy do zarządzania teamem (klanem)."""
-        if ctx.invoked_subcommand is None:
-            # Sprawdź czy użytkownik ma team
-            team_role = await self._get_user_team_role(ctx.author)
+        """Zarządzanie teamem (klanem)."""
+        # Pobierz rolę teamu właściciela
+        team_role = await self._get_user_team_role(ctx.author)
 
-            if team_role:
-                # Pobierz informacje o teamie
-                team_info = await self._get_team_info(team_role)
-                await self._send_team_info(ctx, team_role, team_info)
-            else:
-                # Wyślij informację o dostępnych podkomendach
-                description = (
-                    "**Dostępne komendy:**\n"
-                    f"`{self.prefix}team create <nazwa>` - Utwórz nowy team\n"
-                    f"`{self.prefix}team name <nazwa>` - Zmień nazwę swojego teamu\n"
-                    f"`{self.prefix}team member add <@użytkownik>` - Dodaj członka do teamu\n"
-                    f"`{self.prefix}team member remove <@użytkownik>` - Usuń członka z teamu\n"
-                    f"`{self.prefix}team color <kolor>` - Ustaw kolor teamu (wymaga rangi zG500+)\n"
-                    f"`{self.prefix}team emoji <emoji>` - Ustaw emoji teamu (wymaga rangi zG1000)"
-                )
-                await self.message_sender.send_success(ctx, description)
+        if not team_role:
+            # Tworzenie opisu
+            description = (
+                f"Nie masz teamu. Możesz go utworzyć za pomocą komendy:\n"
+                f"`{self.prefix}team create <nazwa>`\n\n"
+                f"Minimalne wymagania: posiadanie rangi **zG100**."
+            )
+            
+            # Dodanie informacji o planie premium
+            channel = ctx.author.voice.channel if ctx.author.voice else None
+            _, premium_text = self.message_sender._get_premium_text(ctx, channel)
+            if premium_text:
+                description += f"\n\n{premium_text}"
+            
+            await ctx.send(embed=discord.Embed(title="Team", description=description, color=0xFF0000))
+            return
+
+        # Pobierz informacje o teamie
+        team_info = await self._get_team_info(team_role)
+        await self._send_team_info(ctx, team_role, team_info)
 
     @team.command(name="create")
     @PremiumChecker.requires_specific_roles(["zG100", "zG500", "zG1000"])
@@ -328,15 +331,22 @@ class PremiumCog(commands.Cog):
             await self._save_team_to_database(ctx.author.id, team_role.id)
 
             # Wyślij informację o sukcesie
-            description = f"Utworzono team **{full_team_name}**!\n\n"
-            description += f"• **Kanał:** {team_channel.mention}\n"
-            description += f"• **Rola:** {team_role.mention}\n"
-            description += f"• **Właściciel:** {ctx.author.mention}\n\n"
-            description += (
-                "Możesz zarządzać członkami teamu za pomocą komendy `,team member add/remove`."
+            description = (
+                f"Utworzono team {self.team_config['symbol']} {name}!\n\n"
+                f"• Kanał: {team_channel.mention}\n"
+                f"• Rola: {team_role.mention}\n"
+                f"• Właściciel: {ctx.author.mention}\n\n"
+                f"Możesz zarządzać członkami teamu za pomocą komendy {self.prefix}team member add/remove."
             )
-
-            await self.message_sender.send_success(ctx, description)
+            
+            # Dodanie informacji o planie premium
+            user_channel = ctx.author.voice.channel if ctx.author.voice else None
+            _, premium_text = self.message_sender._get_premium_text(ctx, user_channel)
+            if premium_text:
+                description += f"\n\n{premium_text}"
+            
+            embed = discord.Embed(description=description, color=team_role.color)
+            await ctx.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Błąd podczas tworzenia teamu: {str(e)}")
@@ -403,11 +413,16 @@ class PremiumCog(commands.Cog):
                 await team_channel.edit(name=channel_name)
 
                 # Wyślij informację o sukcesie
-                description = f"Zmieniono nazwę teamu na **{new_name}**!\n\n"
-                description += f"• **Kanał:** {team_channel.mention}\n"
-                description += f"• **Rola:** {team_role.mention}"
-
-                await self.message_sender.send_success(ctx, description)
+                description = f"Nazwa teamu została zmieniona na: {self.team_config['symbol']} {new_name}"
+                
+                # Dodanie informacji o planie premium
+                channel = ctx.author.voice.channel if ctx.author.voice else None
+                _, premium_text = self.message_sender._get_premium_text(ctx, channel)
+                if premium_text:
+                    description += f"\n\n{premium_text}"
+                
+                embed = discord.Embed(description=description, color=team_role.color)
+                await ctx.send(embed=embed)
             else:
                 await self.message_sender.send_success(
                     ctx,
@@ -493,10 +508,16 @@ class PremiumCog(commands.Cog):
             await member.add_roles(team_role)
 
             # Wyślij informację o sukcesie
-            await self.message_sender.send_success(
-                ctx,
-                f"Dodano {member.mention} do teamu **{team_role.name}**! ({current_members + 1}/{team_size_limit} członków)",
-            )
+            description = f"Dodano {member.mention} do teamu {team_role.mention}!"
+            
+            # Dodanie informacji o planie premium
+            channel = ctx.author.voice.channel if ctx.author.voice else None
+            _, premium_text = self.message_sender._get_premium_text(ctx, channel)
+            if premium_text:
+                description += f"\n\n{premium_text}"
+            
+            embed = discord.Embed(description=description, color=team_role.color)
+            await ctx.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Błąd podczas dodawania członka do teamu: {str(e)}")
@@ -540,9 +561,16 @@ class PremiumCog(commands.Cog):
             await member.remove_roles(team_role)
 
             # Wyślij informację o sukcesie
-            await self.message_sender.send_success(
-                ctx, f"Usunięto {member.mention} z teamu **{team_role.name}**!"
-            )
+            description = f"Usunięto {member.mention} z teamu {team_role.mention}!"
+            
+            # Dodanie informacji o planie premium
+            channel = ctx.author.voice.channel if ctx.author.voice else None
+            _, premium_text = self.message_sender._get_premium_text(ctx, channel)
+            if premium_text:
+                description += f"\n\n{premium_text}"
+            
+            embed = discord.Embed(description=description, color=team_role.color)
+            await ctx.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Błąd podczas usuwania członka z teamu: {str(e)}")
@@ -583,9 +611,16 @@ class PremiumCog(commands.Cog):
             await team_role.edit(color=discord_color)
 
             # Wyślij informację o sukcesie
-            await self.message_sender.send_success(
-                ctx, f"Zmieniono kolor teamu **{team_role.name}** na `{color}`!"
-            )
+            description = f"Zmieniono kolor teamu {team_role.mention} na `{color}`."
+            
+            # Dodanie informacji o planie premium
+            channel = ctx.author.voice.channel if ctx.author.voice else None
+            _, premium_text = self.message_sender._get_premium_text(ctx, channel)
+            if premium_text:
+                description += f"\n\n{premium_text}"
+            
+            embed = discord.Embed(description=description, color=discord_color)
+            await ctx.send(embed=embed)
 
         except ValueError as e:
             await self.message_sender.send_error(ctx, str(e))
@@ -661,7 +696,16 @@ class PremiumCog(commands.Cog):
                 await team_channel.edit(name=channel_name)
 
             # Wyślij informację o sukcesie
-            await self.message_sender.send_success(ctx, f"Zmieniono emoji teamu na {emoji}!")
+            description = f"Zmieniono emoji teamu {team_role.mention} na {emoji}."
+            
+            # Dodanie informacji o planie premium
+            channel = ctx.author.voice.channel if ctx.author.voice else None
+            _, premium_text = self.message_sender._get_premium_text(ctx, channel)
+            if premium_text:
+                description += f"\n\n{premium_text}"
+            
+            embed = discord.Embed(description=description, color=team_role.color)
+            await ctx.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Błąd podczas zmiany emoji teamu: {str(e)}")
@@ -739,43 +783,24 @@ class PremiumCog(commands.Cog):
 
     async def _send_team_info(self, ctx, team_role, team_info):
         """Wyślij informacje o teamie."""
-        owner = team_info["owner"]
-        members = team_info["members"]
-        channel = team_info["channel"]
-
-        description = f"**Team:** {team_role.name}\n\n"
-
-        if owner:
-            description += f"**Właściciel:** {owner.mention}\n"
-
-            # Dodaj informację o limicie członków
-            team_size_limit = 0
-            for role_config in reversed(self.bot.config["premium_roles"]):
-                if any(r.name == role_config["name"] for r in owner.roles):
-                    team_size_limit = role_config.get("team_size", 10)
-                    break
-
-            description += f"**Liczba członków:** {len(members)}/{team_size_limit}\n"
-        else:
-            description += "**Właściciel:** Nieznany\n"
-            description += f"**Liczba członków:** {len(members)}\n"
-
-        if channel:
-            description += f"**Kanał:** {channel.mention}\n\n"
-
-        if members:
-            # Ogranicz wyświetlanie do maksymalnie 15 członków
-            member_mentions = [member.mention for member in members[:15]]
-            description += f"**Członkowie:** {', '.join(member_mentions)}"
-
-            if len(members) > 15:
-                description += f" i {len(members) - 15} więcej..."
-
-        embed = self.message_sender._create_embed(
-            title=f"Informacje o teamie", description=description, color=team_role.color, ctx=ctx
+        # Utwórz embed z informacjami o teamie
+        embed = discord.Embed(
+            title="Informacje o teamie",
+            description=f"Team: {self.team_config['symbol']} {team_role.name[2:]}\n\n"
+            f"Właściciel: {team_info['owner'].mention}\n"
+            f"Liczba członków: {len(team_info['members'])}/{team_info['max_members']}\n"
+            f"Kanał: {team_info['channel'].mention}\n\n"
+            f"Członkowie: {' '.join(m.mention for m in team_info['members'])}",
+            color=team_role.color,
         )
-
-        await self.message_sender._send_embed(ctx, embed, reply=True)
+        
+        # Dodanie informacji o planie premium
+        channel = ctx.author.voice.channel if ctx.author.voice else None
+        _, premium_text = self.message_sender._get_premium_text(ctx, channel)
+        if premium_text:
+            embed.description += f"\n\n{premium_text}"
+        
+        await ctx.send(embed=embed)
 
 
 # Funkcje pomocnicze
