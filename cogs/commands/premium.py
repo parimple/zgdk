@@ -149,7 +149,7 @@ class PremiumCog(commands.Cog):
     async def update_user_color_role(self, member: discord.Member, color: discord.Color):
         """
         Creates or updates a user's color role.
-        
+
         :param member: The member to update the role for
         :param color: The color to set for the role
         """
@@ -188,7 +188,7 @@ class PremiumCog(commands.Cog):
     async def _send_premium_embed(self, ctx, title=None, description=None, color=None):
         """
         Creates and sends an embed with added premium plan information.
-        
+
         :param ctx: Command context
         :param title: Embed title (optional)
         :param description: Embed description
@@ -198,7 +198,7 @@ class PremiumCog(commands.Cog):
         # Add premium plan information
         channel = ctx.author.voice.channel if ctx.author.voice else None
         mention, premium_text = self.message_sender._get_premium_text(ctx, channel)
-        
+
         # Format description with bold text for important elements
         if description:
             # Add premium text to description if available
@@ -206,7 +206,7 @@ class PremiumCog(commands.Cog):
                 full_description = f"{description}\n\n{premium_text}"
             else:
                 full_description = description
-            
+
             # Use MessageSender to send formatted message
             if color == 0xFF0000:  # Red color indicates error
                 return await self.message_sender.send_error(ctx, full_description)
@@ -244,14 +244,14 @@ class PremiumCog(commands.Cog):
                 f"Minimalne wymagania: posiadanie rangi **zG100**.\n\n"
                 f"{available_commands}"
             )
-            
+
             # Use the new method to send the message
             await self._send_premium_embed(ctx, description=description, color=0xFF0000)
             return
 
         # Get team information
         team_info = await self._get_team_info(team_role)
-        
+
         # Prepare description with team info
         description = (
             f"**Team**: {self.team_config['symbol']} {team_role.name[2:]}\n\n"
@@ -261,7 +261,7 @@ class PremiumCog(commands.Cog):
             f"**Członkowie**: {' '.join(m.mention for m in team_info['members'])}\n\n"
             f"{available_commands}"
         )
-        
+
         # Use the new method to send the message
         await self._send_premium_embed(ctx, description=description)
 
@@ -395,7 +395,7 @@ class PremiumCog(commands.Cog):
                 f"• **Właściciel**: {ctx.author.mention}\n\n"
                 f"Możesz zarządzać członkami teamu za pomocą komendy `{self.prefix}team member add/remove`."
             )
-            
+
             # Use the new method to send the message
             await self._send_premium_embed(ctx, description=description)
 
@@ -473,7 +473,7 @@ class PremiumCog(commands.Cog):
 
                 # Wyślij informację o sukcesie - bez dodawania symbolu ponownie
                 description = f"Nazwa teamu została zmieniona na: **{new_team_name}**"
-                
+
                 # Użyj nowej metody do wysłania wiadomości
                 await self._send_premium_embed(ctx, description=description)
             else:
@@ -562,7 +562,7 @@ class PremiumCog(commands.Cog):
 
             # Wyślij informację o sukcesie
             description = f"Dodano **{member.mention}** do teamu **{team_role.mention}**!"
-            
+
             # Użyj nowej metody do wysłania wiadomości
             await self._send_premium_embed(ctx, description=description)
 
@@ -609,7 +609,7 @@ class PremiumCog(commands.Cog):
 
             # Wyślij informację o sukcesie
             description = f"Usunięto **{member.mention}** z teamu **{team_role.mention}**!"
-            
+
             # Użyj nowej metody do wysłania wiadomości
             await self._send_premium_embed(ctx, description=description)
 
@@ -628,9 +628,9 @@ class PremiumCog(commands.Cog):
         if not has_color_permission:
             # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
-                ctx, 
-                description="Tylko użytkownicy z rangą zG500 lub wyższą mogą ustawić kolor teamu.", 
-                color=0xFF0000
+                ctx,
+                description="Tylko użytkownicy z rangą zG500 lub wyższą mogą ustawić kolor teamu.",
+                color=0xFF0000,
             )
 
         # Check if the user has a team
@@ -638,9 +638,9 @@ class PremiumCog(commands.Cog):
         if not team_role:
             # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
-                ctx, 
-                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.", 
-                color=0xFF0000
+                ctx,
+                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.",
+                color=0xFF0000,
             )
 
         # Check if the user is the team owner
@@ -648,9 +648,7 @@ class PremiumCog(commands.Cog):
         if not is_owner:
             # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
-                ctx, 
-                description="Tylko właściciel teamu może zmienić jego kolor.", 
-                color=0xFF0000
+                ctx, description="Tylko właściciel teamu może zmienić jego kolor.", color=0xFF0000
             )
 
         try:
@@ -662,7 +660,7 @@ class PremiumCog(commands.Cog):
 
             # Wyślij informację o sukcesie
             description = f"Zmieniono kolor teamu **{team_role.mention}** na **`{color}`**."
-            
+
             # Użyj nowej metody do wysłania wiadomości
             await self._send_premium_embed(ctx, description=description)
 
@@ -673,9 +671,9 @@ class PremiumCog(commands.Cog):
             logger.error(f"Błąd podczas zmiany koloru teamu: {str(e)}")
             # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             await self._send_premium_embed(
-                ctx, 
-                description=f"Wystąpił błąd podczas zmiany koloru teamu: {str(e)}", 
-                color=0xFF0000
+                ctx,
+                description=f"Wystąpił błąd podczas zmiany koloru teamu: {str(e)}",
+                color=0xFF0000,
             )
 
     @team.command(name="emoji")
@@ -687,18 +685,16 @@ class PremiumCog(commands.Cog):
         if not has_emoji_permission:
             # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
-                ctx, 
-                description="Tylko użytkownicy z rangą zG1000 mogą ustawić emoji teamu.", 
-                color=0xFF0000
+                ctx,
+                description="Tylko użytkownicy z rangą zG1000 mogą ustawić emoji teamu.",
+                color=0xFF0000,
             )
 
         # Sprawdź czy to jest poprawne emoji
         if not emoji_validator(emoji):
             # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
-                ctx, 
-                description=f"`{emoji}` nie jest poprawnym emoji.", 
-                color=0xFF0000
+                ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
             )
 
         # Sprawdź czy użytkownik ma team
@@ -706,9 +702,9 @@ class PremiumCog(commands.Cog):
         if not team_role:
             # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
-                ctx, 
-                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.", 
-                color=0xFF0000
+                ctx,
+                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.",
+                color=0xFF0000,
             )
 
         # Sprawdź czy użytkownik jest właścicielem teamu
@@ -716,9 +712,7 @@ class PremiumCog(commands.Cog):
         if not is_owner:
             # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             return await self._send_premium_embed(
-                ctx, 
-                description="Tylko właściciel teamu może zmienić emoji teamu.", 
-                color=0xFF0000
+                ctx, description="Tylko właściciel teamu może zmienić emoji teamu.", color=0xFF0000
             )
 
         try:
@@ -757,7 +751,7 @@ class PremiumCog(commands.Cog):
 
             # Wyślij informację o sukcesie
             description = f"Zmieniono emoji teamu **{team_role.mention}** na **{emoji}**."
-            
+
             # Użyj nowej metody do wysłania wiadomości
             await self._send_premium_embed(ctx, description=description)
 
@@ -765,15 +759,15 @@ class PremiumCog(commands.Cog):
             logger.error(f"Błąd podczas zmiany emoji teamu: {str(e)}")
             # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
             await self._send_premium_embed(
-                ctx, 
-                description=f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}", 
-                color=0xFF0000
+                ctx,
+                description=f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}",
+                color=0xFF0000,
             )
 
     async def _get_user_team_role(self, member: discord.Member):
         """
         Get the team role for a user.
-        
+
         :param member: The member to find the team role for
         :return: The team role or None if not found
         """
@@ -793,7 +787,7 @@ class PremiumCog(commands.Cog):
     async def _is_team_owner(self, user_id: int, role_id: int):
         """
         Check if a user is the owner of a team.
-        
+
         :param user_id: The user ID to check
         :param role_id: The team role ID
         :return: True if the user is the owner, False otherwise
@@ -805,7 +799,7 @@ class PremiumCog(commands.Cog):
     async def _save_team_to_database(self, owner_id: int, role_id: int):
         """
         Save team information to the database.
-        
+
         :param owner_id: The ID of the team owner
         :param role_id: The ID of the team role
         """
@@ -821,7 +815,7 @@ class PremiumCog(commands.Cog):
     async def _get_team_info(self, team_role: discord.Role):
         """
         Get information about a team.
-        
+
         :param team_role: The team role to get information for
         :return: A dictionary containing team information
         """
@@ -870,7 +864,7 @@ class PremiumCog(commands.Cog):
 def emoji_validator(emoji_str: str) -> bool:
     """
     Check if a string is a single emoji.
-    
+
     :param emoji_str: The string to check
     :return: True if the string is a single emoji, False otherwise
     """

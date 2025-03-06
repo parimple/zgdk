@@ -243,7 +243,7 @@ premium_roles:
     price: 499  # 499 zł
     usd: 149
     features:
-      - "Rola wyżej niż zG100"
+      - "Rola wyżej niż top1"
       - "Kanał Git Pro nad lounge do tworzenia kanałów głosowych"
       - "Drużyna do 30 osób"
       - "3 moderatorów kanału głosowego"

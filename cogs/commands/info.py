@@ -464,7 +464,7 @@ class SellRoleButton(discord.ui.Button):
                 )
                 return
 
-            refund_amount = calculate_refund(member_role.expiration_date, role_price)
+            refund_amount = calculate_refund(member_role.expiration_date, role_price, role.name)
 
             embed = discord.Embed(
                 title="Sprzedaż rangi",
