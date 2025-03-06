@@ -682,11 +682,11 @@ class PremiumCog(commands.Cog):
             )
 
     @team.command(name="emoji")
-    @app_commands.describe(emoji="Emoji teamu")
-    async def team_emoji(self, ctx, emoji: str):
-        """Set team emoji as role icon."""
+    @app_commands.describe(emoji="Emoji teamu (opcjonalne, bez podania usuwa ikonę)")
+    async def team_emoji(self, ctx, emoji: Optional[str] = None):
+        """Set team emoji as role icon or remove icon if no emoji provided."""
         # Dokładne logowanie, co otrzymaliśmy
-        logger.info(f"team_emoji command with emoji string: '{emoji}', type: {type(emoji)}, length: {len(emoji)}")
+        logger.info(f"team_emoji command with emoji string: '{emoji}', type: {type(emoji)}, length: {len(emoji) if emoji else 0}")
         
         # Check if user has emoji permission (zG1000 only)
         has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
@@ -696,6 +696,63 @@ class PremiumCog(commands.Cog):
                 description="Tylko użytkownicy z rangą zG1000 mogą ustawić emoji teamu.",
                 color=0xFF0000,
             )
+
+        # Check if user has a team
+        team_role = await self._get_user_team_role(ctx.author)
+        if not team_role:
+            return await self._send_premium_embed(
+                ctx,
+                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.",
+                color=0xFF0000,
+            )
+
+        # Check if user is the team owner
+        is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
+        if not is_owner:
+            return await self._send_premium_embed(
+                ctx, description="Tylko właściciel teamu może zmienić emoji teamu.", color=0xFF0000
+            )
+            
+        # Check if server has the required boost level for role icons (Level 2)
+        if ctx.guild.premium_tier < 2:
+            return await self._send_premium_embed(
+                ctx, 
+                description="Serwer musi mieć minimum 7 boostów (Poziom 2), aby można było ustawić ikony ról.", 
+                color=0xFF0000
+            )
+
+        # If no emoji provided, remove the role icon
+        if emoji is None or emoji.strip() == "":
+            try:
+                logger.info(f"Removing icon from role {team_role.id}")
+                await team_role.edit(display_icon=None)
+                logger.info(f"Successfully removed role icon")
+                
+                # Send success message
+                description = f"Usunięto ikonę teamu **{team_role.mention}**."
+                return await self._send_premium_embed(ctx, description=description)
+                
+            except discord.Forbidden:
+                logger.error("Forbidden error during team icon removal")
+                return await self._send_premium_embed(
+                    ctx,
+                    description="Bot nie ma wystarczających uprawnień, aby zmienić ikonę roli.",
+                    color=0xFF0000,
+                )
+            except discord.HTTPException as e:
+                logger.error(f"HTTP error during team icon removal: {str(e)}")
+                return await self._send_premium_embed(
+                    ctx,
+                    description=f"Wystąpił błąd podczas usuwania ikony teamu: {str(e)}",
+                    color=0xFF0000,
+                )
+            except Exception as e:
+                logger.error(f"Error during team icon removal: {str(e)}")
+                return await self._send_premium_embed(
+                    ctx,
+                    description=f"Wystąpił błąd podczas usuwania ikony teamu: {str(e)}",
+                    color=0xFF0000,
+                )
 
         # Check if it's a custom emoji in wrong format (:name: instead of <:name:id>)
         if emoji.startswith(":") and emoji.endswith(":") and len(emoji) > 2:
