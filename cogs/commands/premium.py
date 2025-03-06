@@ -195,21 +195,28 @@ class PremiumCog(commands.Cog):
         :param color: Embed color (optional)
         :return: Sent message
         """
-        # Create embed
-        embed = discord.Embed(
-            title=title,
-            description=description,
-            color=color or discord.Color.blue()
-        )
-        
         # Add premium plan information
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        _, premium_text = self.message_sender._get_premium_text(ctx, channel)
-        if premium_text:
-            embed.description += f"\n\n{premium_text}"
+        mention, premium_text = self.message_sender._get_premium_text(ctx, channel)
         
-        # Send the message
-        return await ctx.send(embed=embed)
+        # Format description with bold text for important elements
+        if description:
+            # Add premium text to description if available
+            if premium_text:
+                full_description = f"{description}\n\n{premium_text}"
+            else:
+                full_description = description
+            
+            # Use MessageSender to send formatted message
+            if color == 0xFF0000:  # Red color indicates error
+                return await self.message_sender.send_error(ctx, full_description)
+            else:
+                return await self.message_sender.send_success(ctx, full_description)
+        else:
+            # In case there's no description but we need to send premium text
+            if premium_text:
+                return await self.message_sender.send_success(ctx, premium_text)
+            return None
 
     @commands.group(invoke_without_command=True)
     @is_zagadka_owner()
@@ -227,7 +234,7 @@ class PremiumCog(commands.Cog):
             )
             
             # Use the new method to send the message
-            await self._send_premium_embed(ctx, title="Team", description=description, color=0xFF0000)
+            await self._send_premium_embed(ctx, description=description, color=0xFF0000)
             return
 
         # Get team information
@@ -358,15 +365,15 @@ class PremiumCog(commands.Cog):
 
             # Send success message
             description = (
-                f"Utworzono team {self.team_config['symbol']} {name}!\n\n"
-                f"• Kanał: {team_channel.mention}\n"
-                f"• Rola: {team_role.mention}\n"
-                f"• Właściciel: {ctx.author.mention}\n\n"
-                f"Możesz zarządzać członkami teamu za pomocą komendy {self.prefix}team member add/remove."
+                f"Utworzono team **{self.team_config['symbol']} {name}**!\n\n"
+                f"• **Kanał**: {team_channel.mention}\n"
+                f"• **Rola**: {team_role.mention}\n"
+                f"• **Właściciel**: {ctx.author.mention}\n\n"
+                f"Możesz zarządzać członkami teamu za pomocą komendy `{self.prefix}team member add/remove`."
             )
             
             # Use the new method to send the message
-            await self._send_premium_embed(ctx, description=description, color=team_role.color)
+            await self._send_premium_embed(ctx, description=description)
 
         except Exception as e:
             logger.error(f"Błąd podczas tworzenia teamu: {str(e)}")
@@ -433,10 +440,10 @@ class PremiumCog(commands.Cog):
                 await team_channel.edit(name=channel_name)
 
                 # Wyślij informację o sukcesie
-                description = f"Nazwa teamu została zmieniona na: {self.team_config['symbol']} {new_name}"
+                description = f"Nazwa teamu została zmieniona na: **{self.team_config['symbol']} {new_name}**"
                 
                 # Użyj nowej metody do wysłania wiadomości
-                await self._send_premium_embed(ctx, description=description, color=team_role.color)
+                await self._send_premium_embed(ctx, description=description)
             else:
                 await self.message_sender.send_success(
                     ctx,
@@ -522,10 +529,10 @@ class PremiumCog(commands.Cog):
             await member.add_roles(team_role)
 
             # Wyślij informację o sukcesie
-            description = f"Dodano {member.mention} do teamu {team_role.mention}!"
+            description = f"Dodano **{member.mention}** do teamu **{team_role.mention}**!"
             
             # Użyj nowej metody do wysłania wiadomości
-            await self._send_premium_embed(ctx, description=description, color=team_role.color)
+            await self._send_premium_embed(ctx, description=description)
 
         except Exception as e:
             logger.error(f"Błąd podczas dodawania członka do teamu: {str(e)}")
@@ -569,10 +576,10 @@ class PremiumCog(commands.Cog):
             await member.remove_roles(team_role)
 
             # Wyślij informację o sukcesie
-            description = f"Usunięto {member.mention} z teamu {team_role.mention}!"
+            description = f"Usunięto **{member.mention}** z teamu **{team_role.mention}**!"
             
             # Użyj nowej metody do wysłania wiadomości
-            await self._send_premium_embed(ctx, description=description, color=team_role.color)
+            await self._send_premium_embed(ctx, description=description)
 
         except Exception as e:
             logger.error(f"Błąd podczas usuwania członka z teamu: {str(e)}")
@@ -613,10 +620,10 @@ class PremiumCog(commands.Cog):
             await team_role.edit(color=discord_color)
 
             # Wyślij informację o sukcesie
-            description = f"Zmieniono kolor teamu {team_role.mention} na `{color}`."
+            description = f"Zmieniono kolor teamu **{team_role.mention}** na **`{color}`**."
             
             # Użyj nowej metody do wysłania wiadomości
-            await self._send_premium_embed(ctx, description=description, color=discord_color)
+            await self._send_premium_embed(ctx, description=description)
 
         except ValueError as e:
             await self.message_sender.send_error(ctx, str(e))
@@ -692,10 +699,10 @@ class PremiumCog(commands.Cog):
                 await team_channel.edit(name=channel_name)
 
             # Wyślij informację o sukcesie
-            description = f"Zmieniono emoji teamu {team_role.mention} na {emoji}."
+            description = f"Zmieniono emoji teamu **{team_role.mention}** na **{emoji}**."
             
             # Użyj nowej metody do wysłania wiadomości
-            await self._send_premium_embed(ctx, description=description, color=team_role.color)
+            await self._send_premium_embed(ctx, description=description)
 
         except Exception as e:
             logger.error(f"Błąd podczas zmiany emoji teamu: {str(e)}")
@@ -808,15 +815,15 @@ class PremiumCog(commands.Cog):
         """
         # Prepare description
         description = (
-            f"Team: {self.team_config['symbol']} {team_role.name[2:]}\n\n"
-            f"Właściciel: {team_info['owner'].mention}\n"
-            f"Liczba członków: {len(team_info['members'])}/{team_info['max_members']}\n"
-            f"Kanał: {team_info['channel'].mention}\n\n"
-            f"Członkowie: {' '.join(m.mention for m in team_info['members'])}"
+            f"**Team**: {self.team_config['symbol']} {team_role.name[2:]}\n\n"
+            f"**Właściciel**: {team_info['owner'].mention}\n"
+            f"**Liczba członków**: {len(team_info['members'])}/{team_info['max_members']}\n"
+            f"**Kanał**: {team_info['channel'].mention}\n\n"
+            f"**Członkowie**: {' '.join(m.mention for m in team_info['members'])}"
         )
         
         # Use the new method to send the message
-        await self._send_premium_embed(ctx, title="Informacje o teamie", description=description, color=team_role.color)
+        await self._send_premium_embed(ctx, description=description)
 
 
 # Helper functions
