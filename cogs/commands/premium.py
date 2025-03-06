@@ -929,17 +929,16 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
     # For standard Unicode emojis, create an image
     try:
         # Find the emoji using emoji_data_python's built-in functions
-        found_emoji = None
-        
-        # Try finding by exact match first
         for e in emoji_data_python.emoji_data:
             if e.char == emoji_str:
-                found_emoji = e
+                # Found exact match, use it
+                emoji_str = e.char
                 break
         
-        # If no exact match, try using the emoji library
-        if not found_emoji and emoji.is_emoji(emoji_str):
-            emoji_str = emoji_str  # Use as is
+        # If emoji not found in emoji_data_python, rely on emoji library validation
+        if not emoji.is_emoji(emoji_str):
+            # If not recognized as emoji, use default
+            emoji_str = "❓"
         
         # Create a blank image with transparent background
         img = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
