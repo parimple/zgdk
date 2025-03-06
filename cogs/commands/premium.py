@@ -5,19 +5,19 @@ import logging
 from typing import Literal, Optional
 
 import discord
+import emoji
+import emoji_data_python
+import httpx
 from colour import Color
 from discord import app_commands
 from discord.ext import commands
-import emoji
-import emoji_data_python
 from PIL import Image, ImageDraw, ImageFont
-import httpx
 
 from datasources.models import MemberRole
 from datasources.models import Role as DBRole
 from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
-from utils.permissions import is_zagadka_owner, is_admin
+from utils.permissions import is_admin, is_zagadka_owner
 from utils.premium_checker import PremiumChecker
 
 logger = logging.getLogger(__name__)
@@ -686,8 +686,10 @@ class PremiumCog(commands.Cog):
     async def team_emoji(self, ctx, emoji: Optional[str] = None):
         """Set team emoji as role icon or remove icon if no emoji provided."""
         # Dokładne logowanie, co otrzymaliśmy
-        logger.info(f"team_emoji command with emoji string: '{emoji}', type: {type(emoji)}, length: {len(emoji) if emoji else 0}")
-        
+        logger.info(
+            f"team_emoji command with emoji string: '{emoji}', type: {type(emoji)}, length: {len(emoji) if emoji else 0}"
+        )
+
         # Check if user has emoji permission (zG1000 only)
         has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
         if not has_emoji_permission:
@@ -712,13 +714,13 @@ class PremiumCog(commands.Cog):
             return await self._send_premium_embed(
                 ctx, description="Tylko właściciel teamu może zmienić emoji teamu.", color=0xFF0000
             )
-            
+
         # Check if server has the required boost level for role icons (Level 2)
         if ctx.guild.premium_tier < 2:
             return await self._send_premium_embed(
-                ctx, 
-                description="Serwer musi mieć minimum 7 boostów (Poziom 2), aby można było ustawić ikony ról.", 
-                color=0xFF0000
+                ctx,
+                description="Serwer musi mieć minimum 7 boostów (Poziom 2), aby można było ustawić ikony ról.",
+                color=0xFF0000,
             )
 
         # If no emoji provided, remove the role icon
@@ -727,11 +729,11 @@ class PremiumCog(commands.Cog):
                 logger.info(f"Removing icon from role {team_role.id}")
                 await team_role.edit(display_icon=None)
                 logger.info(f"Successfully removed role icon")
-                
+
                 # Send success message
                 description = f"Usunięto ikonę teamu **{team_role.mention}**."
                 return await self._send_premium_embed(ctx, description=description)
-                
+
             except discord.Forbidden:
                 logger.error("Forbidden error during team icon removal")
                 return await self._send_premium_embed(
@@ -759,11 +761,11 @@ class PremiumCog(commands.Cog):
             logger.info(f"User provided emoji in :name: format: {emoji}")
             # User provided serwerowe emoji w formacie :nazwa: zamiast <:nazwa:id>
             return await self._send_premium_embed(
-                ctx, 
-                description=f"`{emoji}` nie jest poprawnym formatem emoji serwera. Aby użyć emoji z serwera, kliknij prawym przyciskiem myszy na emoji i wybierz \"Kopiuj odnośnik do emoji\", a następnie wklej go w komendzie.", 
-                color=0xFF0000
+                ctx,
+                description=f'`{emoji}` nie jest poprawnym formatem emoji serwera. Aby użyć emoji z serwera, kliknij prawym przyciskiem myszy na emoji i wybierz "Kopiuj odnośnik do emoji", a następnie wklej go w komendzie.',
+                color=0xFF0000,
             )
-        
+
         # Sprawdzenie, czy emoji serwerowe pochodzi z tego samego serwera
         if emoji.startswith("<") and emoji.endswith(">"):
             parts = emoji.strip("<>").split(":")
@@ -786,17 +788,17 @@ class PremiumCog(commands.Cog):
                         description=f"`{emoji}` nie jest poprawnym emoji.",
                         color=0xFF0000,
                     )
-        
+
         # Logujemy, czy emoji jest poprawne według walidatora
         is_valid = emoji_validator(emoji)
         logger.info(f"Emoji validation result for '{emoji}': {is_valid}")
-        
+
         if not is_valid:
             # Jeśli to emoji serwerowe, sprawdź jeszcze raz z poprawioną logiką
             if emoji.startswith("<") and emoji.endswith(">"):
                 parts = emoji.strip("<>").split(":")
                 logger.info(f"Custom emoji parts: {parts}")
-                
+
                 # Sprawdź, czy to potencjalnie poprawne emoji serwerowe, którego nasz walidator nie przepuszcza
                 if len(parts) >= 3 and parts[1]:
                     # Ostatnia część powinna być liczbą - ID emoji
@@ -833,29 +835,29 @@ class PremiumCog(commands.Cog):
             return await self._send_premium_embed(
                 ctx, description="Tylko właściciel teamu może zmienić emoji teamu.", color=0xFF0000
             )
-            
+
         # Check if server has the required boost level for role icons (Level 2)
         if ctx.guild.premium_tier < 2:
             return await self._send_premium_embed(
-                ctx, 
-                description="Serwer musi mieć minimum 7 boostów (Poziom 2), aby można było ustawić ikony ról.", 
-                color=0xFF0000
+                ctx,
+                description="Serwer musi mieć minimum 7 boostów (Poziom 2), aby można było ustawić ikony ról.",
+                color=0xFF0000,
             )
 
         try:
             # Get current name and team symbol
             current_name_parts = team_role.name.split(" ")
             team_symbol = self.team_config["symbol"]
-            
+
             # Clean up current name if it has emoji in it
             if len(current_name_parts) >= 3 and emoji_validator(current_name_parts[1]):
                 new_name = f"{team_symbol} {' '.join(current_name_parts[2:])}"
             else:
                 new_name = team_role.name
-            
+
             # Log before conversion attempt
             logger.info(f"Converting emoji '{emoji}' to role icon format")
-                
+
             # Convert emoji to role icon format with better error handling
             try:
                 icon_bytes = await emoji_to_icon(emoji)
@@ -867,7 +869,7 @@ class PremiumCog(commands.Cog):
                     description=f"Nie udało się przekonwertować emoji na format ikony roli: {str(e)}",
                     color=0xFF0000,
                 )
-            
+
             # Update role with new icon and cleaned name with better error handling
             try:
                 logger.info(f"Updating role {team_role.id} with new icon")
@@ -1049,32 +1051,32 @@ def emoji_validator(emoji_str: str) -> bool:
     # Check if it's a standard Unicode emoji using the emoji library
     if emoji.is_emoji(emoji_str):
         return True
-    
+
     # Check for Discord custom emoji format: <:name:id> or <a:name:id>
     if emoji_str.startswith("<") and emoji_str.endswith(">"):
         parts = emoji_str.strip("<>").split(":")
-        
-        # Dla emoji w formacie <:nazwa:id> mamy ['', 'nazwa', 'id'] 
+
+        # Dla emoji w formacie <:nazwa:id> mamy ['', 'nazwa', 'id']
         # Dla emoji w formacie <a:nazwa:id> mamy ['a', 'nazwa', 'id']
         # Upewnijmy się, że mamy co najmniej 3 części i druga oraz trzecia nie są puste
         if len(parts) >= 3 and parts[1] and parts[2]:
             return True
-        
+
         # Dla innych formatów sprawdź czy wszystkie części są niepuste
         return len(parts) >= 2 and all(part for part in parts)
-    
+
     # Special case for when user inputs :name: format instead of <:name:id>
     if emoji_str.startswith(":") and emoji_str.endswith(":") and len(emoji_str) > 2:
         # Powiedz użytkownikowi, że nie możemy obsłużyć tego formatu
         return False
-    
+
     return False
 
 
 async def emoji_to_icon(emoji_str: str) -> bytes:
     """
     Convert an emoji to an image format suitable for Discord role icon.
-    
+
     :param emoji_str: The emoji string to convert
     :return: Bytes representation of the image
     """
@@ -1082,7 +1084,7 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
     if emoji_str.startswith("<") and emoji_str.endswith(">"):
         # Custom emoji format: <:name:id> or <a:name:id>
         parts = emoji_str.split(":")
-        
+
         # For emoji in format <:name:id> we get ['', 'name', 'id>']
         # For emoji in format <a:name:id> we get ['<a', 'name', 'id>']
         if len(parts) >= 3:
@@ -1090,13 +1092,13 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
             emoji_id = parts[-1].replace(">", "")
             # Check if it's an animated emoji
             is_animated = emoji_str.startswith("<a:")
-            
+
             # Format the URL
             ext = "gif" if is_animated else "png"
             emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
-            
+
             logger.info(f"Fetching custom emoji from URL: {emoji_url}")
-            
+
             # Use httpx to get the emoji image
             try:
                 async with httpx.AsyncClient() as client:
@@ -1105,10 +1107,12 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
                         logger.info(f"Successfully downloaded custom emoji image from {emoji_url}")
                         return response.content
                     else:
-                        logger.error(f"Failed to download custom emoji image from {emoji_url}: HTTP {response.status_code}")
+                        logger.error(
+                            f"Failed to download custom emoji image from {emoji_url}: HTTP {response.status_code}"
+                        )
             except Exception as e:
                 logger.error(f"Error getting custom emoji from URL: {emoji_url}, error: {str(e)}")
-    
+
     # For standard Unicode emojis, use the Twemoji CDN to get the emoji image
     try:
         # Konwertuj emoji Unicode na kod dla Twemoji
@@ -1120,15 +1124,17 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
                 codepoints.append(f"{ord(char):x}")
             else:  # Znaki spoza Basic Multilingual Plane
                 codepoints.append(f"{ord(char):x}")
-        
+
         # Tworzenie kodu emoji dla Twemoji - używa kresek dla złożonych emoji
         emoji_code = "-".join(codepoints).lower()
         logger.info(f"Unicode emoji '{emoji_str}' converted to code: {emoji_code}")
-        
+
         # Pobieranie emoji z CDN Twemoji
-        emoji_url = f"https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/{emoji_code}.png"
+        emoji_url = (
+            f"https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/{emoji_code}.png"
+        )
         logger.info(f"Fetching Twemoji from URL: {emoji_url}")
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(emoji_url)
@@ -1137,32 +1143,38 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
                     logger.info(f"Successfully downloaded Twemoji from {emoji_url}")
                     return response.content
                 else:
-                    logger.error(f"Failed to download Twemoji from {emoji_url}: HTTP {response.status_code}")
+                    logger.error(
+                        f"Failed to download Twemoji from {emoji_url}: HTTP {response.status_code}"
+                    )
                     # Spróbuj alternatywnego źródła Twemoji
                     alternate_url = f"https://twemoji.maxcdn.com/v/latest/72x72/{emoji_code}.png"
                     logger.info(f"Trying alternate Twemoji URL: {alternate_url}")
                     alt_response = await client.get(alternate_url)
                     if alt_response.status_code == 200:
-                        logger.info(f"Successfully downloaded Twemoji from alternate URL {alternate_url}")
+                        logger.info(
+                            f"Successfully downloaded Twemoji from alternate URL {alternate_url}"
+                        )
                         return alt_response.content
                     else:
-                        logger.error(f"Failed to download Twemoji from alternate URL: HTTP {alt_response.status_code}")
+                        logger.error(
+                            f"Failed to download Twemoji from alternate URL: HTTP {alt_response.status_code}"
+                        )
         except Exception as e:
             logger.error(f"Error getting Twemoji from URL: {emoji_url}, error: {str(e)}")
-        
+
         # Jeśli nie udało się pobrać z Twemoji, spróbujmy użyć biblioteki emoji_data_python
         logger.info("Fallback to rendering emoji with Pillow")
-        
+
         # Find the emoji using emoji_data_python
         for e in emoji_data_python.emoji_data:
             if e.char == emoji_str:
                 emoji_str = e.char
                 break
-        
+
         # Try to use system fonts
-        img = Image.new('RGBA', (128, 128), (0, 0, 0, 0))  # Transparent background
+        img = Image.new("RGBA", (128, 128), (0, 0, 0, 0))  # Transparent background
         draw = ImageDraw.Draw(img)
-        
+
         try:
             # Try common emoji font paths
             font_paths = [
@@ -1172,7 +1184,7 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
                 "/usr/share/fonts/truetype/ancient-scripts/Symbola.ttf",  # Linux fallback
                 "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",  # Another Linux option
             ]
-            
+
             font = None
             for font_path in font_paths:
                 try:
@@ -1180,28 +1192,28 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
                     break
                 except (IOError, OSError):
                     continue
-            
+
             if font is None:
                 # If all font paths fail, try to use a system font
                 font = ImageFont.load_default()
-            
+
             # Draw the emoji centered with a more visible color (white)
             draw.text((64, 64), emoji_str, font=font, fill=(255, 255, 255, 255), anchor="mm")
-            
+
             buffer = io.BytesIO()
             img.save(buffer, format="PNG")
             buffer.seek(0)
             return buffer.read()
-        
+
         except Exception as e:
             logger.error(f"Error rendering emoji with Pillow: {str(e)}")
             # Continue to fallback
-    
+
     except Exception as e:
         logger.error(f"Error processing emoji: {str(e)}")
-    
+
     # Last resort: use a default image
-    img = Image.new('RGBA', (128, 128), (0, 120, 215, 255))  # Discord blue as fallback
+    img = Image.new("RGBA", (128, 128), (0, 120, 215, 255))  # Discord blue as fallback
     draw = ImageDraw.Draw(img)
     # Draw a question mark
     try:
@@ -1209,7 +1221,7 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
         draw.text((64, 64), "?", font=font, fill=(255, 255, 255, 255), anchor="mm")
     except:
         pass  # Just use the blue background if text fails
-    
+
     buffer = io.BytesIO()
     img.save(buffer, format="PNG")
     buffer.seek(0)
