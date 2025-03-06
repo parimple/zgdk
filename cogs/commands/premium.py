@@ -27,7 +27,12 @@ class PremiumCog(commands.Cog):
     """Commands related to premium features."""
 
     def __init__(self, bot):
+        """Initialize the PremiumCog."""
         self.bot = bot
+        self.prefix = self.bot.command_prefix[0] if self.bot.command_prefix else ","
+        self.team_config = self.bot.config.get("team", {})
+        # ID roli bazowej, nad którą będą umieszczane role teamów
+        self.team_base_role_id = self.team_config.get("base_role_id", 0)  # Domyślnie 0, jeśli nie skonfigurowano
         self.message_sender = MessageSender()
 
         # Nazwa roli kolorowej z config
@@ -40,9 +45,6 @@ class PremiumCog(commands.Cog):
             "symbol": self.bot.config.get("team", {}).get("symbol", "☫"),
             "category_id": self.bot.config.get("team", {}).get("category_id", 1344105013357842522),
         }
-
-        # Prefix z konfiguracji
-        self.prefix = self.bot.config["prefix"]
 
     @commands.hybrid_command(aliases=["colour", "kolor"])
     @PremiumChecker.requires_premium_tier("color")
@@ -305,18 +307,25 @@ class PremiumCog(commands.Cog):
             # 3. Tworzenie roli teamu
             team_role = await ctx.guild.create_role(name=team_name, mentionable=True)
 
-            # 3.1. Pozycjonowanie roli teamu - podobnie jak w update_user_color_role
-            highest_assign_role = None
-            for role in reversed(ctx.guild.roles):
-                if role.permissions.manage_roles and not role.managed:
-                    highest_assign_role = role
-                    break
-
-            if highest_assign_role:
-                # Umieszczamy rolę teamu pod tą samą rolą, pod którą umieszczana jest rola koloru
-                positions = {team_role: highest_assign_role.position - 1}
+            # 3.1. Pozycjonowanie roli teamu - nad rolą bazową, podobnie jak w update_user_color_role
+            base_role = ctx.guild.get_role(self.team_base_role_id)
+            if base_role:
+                # Umieszczamy rolę teamu ponad rolą bazową
+                positions = {team_role: base_role.position + 1}
                 await ctx.guild.edit_role_positions(positions=positions)
-                logger.info(f"Team role {team_role.name} positioned under {highest_assign_role.name}")
+                logger.info(f"Team role {team_role.name} positioned above base role {base_role.name}")
+            else:
+                # Jeśli nie znaleziono roli bazowej, spróbuj fallback do poprzedniej implementacji
+                highest_assign_role = None
+                for role in reversed(ctx.guild.roles):
+                    if role.permissions.manage_roles and not role.managed:
+                        highest_assign_role = role
+                        break
+
+                if highest_assign_role:
+                    positions = {team_role: highest_assign_role.position - 1}
+                    await ctx.guild.edit_role_positions(positions=positions)
+                    logger.info(f"Team role {team_role.name} positioned under {highest_assign_role.name} (fallback)")
 
             # 4. Zapisz informacje o teamie w bazie danych
             await self._save_team_to_database(ctx.author.id, team_role.id)
