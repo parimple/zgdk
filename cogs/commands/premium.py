@@ -695,6 +695,14 @@ class PremiumCog(commands.Cog):
             )
 
         # Check if it's a valid emoji
+        if emoji.startswith(":") and emoji.endswith(":") and len(emoji) > 2:
+            # User provided serwerowe emoji w formacie :nazwa: zamiast <:nazwa:id>
+            return await self._send_premium_embed(
+                ctx, 
+                description=f"`{emoji}` nie jest poprawnym formatem emoji serwera. Aby użyć emoji z serwera, kliknij prawym przyciskiem myszy na emoji i wybierz \"Kopiuj odnośnik do emoji\", a następnie wklej go w komendzie.", 
+                color=0xFF0000
+            )
+        
         if not emoji_validator(emoji):
             return await self._send_premium_embed(
                 ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
@@ -900,6 +908,11 @@ def emoji_validator(emoji_str: str) -> bool:
         parts = emoji_str.strip("<>").split(":")
         return len(parts) >= 2 and all(part for part in parts)
     
+    # Special case for when user inputs :name: format instead of <:name:id>
+    if emoji_str.startswith(":") and emoji_str.endswith(":") and len(emoji_str) > 2:
+        # Powiedz użytkownikowi, że nie możemy obsłużyć tego formatu
+        return False
+    
     return False
 
 
@@ -913,61 +926,100 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
     # Check if it's a custom Discord emoji
     if emoji_str.startswith("<") and emoji_str.endswith(">"):
         # Custom emoji format: <:name:id> or <a:name:id>
-        emoji_id = emoji_str.split(":")[-1].replace(">", "")
-        is_animated = emoji_str.startswith("<a:")
-        
-        # Format the URL
-        ext = "gif" if is_animated else "png"
-        emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
-        
-        # Use httpx to get the emoji image
-        async with httpx.AsyncClient() as client:
-            response = await client.get(emoji_url)
-            if response.status_code == 200:
-                return response.content
+        parts = emoji_str.split(":")
+        if len(parts) >= 3:
+            emoji_id = parts[-1].replace(">", "")
+            is_animated = emoji_str.startswith("<a:")
+            
+            # Format the URL
+            ext = "gif" if is_animated else "png"
+            emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
+            
+            # Use httpx to get the emoji image
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(emoji_url)
+                    if response.status_code == 200:
+                        return response.content
+            except Exception as e:
+                logger.error(f"Error getting custom emoji from URL: {emoji_url}, error: {str(e)}")
     
-    # For standard Unicode emojis, create an image
+    # For standard Unicode emojis, use the Discord CDN to get the emoji image
     try:
-        # Find the emoji using emoji_data_python's built-in functions
+        emoji_code = "-".join(f"{ord(c):x}" for c in emoji_str)
+        emoji_url = f"https://twemoji.maxcdn.com/v/latest/72x72/{emoji_code}.png"
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(emoji_url)
+                if response.status_code == 200:
+                    # Twemoji successfully found
+                    return response.content
+        except Exception as e:
+            logger.error(f"Error getting Twemoji from URL: {emoji_url}, error: {str(e)}")
+        
+        # If Twemoji failed, try rendering with Pillow
+        # Find the emoji using emoji_data_python
         for e in emoji_data_python.emoji_data:
             if e.char == emoji_str:
-                # Found exact match, use it
                 emoji_str = e.char
                 break
         
-        # If emoji not found in emoji_data_python, rely on emoji library validation
-        if not emoji.is_emoji(emoji_str):
-            # If not recognized as emoji, use default
-            emoji_str = "❓"
-        
-        # Create a blank image with transparent background
+        # Try to use system fonts
         img = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         
-        # Try to load a font that supports emoji
         try:
-            # Try system fonts that might support emoji
-            font = ImageFont.truetype("NotoColorEmoji.ttf", 109)
-        except IOError:
-            # Fallback to default font
-            font = ImageFont.load_default()
+            # Try common emoji font paths
+            font_paths = [
+                "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",  # Linux
+                "/System/Library/Fonts/Apple Color Emoji.ttc",  # macOS
+                "C:\\Windows\\Fonts\\seguiemj.ttf",  # Windows
+                "/usr/share/fonts/truetype/ancient-scripts/Symbola.ttf",  # Linux fallback
+                "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",  # Another Linux option
+            ]
+            
+            font = None
+            for font_path in font_paths:
+                try:
+                    font = ImageFont.truetype(font_path, 109)
+                    break
+                except (IOError, OSError):
+                    continue
+            
+            if font is None:
+                # If all font paths fail, try to use a system font
+                font = ImageFont.load_default()
+            
+            # Draw the emoji centered with a more visible color (white)
+            draw.text((64, 64), emoji_str, font=font, fill=(255, 255, 255, 255), anchor="mm")
+            
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG")
+            buffer.seek(0)
+            return buffer.read()
         
-        # Draw the emoji centered in the image
-        draw.text((64, 64), emoji_str, font=font, fill=(0, 0, 0, 255), anchor="mm")
-        
-        # Save to bytes
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-        buffer.seek(0)
-        return buffer.read()
+        except Exception as e:
+            logger.error(f"Error rendering emoji with Pillow: {str(e)}")
+            # Continue to fallback
+    
     except Exception as e:
-        # In case of error, return a default image
-        logger.error(f"Error converting emoji to image: {str(e)}")
-        img = Image.new('RGBA', (128, 128), (255, 0, 0, 255))  # Red square as fallback
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-        buffer.seek(0)
-        return buffer.read()
+        logger.error(f"Error processing emoji: {str(e)}")
+    
+    # Last resort: use a default image
+    img = Image.new('RGBA', (128, 128), (0, 120, 215, 255))  # Discord blue as fallback
+    draw = ImageDraw.Draw(img)
+    # Draw a question mark
+    try:
+        font = ImageFont.load_default()
+        draw.text((64, 64), "?", font=font, fill=(255, 255, 255, 255), anchor="mm")
+    except:
+        pass  # Just use the blue background if text fails
+    
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return buffer.read()
 
 
 async def setup(bot):
