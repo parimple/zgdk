@@ -7,6 +7,8 @@ playwright
 beautifulsoup4
 colour
 emoji==2.14.1
+emoji-data-python==1.6.0
+Pillow==11.1.0
 
 # database libraries
 SQLAlchemy==2.0.15
