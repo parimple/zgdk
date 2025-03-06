@@ -1,12 +1,11 @@
 """Premium commands cog for premium features like role colors and more."""
 
 import logging
-import re
-from typing import Literal, Optional, Dict, List, Union, Tuple
+from typing import Literal, Optional
 
 import discord
 from colour import Color
-from discord import app_commands, AllowedMentions, Embed
+from discord import app_commands
 from discord.ext import commands
 import emoji
 
