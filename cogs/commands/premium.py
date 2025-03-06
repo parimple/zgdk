@@ -707,6 +707,29 @@ class PremiumCog(commands.Cog):
                 color=0xFF0000
             )
         
+        # Sprawdzenie, czy emoji serwerowe pochodzi z tego samego serwera
+        if emoji.startswith("<") and emoji.endswith(">"):
+            parts = emoji.strip("<>").split(":")
+            if len(parts) >= 3:
+                emoji_id = parts[-1]
+                try:
+                    # Próba znalezienia emoji na serwerze
+                    emoji_id = int(emoji_id)
+                    server_emoji = discord.utils.get(ctx.guild.emojis, id=emoji_id)
+                    if not server_emoji:
+                        logger.warning(f"User tried to use emoji from another server: {emoji}")
+                        return await self._send_premium_embed(
+                            ctx,
+                            description=f"Możesz używać tylko emoji, które są dostępne na tym serwerze.",
+                            color=0xFF0000,
+                        )
+                except (ValueError, TypeError):
+                    return await self._send_premium_embed(
+                        ctx,
+                        description=f"`{emoji}` nie jest poprawnym emoji.",
+                        color=0xFF0000,
+                    )
+        
         # Logujemy, czy emoji jest poprawne według walidatora
         is_valid = emoji_validator(emoji)
         logger.info(f"Emoji validation result for '{emoji}': {is_valid}")
@@ -1029,11 +1052,24 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
             except Exception as e:
                 logger.error(f"Error getting custom emoji from URL: {emoji_url}, error: {str(e)}")
     
-    # For standard Unicode emojis, use the Discord CDN to get the emoji image
+    # For standard Unicode emojis, use the Twemoji CDN to get the emoji image
     try:
-        emoji_code = "-".join(f"{ord(c):x}" for c in emoji_str)
-        emoji_url = f"https://twemoji.maxcdn.com/v/latest/72x72/{emoji_code}.png"
+        # Konwertuj emoji Unicode na kod dla Twemoji
+        codepoints = []
+        for char in emoji_str:
+            # Dla każdego znaku emoji (które mogą składać się z kilku kodów Unicode)
+            # pobierz kod szesnastkowy i dodaj go do listy
+            if ord(char) < 0x10000:  # Podstawowe znaki Unicode
+                codepoints.append(f"{ord(char):x}")
+            else:  # Znaki spoza Basic Multilingual Plane
+                codepoints.append(f"{ord(char):x}")
         
+        # Tworzenie kodu emoji dla Twemoji - używa kresek dla złożonych emoji
+        emoji_code = "-".join(codepoints).lower()
+        logger.info(f"Unicode emoji '{emoji_str}' converted to code: {emoji_code}")
+        
+        # Pobieranie emoji z CDN Twemoji
+        emoji_url = f"https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/{emoji_code}.png"
         logger.info(f"Fetching Twemoji from URL: {emoji_url}")
         
         try:
@@ -1045,10 +1081,21 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
                     return response.content
                 else:
                     logger.error(f"Failed to download Twemoji from {emoji_url}: HTTP {response.status_code}")
+                    # Spróbuj alternatywnego źródła Twemoji
+                    alternate_url = f"https://twemoji.maxcdn.com/v/latest/72x72/{emoji_code}.png"
+                    logger.info(f"Trying alternate Twemoji URL: {alternate_url}")
+                    alt_response = await client.get(alternate_url)
+                    if alt_response.status_code == 200:
+                        logger.info(f"Successfully downloaded Twemoji from alternate URL {alternate_url}")
+                        return alt_response.content
+                    else:
+                        logger.error(f"Failed to download Twemoji from alternate URL: HTTP {alt_response.status_code}")
         except Exception as e:
             logger.error(f"Error getting Twemoji from URL: {emoji_url}, error: {str(e)}")
         
-        # If Twemoji failed, try rendering with Pillow
+        # Jeśli nie udało się pobrać z Twemoji, spróbujmy użyć biblioteki emoji_data_python
+        logger.info("Fallback to rendering emoji with Pillow")
+        
         # Find the emoji using emoji_data_python
         for e in emoji_data_python.emoji_data:
             if e.char == emoji_str:
@@ -1056,7 +1103,7 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
                 break
         
         # Try to use system fonts
-        img = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
+        img = Image.new('RGBA', (128, 128), (0, 0, 0, 0))  # Transparent background
         draw = ImageDraw.Draw(img)
         
         try:
