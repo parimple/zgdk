@@ -409,6 +409,12 @@ class PremiumCog(commands.Cog):
     @app_commands.describe(name="Nowa nazwa teamu")
     async def team_name(self, ctx, name: str):
         """Zmień nazwę swojego teamu."""
+        # Sprawdź czy nazwa jest odpowiednia
+        if len(name) < 3 or len(name) > 20:
+            return await self.message_sender.send_error(
+                ctx, "Nazwa teamu musi mieć od 3 do 20 znaków."
+            )
+
         # Sprawdź czy użytkownik ma team
         team_role = await self._get_user_team_role(ctx.author)
         if not team_role:
@@ -420,13 +426,7 @@ class PremiumCog(commands.Cog):
         is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
         if not is_owner:
             return await self.message_sender.send_error(
-                ctx, "Tylko właściciel teamu może zmienić jego nazwę."
-            )
-
-        # Sprawdź czy nazwa jest odpowiednia
-        if len(name) < 3 or len(name) > 20:
-            return await self.message_sender.send_error(
-                ctx, "Nazwa teamu musi mieć od 3 do 20 znaków."
+                ctx, "Tylko właściciel teamu może zmienić nazwę teamu."
             )
 
         # Zachowanie emoji jeśli było wcześniej
@@ -437,13 +437,21 @@ class PremiumCog(commands.Cog):
         # Sprawdź czy team ma już emoji (format: ☫ 🔥 Nazwa)
         if len(current_name_parts) >= 3 and emoji_validator(current_name_parts[1]):
             team_emoji = current_name_parts[1]
-            new_name = f"{team_symbol} {team_emoji} {name}"
+            new_team_name = f"{team_symbol} {team_emoji} {name}"
         else:
-            new_name = f"{team_symbol} {name}"
+            new_team_name = f"{team_symbol} {name}"
+
+        # Sprawdź czy team o takiej nazwie już istnieje
+        guild = ctx.guild
+        existing_role = discord.utils.get(guild.roles, name=new_team_name)
+        if existing_role and existing_role.id != team_role.id:
+            return await self.message_sender.send_error(
+                ctx, f"Team o nazwie `{name}` już istnieje."
+            )
 
         try:
             # Aktualizuj rolę
-            await team_role.edit(name=new_name)
+            await team_role.edit(name=new_team_name)
 
             # Znajdź i zaktualizuj kanał
             team_channels = [c for c in ctx.guild.channels if isinstance(c, discord.TextChannel)]
@@ -460,18 +468,18 @@ class PremiumCog(commands.Cog):
 
             if team_channel:
                 # Aktualizuj nazwę kanału
-                channel_name = new_name.lower().replace(" ", "-")
+                channel_name = new_team_name.lower().replace(" ", "-")
                 await team_channel.edit(name=channel_name)
 
-                # Wyślij informację o sukcesie
-                description = f"Nazwa teamu została zmieniona na: **{self.team_config['symbol']} {new_name}**"
+                # Wyślij informację o sukcesie - bez dodawania symbolu ponownie
+                description = f"Nazwa teamu została zmieniona na: **{new_team_name}**"
                 
                 # Użyj nowej metody do wysłania wiadomości
                 await self._send_premium_embed(ctx, description=description)
             else:
                 await self.message_sender.send_success(
                     ctx,
-                    f"Zmieniono nazwę teamu na **{new_name}**, ale nie znaleziono kanału teamu.",
+                    f"Zmieniono nazwę teamu na **{new_team_name}**, ale nie znaleziono kanału teamu.",
                 )
 
         except Exception as e:
