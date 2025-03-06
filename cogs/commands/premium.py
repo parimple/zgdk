@@ -32,7 +32,9 @@ class PremiumCog(commands.Cog):
         self.prefix = self.bot.command_prefix[0] if self.bot.command_prefix else ","
         self.team_config = self.bot.config.get("team", {})
         # ID roli bazowej, nad którą będą umieszczane role teamów
-        self.team_base_role_id = self.team_config.get("base_role_id", 0)  # Domyślnie 0, jeśli nie skonfigurowano
+        self.team_base_role_id = self.team_config.get(
+            "base_role_id", 0
+        )  # Domyślnie 0, jeśli nie skonfigurowano
         self.message_sender = MessageSender()
 
         # Nazwa roli kolorowej z config
@@ -313,7 +315,9 @@ class PremiumCog(commands.Cog):
                 # Umieszczamy rolę teamu ponad rolą bazową
                 positions = {team_role: base_role.position + 1}
                 await ctx.guild.edit_role_positions(positions=positions)
-                logger.info(f"Team role {team_role.name} positioned above base role {base_role.name}")
+                logger.info(
+                    f"Team role {team_role.name} positioned above base role {base_role.name}"
+                )
             else:
                 # Jeśli nie znaleziono roli bazowej, spróbuj fallback do poprzedniej implementacji
                 highest_assign_role = None
@@ -325,7 +329,9 @@ class PremiumCog(commands.Cog):
                 if highest_assign_role:
                     positions = {team_role: highest_assign_role.position - 1}
                     await ctx.guild.edit_role_positions(positions=positions)
-                    logger.info(f"Team role {team_role.name} positioned under {highest_assign_role.name} (fallback)")
+                    logger.info(
+                        f"Team role {team_role.name} positioned under {highest_assign_role.name} (fallback)"
+                    )
 
             # 4. Zapisz informacje o teamie w bazie danych
             await self._save_team_to_database(ctx.author.id, team_role.id)
@@ -349,9 +355,7 @@ class PremiumCog(commands.Cog):
                         discord_color = await self.parse_color(color)
                         await team_role.edit(color=discord_color)
                     except ValueError as e:
-                        await self._send_premium_embed(
-                            ctx, description=str(e), color=0xFF0000
-                        )
+                        await self._send_premium_embed(ctx, description=str(e), color=0xFF0000)
 
             # 7. Ustaw emoji jeśli został podany i użytkownik ma rangę zG1000
             if emoji:
