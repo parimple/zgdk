@@ -280,81 +280,92 @@ class PremiumCog(commands.Cog):
     async def team_create(
         self, ctx, name: str, color: Optional[str] = None, emoji: Optional[str] = None
     ):
-        """Create a new team (clan)."""
-        # Check if the user already has a team
-        existing_team = await self._get_user_team_role(ctx.author)
-        if existing_team:
-            return await self.message_sender.send_error(
-                ctx, f"Masz już team `{existing_team.name}`. Musisz go najpierw usunąć."
+        """
+        Create a new team (clan).
+        """
+        # 1. Sprawdź, czy użytkownik ma już team
+        user_team_role = await self._get_user_team_role(ctx.author)
+        if user_team_role:
+            return await self._send_premium_embed(
+                ctx,
+                description=f"Masz już team **{user_team_role.mention}**. Najpierw opuść obecny team.",
+                color=0xFF0000,
             )
 
-        # Check if the name is appropriate
-        if len(name) < 3 or len(name) > 20:
-            return await self.message_sender.send_error(
-                ctx, "Nazwa teamu musi mieć od 3 do 20 znaków."
+        # 2. Sprawdź, czy nazwa nie jest zajęta
+        team_name = f"{self.team_config['symbol']} {name}"
+        if discord.utils.get(ctx.guild.roles, name=team_name):
+            return await self._send_premium_embed(
+                ctx,
+                description=f"Team o nazwie **{name}** już istnieje. Wybierz inną nazwę.",
+                color=0xFF0000,
             )
 
-        # Check if a team with this name already exists
-        guild = ctx.guild
-        team_symbol = self.team_config["symbol"]
-        full_team_name = f"{team_symbol} {name}"
-
-        existing_role = discord.utils.get(guild.roles, name=full_team_name)
-        if existing_role:
-            return await self.message_sender.send_error(
-                ctx, f"Team o nazwie `{name}` już istnieje."
-            )
-
-        # Check color permissions (zG500 or zG1000)
-        discord_color = None
-        if color:
-            has_color_permission = any(
-                role.name in ["zG500", "zG1000"] for role in ctx.author.roles
-            )
-            if not has_color_permission:
-                return await self.message_sender.send_error(
-                    ctx, "Tylko użytkownicy z rangą zG500 lub wyższą mogą ustawić kolor teamu."
-                )
-
-            try:
-                discord_color = await self.parse_color(color)
-            except ValueError as e:
-                return await self.message_sender.send_error(ctx, str(e))
-
-        # Check emoji permissions (only zG1000)
-        team_emoji = None
-        if emoji:
-            has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
-            if not has_emoji_permission:
-                return await self.message_sender.send_error(
-                    ctx, "Tylko użytkownicy z rangą zG1000 mogą ustawić emoji teamu."
-                )
-
-            # Check if it's a valid emoji
-            if not emoji_validator(emoji):
-                return await self.message_sender.send_error(
-                    ctx, f"`{emoji}` nie jest poprawnym emoji."
-                )
-
-            team_emoji = emoji
-            # Emoji will be added to the team name
-            full_team_name = f"{team_symbol} {team_emoji} {name}"
-
-        # Create team role
         try:
-            # Create role
-            team_role = await guild.create_role(
-                name=full_team_name,
-                color=discord_color or discord.Color.default(),
-                mentionable=True,
-                reason=f"Utworzenie teamu przez {ctx.author.display_name}",
-            )
+            # 3. Tworzenie roli teamu
+            team_role = await ctx.guild.create_role(name=team_name, mentionable=True)
 
-            # Assign role to user
+            # 3.1. Pozycjonowanie roli teamu - podobnie jak w update_user_color_role
+            highest_assign_role = None
+            for role in reversed(ctx.guild.roles):
+                if role.permissions.manage_roles and not role.managed:
+                    highest_assign_role = role
+                    break
+
+            if highest_assign_role:
+                # Umieszczamy rolę teamu pod tą samą rolą, pod którą umieszczana jest rola koloru
+                positions = {team_role: highest_assign_role.position - 1}
+                await ctx.guild.edit_role_positions(positions=positions)
+                logger.info(f"Team role {team_role.name} positioned under {highest_assign_role.name}")
+
+            # 4. Zapisz informacje o teamie w bazie danych
+            await self._save_team_to_database(ctx.author.id, team_role.id)
+
+            # 5. Przydziel rolę właścicielowi
             await ctx.author.add_roles(team_role)
 
-            # Create text channel in appropriate category
-            category = guild.get_channel(self.team_config["category_id"])
+            # 6. Ustaw kolor jeśli został podany i użytkownik ma rangę zG500+
+            if color:
+                has_color_permission = any(
+                    role.name in ["zG500", "zG1000"] for role in ctx.author.roles
+                )
+                if not has_color_permission:
+                    await self._send_premium_embed(
+                        ctx,
+                        description="Kolor teamu dostępny tylko dla rang zG500+. Kolor nie został ustawiony.",
+                        color=0xFF0000,
+                    )
+                else:
+                    try:
+                        discord_color = await self.parse_color(color)
+                        await team_role.edit(color=discord_color)
+                    except ValueError as e:
+                        await self._send_premium_embed(
+                            ctx, description=str(e), color=0xFF0000
+                        )
+
+            # 7. Ustaw emoji jeśli został podany i użytkownik ma rangę zG1000
+            if emoji:
+                has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
+                if not has_emoji_permission:
+                    await self._send_premium_embed(
+                        ctx,
+                        description="Emoji teamu dostępny tylko dla rang zG1000. Emoji nie zostało ustawione.",
+                        color=0xFF0000,
+                    )
+                else:
+                    # Check if it's a valid emoji
+                    if not emoji_validator(emoji):
+                        await self._send_premium_embed(
+                            ctx,
+                            description=f"`{emoji}` nie jest poprawnym emoji.",
+                            color=0xFF0000,
+                        )
+                    else:
+                        await team_role.edit(display_icon=await emoji_to_icon(emoji))
+
+            # 8. Ustaw kanał teamu
+            category = ctx.guild.get_channel(self.team_config["category_id"])
             if not category:
                 logger.error(
                     f"Nie znaleziono kategorii teamów o ID {self.team_config['category_id']}"
@@ -363,7 +374,7 @@ class PremiumCog(commands.Cog):
 
             # Create channel permissions
             overwrites = {
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 team_role: discord.PermissionOverwrite(
                     read_messages=True,
                     send_messages=True,
@@ -380,17 +391,14 @@ class PremiumCog(commands.Cog):
             }
 
             # Create text channel
-            channel_name = full_team_name.lower().replace(" ", "-")
-            team_channel = await guild.create_text_channel(
+            channel_name = team_name.lower().replace(" ", "-")
+            team_channel = await ctx.guild.create_text_channel(
                 name=channel_name,
                 category=category,
-                topic=f"Team Channel for {full_team_name}. Owner: {ctx.author.id}",
+                topic=f"Team Channel for {team_name}. Owner: {ctx.author.id}",
                 overwrites=overwrites,
                 reason=f"Utworzenie kanału teamu przez {ctx.author.display_name}",
             )
-
-            # Save team role to database
-            await self._save_team_to_database(ctx.author.id, team_role.id)
 
             # Send success message
             description = (
