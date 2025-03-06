@@ -626,22 +626,31 @@ class PremiumCog(commands.Cog):
         # Check color permissions (zG500 or zG1000)
         has_color_permission = any(role.name in ["zG500", "zG1000"] for role in ctx.author.roles)
         if not has_color_permission:
-            return await self.message_sender.send_error(
-                ctx, "Tylko użytkownicy z rangą zG500 lub wyższą mogą ustawić kolor teamu."
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            return await self._send_premium_embed(
+                ctx, 
+                description="Tylko użytkownicy z rangą zG500 lub wyższą mogą ustawić kolor teamu.", 
+                color=0xFF0000
             )
 
         # Check if the user has a team
         team_role = await self._get_user_team_role(ctx.author)
         if not team_role:
-            return await self.message_sender.send_error(
-                ctx, "Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`."
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            return await self._send_premium_embed(
+                ctx, 
+                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.", 
+                color=0xFF0000
             )
 
         # Check if the user is the team owner
         is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
         if not is_owner:
-            return await self.message_sender.send_error(
-                ctx, "Tylko właściciel teamu może zmienić jego kolor."
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            return await self._send_premium_embed(
+                ctx, 
+                description="Tylko właściciel teamu może zmienić jego kolor.", 
+                color=0xFF0000
             )
 
         try:
@@ -658,56 +667,72 @@ class PremiumCog(commands.Cog):
             await self._send_premium_embed(ctx, description=description)
 
         except ValueError as e:
-            await self.message_sender.send_error(ctx, str(e))
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            await self._send_premium_embed(ctx, description=str(e), color=0xFF0000)
         except Exception as e:
             logger.error(f"Błąd podczas zmiany koloru teamu: {str(e)}")
-            await self.message_sender.send_error(
-                ctx, f"Wystąpił błąd podczas zmiany koloru teamu: {str(e)}"
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            await self._send_premium_embed(
+                ctx, 
+                description=f"Wystąpił błąd podczas zmiany koloru teamu: {str(e)}", 
+                color=0xFF0000
             )
 
     @team.command(name="emoji")
     @app_commands.describe(emoji="Emoji teamu")
     async def team_emoji(self, ctx, emoji: str):
-        """Zmień emoji swojego teamu."""
+        """Ustaw emoji teamu."""
         # Sprawdź uprawnienia do emoji (tylko zG1000)
         has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
         if not has_emoji_permission:
-            return await self.message_sender.send_error(
-                ctx, "Tylko użytkownicy z rangą zG1000 mogą ustawić emoji teamu."
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            return await self._send_premium_embed(
+                ctx, 
+                description="Tylko użytkownicy z rangą zG1000 mogą ustawić emoji teamu.", 
+                color=0xFF0000
+            )
+
+        # Sprawdź czy to jest poprawne emoji
+        if not emoji_validator(emoji):
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            return await self._send_premium_embed(
+                ctx, 
+                description=f"`{emoji}` nie jest poprawnym emoji.", 
+                color=0xFF0000
             )
 
         # Sprawdź czy użytkownik ma team
         team_role = await self._get_user_team_role(ctx.author)
         if not team_role:
-            return await self.message_sender.send_error(
-                ctx, "Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`."
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            return await self._send_premium_embed(
+                ctx, 
+                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.", 
+                color=0xFF0000
             )
 
         # Sprawdź czy użytkownik jest właścicielem teamu
         is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
         if not is_owner:
-            return await self.message_sender.send_error(
-                ctx, "Tylko właściciel teamu może zmienić jego emoji."
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            return await self._send_premium_embed(
+                ctx, 
+                description="Tylko właściciel teamu może zmienić emoji teamu.", 
+                color=0xFF0000
             )
 
-        # Sprawdź czy to jest poprawne emoji
-        if not emoji_validator(emoji):
-            return await self.message_sender.send_error(ctx, f"`{emoji}` nie jest poprawnym emoji.")
-
         try:
-            # Zaktualizuj nazwę roli z emoji
+            # Zachowanie aktualnej nazwy
             current_name_parts = team_role.name.split(" ")
             team_symbol = self.team_config["symbol"]
 
-            # Sprawdź czy team ma już emoji (format: ☫ 🔥 Nazwa) lub nie (format: ☫ Nazwa)
+            # Jeśli team już ma emoji, zastąp je
             if len(current_name_parts) >= 3 and emoji_validator(current_name_parts[1]):
-                # Zastąp istniejące emoji
-                team_name = " ".join(current_name_parts[2:])
-                new_name = f"{team_symbol} {emoji} {team_name}"
+                # Format: "☫ 🔥 Nazwa" -> "☫ 🆕 Nazwa"
+                new_name = f"{team_symbol} {emoji} {' '.join(current_name_parts[2:])}"
             else:
-                # Dodaj emoji do istniejącej nazwy
-                team_name = " ".join(current_name_parts[1:])
-                new_name = f"{team_symbol} {emoji} {team_name}"
+                # Format: "☫ Nazwa" -> "☫ 🔥 Nazwa"
+                new_name = f"{team_symbol} {emoji} {' '.join(current_name_parts[1:])}"
 
             # Aktualizuj rolę
             await team_role.edit(name=new_name)
@@ -738,8 +763,11 @@ class PremiumCog(commands.Cog):
 
         except Exception as e:
             logger.error(f"Błąd podczas zmiany emoji teamu: {str(e)}")
-            await self.message_sender.send_error(
-                ctx, f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}"
+            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
+            await self._send_premium_embed(
+                ctx, 
+                description=f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}", 
+                color=0xFF0000
             )
 
     async def _get_user_team_role(self, member: discord.Member):
