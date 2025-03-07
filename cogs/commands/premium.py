@@ -441,19 +441,10 @@ class PremiumCog(commands.Cog):
                 ctx, "Nazwa teamu musi mieć od 3 do 20 znaków."
             )
 
-        # Sprawdź czy użytkownik ma team
-        team_role = await self._get_user_team_role(ctx.author)
-        if not team_role:
-            return await self.message_sender.send_error(
-                ctx, "Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`."
-            )
-
-        # Sprawdź czy użytkownik jest właścicielem teamu
-        is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
-        if not is_owner:
-            return await self.message_sender.send_error(
-                ctx, "Tylko właściciel teamu może zmienić nazwę teamu."
-            )
+        # Użyj metody pomocniczej do sprawdzenia uprawnień
+        has_perm, team_role, error_msg = await self._check_team_permissions(ctx, check_owner=True)
+        if not has_perm:
+            return await self.message_sender.send_error(ctx, error_msg)
 
         # Zachowanie emoji jeśli było wcześniej
         current_name_parts = team_role.name.split(" ")
@@ -529,20 +520,10 @@ class PremiumCog(commands.Cog):
     @app_commands.describe(member="Użytkownik do dodania do teamu")
     async def team_member_add(self, ctx, member: discord.Member):
         """Dodaj członka do swojego teamu."""
-        # Sprawdź czy użytkownik ma team
-        team_role = await self._get_user_team_role(ctx.author)
-        if not team_role:
-            return await self.message_sender.send_error(
-                ctx,
-                f"Nie masz żadnego teamu. Utwórz go najpierw za pomocą `{self.prefix}team create`.",
-            )
-
-        # Sprawdź czy użytkownik jest właścicielem teamu
-        is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
-        if not is_owner:
-            return await self.message_sender.send_error(
-                ctx, "Tylko właściciel teamu może dodawać członków."
-            )
+        # Użyj metody pomocniczej do sprawdzenia uprawnień
+        has_perm, team_role, error_msg = await self._check_team_permissions(ctx, check_owner=True)
+        if not has_perm:
+            return await self.message_sender.send_error(ctx, error_msg)
 
         # Sprawdź czy użytkownik nie próbuje dodać samego siebie
         if member.id == ctx.author.id:
@@ -602,19 +583,10 @@ class PremiumCog(commands.Cog):
     @app_commands.describe(member="Użytkownik do usunięcia z teamu")
     async def team_member_remove(self, ctx, member: discord.Member):
         """Remove a member from your team."""
-        # Check if the user has a team
-        team_role = await self._get_user_team_role(ctx.author)
-        if not team_role:
-            return await self.message_sender.send_error(
-                ctx, "Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`."
-            )
-
-        # Check if the user is the team owner
-        is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
-        if not is_owner:
-            return await self.message_sender.send_error(
-                ctx, "Tylko właściciel teamu może usuwać członków."
-            )
+        # Użyj metody pomocniczej do sprawdzenia uprawnień
+        has_perm, team_role, error_msg = await self._check_team_permissions(ctx, check_owner=True)
+        if not has_perm:
+            return await self.message_sender.send_error(ctx, error_msg)
 
         # Check if the user is trying to remove themselves
         if member.id == ctx.author.id:
@@ -649,33 +621,12 @@ class PremiumCog(commands.Cog):
     @app_commands.describe(color="Kolor teamu (angielska nazwa, hex lub polska nazwa)")
     async def team_color(self, ctx, color: str):
         """Change your team's color."""
-        # Check color permissions (zG500 or zG1000)
-        has_color_permission = any(role.name in ["zG500", "zG1000"] for role in ctx.author.roles)
-        if not has_color_permission:
-            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
-            return await self._send_premium_embed(
-                ctx,
-                description="Tylko użytkownicy z rangą zG500 lub wyższą mogą ustawić kolor teamu.",
-                color=0xFF0000,
-            )
-
-        # Check if the user has a team
-        team_role = await self._get_user_team_role(ctx.author)
-        if not team_role:
-            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
-            return await self._send_premium_embed(
-                ctx,
-                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.",
-                color=0xFF0000,
-            )
-
-        # Check if the user is the team owner
-        is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
-        if not is_owner:
-            # Użyj _send_premium_embed zamiast send_error, aby dodać informację o planach premium
-            return await self._send_premium_embed(
-                ctx, description="Tylko właściciel teamu może zmienić jego kolor.", color=0xFF0000
-            )
+        # Użyj metody pomocniczej do sprawdzenia uprawnień
+        has_perm, team_role, error_msg = await self._check_team_permissions(
+            ctx, required_role="zG500", check_owner=True
+        )
+        if not has_perm:
+            return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
 
         try:
             # Próba konwersji koloru na obiekt discord.Color
@@ -711,30 +662,10 @@ class PremiumCog(commands.Cog):
             f"team_emoji command with emoji string: '{emoji}', type: {type(emoji)}, length: {len(emoji) if emoji else 0}"
         )
 
-        # Check if user has emoji permission (zG1000 only)
-        has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
-        if not has_emoji_permission:
-            return await self._send_premium_embed(
-                ctx,
-                description="Tylko użytkownicy z rangą zG1000 mogą ustawić emoji teamu.",
-                color=0xFF0000,
-            )
-
-        # Check if user has a team
-        team_role = await self._get_user_team_role(ctx.author)
-        if not team_role:
-            return await self._send_premium_embed(
-                ctx,
-                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.",
-                color=0xFF0000,
-            )
-
-        # Check if user is the team owner
-        is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
-        if not is_owner:
-            return await self._send_premium_embed(
-                ctx, description="Tylko właściciel teamu może zmienić emoji teamu.", color=0xFF0000
-            )
+        # Użyj metody pomocniczej do sprawdzenia uprawnień
+        has_perm, team_role, error_msg = await self._check_team_permissions(ctx, required_role="zG1000")
+        if not has_perm:
+            return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
 
         # Check if server has the required boost level for role icons (Level 2)
         if ctx.guild.premium_tier < 2:
@@ -840,30 +771,6 @@ class PremiumCog(commands.Cog):
                 return await self._send_premium_embed(
                     ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
                 )
-
-        # Check if user has a team
-        team_role = await self._get_user_team_role(ctx.author)
-        if not team_role:
-            return await self._send_premium_embed(
-                ctx,
-                description="Nie masz żadnego teamu. Utwórz go najpierw za pomocą `,team create`.",
-                color=0xFF0000,
-            )
-
-        # Check if user is the team owner
-        is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
-        if not is_owner:
-            return await self._send_premium_embed(
-                ctx, description="Tylko właściciel teamu może zmienić emoji teamu.", color=0xFF0000
-            )
-
-        # Check if server has the required boost level for role icons (Level 2)
-        if ctx.guild.premium_tier < 2:
-            return await self._send_premium_embed(
-                ctx,
-                description="Serwer musi mieć minimum 7 boostów (Poziom 2), aby można było ustawić ikony ról.",
-                color=0xFF0000,
-            )
 
         try:
             # Get current name and team symbol
@@ -1010,6 +917,43 @@ class PremiumCog(commands.Cog):
             session.add(role)
             await session.commit()
 
+    async def _check_team_permissions(self, ctx, required_role=None, check_owner=True):
+        """
+        Helper method to check if user has required permissions for team operations.
+        
+        :param ctx: Command context
+        :param required_role: Required role name (e.g. 'zG1000' for emoji) or list of role names
+        :param check_owner: Whether to check if user is team owner
+        :return: (has_permission, team_role, error_msg) tuple. If has_permission is False, error_msg contains the error message.
+        """
+        # Check if user has required role
+        if required_role:
+            if isinstance(required_role, str):
+                required_roles = [required_role]
+            else:
+                required_roles = required_role
+                
+            has_any_role = any(role.name in required_roles for role in ctx.author.roles)
+            if not has_any_role:
+                if len(required_roles) == 1:
+                    return False, None, f"Tylko użytkownicy z rangą {required_roles[0]} mogą wykonać tę operację."
+                else:
+                    role_list = " lub ".join(required_roles)
+                    return False, None, f"Tylko użytkownicy z rangą {role_list} mogą wykonać tę operację."
+        
+        # Check if user has a team
+        team_role = await self._get_user_team_role(ctx.author)
+        if not team_role:
+            return False, None, f"Nie masz żadnego teamu. Utwórz go najpierw za pomocą `{self.prefix}team create`."
+        
+        # Check if user is team owner
+        if check_owner:
+            is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
+            if not is_owner:
+                return False, None, "Tylko właściciel teamu może wykonać tę operację."
+                
+        return True, team_role, None
+
     async def _get_team_info(self, team_role: discord.Role):
         """
         Get information about a team.
@@ -1106,8 +1050,8 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
         # Custom emoji format: <:name:id> or <a:name:id>
         parts = emoji_str.split(":")
 
-        # For emoji in format <:name:id> we get ['', 'name', 'id>']
-        # For emoji in format <a:name:id> we get ['<a', 'name', 'id>']
+        # For emoji in format <:nazwa:id> we get ['', 'name', 'id>']
+        # For emoji in format <a:nazwa:id> we get ['<a', 'name', 'id>']
         if len(parts) >= 3:
             # Extract the ID properly, removing the closing ">"
             emoji_id = parts[-1].replace(">", "")
