@@ -663,7 +663,9 @@ class PremiumCog(commands.Cog):
         )
 
         # Użyj metody pomocniczej do sprawdzenia uprawnień
-        has_perm, team_role, error_msg = await self._check_team_permissions(ctx, required_role="zG1000")
+        has_perm, team_role, error_msg = await self._check_team_permissions(
+            ctx, required_role="zG1000"
+        )
         if not has_perm:
             return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
 
@@ -920,7 +922,7 @@ class PremiumCog(commands.Cog):
     async def _check_team_permissions(self, ctx, required_role=None, check_owner=True):
         """
         Helper method to check if user has required permissions for team operations.
-        
+
         :param ctx: Command context
         :param required_role: Required role name (e.g. 'zG1000' for emoji) or list of role names
         :param check_owner: Whether to check if user is team owner
@@ -932,30 +934,32 @@ class PremiumCog(commands.Cog):
                 required_roles = [required_role]
             else:
                 required_roles = required_role
-            
+
             # Hierarchia ról premium (od najniższej do najwyższej)
             premium_roles_hierarchy = ["zG50", "zG100", "zG500", "zG1000"]
-            
+
             # Sprawdź rolę użytkownika w hierarchii
             user_highest_role = None
             for role in ctx.author.roles:
                 if role.name in premium_roles_hierarchy:
                     role_index = premium_roles_hierarchy.index(role.name)
-                    if user_highest_role is None or role_index > premium_roles_hierarchy.index(user_highest_role):
+                    if user_highest_role is None or role_index > premium_roles_hierarchy.index(
+                        user_highest_role
+                    ):
                         user_highest_role = role.name
-            
+
             # Sprawdź czy rola użytkownika jest wystarczająca
             has_sufficient_role = False
             min_required_role = None
-            min_required_index = float('inf')
-            
+            min_required_index = float("inf")
+
             for role_name in required_roles:
                 if role_name in premium_roles_hierarchy:
                     role_index = premium_roles_hierarchy.index(role_name)
                     if role_index < min_required_index:
                         min_required_index = role_index
                         min_required_role = role_name
-            
+
             if user_highest_role and min_required_role:
                 user_role_index = premium_roles_hierarchy.index(user_highest_role)
                 min_required_index = premium_roles_hierarchy.index(min_required_role)
@@ -963,25 +967,37 @@ class PremiumCog(commands.Cog):
             else:
                 # Jeśli nie możemy określić pozycji w hierarchii, użyj starej metody
                 has_sufficient_role = any(role.name in required_roles for role in ctx.author.roles)
-            
+
             if not has_sufficient_role:
                 if len(required_roles) == 1:
-                    return False, None, f"Tylko użytkownicy z rangą {required_roles[0]} lub wyższą mogą wykonać tę operację."
+                    return (
+                        False,
+                        None,
+                        f"Tylko użytkownicy z rangą {required_roles[0]} lub wyższą mogą wykonać tę operację.",
+                    )
                 else:
                     min_role_name = min_required_role or " lub ".join(required_roles)
-                    return False, None, f"Tylko użytkownicy z rangą {min_role_name} lub wyższą mogą wykonać tę operację."
-        
+                    return (
+                        False,
+                        None,
+                        f"Tylko użytkownicy z rangą {min_role_name} lub wyższą mogą wykonać tę operację.",
+                    )
+
         # Check if user has a team
         team_role = await self._get_user_team_role(ctx.author)
         if not team_role:
-            return False, None, f"Nie masz żadnego teamu. Utwórz go najpierw za pomocą `{self.prefix}team create`."
-        
+            return (
+                False,
+                None,
+                f"Nie masz żadnego teamu. Utwórz go najpierw za pomocą `{self.prefix}team create`.",
+            )
+
         # Check if user is team owner
         if check_owner:
             is_owner = await self._is_team_owner(ctx.author.id, team_role.id)
             if not is_owner:
                 return False, None, "Tylko właściciel teamu może wykonać tę operację."
-                
+
         return True, team_role, None
 
     async def _get_team_info(self, team_role: discord.Role):

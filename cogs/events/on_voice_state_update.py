@@ -73,34 +73,47 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         if channel.id == self.bot.config["channels_voice"]["afk"]:
             return
 
+        self.logger.info(f"Checking autokick for member {member.id} in channel {channel.id}")
+
         # Check if member should be autokicked using AutoKickManager
-        if await self.autokick_manager.check_autokick(member, channel):
+        should_kick, matching_owners = await self.autokick_manager.check_autokick(member, channel)
+        self.logger.info(f"Should kick member {member.id}: {should_kick}")
+
+        if should_kick and matching_owners:
             try:
-                # Find the owner who has autokick on this member
+                # Get the first matching owner
                 owner = None
-                for owner_id in self.autokick_manager._autokick_cache.get(member.id, []):
+                for owner_id in matching_owners:
                     potential_owner = channel.guild.get_member(owner_id)
                     if potential_owner and potential_owner in channel.members:
                         owner = potential_owner
+                        self.logger.info(f"Found owner {owner.id} in channel members")
                         break
 
                 if not owner:
+                    self.logger.warning(f"No owner found for autokick of member {member.id}")
                     return
 
                 # Move member to AFK channel
                 afk_channel = self.guild.get_channel(self.bot.config["channels_voice"]["afk"])
                 if afk_channel:
                     await member.move_to(afk_channel)
+                    self.logger.info(f"Moved member {member.id} to AFK channel {afk_channel.id}")
                 else:
                     await member.move_to(None)
+                    self.logger.info(f"Disconnected member {member.id} (no AFK channel)")
 
                 # Set connect permission to False
                 current_perms = channel.overwrites_for(member) or discord.PermissionOverwrite()
                 current_perms.connect = False
                 await channel.set_permissions(member, overwrite=current_perms)
+                self.logger.info(
+                    f"Set connect=False permission for member {member.id} in channel {channel.id}"
+                )
 
                 # Send notification
                 await self.message_sender.send_autokick_notification(channel, member, owner)
+                self.logger.info(f"Sent autokick notification for member {member.id}")
             except discord.Forbidden:
                 self.logger.warning(f"Failed to autokick {member.id} (no permission)")
             except Exception as e:
