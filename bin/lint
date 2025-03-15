@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# Execute the linters script from the project root
+cd $(dirname "$0")/..
+sh run_linters.sh 

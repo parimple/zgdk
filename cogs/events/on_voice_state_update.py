@@ -73,11 +73,11 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         if channel.id == self.bot.config["channels_voice"]["afk"]:
             return
 
-        self.logger.info(f"Checking autokick for member {member.id} in channel {channel.id}")
+        # self.logger.info(f"Checking autokick for member {member.id} in channel {channel.id}")
 
         # Check if member should be autokicked using AutoKickManager
         should_kick, matching_owners = await self.autokick_manager.check_autokick(member, channel)
-        self.logger.info(f"Should kick member {member.id}: {should_kick}")
+        # self.logger.info(f"Should kick member {member.id}: {should_kick}")
 
         if should_kick and matching_owners:
             try:

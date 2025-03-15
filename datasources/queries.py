@@ -6,14 +6,14 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
-from sqlalchemy import asc, delete, desc, select, update
+from sqlalchemy import asc, delete, desc, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.expression import and_, case, or_
 from sqlalchemy.sql.functions import func
 
-from .models import (
+from datasources.models import (
     AutoKick,
     ChannelPermission,
     HandledPayment,
@@ -308,11 +308,16 @@ class RoleQueries:
     @staticmethod
     async def delete_member_role(session: AsyncSession, member_id: int, role_id: int):
         """Delete a role of a member"""
-        await session.execute(
-            delete(MemberRole).where(
-                (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
+        try:
+            # Bezpośrednie wykonanie SQL DELETE z użyciem text()
+            sql = text(
+                f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
             )
-        )
+            await session.execute(sql, {"member_id": member_id, "role_id": role_id})
+            logger.info(f"Deleted role {role_id} for member {member_id} using raw SQL")
+        except Exception as e:
+            logger.error(f"Error deleting role {role_id} for member {member_id}: {str(e)}")
+            raise
 
     @staticmethod
     async def get_premium_role(session: AsyncSession, member_id: int) -> Optional[MemberRole]:
@@ -399,6 +404,79 @@ class RoleQueries:
             .where(and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id))
         )
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def safe_delete_member_role(session: AsyncSession, member_id: int, role_id: int):
+        """
+        Bezpieczna metoda usuwania roli użytkownika, która unika problemów z ORM.
+        W przeciwieństwie do delete_member_role, ta metoda:
+        1. Zamyka wcześniej sesję przed wykonaniem delete
+        2. Nie używa relacji, tylko usuwanie według klucza głównego
+        3. Jest bardziej odporna na błędy
+        """
+        try:
+            # Pobierz obiekt z bazy bez używania relacji
+            stmt = select(MemberRole).where(
+                (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
+            )
+            result = await session.execute(stmt)
+            member_role = result.scalar_one_or_none()
+
+            if member_role:
+                # Zdetachuj obiekt od sesji
+                session.expunge(member_role)
+
+                # Wykonaj surowy SQL DELETE z użyciem text()
+                sql = text(
+                    f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
+                )
+                await session.execute(sql, {"member_id": member_id, "role_id": role_id})
+
+                logger.info(f"Safely deleted role {role_id} for member {member_id}")
+                return True
+            else:
+                logger.warning(f"No role {role_id} found for member {member_id} to delete (safe)")
+                return False
+        except Exception as e:
+            logger.error(f"Error in safe_delete_member_role: {str(e)}")
+            raise
+
+    @staticmethod
+    async def raw_delete_member_role(session: AsyncSession, member_id: int, role_id: int) -> bool:
+        """
+        Najprostsza i najbezpieczniejsza metoda usuwania roli członka, używająca wyłącznie surowego SQL.
+        Ta metoda jest stworzona specjalnie do rozwiązania problemu z usuwaniem ról podczas sprzedaży.
+        """
+        try:
+            # Użyj text() do deklaracji surowego SQL
+            sql = text(
+                f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
+            )
+            await session.execute(sql, {"member_id": member_id, "role_id": role_id})
+            logger.info(f"Raw SQL deletion of role {role_id} for member {member_id} succeeded")
+            return True
+        except Exception as e:
+            logger.error(f"Raw SQL deletion failed for role {role_id}, member {member_id}: {e}")
+            return False
+
+    @staticmethod
+    async def orm_delete_member_role(session: AsyncSession, member_id: int, role_id: int) -> bool:
+        """
+        Metoda usuwania roli członka używająca ORM SQLAlchemy, ale w bezpieczny sposób.
+        Ta metoda używa funkcji delete() zamiast surowego SQL.
+        """
+        try:
+            # Użyj delete() zamiast surowego SQL
+            stmt = delete(MemberRole).where(
+                (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
+            )
+            result = await session.execute(stmt)
+            await session.flush()
+            logger.info(f"ORM deletion of role {role_id} for member {member_id} succeeded")
+            return True
+        except Exception as e:
+            logger.error(f"ORM deletion failed for role {role_id}, member {member_id}: {e}")
+            return False
 
 
 class HandledPaymentQueries:
@@ -522,12 +600,12 @@ class ChannelPermissionQueries:
     @staticmethod
     async def remove_permission(session: AsyncSession, member_id: int, target_id: int):
         """Remove channel permissions for a specific member or role."""
-        await session.execute(
-            delete(ChannelPermission).where(
-                (ChannelPermission.member_id == member_id)
-                & (ChannelPermission.target_id == target_id)
-            )
-        )
+        permission = await session.get(ChannelPermission, (member_id, target_id))
+        if permission:
+            await session.delete(permission)
+            logger.info(f"Removed permission for member {member_id} and target {target_id}")
+        else:
+            logger.warning(f"No permission found for member {member_id} and target {target_id}")
 
     @staticmethod
     async def get_permission(
@@ -572,9 +650,15 @@ class ChannelPermissionQueries:
     @staticmethod
     async def remove_all_permissions(session: AsyncSession, owner_id: int):
         """Remove all permissions for a specific owner."""
-        await session.execute(
-            delete(ChannelPermission).where(ChannelPermission.member_id == owner_id)
+        result = await session.execute(
+            select(ChannelPermission).where(ChannelPermission.member_id == owner_id)
         )
+        permissions = result.scalars().all()
+
+        for permission in permissions:
+            await session.delete(permission)
+
+        logger.info(f"Removed all {len(permissions)} permissions for owner {owner_id}")
 
     @staticmethod
     async def remove_mod_permissions_granted_by_member(session: AsyncSession, owner_id: int):

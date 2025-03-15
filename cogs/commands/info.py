@@ -1,5 +1,6 @@
 """Info cog."""
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
@@ -7,39 +8,49 @@ from typing import Literal, Optional
 import discord
 from discord import app_commands
 from discord.ext import commands
+from sqlalchemy import select
 
-from datasources.queries import ChannelPermissionQueries, InviteQueries, MemberQueries, RoleQueries
+from datasources.models import Role
+from datasources.queries import (
+    ChannelPermissionQueries,
+    InviteQueries,
+    MemberQueries,
+    NotificationLogQueries,
+    RoleQueries,
+)
 from utils.currency import CURRENCY_UNIT
+from utils.decorators import is_zagadka_owner
 from utils.permissions import is_admin
 from utils.premium import PremiumManager
 from utils.refund import calculate_refund
+from utils.team_manager import TeamManager
 
 logger = logging.getLogger(__name__)
 
 
 async def remove_premium_role_mod_permissions(session, bot, member_id: int):
     """
-    Usuwa uprawnienia moderatora nadane przez użytkownika po utracie roli premium.
+    Remove moderator permissions granted by a user and delete their teams.
 
-    Ta funkcja powinna być wywołana w każdym miejscu, gdzie użytkownik traci rolę premium,
-    czy to przez wygaśnięcie, czy przez sprzedaż.
+    This function is called both when a premium role is manually sold and
+    when a premium role automatically expires.
 
-    Args:
-        session: Sesja bazy danych
-        bot: Instancja bota
-        member_id: ID użytkownika, który traci rolę premium
+    :param session: Database session
+    :param bot: Bot instance
+    :param member_id: User ID
     """
-    # Usuń tylko uprawnienia moderatorów nadane przez tego użytkownika
-    await ChannelPermissionQueries.remove_mod_permissions_granted_by_member(session, member_id)
+    logger.info(f"Removing premium role-related privileges for user {member_id}")
 
-    # Loguj informację o usunięciu uprawnień
-    member = bot.guild.get_member(member_id)
-    display_name = member.display_name if member else f"User {member_id}"
-    logger.info(
-        "Removed all moderator permissions granted by %s (%d) [via helper function]",
-        display_name,
-        member_id,
-    )
+    # 1. Usuń uprawnienia moderatorów kanałów głosowych
+    await ChannelPermissionQueries.remove_mod_permissions_granted_by_member(session, member_id)
+    logger.info(f"Voice channel permissions granted by {member_id} removed")
+
+    # 2. Usuń teamy należące do tego użytkownika - używamy bezpieczniejszej metody SQL
+    deleted_teams = await TeamManager.delete_user_teams_by_sql(session, bot, member_id)
+    if deleted_teams > 0:
+        logger.info(f"Deleted {deleted_teams} teams owned by {member_id} using SQL method")
+
+    return deleted_teams
 
 
 class InfoCog(commands.Cog):
@@ -382,6 +393,172 @@ class InfoCog(commands.Cog):
 
         await ctx.reply(f"Dodano {hours}T do konta {user.mention}.")
 
+    @commands.command(name="checkroles", description="Sprawdza role użytkownika w logach.")
+    @is_admin()
+    async def check_roles(self, ctx: commands.Context, user: discord.Member):
+        """Sprawdza role użytkownika i wypisuje je w logach."""
+        roles = user.roles
+        role_names = [r.name for r in roles]
+        role_ids = [r.id for r in roles]
+
+        logger.info(f"[CHECK_ROLES] Role użytkownika {user.display_name} ({user.id}):")
+        logger.info(f"[CHECK_ROLES] Nazwy ról: {role_names}")
+        logger.info(f"[CHECK_ROLES] ID ról: {role_ids}")
+
+        # Sprawdza też w bazie danych
+        async with self.bot.get_db() as session:
+            premium_roles = await RoleQueries.get_member_premium_roles(session, user.id)
+            logger.info(f"[CHECK_ROLES] Role premium w bazie danych dla {user.display_name}:")
+            for member_role, role in premium_roles:
+                logger.info(
+                    f"[CHECK_ROLES] Rola {role.name} (ID: {role.id}), wygasa: {member_role.expiration_date}"
+                )
+
+                # Sprawdź czy użytkownik ma tę rolę na Discord
+                has_role = role.id in role_ids
+                logger.info(
+                    f"[CHECK_ROLES] Czy użytkownik ma rolę {role.name} na Discord: {has_role}"
+                )
+
+        await ctx.reply(
+            f"Informacje o rolach użytkownika {user.mention} zostały zapisane w logach."
+        )
+
+    @commands.command(
+        name="checkstatus", description="Sprawdza status premium i teamy użytkownika."
+    )
+    @is_admin()
+    async def check_status(self, ctx, member: discord.Member):
+        """Sprawdza status premium i teamy użytkownika."""
+        logger.info(
+            f"Checking premium status and teams for {member.display_name} (ID: {member.id})"
+        )
+
+        premium_roles = []
+        team_roles = []
+        team_channels = []
+
+        # 1. Sprawdź role Discord
+        for role in member.roles:
+            for premium_config in self.bot.config["premium_roles"]:
+                if role.name == premium_config["name"]:
+                    premium_roles.append(role)
+                    break
+
+            # Sprawdź czy to rola teamu (w formacie "☫ nazwa")
+            team_symbol = self.bot.config.get("team", {}).get("symbol", "☫")
+            if (
+                role.name.startswith(team_symbol)
+                and len(role.name) > len(team_symbol)
+                and role.name[len(team_symbol)] == " "
+            ):
+                team_roles.append(role)
+
+        # 2. Sprawdź kanały z topikiem zawierającym ID użytkownika
+        for channel in ctx.guild.channels:
+            if hasattr(channel, "topic") and channel.topic and str(member.id) in channel.topic:
+                if "Team Channel" in channel.topic or (
+                    len(channel.topic.split()) >= 2 and channel.topic.split()[0] == str(member.id)
+                ):
+                    team_channels.append(channel)
+
+        # 3. Sprawdź role w bazie danych
+        roles_db_info = []
+        teams_db_info = []
+
+        async with self.bot.get_db() as session:
+            # Pobierz role premium z bazy danych
+            premium_roles_db = await RoleQueries.get_member_premium_roles(session, member.id)
+            for member_role, role in premium_roles_db:
+                expiry = (
+                    member_role.expiration_date.strftime("%d.%m.%Y %H:%M")
+                    if member_role.expiration_date
+                    else "bez wygaśnięcia"
+                )
+                roles_db_info.append(f"Rola: {role.name}, ID: {role.id}, wygasa: {expiry}")
+
+            # Pobierz teamy z bazy danych
+            teams_query = await session.execute(
+                select(Role).where((Role.role_type == "team") & (Role.name == str(member.id)))
+            )
+            teams_db = teams_query.scalars().all()
+
+            for team in teams_db:
+                teams_db_info.append(f"Team ID: {team.id}")
+
+        # 4. Przygotuj i wyślij embed z informacjami
+        embed = discord.Embed(
+            title=f"Status użytkownika {member.display_name}", color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="Role premium (Discord)",
+            value="\n".join([f"{role.name} (ID: {role.id})" for role in premium_roles]) or "Brak",
+            inline=False,
+        )
+        embed.add_field(
+            name="Role premium (baza danych)",
+            value="\n".join(roles_db_info) or "Brak",
+            inline=False,
+        )
+        embed.add_field(
+            name="Role teamów (Discord)",
+            value="\n".join([f"{role.name} (ID: {role.id})" for role in team_roles]) or "Brak",
+            inline=False,
+        )
+        embed.add_field(
+            name="Kanały teamów",
+            value="\n".join([f"{channel.name} (ID: {channel.id})" for channel in team_channels])
+            or "Brak",
+            inline=False,
+        )
+        embed.add_field(
+            name="Teamy (baza danych)", value="\n".join(teams_db_info) or "Brak", inline=False
+        )
+
+        await ctx.send(embed=embed)
+        logger.info(f"Status check completed for {member.display_name}")
+
+        # 5. Jeśli wykryto niespójności, zasugeruj rozwiązania
+        inconsistencies = []
+
+        # Sprawdź, czy użytkownik ma teamy ale nie ma roli premium
+        if (team_roles or team_channels or teams_db_info) and not premium_roles:
+            inconsistencies.append("Użytkownik ma teamy, ale nie ma aktywnej roli premium.")
+
+        # Sprawdź, czy są teamy w bazie danych, ale nie ma ich na Discord
+        if teams_db_info and not team_roles:
+            inconsistencies.append(
+                "Użytkownik ma teamy w bazie danych, ale brakuje ról na Discord."
+            )
+
+        # Sprawdź, czy są role teamów na Discord, ale nie ma ich w bazie danych
+        if team_roles and not teams_db_info:
+            inconsistencies.append(
+                "Użytkownik ma role teamów na Discord, ale brakuje ich w bazie danych."
+            )
+
+        if inconsistencies:
+            embed = discord.Embed(
+                title="⚠️ Wykryto niespójności",
+                description="Wykryto niespójności w statusie użytkownika:",
+                color=discord.Color.orange(),
+            )
+            embed.add_field(
+                name="Problemy",
+                value="\n".join([f"- {issue}" for issue in inconsistencies]),
+                inline=False,
+            )
+            embed.add_field(
+                name="Sugerowane działania",
+                value=(
+                    f"- Możesz użyć komendy `,team admin_delete @{member.display_name}` aby usunąć teamy użytkownika\n"
+                    f"- Możesz ręcznie usunąć role teamów użytkownika z serwera Discord\n"
+                    f"- Możesz sprawdzić role premium użytkownika używając komendy `,checkroles @{member.display_name}`"
+                ),
+                inline=False,
+            )
+            await ctx.send(embed=embed)
+
 
 class ProfileView(discord.ui.View):
     """View for profile command."""
@@ -509,101 +686,353 @@ class SellRoleButton(discord.ui.Button):
                 async def confirm(
                     self, confirm_interaction: discord.Interaction, button: discord.ui.Button
                 ):
-                    if confirm_interaction.user.id != self.original_interaction.user.id:
-                        await confirm_interaction.response.send_message(
-                            "Nie możesz potwierdzić tej transakcji.", ephemeral=True
-                        )
-                        return
-
-                    # Disable all buttons
+                    # Wyłączamy przyciski
                     for item in self.children:
                         item.disabled = True
 
-                    # Verify again if user still has the role and is still the owner
-                    user_role_ids = [r.id for r in confirm_interaction.user.roles]
-                    if (
-                        self.role.id not in user_role_ids
-                        or confirm_interaction.user.id != self.owner_id
-                    ):
-                        await confirm_interaction.response.send_message(
-                            "Nie posiadasz już tej roli lub nie jesteś jej właścicielem.",
-                            ephemeral=True,
+                    try:
+                        await confirm_interaction.response.defer()
+                        logger.info(
+                            f"[SELL_ROLE] Interakcja defer wykonany pomyślnie dla użytkownika {confirm_interaction.user.display_name}"
                         )
+                    except Exception as e:
+                        # Interakcja może być już wykonana
+                        logger.warning(f"[SELL_ROLE] Nie można wykonać defer: {e}")
+                        pass
+
+                    if confirm_interaction.user.id != self.original_interaction.user.id:
+                        try:
+                            await confirm_interaction.followup.send(
+                                "Nie możesz potwierdzić tej transakcji.", ephemeral=True
+                            )
+                        except:
+                            pass
                         return
 
+                    # 1. Zapisujemy dane przed jakimikolwiek modyfikacjami w bazie
+                    member_id = self.original_interaction.user.id
+                    role_id = self.role.id
+                    role_name = self.role.name
+                    refund_amount = self.refund_amount
+
+                    logger.info(
+                        f"[SELL_ROLE] Rozpoczęto sprzedaż roli {role_name} (ID: {role_id}) przez użytkownika {confirm_interaction.user.display_name} (ID: {member_id})"
+                    )
+
+                    # 2. Sprawdź, czy użytkownik ma rolę na Discord - z dodatkowym fetching dla pewności
+                    logger.info(
+                        f"[SELL_ROLE] Oczekiwanie 2 sekundy na synchronizację API Discord..."
+                    )
+                    await asyncio.sleep(2)
+
+                    member = confirm_interaction.guild.get_member(member_id)
+
+                    # Logujemy wszystkie role użytkownika, aby zobaczyć co faktycznie ma
+                    user_roles = []
+                    user_role_ids = []
+
+                    if member:
+                        user_roles = [r.name for r in member.roles]
+                        user_role_ids = [r.id for r in member.roles]
+                        logger.info(f"[SELL_ROLE] Role użytkownika z cache: {user_roles}")
+                        logger.info(f"[SELL_ROLE] ID ról użytkownika z cache: {user_role_ids}")
+                        logger.info(f"[SELL_ROLE] ID szukanej roli: {role_id}")
+
+                    # Jeśli nie znaleziono członka lub nie wykryto roli, spróbuj pobrać go jeszcze raz bezpośrednio z API
+                    has_role = False
+                    if member and self.role in member.roles:
+                        has_role = True
+                        logger.info(
+                            f"[SELL_ROLE] Znaleziono rolę {role_name} w cache Discord dla {member.display_name}"
+                        )
+                    else:
+                        logger.warning(
+                            f"[SELL_ROLE] Nie znaleziono roli {role_name} w cache Discord dla {member.display_name if member else 'nieznany'}, próbuję pobrać bezpośrednio z API"
+                        )
+                        try:
+                            # Próba pobrania członka bezpośrednio z API zamiast cache'u
+                            fresh_member = await confirm_interaction.guild.fetch_member(member_id)
+
+                            # Logujemy role pobrane bezpośrednio z API
+                            fresh_user_roles = [r.name for r in fresh_member.roles]
+                            fresh_user_role_ids = [r.id for r in fresh_member.roles]
+                            logger.info(f"[SELL_ROLE] Role użytkownika z API: {fresh_user_roles}")
+                            logger.info(
+                                f"[SELL_ROLE] ID ról użytkownika z API: {fresh_user_role_ids}"
+                            )
+
+                            if fresh_member and self.role in fresh_member.roles:
+                                has_role = True
+                                member = fresh_member  # Zastąp member świeżymi danymi
+                                logger.info(
+                                    f"[SELL_ROLE] Znaleziono rolę {role_name} przez bezpośrednie API dla {member.display_name}"
+                                )
+                            else:
+                                logger.warning(
+                                    f"[SELL_ROLE] Nawet przez API nie znaleziono roli {role_name} dla {fresh_member.display_name if fresh_member else 'nieznany'}"
+                                )
+
+                                # Próba alternatywnego sprawdzenia ról - być może ID roli się zmieniło
+                                all_roles = confirm_interaction.guild.roles
+                                matching_roles = [r for r in all_roles if r.name == role_name]
+                                if matching_roles:
+                                    for matching_role in matching_roles:
+                                        logger.info(
+                                            f"[SELL_ROLE] Znaleziono rolę o nazwie {role_name} z ID: {matching_role.id}"
+                                        )
+                                        if matching_role in fresh_member.roles:
+                                            logger.info(
+                                                f"[SELL_ROLE] Użytkownik ma rolę o nazwie {role_name} ale z ID: {matching_role.id} zamiast {role_id}"
+                                            )
+                                            # Przypisujemy nowe ID roli jeśli się zmieniło
+                                            self.role = matching_role
+                                            has_role = True
+                                            break
+                        except Exception as e:
+                            logger.error(f"[SELL_ROLE] Błąd podczas pobierania członka z API: {e}")
+
+                    if not has_role:
+                        try:
+                            await confirm_interaction.followup.send(
+                                "Nie masz już tej roli na Discord.", ephemeral=True
+                            )
+                            logger.warning(
+                                f"[SELL_ROLE] Przerwano sprzedaż - użytkownik nie ma roli {role_name} na Discord"
+                            )
+                        except:
+                            pass
+                        return
+
+                    # 3. KROK 1: Sprawdź bazę danych
+                    has_role_in_db = False
+                    db_role = None
+                    async with self.bot.get_db() as session:
+                        try:
+                            # Standardowe sprawdzenie po ID roli
+                            db_role = await RoleQueries.get_member_role(session, member_id, role_id)
+                            has_role_in_db = db_role is not None
+                            logger.info(
+                                f"[SELL_ROLE] Sprawdzenie roli w bazie danych po ID {role_id}: {has_role_in_db}"
+                            )
+
+                            # Jeśli nie znaleziono roli po ID, ale mamy już nowe ID (bo wykryliśmy rolę o tej samej nazwie)
+                            if (
+                                not has_role_in_db
+                                and hasattr(self, "role")
+                                and self.role.id != role_id
+                            ):
+                                # Sprawdzamy czy użytkownik ma rolę o tej samej nazwie w bazie danych
+                                logger.info(
+                                    f"[SELL_ROLE] Nie znaleziono roli po ID {role_id}, sprawdzam czy jest rola o ID {self.role.id}"
+                                )
+                                alternative_db_role = await RoleQueries.get_member_role(
+                                    session, member_id, self.role.id
+                                )
+                                if alternative_db_role is not None:
+                                    logger.info(
+                                        f"[SELL_ROLE] Znaleziono alternatywną rolę w bazie danych o ID {self.role.id}"
+                                    )
+                                    has_role_in_db = True
+                                    db_role = alternative_db_role
+                                    role_id = self.role.id  # Zaktualizuj ID roli
+
+                            await session.commit()
+                        except Exception as e:
+                            logger.error(
+                                f"[SELL_ROLE] Błąd podczas sprawdzania roli w bazie danych: {e}"
+                            )
+                            await session.rollback()
+
+                    if not has_role_in_db:
+                        try:
+                            await confirm_interaction.followup.send(
+                                "Nie jesteś już właścicielem tej roli w bazie danych.",
+                                ephemeral=True,
+                            )
+                            logger.warning(
+                                f"[SELL_ROLE] Przerwano sprzedaż - użytkownik nie ma roli {role_name} w bazie danych"
+                            )
+                        except:
+                            pass
+                        return
+
+                    # 4. KROK 2: Usuń rolę z Discord (bez dostępu do bazy danych)
+                    try:
+                        await member.remove_roles(self.role)
+                        logger.info(
+                            f"[SELL_ROLE] Usunięto rolę {role_name} z Discord dla {member.display_name}"
+                        )
+                    except Exception as e:
+                        logger.error(f"[SELL_ROLE] Błąd podczas usuwania roli Discord: {e}")
+                        try:
+                            await confirm_interaction.followup.send(
+                                "Wystąpił błąd podczas usuwania roli Discord.", ephemeral=True
+                            )
+                        except:
+                            pass
+                        return
+
+                    # 5. KROK 3: Usuń teamy i uprawnienia moderatora
+                    # WAŻNA ZMIANA: Najpierw usuwamy teamy i uprawnienia, a dopiero potem rolę z bazy
+                    permissions_removed = False
                     try:
                         async with self.bot.get_db() as session:
-                            # Verify in database that the user owns this role
-                            db_role = await RoleQueries.get_member_role(
-                                session, confirm_interaction.user.id, self.role.id
+                            await remove_premium_role_mod_permissions(session, self.bot, member_id)
+                            await session.commit()
+                            permissions_removed = True
+                            logger.info(
+                                f"[SELL_ROLE] Usunięto uprawnienia moderatora i teamy dla {member.display_name}"
                             )
-                            if not db_role:
-                                await confirm_interaction.response.send_message(
-                                    "Nie jesteś właścicielem tej roli w bazie danych.",
-                                    ephemeral=True,
-                                )
-                                return
+                    except Exception as e:
+                        logger.error(f"[SELL_ROLE] Błąd podczas usuwania uprawnień: {e}")
+                        # Nawet jeśli wystąpił błąd, kontynuujemy (to nie jest krytyczne)
 
-                            # Remove role from database
-                            await RoleQueries.delete_member_role(
-                                session, self.original_interaction.user.id, self.role.id
+                    # 6. KROK 4: Usuń rolę z bazy danych jedną niezależną operacją (bez obsługi innych relacji)
+                    db_deleted = False
+                    try:
+                        async with self.bot.get_db() as session:
+                            from sqlalchemy import text
+
+                            # Używamy aktualnego role_id, które mogło zostać zaktualizowane wcześniej
+                            sql = text(
+                                "DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
                             )
-
-                            # Usuń uprawnienia moderatora nadane przez użytkownika
-                            await remove_premium_role_mod_permissions(
-                                session, self.bot, self.original_interaction.user.id
+                            result = await session.execute(
+                                sql, {"member_id": member_id, "role_id": role_id}
                             )
-
-                            # Add refund to wallet
-                            await MemberQueries.add_to_wallet_balance(
-                                session, self.original_interaction.user.id, self.refund_amount
+                            rows_deleted = result.rowcount if hasattr(result, "rowcount") else 0
+                            logger.info(
+                                f"[SELL_ROLE] Wynik SQL DELETE: usunięto {rows_deleted} wierszy"
                             )
                             await session.commit()
+                            db_deleted = rows_deleted > 0
+                            logger.info(
+                                f"[SELL_ROLE] Usunięto rolę {role_name} (ID: {role_id}) z bazy danych dla {member.display_name}"
+                            )
+                    except Exception as e:
+                        logger.error(f"[SELL_ROLE] Błąd podczas usuwania roli z bazy danych: {e}")
+                        db_deleted = False
 
-                        # Remove role from member
-                        await self.original_interaction.user.remove_roles(self.role)
+                    if not db_deleted:
+                        # Przywróć rolę Discord i zakończ
+                        try:
+                            await member.add_roles(self.role)
+                            logger.info(
+                                f"[SELL_ROLE] Przywrócono rolę {role_name} na Discord po błędzie bazy danych"
+                            )
+                        except Exception as e:
+                            logger.error(f"[SELL_ROLE] Nie można przywrócić roli na Discord: {e}")
+                        try:
+                            await confirm_interaction.followup.send(
+                                "Wystąpił błąd podczas usuwania roli z bazy danych.", ephemeral=True
+                            )
+                        except:
+                            pass
+                        return
 
-                        # Send success message
-                        await confirm_interaction.response.send_message(
-                            f"Sprzedano rangę {self.role.name} za {self.refund_amount}{CURRENCY_UNIT}.",
+                    # 7. KROK 5: Dodaj zwrot do portfela
+                    refund_added = False
+                    try:
+                        async with self.bot.get_db() as session:
+                            await MemberQueries.add_to_wallet_balance(
+                                session, member_id, refund_amount
+                            )
+                            await session.commit()
+                            refund_added = True
+                            logger.info(
+                                f"[SELL_ROLE] Dodano zwrot {refund_amount}G do portfela użytkownika {member.display_name}"
+                            )
+                    except Exception as e:
+                        logger.error(f"[SELL_ROLE] Błąd podczas dodawania zwrotu: {e}")
+
+                    if not refund_added:
+                        try:
+                            await confirm_interaction.followup.send(
+                                "Rola została usunięta, ale wystąpił błąd podczas dodawania zwrotu do portfela. Skontaktuj się z administracją.",
+                                ephemeral=True,
+                            )
+                            logger.error(
+                                f"[SELL_ROLE] Nie można dodać zwrotu do portfela użytkownika {member.display_name}"
+                            )
+                        except:
+                            pass
+                        return
+
+                    # 8. Wyślij wiadomość o sukcesie
+                    try:
+                        await confirm_interaction.followup.send(
+                            f"Sprzedano rangę {role_name} za {refund_amount}{CURRENCY_UNIT}.",
                             ephemeral=True,
                         )
-
-                        # Try to edit original message if possible
-                        if self.message:
-                            await self.message.edit(view=self)
-
-                        self.value = True
-                        self.stop()
-
-                    except Exception as e:
-                        await confirm_interaction.response.send_message(
-                            f"Wystąpił błąd podczas sprzedaży roli: {str(e)}", ephemeral=True
+                        logger.info(
+                            f"[SELL_ROLE] Zakończono pomyślnie sprzedaż roli {role_name} za {refund_amount}G dla {member.display_name}"
                         )
-                        self.value = False
-                        self.stop()
+
+                        # Próba automatycznego odświeżenia profilu użytkownika
+                        try:
+                            # Utwórz kontekst dla komendy profile
+                            ctx = await self.bot.get_context(self.original_interaction.message)
+                            if ctx:
+                                ctx.author = member
+                                logger.info(
+                                    f"[SELL_ROLE] Próba wywołania komendy profile dla użytkownika {member.display_name}"
+                                )
+
+                                # Odczekaj 1 sekundę aby dać czas na aktualizację bazy danych
+                                await asyncio.sleep(1)
+
+                                # Wyślij publiczną wiadomość o udanej sprzedaży
+                                embed = discord.Embed(
+                                    title="Sprzedaż rangi",
+                                    description=f"{member.mention} sprzedał rangę {role_name} za {refund_amount}{CURRENCY_UNIT}.",
+                                    color=discord.Color.green(),
+                                )
+                                await ctx.send(embed=embed)
+                        except Exception as e:
+                            logger.error(f"[SELL_ROLE] Błąd podczas odświeżania profilu: {e}")
+                    except Exception as e:
+                        logger.error(f"[SELL_ROLE] Nie można wysłać wiadomości o sukcesie: {e}")
+
+                    # 9. Zaktualizuj wiadomość
+                    if self.message:
+                        try:
+                            await self.message.edit(view=self)
+                        except Exception as e:
+                            logger.error(f"[SELL_ROLE] Nie można zaktualizować wiadomości: {e}")
+
+                    self.value = True
+                    self.stop()
 
                 @discord.ui.button(label="Anuluj", style=discord.ButtonStyle.secondary)
                 async def cancel(
                     self, cancel_interaction: discord.Interaction, button: discord.ui.Button
                 ):
                     if cancel_interaction.user.id != self.original_interaction.user.id:
-                        await cancel_interaction.response.send_message(
-                            "Nie możesz anulować tej transakcji.", ephemeral=True
-                        )
+                        try:
+                            await cancel_interaction.response.send_message(
+                                "Nie możesz anulować tej transakcji.", ephemeral=True
+                            )
+                        except:
+                            pass
                         return
 
-                    # Disable all buttons
+                    # Wyłącz wszystkie przyciski
                     for item in self.children:
                         item.disabled = True
 
-                    await cancel_interaction.response.send_message(
-                        "Anulowano sprzedaż rangi.", ephemeral=True
-                    )
+                    try:
+                        await cancel_interaction.response.send_message(
+                            "Anulowano sprzedaż rangi.", ephemeral=True
+                        )
+                    except:
+                        pass
 
-                    # Try to edit original message if possible
+                    # Zaktualizuj oryginalną wiadomość jeśli to możliwe
                     if self.message:
-                        await self.message.edit(view=self)
+                        try:
+                            await self.message.edit(view=self)
+                        except:
+                            pass
 
                     self.value = False
                     self.stop()

@@ -169,29 +169,29 @@ class AutoKickManager:
         try:
             await self._initialize_cache()
 
-            self.logger.info(f"Checking autokick for member {member.id} in channel {channel.id}")
-            self.logger.info(
-                f"Current cache state for member {member.id}: {self._autokick_cache.get(member.id, set())}"
-            )
+            # self.logger.info(f"Checking autokick for member {member.id} in channel {channel.id}")
+            # self.logger.info(
+            #     f"Current cache state for member {member.id}: {self._autokick_cache.get(member.id, set())}"
+            # )
 
             if member.id not in self._autokick_cache:
-                self.logger.info(f"Member {member.id} not in autokick cache")
+                # self.logger.info(f"Member {member.id} not in autokick cache")
                 return False, set()
 
             # Check if any channel members have autokick on this member
             channel_member_ids = {m.id for m in channel.members}
-            self.logger.info(f"Channel {channel.id} members: {channel_member_ids}")
+            # self.logger.info(f"Channel {channel.id} members: {channel_member_ids}")
 
             owner_ids = self._autokick_cache[member.id]
-            self.logger.info(f"Owners who have autokick on member {member.id}: {owner_ids}")
+            # self.logger.info(f"Owners who have autokick on member {member.id}: {owner_ids}")
 
             # Check intersection between channel members and owners who have autokick
             matching_owners = owner_ids.intersection(channel_member_ids)
             if matching_owners:
-                self.logger.info(f"Found matching owners in channel: {matching_owners}")
+                # self.logger.info(f"Found matching owners in channel: {matching_owners}")
                 return True, matching_owners
 
-            self.logger.info(f"No matching owners found for member {member.id}")
+            # self.logger.info(f"No matching owners found for member {member.id}")
             return False, set()
         except Exception as e:
             self.logger.error(f"Error in check_autokick: {str(e)}")

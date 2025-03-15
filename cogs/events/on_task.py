@@ -198,7 +198,7 @@ class OnTaskEvent(commands.Cog):
                             # Usuń tylko uprawnienia moderatorów nadane przez tego użytkownika
                             await remove_premium_role_mod_permissions(session, self.bot, member.id)
                             logger.info(
-                                "Removed all moderator permissions granted by %s (%d)",
+                                "Removed premium role privileges (mod permissions and teams) for %s (%d)",
                                 member.display_name,
                                 member.id,
                             )
