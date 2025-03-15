@@ -475,7 +475,7 @@ class PremiumCog(commands.Cog):
                 f"• **Kanał**: {team_channel.mention}\n"
                 f"• **Rola**: {team_role.mention}\n"
                 f"• **Właściciel**: {ctx.author.mention}\n\n"
-                f"Możesz zarządzać członkami teamu za pomocą komendy `{self.prefix}team member add/remove`."
+                f"Możesz zarządzać członkami teamu za pomocą komendy `{self.prefix}team member <@użytkownik> [+/-]`."
                 f"{additional_info}"
             )
 
