@@ -43,9 +43,9 @@ async def create_shop_embed(
         )
 
     embed = discord.Embed(
-        title=title, 
-        description=description, 
-        color=viewer.color if viewer.color.value != 0 else discord.Color.blurple()
+        title=title,
+        description=description,
+        color=viewer.color if viewer.color.value != 0 else discord.Color.blurple(),
     )
     avatar_url = get_user_avatar_url(viewer, ctx.bot)
     embed.set_author(name=f"{viewer.display_name}", icon_url=avatar_url)

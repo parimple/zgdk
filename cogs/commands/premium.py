@@ -581,7 +581,11 @@ class PremiumCog(commands.Cog):
                     # Sprawdź nowy format topicu: "id_właściciela id_roli"
                     topic_parts = channel.topic.split()
                     # Jeśli topic ma format id_właściciela id_roli
-                    if len(topic_parts) >= 2 and topic_parts[0] == str(ctx.author.id) and topic_parts[1] == str(team_role.id):
+                    if (
+                        len(topic_parts) >= 2
+                        and topic_parts[0] == str(ctx.author.id)
+                        and topic_parts[1] == str(team_role.id)
+                    ):
                         team_channel = channel
                         break
                     # Dla kompatybilności ze starym formatem
@@ -594,16 +598,19 @@ class PremiumCog(commands.Cog):
                 # Najpierw usuń symbol teamu i emoji jeśli istnieje
                 channel_parts = new_team_name.split()
                 actual_name = channel_parts[-1] if len(channel_parts) >= 2 else new_team_name
-                
+
                 # Stwórz nazwę kanału zgodną z wymaganiami Discord (małe litery, cyfry, myślniki)
                 import re
-                channel_name = re.sub(r'[^a-zA-Z0-9 ]', '', actual_name)
+
+                channel_name = re.sub(r"[^a-zA-Z0-9 ]", "", actual_name)
                 channel_name = channel_name.lower().strip().replace(" ", "-")
-                
+
                 # Dodaj prefix teamu dla lepszej organizacji
                 channel_name = f"☫-{channel_name}"
-                
-                logger.info(f"Aktualizacja nazwy kanału teamu z {team_channel.name} na {channel_name}")
+
+                logger.info(
+                    f"Aktualizacja nazwy kanału teamu z {team_channel.name} na {channel_name}"
+                )
                 await team_channel.edit(name=channel_name)
 
                 # Wyślij informację o sukcesie - bez dodawania symbolu ponownie
@@ -626,7 +633,7 @@ class PremiumCog(commands.Cog):
     @team.command(name="member")
     @app_commands.describe(
         target="Użytkownik do dodania/usunięcia z teamu",
-        action="Dodaj (+) lub usuń (-) użytkownika z teamu. Bez parametru działa jak przełącznik."
+        action="Dodaj (+) lub usuń (-) użytkownika z teamu. Bez parametru działa jak przełącznik.",
     )
     async def team_member(
         self,
@@ -648,12 +655,12 @@ class PremiumCog(commands.Cog):
 
         # Sprawdź czy osoba jest już w teamie
         is_in_team = team_role in target.roles
-        
+
         # Określ akcję na podstawie parametrów
         # Jeśli nie podano jawnej akcji, przełącz członkostwo
         if action is None:
             action = "-" if is_in_team else "+"
-        
+
         # Obsługa dodawania do teamu
         if action == "+" and not is_in_team:
             # Sprawdź czy osoba nie ma już innego teamu
@@ -662,11 +669,11 @@ class PremiumCog(commands.Cog):
                 return await self.message_sender.send_error(
                     ctx, f"{target.mention} jest już członkiem teamu **{member_team.name}**."
                 )
-                
+
             # Sprawdź limit członków na podstawie roli właściciela
             current_members = len([m for m in ctx.guild.members if team_role in m.roles])
             team_size_limit = 0
-            
+
             # Znajdź najwyższą rangę premium użytkownika i jej limit
             for role_config in reversed(self.bot.config["premium_roles"]):
                 if any(r.name == role_config["name"] for r in ctx.author.roles):
@@ -674,18 +681,18 @@ class PremiumCog(commands.Cog):
                         "team_size", 10
                     )  # Domyślnie 10 jeśli nie określono
                     break
-                    
+
             if current_members >= team_size_limit:
                 return await self.message_sender.send_error(
                     ctx,
                     f"Osiągnięto limit członków teamu ({current_members}/{team_size_limit}). "
                     f"Aby zwiększyć limit, potrzebujesz wyższej rangi premium.",
                 )
-                
+
             try:
                 # Dodaj rolę do użytkownika
                 await target.add_roles(team_role)
-                
+
                 # Wyślij informację o sukcesie
                 description = f"Dodano **{target.mention}** do teamu **{team_role.mention}**!"
                 await self._send_premium_embed(ctx, description=description)
@@ -694,13 +701,13 @@ class PremiumCog(commands.Cog):
                 await self.message_sender.send_error(
                     ctx, f"Wystąpił błąd podczas dodawania członka do teamu: {str(e)}"
                 )
-        
+
         # Obsługa usuwania z teamu
         elif action == "-" and is_in_team:
             try:
                 # Usuń rolę od użytkownika
                 await target.remove_roles(team_role)
-                
+
                 # Wyślij informację o sukcesie
                 description = f"Usunięto **{target.mention}** z teamu **{team_role.mention}**!"
                 await self._send_premium_embed(ctx, description=description)
@@ -709,7 +716,7 @@ class PremiumCog(commands.Cog):
                 await self.message_sender.send_error(
                     ctx, f"Wystąpił błąd podczas usuwania członka z teamu: {str(e)}"
                 )
-        
+
         # Jeśli akcja nie pasuje do obecnego stanu
         elif (action == "+" and is_in_team) or (action == "-" and not is_in_team):
             state = "już jest" if is_in_team else "nie jest"

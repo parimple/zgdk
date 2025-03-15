@@ -154,6 +154,16 @@ class InfoCog(commands.Cog):
             premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
             bypass_until = await MemberQueries.get_voice_bypass_status(session, member.id)
 
+            # Get owned teams from database
+            from sqlalchemy import select
+
+            from datasources.models import Role as DBRole
+
+            owned_teams_query = await session.execute(
+                select(DBRole).where((DBRole.role_type == "team") & (DBRole.name == str(member.id)))
+            )
+            owned_teams = owned_teams_query.scalars().all()
+
         current_time = datetime.now(timezone.utc)
         logger.info(f"Current time: {current_time}")
         for member_role, role in premium_roles:
@@ -196,6 +206,16 @@ class InfoCog(commands.Cog):
 
         if premium_roles:
             PremiumManager.add_premium_roles_to_embed(ctx, embed, premium_roles)
+
+        # Add team ownership information right after premium roles
+        if owned_teams:
+            team_roles = []
+            for team in owned_teams:
+                team_role = ctx.guild.get_role(team.id)
+                if team_role:
+                    team_roles.append(team_role.mention)
+            if team_roles:
+                embed.add_field(name="Właściciel Drużyny:", value=" ".join(team_roles), inline=True)
 
         if db_member.first_inviter_id is not None:
             first_inviter = self.bot.get_user(db_member.first_inviter_id)
@@ -647,7 +667,9 @@ class SellRoleButton(discord.ui.Button):
                 title="Sprzedaż rangi",
                 description=f"Czy na pewno chcesz sprzedać rangę {role.name}?\n"
                 f"Otrzymasz zwrot w wysokości {refund_amount}{CURRENCY_UNIT}.",
-                color=interaction.user.color if interaction.user.color.value != 0 else discord.Color.red(),
+                color=interaction.user.color
+                if interaction.user.color.value != 0
+                else discord.Color.red(),
             )
 
             # Create a new view with a timeout
@@ -975,7 +997,9 @@ class SellRoleButton(discord.ui.Button):
                                 embed = discord.Embed(
                                     title="Sprzedaż rangi",
                                     description=f"{member.mention} sprzedał rangę **{role_name}** za **{refund_amount}{CURRENCY_UNIT}**.\nSaldo zostało zaktualizowane.",
-                                    color=member.color if member.color.value != 0 else discord.Color.green(),
+                                    color=member.color
+                                    if member.color.value != 0
+                                    else discord.Color.green(),
                                 )
                                 await ctx.send(embed=embed)
                         except Exception as e:
