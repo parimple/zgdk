@@ -697,7 +697,7 @@ class PremiumCog(commands.Cog):
         # Jeśli akcja nie pasuje do obecnego stanu
         elif (action == "+" and is_in_team) or (action == "-" and not is_in_team):
             state = "już jest" if is_in_team else "nie jest"
-            await self.message_sender.send_info(
+            await self.message_sender.send_success(
                 ctx, f"{target.mention} {state} członkiem teamu **{team_role.name}**."
             )
 
