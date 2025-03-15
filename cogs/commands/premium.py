@@ -577,13 +577,17 @@ class PremiumCog(commands.Cog):
             team_channel = None
 
             for channel in team_channels:
-                if (
-                    channel.topic
-                    and str(ctx.author.id) in channel.topic
-                    and "Team Channel" in channel.topic
-                ):
-                    team_channel = channel
-                    break
+                if channel.topic and str(ctx.author.id) in channel.topic:
+                    # Sprawdź nowy format topicu: "id_właściciela id_roli"
+                    topic_parts = channel.topic.split()
+                    # Jeśli topic ma format id_właściciela id_roli
+                    if len(topic_parts) >= 2 and topic_parts[0] == str(ctx.author.id) and topic_parts[1] == str(team_role.id):
+                        team_channel = channel
+                        break
+                    # Dla kompatybilności ze starym formatem
+                    elif "Team Channel" in channel.topic:
+                        team_channel = channel
+                        break
 
             if team_channel:
                 # Aktualizuj nazwę kanału
