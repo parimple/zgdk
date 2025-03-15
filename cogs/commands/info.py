@@ -864,13 +864,6 @@ class SellRoleButton(discord.ui.Button):
                         )
                     except Exception as e:
                         logger.error(f"[SELL_ROLE] Błąd podczas usuwania roli Discord: {e}")
-                        try:
-                            await confirm_interaction.followup.send(
-                                "Wystąpił błąd podczas usuwania roli Discord.", ephemeral=True
-                            )
-                        except:
-                            pass
-                        return
 
                     # 5. KROK 3: Usuń teamy i uprawnienia moderatora
                     # WAŻNA ZMIANA: Najpierw usuwamy teamy i uprawnienia, a dopiero potem rolę z bazy
@@ -985,12 +978,6 @@ class SellRoleButton(discord.ui.Button):
                                     color=member.color if member.color.value != 0 else discord.Color.green(),
                                 )
                                 await ctx.send(embed=embed)
-                                
-                                # Powiadom użytkownika krótką wiadomością
-                                await confirm_interaction.followup.send(
-                                    "Transakcja zakończona pomyślnie.", 
-                                    ephemeral=True
-                                )
                         except Exception as e:
                             logger.error(f"[SELL_ROLE] Błąd podczas odświeżania profilu: {e}")
                     except Exception as e:
@@ -1042,7 +1029,7 @@ class SellRoleButton(discord.ui.Button):
 
             view = ConfirmView(self.bot, self.owner_id, role, refund_amount, interaction)
             message = await interaction.response.send_message(
-                embed=embed, view=view, ephemeral=True
+                "Potwierdź sprzedaż rangi:", embed=embed, view=view
             )
             view.message = await interaction.original_response()
             # Wait for the view to finish
