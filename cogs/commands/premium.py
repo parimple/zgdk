@@ -590,8 +590,20 @@ class PremiumCog(commands.Cog):
                         break
 
             if team_channel:
-                # Aktualizuj nazwę kanału
-                channel_name = new_team_name.lower().replace(" ", "-")
+                # Aktualizuj nazwę kanału - usuń symbole specjalne i emoji, zachowaj tylko alfanumeryczne znaki
+                # Najpierw usuń symbol teamu i emoji jeśli istnieje
+                channel_parts = new_team_name.split()
+                actual_name = channel_parts[-1] if len(channel_parts) >= 2 else new_team_name
+                
+                # Stwórz nazwę kanału zgodną z wymaganiami Discord (małe litery, cyfry, myślniki)
+                import re
+                channel_name = re.sub(r'[^a-zA-Z0-9 ]', '', actual_name)
+                channel_name = channel_name.lower().strip().replace(" ", "-")
+                
+                # Dodaj prefix teamu dla lepszej organizacji
+                channel_name = f"☫-{channel_name}"
+                
+                logger.info(f"Aktualizacja nazwy kanału teamu z {team_channel.name} na {channel_name}")
                 await team_channel.edit(name=channel_name)
 
                 # Wyślij informację o sukcesie - bez dodawania symbolu ponownie
