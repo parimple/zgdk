@@ -647,7 +647,7 @@ class SellRoleButton(discord.ui.Button):
                 title="Sprzedaż rangi",
                 description=f"Czy na pewno chcesz sprzedać rangę {role.name}?\n"
                 f"Otrzymasz zwrot w wysokości {refund_amount}{CURRENCY_UNIT}.",
-                color=discord.Color.red(),
+                color=interaction.user.color if interaction.user.color.value != 0 else discord.Color.red(),
             )
 
             # Create a new view with a timeout
@@ -960,10 +960,7 @@ class SellRoleButton(discord.ui.Button):
 
                     # 8. Wyślij wiadomość o sukcesie
                     try:
-                        await confirm_interaction.followup.send(
-                            f"Sprzedano rangę {role_name} za {refund_amount}{CURRENCY_UNIT}.",
-                            ephemeral=True,
-                        )
+                        # Log success
                         logger.info(
                             f"[SELL_ROLE] Zakończono pomyślnie sprzedaż roli {role_name} za {refund_amount}G dla {member.display_name}"
                         )
@@ -984,10 +981,16 @@ class SellRoleButton(discord.ui.Button):
                                 # Wyślij publiczną wiadomość o udanej sprzedaży
                                 embed = discord.Embed(
                                     title="Sprzedaż rangi",
-                                    description=f"{member.mention} sprzedał rangę {role_name} za {refund_amount}{CURRENCY_UNIT}.",
-                                    color=discord.Color.green(),
+                                    description=f"{member.mention} sprzedał rangę **{role_name}** za **{refund_amount}{CURRENCY_UNIT}**.\nSaldo zostało zaktualizowane.",
+                                    color=member.color if member.color.value != 0 else discord.Color.green(),
                                 )
                                 await ctx.send(embed=embed)
+                                
+                                # Powiadom użytkownika krótką wiadomością
+                                await confirm_interaction.followup.send(
+                                    "Transakcja zakończona pomyślnie.", 
+                                    ephemeral=True
+                                )
                         except Exception as e:
                             logger.error(f"[SELL_ROLE] Błąd podczas odświeżania profilu: {e}")
                     except Exception as e:
