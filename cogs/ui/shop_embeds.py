@@ -42,7 +42,11 @@ async def create_shop_embed(
             "Pamiętaj, aby podczas wpłaty wpisać swoje ID w polu 'Wpisz swój nick'"
         )
 
-    embed = discord.Embed(title=title, description=description, color=discord.Color.blurple())
+    embed = discord.Embed(
+        title=title, 
+        description=description, 
+        color=viewer.color if viewer.color.value != 0 else discord.Color.blurple()
+    )
     avatar_url = get_user_avatar_url(viewer, ctx.bot)
     embed.set_author(name=f"{viewer.display_name}", icon_url=avatar_url)
     embed.set_thumbnail(url=avatar_url)
@@ -78,7 +82,7 @@ async def create_role_description_embed(
     embed = discord.Embed(
         title=f"Opis roli {role_name}",
         description="\n".join([f"• {feature}" for feature in role["features"]]),
-        color=discord.Color.blurple(),
+        color=viewer.color if viewer.color.value != 0 else discord.Color.blurple(),
     )
     avatar_url = get_user_avatar_url(viewer, ctx.bot)
     embed.set_author(name=f"{viewer.display_name}", icon_url=avatar_url)
