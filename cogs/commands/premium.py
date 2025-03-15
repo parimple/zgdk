@@ -761,7 +761,9 @@ class PremiumCog(commands.Cog):
             )
 
     @team.command(name="emoji")
-    @app_commands.describe(emoji="Emoji teamu (opcjonalne, bez podania usuwa ikonę)")
+    @app_commands.describe(
+        emoji="Emoji teamu (animowane emoji zostaną przekonwertowane na statyczne)"
+    )
     async def team_emoji(self, ctx, emoji: Optional[str] = None):
         """Set team emoji as role icon or remove icon if no emoji provided."""
         # Dokładne logowanie, co otrzymaliśmy
@@ -849,6 +851,13 @@ class PremiumCog(commands.Cog):
                         description=f"`{emoji}` nie jest poprawnym emoji.",
                         color=0xFF0000,
                     )
+
+        # Dodaj ostrzeżenie dla animowanych emoji
+        if emoji and emoji.startswith("<a:"):
+            await ctx.send(
+                "⚠️ Animowane emoji zostanie przekonwertowane na statyczne (pierwsza klatka).",
+                ephemeral=True,
+            )
 
         # Logujemy, czy emoji jest poprawne według walidatora
         is_valid = emoji_validator(emoji)
@@ -1273,33 +1282,67 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
         # Custom emoji format: <:name:id> or <a:name:id>
         parts = emoji_str.split(":")
 
-        # For emoji in format <:nazwa:id> we get ['', 'name', 'id>']
-        # For emoji in format <a:nazwa:id> we get ['<a', 'name', 'id']
         if len(parts) >= 3:
             # Extract the ID properly, removing the closing ">"
             emoji_id = parts[-1].replace(">", "")
             # Check if it's an animated emoji
             is_animated = emoji_str.startswith("<a:")
 
-            # Format the URL
-            ext = "gif" if is_animated else "png"
-            emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
+            # For animated emoji, always try to get PNG first (first frame)
+            # Only if PNG fails, try GIF and extract first frame
+            if is_animated:
+                # Try PNG first
+                emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.png"
+                logger.info(f"Fetching first frame of animated emoji from URL: {emoji_url}")
 
-            logger.info(f"Fetching custom emoji from URL: {emoji_url}")
+                try:
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(emoji_url)
+                        if response.status_code == 200:
+                            logger.info(f"Successfully downloaded static version of animated emoji")
+                            return response.content
+                except Exception as e:
+                    logger.error(f"Error getting static version of animated emoji: {str(e)}")
 
-            # Use httpx to get the emoji image
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(emoji_url)
-                    if response.status_code == 200:
-                        logger.info(f"Successfully downloaded custom emoji image from {emoji_url}")
-                        return response.content
-                    else:
-                        logger.error(
-                            f"Failed to download custom emoji image from {emoji_url}: HTTP {response.status_code}"
-                        )
-            except Exception as e:
-                logger.error(f"Error getting custom emoji from URL: {emoji_url}, error: {str(e)}")
+                # If PNG failed, try GIF and extract first frame
+                try:
+                    emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.gif"
+                    logger.info(f"Fetching animated emoji from URL: {emoji_url}")
+
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(emoji_url)
+                        if response.status_code == 200:
+                            # Use PIL to extract first frame
+                            import io
+
+                            from PIL import Image
+
+                            gif = Image.open(io.BytesIO(response.content))
+                            # Convert to RGBA if needed
+                            if gif.mode != "RGBA":
+                                gif = gif.convert("RGBA")
+
+                            # Save first frame as PNG
+                            output = io.BytesIO()
+                            gif.save(output, format="PNG")
+                            output.seek(0)
+                            logger.info(f"Successfully extracted first frame from animated emoji")
+                            return output.getvalue()
+                except Exception as e:
+                    logger.error(f"Error processing animated emoji: {str(e)}")
+            else:
+                # For static emoji, just get PNG
+                emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.png"
+                logger.info(f"Fetching static emoji from URL: {emoji_url}")
+
+                try:
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(emoji_url)
+                        if response.status_code == 200:
+                            logger.info(f"Successfully downloaded static emoji")
+                            return response.content
+                except Exception as e:
+                    logger.error(f"Error getting static emoji: {str(e)}")
 
     # For standard Unicode emojis, use the Twemoji CDN to get the emoji image
     try:
