@@ -607,116 +607,98 @@ class PremiumCog(commands.Cog):
                 ctx, f"Wystąpił błąd podczas zmiany nazwy teamu: {str(e)}"
             )
 
-    @team.group(name="member", invoke_without_command=True)
-    async def team_member(self, ctx):
-        """Zarządzaj członkami teamu."""
-        if ctx.invoked_subcommand is None:
-            description = (
-                "**Dostępne komendy:**\n"
-                f"`{self.prefix}team member add <@użytkownik>` - Dodaj członka do teamu\n"
-                f"`{self.prefix}team member remove <@użytkownik>` - Usuń członka z teamu"
-            )
-            await self.message_sender.send_success(ctx, description)
-
-    @team_member.command(name="add")
-    @app_commands.describe(member="Użytkownik do dodania do teamu")
-    async def team_member_add(self, ctx, member: discord.Member):
-        """Dodaj członka do swojego teamu."""
+    @team.command(name="member")
+    @app_commands.describe(
+        target="Użytkownik do dodania/usunięcia z teamu",
+        action="Dodaj (+) lub usuń (-) użytkownika z teamu. Bez parametru działa jak przełącznik."
+    )
+    async def team_member(
+        self,
+        ctx,
+        target: discord.Member,
+        action: Optional[Literal["+", "-"]] = None,
+    ):
+        """Dodaj lub usuń członka teamu. Bez parametru + lub - działa jak przełącznik."""
         # Użyj metody pomocniczej do sprawdzenia uprawnień
         has_perm, team_role, error_msg = await self._check_team_permissions(ctx, check_owner=True)
         if not has_perm:
             return await self.message_sender.send_error(ctx, error_msg)
 
-        # Sprawdź czy użytkownik nie próbuje dodać samego siebie
-        if member.id == ctx.author.id:
+        # Sprawdź czy użytkownik nie próbuje dodać/usunąć samego siebie
+        if target.id == ctx.author.id:
             return await self.message_sender.send_error(
-                ctx, "Nie możesz dodać siebie do teamu - jesteś już jego właścicielem."
+                ctx, "Nie możesz dodać/usunąć siebie z teamu - jesteś jego właścicielem."
             )
 
-        # Sprawdź czy osoba już jest w teamie
-        if team_role in member.roles:
-            return await self.message_sender.send_error(
-                ctx, f"{member.mention} już jest członkiem teamu **{team_role.name}**."
-            )
-
-        # Sprawdź czy osoba nie ma już innego teamu
-        member_team = await self._get_user_team_role(member)
-        if member_team:
-            return await self.message_sender.send_error(
-                ctx, f"{member.mention} jest już członkiem teamu **{member_team.name}**."
-            )
-
-        # Sprawdź limit członków na podstawie roli właściciela
-        current_members = len([m for m in ctx.guild.members if team_role in m.roles])
-        team_size_limit = 0
-
-        # Znajdź najwyższą rangę premium użytkownika i jej limit
-        for role_config in reversed(self.bot.config["premium_roles"]):
-            if any(r.name == role_config["name"] for r in ctx.author.roles):
-                team_size_limit = role_config.get(
-                    "team_size", 10
-                )  # Domyślnie 10 jeśli nie określono
-                break
-
-        if current_members >= team_size_limit:
-            return await self.message_sender.send_error(
-                ctx,
-                f"Osiągnięto limit członków teamu ({current_members}/{team_size_limit}). "
-                f"Aby zwiększyć limit, potrzebujesz wyższej rangi premium.",
-            )
-
-        try:
-            # Dodaj rolę do użytkownika
-            await member.add_roles(team_role)
-
-            # Wyślij informację o sukcesie
-            description = f"Dodano **{member.mention}** do teamu **{team_role.mention}**!"
-
-            # Użyj nowej metody do wysłania wiadomości
-            await self._send_premium_embed(ctx, description=description)
-
-        except Exception as e:
-            logger.error(f"Błąd podczas dodawania członka do teamu: {str(e)}")
-            await self.message_sender.send_error(
-                ctx, f"Wystąpił błąd podczas dodawania członka do teamu: {str(e)}"
-            )
-
-    @team_member.command(name="remove")
-    @app_commands.describe(member="Użytkownik do usunięcia z teamu")
-    async def team_member_remove(self, ctx, member: discord.Member):
-        """Remove a member from your team."""
-        # Użyj metody pomocniczej do sprawdzenia uprawnień
-        has_perm, team_role, error_msg = await self._check_team_permissions(ctx, check_owner=True)
-        if not has_perm:
-            return await self.message_sender.send_error(ctx, error_msg)
-
-        # Check if the user is trying to remove themselves
-        if member.id == ctx.author.id:
-            return await self.message_sender.send_error(
-                ctx,
-                "Nie możesz usunąć siebie z teamu. Aby usunąć team, skontaktuj się z administracją.",
-            )
-
-        # Check if the person is in the team
-        if team_role not in member.roles:
-            return await self.message_sender.send_error(
-                ctx, f"{member.mention} nie jest członkiem teamu **{team_role.name}**."
-            )
-
-        try:
-            # Usuń rolę od użytkownika
-            await member.remove_roles(team_role)
-
-            # Wyślij informację o sukcesie
-            description = f"Usunięto **{member.mention}** z teamu **{team_role.mention}**!"
-
-            # Użyj nowej metody do wysłania wiadomości
-            await self._send_premium_embed(ctx, description=description)
-
-        except Exception as e:
-            logger.error(f"Błąd podczas usuwania członka z teamu: {str(e)}")
-            await self.message_sender.send_error(
-                ctx, f"Wystąpił błąd podczas usuwania członka z teamu: {str(e)}"
+        # Sprawdź czy osoba jest już w teamie
+        is_in_team = team_role in target.roles
+        
+        # Określ akcję na podstawie parametrów
+        # Jeśli nie podano jawnej akcji, przełącz członkostwo
+        if action is None:
+            action = "-" if is_in_team else "+"
+        
+        # Obsługa dodawania do teamu
+        if action == "+" and not is_in_team:
+            # Sprawdź czy osoba nie ma już innego teamu
+            member_team = await self._get_user_team_role(target)
+            if member_team:
+                return await self.message_sender.send_error(
+                    ctx, f"{target.mention} jest już członkiem teamu **{member_team.name}**."
+                )
+                
+            # Sprawdź limit członków na podstawie roli właściciela
+            current_members = len([m for m in ctx.guild.members if team_role in m.roles])
+            team_size_limit = 0
+            
+            # Znajdź najwyższą rangę premium użytkownika i jej limit
+            for role_config in reversed(self.bot.config["premium_roles"]):
+                if any(r.name == role_config["name"] for r in ctx.author.roles):
+                    team_size_limit = role_config.get(
+                        "team_size", 10
+                    )  # Domyślnie 10 jeśli nie określono
+                    break
+                    
+            if current_members >= team_size_limit:
+                return await self.message_sender.send_error(
+                    ctx,
+                    f"Osiągnięto limit członków teamu ({current_members}/{team_size_limit}). "
+                    f"Aby zwiększyć limit, potrzebujesz wyższej rangi premium.",
+                )
+                
+            try:
+                # Dodaj rolę do użytkownika
+                await target.add_roles(team_role)
+                
+                # Wyślij informację o sukcesie
+                description = f"Dodano **{target.mention}** do teamu **{team_role.mention}**!"
+                await self._send_premium_embed(ctx, description=description)
+            except Exception as e:
+                logger.error(f"Błąd podczas dodawania członka do teamu: {str(e)}")
+                await self.message_sender.send_error(
+                    ctx, f"Wystąpił błąd podczas dodawania członka do teamu: {str(e)}"
+                )
+        
+        # Obsługa usuwania z teamu
+        elif action == "-" and is_in_team:
+            try:
+                # Usuń rolę od użytkownika
+                await target.remove_roles(team_role)
+                
+                # Wyślij informację o sukcesie
+                description = f"Usunięto **{target.mention}** z teamu **{team_role.mention}**!"
+                await self._send_premium_embed(ctx, description=description)
+            except Exception as e:
+                logger.error(f"Błąd podczas usuwania członka z teamu: {str(e)}")
+                await self.message_sender.send_error(
+                    ctx, f"Wystąpił błąd podczas usuwania członka z teamu: {str(e)}"
+                )
+        
+        # Jeśli akcja nie pasuje do obecnego stanu
+        elif (action == "+" and is_in_team) or (action == "-" and not is_in_team):
+            state = "już jest" if is_in_team else "nie jest"
+            await self.message_sender.send_info(
+                ctx, f"{target.mention} {state} członkiem teamu **{team_role.name}**."
             )
 
     @team.command(name="color")
@@ -1214,8 +1196,7 @@ class PremiumCog(commands.Cog):
         return (
             f"• `{self.prefix}team create <nazwa>` - Utwórz nowy team\n"
             f"• `{self.prefix}team name <nazwa>` - Zmień nazwę swojego teamu\n"
-            f"• `{self.prefix}team member add <@użytkownik>` - Dodaj członka do teamu\n"
-            f"• `{self.prefix}team member remove <@użytkownik>` - Usuń członka z teamu\n"
+            f"• `{self.prefix}team member <@użytkownik> [+/-]` - Dodaj/usuń członka do/z teamu\n"
             f"• `{self.prefix}team color <kolor>` - Ustaw kolor teamu (wymaga rangi zG500+)\n"
             f"• `{self.prefix}team emoji <emoji>` - Ustaw emoji teamu (wymaga rangi zG1000)"
         )
@@ -1240,7 +1221,7 @@ def emoji_validator(emoji_str: str) -> bool:
     if emoji_str.startswith("<") and emoji_str.endswith(">"):
         parts = emoji_str.strip("<>").split(":")
 
-        # Dla emoji w formacie <:nazwa:id> mamy ['', 'nazwa', 'id']
+        # Dla emoji w formacie <:nazwa:id> mamy ['', 'nazwa', 'id>']
         # Dla emoji w formacie <a:nazwa:id> mamy ['a', 'nazwa', 'id']
         # Upewnijmy się, że mamy co najmniej 3 części i druga oraz trzecia nie są puste
         if len(parts) >= 3 and parts[1] and parts[2]:
