@@ -2,6 +2,7 @@
 
 import io
 import logging
+from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import discord
@@ -12,6 +13,7 @@ from colour import Color
 from discord import app_commands
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont
+from sqlalchemy import select
 
 from datasources.models import MemberRole
 from datasources.models import Role as DBRole
@@ -19,6 +21,7 @@ from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 from utils.permissions import is_admin, is_zagadka_owner
 from utils.premium_checker import PremiumChecker
+from utils.team_manager import TeamManager
 
 logger = logging.getLogger(__name__)
 
@@ -235,15 +238,7 @@ class PremiumCog(commands.Cog):
         team_role = await self._get_user_team_role(ctx.author)
 
         # Lista dostępnych komend
-        available_commands = (
-            f"**Dostępne komendy:**\n"
-            f"• `{self.prefix}team create <nazwa>` - Utwórz nowy team\n"
-            f"• `{self.prefix}team name <nazwa>` - Zmień nazwę swojego teamu\n"
-            f"• `{self.prefix}team member add <@użytkownik>` - Dodaj członka do teamu\n"
-            f"• `{self.prefix}team member remove <@użytkownik>` - Usuń członka z teamu\n"
-            f"• `{self.prefix}team color <kolor>` - Ustaw kolor teamu (wymaga rangi zG500+)\n"
-            f"• `{self.prefix}team emoji <emoji>` - Ustaw emoji teamu (wymaga rangi zG1000)"
-        )
+        available_commands = f"**Dostępne komendy:**\n" f"{self._get_team_commands_description()}"
 
         if not team_role:
             # Create description
@@ -287,12 +282,65 @@ class PremiumCog(commands.Cog):
         """
         Create a new team (clan).
         """
-        # 1. Sprawdź, czy użytkownik ma już team
-        user_team_role = await self._get_user_team_role(ctx.author)
-        if user_team_role:
+        # 1. Sprawdź, czy użytkownik jest już właścicielem teamu w bazie danych
+        is_already_owner = False
+        existing_team = None
+        existing_team_role = None
+        existing_team_channel = None
+
+        async with self.bot.get_db() as session:
+            # Szukaj roli typu "team" z ID użytkownika jako właścicielem
+            result = await session.execute(
+                select(DBRole).where(
+                    (DBRole.role_type == "team") & (DBRole.name == str(ctx.author.id))
+                )
+            )
+            existing_team = result.scalar_one_or_none()
+            if existing_team:
+                is_already_owner = True
+                existing_team_role = ctx.guild.get_role(existing_team.id)
+
+        # Dodatkowe sprawdzenie kanałów - nawet jeśli nie ma roli w bazie, sprawdź czy są kanały
+        if not is_already_owner:
+            # Szukaj kanałów, które mogą należeć do teamu tego użytkownika
+            for channel in ctx.guild.channels:
+                if hasattr(channel, "topic") and channel.topic:
+                    topic_parts = channel.topic.split()
+                    # Sprawdź czy topic ma format id_właściciela id_roli
+                    if len(topic_parts) >= 2 and topic_parts[0] == str(ctx.author.id):
+                        is_already_owner = True
+                        existing_team_channel = channel
+                        role_id = (
+                            int(topic_parts[1])
+                            if len(topic_parts) > 1 and topic_parts[1].isdigit()
+                            else None
+                        )
+                        if role_id:
+                            existing_team_role = ctx.guild.get_role(role_id)
+                        break
+                    # Dla kompatybilności ze starym formatem
+                    elif "Team Channel" in channel.topic and str(ctx.author.id) in channel.topic:
+                        is_already_owner = True
+                        existing_team_channel = channel
+                        break
+
+        # Jeśli już jest właścicielem, wyświetl błąd
+        if is_already_owner:
+            team_mention = "unknown team"
+            if existing_team_role:
+                team_mention = existing_team_role.mention
+            elif existing_team:
+                team_mention = f"ID: {existing_team.id}"
+            elif existing_team_channel:
+                team_mention = f"kanał {existing_team_channel.mention}"
+
+            logger.warning(
+                f"User {ctx.author.display_name} tried to create a team but already owns {team_mention}"
+            )
+
             return await self._send_premium_embed(
                 ctx,
-                description=f"Masz już team **{user_team_role.mention}**. Najpierw opuść obecny team.",
+                description=f"Jesteś już właścicielem teamu **{team_mention}**. Nie możesz stworzyć drugiego teamu.",
                 color=0xFF0000,
             )
 
@@ -371,7 +419,7 @@ class PremiumCog(commands.Cog):
                     if not emoji_validator(emoji):
                         await self._send_premium_embed(
                             ctx,
-                            description=f"`{emoji}` nie jest poprawnym emoji.",
+                            description=f"`{emoji}` nie jest poprawnym formatem emoji serwera. Aby użyć emoji z serwera, kliknij prawym przyciskiem myszy na emoji i wybierz 'Kopiuj odnośnik do emoji', a następnie wklej go w komendzie.",
                             color=0xFF0000,
                         )
                     else:
@@ -408,10 +456,18 @@ class PremiumCog(commands.Cog):
             team_channel = await ctx.guild.create_text_channel(
                 name=channel_name,
                 category=category,
-                topic=f"Team Channel for {team_name}. Owner: {ctx.author.id}",
+                topic=f"{ctx.author.id} {team_role.id}",
                 overwrites=overwrites,
                 reason=f"Utworzenie kanału teamu przez {ctx.author.display_name}",
             )
+
+            # Informacja o przynależności do innego teamu
+            user_team_role = await self._get_user_team_role(ctx.author)
+            additional_info = ""
+            if user_team_role and user_team_role.id != team_role.id:
+                additional_info = (
+                    f"\n\nJesteś obecnie również członkiem teamu {user_team_role.mention}."
+                )
 
             # Send success message
             description = (
@@ -420,10 +476,56 @@ class PremiumCog(commands.Cog):
                 f"• **Rola**: {team_role.mention}\n"
                 f"• **Właściciel**: {ctx.author.mention}\n\n"
                 f"Możesz zarządzać członkami teamu za pomocą komendy `{self.prefix}team member add/remove`."
+                f"{additional_info}"
             )
 
             # Use the new method to send the message
             await self._send_premium_embed(ctx, description=description)
+
+            # Wysyłanie i przypinanie wiadomości informacyjnej na kanale teamu
+            team_info_embed = discord.Embed(
+                title=f"Team **{self.team_config['symbol']} {name}**",
+                description="Witaj w twoim nowym teamie! Oto informacje o nim:",
+                color=team_role.color if team_role.color.value != 0 else discord.Color.blue(),
+            )
+            team_info_embed.add_field(name="Właściciel", value=ctx.author.mention, inline=True)
+            team_info_embed.add_field(name="Rola", value=team_role.mention, inline=True)
+            team_info_embed.add_field(
+                name="Data utworzenia",
+                value=discord.utils.format_dt(datetime.now(timezone.utc), style="f"),
+                inline=True,
+            )
+
+            # Dodaj sekcję z komendami
+            team_info_embed.add_field(
+                name="Dostępne komendy", value=self._get_team_commands_description(), inline=False
+            )
+
+            # Dodaj informację o twojej roli
+            user_premium_role = None
+            for role in ctx.author.roles:
+                if any(r["name"] == role.name for r in self.bot.config["premium_roles"]):
+                    user_premium_role = role
+                    break
+
+            if user_premium_role:
+                max_members = next(
+                    (
+                        r["team_size"]
+                        for r in self.bot.config["premium_roles"]
+                        if r["name"] == user_premium_role.name
+                    ),
+                    10,
+                )
+                team_info_embed.add_field(
+                    name="Limity teamu",
+                    value=f"• Maksymalna liczba członków: **{max_members}**",
+                    inline=False,
+                )
+
+            # Wyślij i przypnij wiadomość
+            team_info_message = await team_channel.send(embed=team_info_embed)
+            await team_info_message.pin(reason="Informacje o teamie")
 
         except Exception as e:
             logger.error(f"Błąd podczas tworzenia teamu: {str(e)}")
@@ -716,7 +818,7 @@ class PremiumCog(commands.Cog):
             # User provided serwerowe emoji w formacie :nazwa: zamiast <:nazwa:id>
             return await self._send_premium_embed(
                 ctx,
-                description=f'`{emoji}` nie jest poprawnym formatem emoji serwera. Aby użyć emoji z serwera, kliknij prawym przyciskiem myszy na emoji i wybierz "Kopiuj odnośnik do emoji", a następnie wklej go w komendzie.',
+                description=f"`{emoji}` nie jest poprawnym formatem emoji serwera. Aby użyć emoji z serwera, kliknij prawym przyciskiem myszy na emoji i wybierz 'Kopiuj odnośnik do emoji', a następnie wklej go w komendzie.",
                 color=0xFF0000,
             )
 
@@ -871,6 +973,48 @@ class PremiumCog(commands.Cog):
                 color=0xFF0000,
             )
 
+    @team.command(name="admin_delete")
+    @is_admin()
+    @app_commands.describe(user="Użytkownik, którego teamy mają zostać usunięte")
+    async def team_admin_delete(self, ctx, user: discord.Member):
+        """
+        Usuń wszystkie teamy użytkownika (komenda administracyjna).
+        Przydatne, gdy zostały zespoły, których użytkownik nie powinien mieć.
+        """
+        logger.info(
+            f"Admin {ctx.author.display_name} zainicjował usunięcie teamów użytkownika {user.display_name}"
+        )
+
+        async with self.bot.get_db() as session:
+            try:
+                # Użyj bezpieczniejszej metody SQL do usuwania teamów
+                deleted_teams = await TeamManager.delete_user_teams_by_sql(
+                    session, self.bot, user.id
+                )
+
+                if deleted_teams > 0:
+                    await self._send_premium_embed(
+                        ctx,
+                        description=f"Usunięto {deleted_teams} teamy użytkownika {user.mention}.",
+                        color=0x00FF00,
+                    )
+                    logger.info(
+                        f"Admin {ctx.author.display_name} usunął {deleted_teams} teamów użytkownika {user.display_name}"
+                    )
+                else:
+                    await self._send_premium_embed(
+                        ctx,
+                        description=f"Nie znaleziono żadnych teamów użytkownika {user.mention}.",
+                        color=0xFF9900,
+                    )
+            except Exception as e:
+                logger.error(f"Błąd podczas usuwania teamów: {str(e)}")
+                await self._send_premium_embed(
+                    ctx,
+                    description=f"Wystąpił błąd podczas usuwania teamów: {str(e)}",
+                    color=0xFF0000,
+                )
+
     async def _get_user_team_role(self, member: discord.Member):
         """
         Get the team role for a user.
@@ -894,6 +1038,9 @@ class PremiumCog(commands.Cog):
     async def _is_team_owner(self, user_id: int, role_id: int):
         """
         Check if a user is the owner of a team.
+
+        This method only checks ownership, not team membership.
+        A user can be a member of multiple teams but can only own one team.
 
         :param user_id: The user ID to check
         :param role_id: The team role ID
@@ -1020,32 +1167,58 @@ class PremiumCog(commands.Cog):
             # Find team members
             members = [member for member in guild.members if team_role in member.roles]
 
-            # Find the team channel
+            # Find the team channel - używamy nowego formatu topicu
             team_channel = None
             for channel in guild.channels:
                 if (
                     isinstance(channel, discord.TextChannel)
                     and channel.topic
-                    and str(owner_id) in channel.topic
-                    and "Team Channel" in channel.topic
+                    and len(channel.topic.split()) >= 2
                 ):
-                    team_channel = channel
-                    break
-
-            # Get maximum team size based on owner's roles
-            max_members = 10
-            if owner:
-                for role_config in reversed(self.bot.config["premium_roles"]):
-                    if any(r.name == role_config["name"] for r in owner.roles):
-                        max_members = role_config.get("team_size", 10)
+                    topic_parts = channel.topic.split()
+                    # Sprawdzamy czy topic zawiera dwa ID: właściciela i roli
+                    if (
+                        len(topic_parts) >= 2
+                        and topic_parts[0] == str(owner_id)
+                        and topic_parts[1] == str(team_role.id)
+                    ):
+                        team_channel = channel
                         break
 
-            return {
-                "owner": owner,
-                "members": members,
-                "channel": team_channel,
-                "max_members": max_members,
-            }
+                    # Dla kompatybilności ze starym formatem
+                    elif "Team Channel" in channel.topic and str(owner_id) in channel.topic:
+                        team_channel = channel
+                        break
+
+        # Get maximum team size based on owner's roles
+        max_members = 10
+        if owner:
+            for role_config in reversed(self.bot.config["premium_roles"]):
+                if any(r.name == role_config["name"] for r in owner.roles):
+                    max_members = role_config.get("team_size", 10)
+                    break
+
+        return {
+            "owner": owner,
+            "members": members,
+            "channel": team_channel,
+            "max_members": max_members,
+        }
+
+    def _get_team_commands_description(self):
+        """
+        Get a formatted description of available team commands.
+
+        :return: Formatted string with team commands
+        """
+        return (
+            f"• `{self.prefix}team create <nazwa>` - Utwórz nowy team\n"
+            f"• `{self.prefix}team name <nazwa>` - Zmień nazwę swojego teamu\n"
+            f"• `{self.prefix}team member add <@użytkownik>` - Dodaj członka do teamu\n"
+            f"• `{self.prefix}team member remove <@użytkownik>` - Usuń członka z teamu\n"
+            f"• `{self.prefix}team color <kolor>` - Ustaw kolor teamu (wymaga rangi zG500+)\n"
+            f"• `{self.prefix}team emoji <emoji>` - Ustaw emoji teamu (wymaga rangi zG1000)"
+        )
 
 
 # Helper functions
@@ -1097,7 +1270,7 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
         parts = emoji_str.split(":")
 
         # For emoji in format <:nazwa:id> we get ['', 'name', 'id>']
-        # For emoji in format <a:nazwa:id> we get ['<a', 'name', 'id>']
+        # For emoji in format <a:nazwa:id> we get ['<a', 'name', 'id']
         if len(parts) >= 3:
             # Extract the ID properly, removing the closing ">"
             emoji_id = parts[-1].replace(">", "")
