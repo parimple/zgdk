@@ -357,7 +357,7 @@ class PremiumCog(commands.Cog):
                 await self._send_premium_embed(
                     ctx,
                     description="Posiadasz już team! Nie możesz stworzyć kolejnego.",
-                    color=0xFF0000
+                    color=0xFF0000,
                 )
                 return
 
