@@ -327,3 +327,9 @@ voice_permissions:
 color:
   role_name: "✎"  # Nazwa roli kolorowej
   base_role_id: 960665311772803184  # ID roli, nad którą będzie umieszczana rola kolorowa
+
+# Konfiguracja dla modułu teamów
+team:
+  symbol: "☫"  # Symbol teamu używany w nazwach
+  base_role_id: 960665311730868240  # ID roli, nad którą będą umieszczane role teamów
+  category_id: 1344105013357842522  # ID kategorii dla kanałów teamów

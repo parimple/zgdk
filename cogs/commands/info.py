@@ -57,9 +57,13 @@ class InfoCog(commands.Cog):
     """Info cog."""
 
     def __init__(self, bot):
+        """Info cog."""
         self.bot = bot
         # Remove default help command
         self.bot.remove_command("help")
+        # Get team symbol from config
+        team_config = self.bot.config.get("team", {})
+        self.team_symbol = team_config.get("symbol", "☫")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -155,14 +159,21 @@ class InfoCog(commands.Cog):
             bypass_until = await MemberQueries.get_voice_bypass_status(session, member.id)
 
             # Get owned teams from database
-            from sqlalchemy import select
-
-            from datasources.models import Role as DBRole
-
             owned_teams_query = await session.execute(
-                select(DBRole).where((DBRole.role_type == "team") & (DBRole.name == str(member.id)))
+                select(Role).where((Role.role_type == "team") & (Role.name == str(member.id)))
             )
             owned_teams = owned_teams_query.scalars().all()
+
+            # Get teams from database
+            teams_query = await session.execute(
+                select(Role).where((Role.role_type == "team") & (Role.name == str(member.id)))
+            )
+            teams = teams_query.scalars().all()
+
+            colors_query = await session.execute(
+                select(Role).where((Role.role_type == "color") & (Role.name == str(member.id)))
+            )
+            colors = colors_query.scalars().all()
 
         current_time = datetime.now(timezone.utc)
         logger.info(f"Current time: {current_time}")
@@ -465,12 +476,11 @@ class InfoCog(commands.Cog):
                     premium_roles.append(role)
                     break
 
-            # Sprawdź czy to rola teamu (w formacie "☫ nazwa")
-            team_symbol = self.bot.config.get("team", {}).get("symbol", "☫")
+            # Sprawdź czy to rola teamu
             if (
-                role.name.startswith(team_symbol)
-                and len(role.name) > len(team_symbol)
-                and role.name[len(team_symbol)] == " "
+                role.name.startswith(self.team_symbol)
+                and len(role.name) > len(self.team_symbol)
+                and role.name[len(self.team_symbol)] == " "
             ):
                 team_roles.append(role)
 
@@ -501,9 +511,9 @@ class InfoCog(commands.Cog):
             teams_query = await session.execute(
                 select(Role).where((Role.role_type == "team") & (Role.name == str(member.id)))
             )
-            teams_db = teams_query.scalars().all()
+            teams = teams_query.scalars().all()
 
-            for team in teams_db:
+            for team in teams:
                 teams_db_info.append(f"Team ID: {team.id}")
 
         # 4. Przygotuj i wyślij embed z informacjami

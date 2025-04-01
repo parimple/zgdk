@@ -5,9 +5,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
+import aiohttp
 import discord
-import emoji
-import emoji_data_python
 import httpx
 from colour import Color
 from discord import app_commands
@@ -26,6 +25,60 @@ from utils.team_manager import TeamManager
 logger = logging.getLogger(__name__)
 
 
+def emoji_validator(emoji_str: str) -> bool:
+    """
+    Sprawdza, czy podany string jest poprawnym emoji serwera Discord.
+
+    :param emoji_str: String do sprawdzenia
+    :return: True jeśli string jest poprawnym emoji, False w przeciwnym razie
+    """
+    # Sprawdź czy string jest w formacie <:name:id> lub <a:name:id>
+    if not emoji_str.startswith("<") or not emoji_str.endswith(">"):
+        return False
+
+    parts = emoji_str.strip("<>").split(":")
+
+    # Sprawdź czy mamy odpowiednią liczbę części
+    if len(parts) != 3 and len(parts) != 2:
+        return False
+
+    # Jeśli mamy 3 części, sprawdź czy pierwsza to 'a' (animowane) lub pusta
+    if len(parts) == 3 and parts[0] not in ["", "a"]:
+        return False
+
+    # Sprawdź czy ostatnia część (ID) to liczba
+    try:
+        int(parts[-1])
+        return True
+    except ValueError:
+        return False
+
+
+async def emoji_to_icon(emoji_str: str) -> bytes:
+    """
+    Konwertuje emoji na ikonę.
+
+    :param emoji_str: String emoji do konwersji
+    :return: Bajty ikony
+    """
+    # Wyciągnij ID emoji z formatu <:name:id> lub <a:name:id>
+    emoji_id = emoji_str.split(":")[-1].rstrip(">")
+
+    # Utwórz URL do ikony emoji
+    # Jeśli emoji jest animowane (format <a:name:id>), użyj rozszerzenia GIF
+    is_animated = emoji_str.startswith("<a:")
+    extension = "gif" if is_animated else "png"
+    url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{extension}"
+
+    # Pobierz ikonę
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        if response.status_code == 200:
+            return response.content  # Używamy .content zamiast await response.read()
+        else:
+            raise ValueError(f"Nie można pobrać emoji. Status: {response.status_code}")
+
+
 class PremiumCog(commands.Cog):
     """Commands related to premium features."""
 
@@ -33,23 +86,19 @@ class PremiumCog(commands.Cog):
         """Initialize the PremiumCog."""
         self.bot = bot
         self.prefix = self.bot.command_prefix[0] if self.bot.command_prefix else ","
-        self.team_config = self.bot.config.get("team", {})
-        # ID roli bazowej, nad którą będą umieszczane role teamów
-        self.team_base_role_id = self.team_config.get(
-            "base_role_id", 0
-        )  # Domyślnie 0, jeśli nie skonfigurowano
-        self.message_sender = MessageSender()
 
-        # Nazwa roli kolorowej z config
-        self.color_role_name = self.bot.config.get("color", {}).get("role_name", "✎")
-        # ID roli nad którą będą umieszczane role kolorowe
-        self.base_role_id = self.bot.config.get("color", {}).get("base_role_id", 960665311772803184)
+        # Konfiguracja kolorów
+        color_config = self.bot.config.get("color", {})
+        self.color_role_name = color_config.get("role_name", "✎")
+        self.base_role_id = color_config.get("base_role_id", 960665311772803184)
 
         # Konfiguracja teamów
-        self.team_config = {
-            "symbol": self.bot.config.get("team", {}).get("symbol", "☫"),
-            "category_id": self.bot.config.get("team", {}).get("category_id", 1344105013357842522),
-        }
+        team_config = self.bot.config.get("team", {})
+        self.team_symbol = team_config.get("symbol", "☫")
+        self.team_base_role_id = team_config.get("base_role_id", 960665311730868240)
+        self.team_category_id = team_config.get("category_id", 1344105013357842522)
+
+        self.message_sender = MessageSender()
 
     @commands.hybrid_command(aliases=["colour", "kolor"])
     @PremiumChecker.requires_premium_tier("color")
@@ -258,7 +307,7 @@ class PremiumCog(commands.Cog):
 
         # Prepare description with team info
         description = (
-            f"**Team**: {self.team_config['symbol']} {team_role.name[2:]}\n\n"
+            f"**Team**: {self.team_symbol} {team_role.name[2:]}\n\n"
             f"**Właściciel**: {team_info['owner'].mention}\n"
             f"**Liczba członków**: {len(team_info['members'])}/{team_info['max_members']}\n"
             f"**Kanał**: {team_info['channel'].mention}\n\n"
@@ -272,266 +321,228 @@ class PremiumCog(commands.Cog):
     @team.command(name="create")
     @PremiumChecker.requires_specific_roles(["zG100", "zG500", "zG1000"])
     @app_commands.describe(
-        name="Nazwa teamu (klanu)",
+        name="Nazwa teamu (klanu) - jeśli nie podano, użyta zostanie nazwa użytkownika",
         color="Kolor teamu (opcjonalne, wymaga rangi zG500+)",
         emoji="Emoji teamu (opcjonalne, wymaga rangi zG1000)",
     )
     async def team_create(
-        self, ctx, name: str, color: Optional[str] = None, emoji: Optional[str] = None
+        self,
+        ctx,
+        name: Optional[str] = None,
+        color: Optional[str] = None,
+        emoji: Optional[str] = None,
     ):
         """
-        Create a new team (clan).
-        """
-        # 1. Sprawdź, czy użytkownik jest już właścicielem teamu w bazie danych
-        is_already_owner = False
-        existing_team = None
-        existing_team_role = None
-        existing_team_channel = None
+        Tworzy nowy team.
 
+        :param ctx: Kontekst komendy
+        :param name: Nazwa teamu (opcjonalne, domyślnie nazwa użytkownika)
+        :param color: Kolor teamu (opcjonalne)
+        :param emoji: Emoji teamu (opcjonalne)
+        """
+        # Jeśli nie podano nazwy, użyj nazwy użytkownika
+        if name is None:
+            name = ctx.author.display_name
+
+        # 1. Sprawdź, czy użytkownik jest już właścicielem teamu w bazie danych
         async with self.bot.get_db() as session:
-            # Szukaj roli typu "team" z ID użytkownika jako właścicielem
             result = await session.execute(
                 select(DBRole).where(
                     (DBRole.role_type == "team") & (DBRole.name == str(ctx.author.id))
                 )
             )
             existing_team = result.scalar_one_or_none()
+
             if existing_team:
-                is_already_owner = True
-                existing_team_role = ctx.guild.get_role(existing_team.id)
+                await self.message_sender.send_error(
+                    ctx, "Posiadasz już team! Nie możesz stworzyć kolejnego."
+                )
+                return
 
-        # Dodatkowe sprawdzenie kanałów - nawet jeśli nie ma roli w bazie, sprawdź czy są kanały
-        if not is_already_owner:
-            # Szukaj kanałów, które mogą należeć do teamu tego użytkownika
-            for channel in ctx.guild.channels:
-                if hasattr(channel, "topic") and channel.topic:
-                    topic_parts = channel.topic.split()
-                    # Sprawdź czy topic ma format id_właściciela id_roli
-                    if len(topic_parts) >= 2 and topic_parts[0] == str(ctx.author.id):
-                        is_already_owner = True
-                        existing_team_channel = channel
-                        role_id = (
-                            int(topic_parts[1])
-                            if len(topic_parts) > 1 and topic_parts[1].isdigit()
-                            else None
-                        )
-                        if role_id:
-                            existing_team_role = ctx.guild.get_role(role_id)
-                        break
-                    # Dla kompatybilności ze starym formatem
-                    elif "Team Channel" in channel.topic and str(ctx.author.id) in channel.topic:
-                        is_already_owner = True
-                        existing_team_channel = channel
-                        break
+            try:
+                # 3. Tworzenie roli teamu
+                team_role = await ctx.guild.create_role(name=name, mentionable=True)
 
-        # Jeśli już jest właścicielem, wyświetl błąd
-        if is_already_owner:
-            team_mention = "unknown team"
-            if existing_team_role:
-                team_mention = existing_team_role.mention
-            elif existing_team:
-                team_mention = f"ID: {existing_team.id}"
-            elif existing_team_channel:
-                team_mention = f"kanał {existing_team_channel.mention}"
+                # 4. Ustawienie pozycji roli
+                base_role = ctx.guild.get_role(self.team_base_role_id)
+                if base_role:
+                    await ctx.guild.edit_role_positions({team_role: base_role.position + 1})
+                else:
+                    # Fallback: ustaw pod najwyższą rolą, którą bot może zarządzać
+                    assignable_roles = [
+                        r for r in ctx.guild.roles if r.position < ctx.guild.me.top_role.position
+                    ]
+                    if assignable_roles:
+                        highest_role = max(assignable_roles, key=lambda r: r.position)
+                        await ctx.guild.edit_role_positions({team_role: highest_role.position - 1})
 
-            logger.warning(
-                f"User {ctx.author.display_name} tried to create a team but already owns {team_mention}"
+                # 5. Przypisanie roli do użytkownika
+                await ctx.author.add_roles(team_role)
+
+                # 6. Zapisanie informacji o teamie w bazie danych
+                db_role = DBRole(
+                    id=team_role.id,
+                    name=str(ctx.author.id),
+                    role_type="team",
+                    created_at=datetime.now(timezone.utc),
+                )
+                session.add(db_role)
+                await session.commit()
+
+                await self.message_sender.send_success(
+                    ctx, f"Pomyślnie utworzono team {team_role.mention}!"
+                )
+
+            except Exception as e:
+                logger.error(f"Błąd podczas tworzenia teamu: {str(e)}")
+                await self.message_sender.send_error(
+                    ctx, f"Wystąpił błąd podczas tworzenia teamu: {str(e)}"
+                )
+                return
+
+        # 7. Ustaw kolor jeśli został podany i użytkownik ma rangę zG500+
+        if color:
+            has_color_permission = any(
+                role.name in ["zG500", "zG1000"] for role in ctx.author.roles
             )
-
-            return await self._send_premium_embed(
-                ctx,
-                description=f"Jesteś już właścicielem teamu **{team_mention}**. Nie możesz stworzyć drugiego teamu.",
-                color=0xFF0000,
-            )
-
-        # 2. Sprawdź, czy nazwa nie jest zajęta
-        team_name = f"{self.team_config['symbol']} {name}"
-        if discord.utils.get(ctx.guild.roles, name=team_name):
-            return await self._send_premium_embed(
-                ctx,
-                description=f"Team o nazwie **{name}** już istnieje. Wybierz inną nazwę.",
-                color=0xFF0000,
-            )
-
-        try:
-            # 3. Tworzenie roli teamu
-            team_role = await ctx.guild.create_role(name=team_name, mentionable=True)
-
-            # 3.1. Pozycjonowanie roli teamu - nad rolą bazową, podobnie jak w update_user_color_role
-            base_role = ctx.guild.get_role(self.team_base_role_id)
-            if base_role:
-                # Umieszczamy rolę teamu ponad rolą bazową
-                positions = {team_role: base_role.position + 1}
-                await ctx.guild.edit_role_positions(positions=positions)
-                logger.info(
-                    f"Team role {team_role.name} positioned above base role {base_role.name}"
+            if not has_color_permission:
+                await self._send_premium_embed(
+                    ctx,
+                    description="Kolor teamu dostępny tylko dla rang zG500+. Kolor nie został ustawiony.",
+                    color=0xFF0000,
                 )
             else:
-                # Jeśli nie znaleziono roli bazowej, spróbuj fallback do poprzedniej implementacji
-                highest_assign_role = None
-                for role in reversed(ctx.guild.roles):
-                    if role.permissions.manage_roles and not role.managed:
-                        highest_assign_role = role
-                        break
+                try:
+                    discord_color = await self.parse_color(color)
+                    await team_role.edit(color=discord_color)
+                except ValueError as e:
+                    await self._send_premium_embed(ctx, description=str(e), color=0xFF0000)
 
-                if highest_assign_role:
-                    positions = {team_role: highest_assign_role.position - 1}
-                    await ctx.guild.edit_role_positions(positions=positions)
-                    logger.info(
-                        f"Team role {team_role.name} positioned under {highest_assign_role.name} (fallback)"
-                    )
-
-            # 4. Zapisz informacje o teamie w bazie danych
-            await self._save_team_to_database(ctx.author.id, team_role.id)
-
-            # 5. Przydziel rolę właścicielowi
-            await ctx.author.add_roles(team_role)
-
-            # 6. Ustaw kolor jeśli został podany i użytkownik ma rangę zG500+
-            if color:
-                has_color_permission = any(
-                    role.name in ["zG500", "zG1000"] for role in ctx.author.roles
+        # 8. Ustaw emoji jeśli został podany i użytkownik ma rangę zG1000
+        if emoji:
+            has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
+            if not has_emoji_permission:
+                await self._send_premium_embed(
+                    ctx,
+                    description="Emoji teamu dostępny tylko dla rang zG1000. Emoji nie zostało ustawione.",
+                    color=0xFF0000,
                 )
-                if not has_color_permission:
+            else:
+                # Check if it's a valid emoji
+                if not emoji_validator(emoji):
                     await self._send_premium_embed(
                         ctx,
-                        description="Kolor teamu dostępny tylko dla rang zG500+. Kolor nie został ustawiony.",
+                        description=f"`{emoji}` nie jest poprawnym formatem emoji serwera. Aby użyć emoji z serwera, kliknij prawym przyciskiem myszy na emoji i wybierz 'Kopiuj odnośnik do emoji', a następnie wklej go w komendzie.",
                         color=0xFF0000,
                     )
                 else:
-                    try:
-                        discord_color = await self.parse_color(color)
-                        await team_role.edit(color=discord_color)
-                    except ValueError as e:
-                        await self._send_premium_embed(ctx, description=str(e), color=0xFF0000)
+                    await team_role.edit(display_icon=await emoji_to_icon(emoji))
 
-            # 7. Ustaw emoji jeśli został podany i użytkownik ma rangę zG1000
-            if emoji:
-                has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
-                if not has_emoji_permission:
-                    await self._send_premium_embed(
-                        ctx,
-                        description="Emoji teamu dostępny tylko dla rang zG1000. Emoji nie zostało ustawione.",
-                        color=0xFF0000,
-                    )
-                else:
-                    # Check if it's a valid emoji
-                    if not emoji_validator(emoji):
-                        await self._send_premium_embed(
-                            ctx,
-                            description=f"`{emoji}` nie jest poprawnym formatem emoji serwera. Aby użyć emoji z serwera, kliknij prawym przyciskiem myszy na emoji i wybierz 'Kopiuj odnośnik do emoji', a następnie wklej go w komendzie.",
-                            color=0xFF0000,
-                        )
-                    else:
-                        await team_role.edit(display_icon=await emoji_to_icon(emoji))
+        # 8. Ustaw kanał teamu
+        category = ctx.guild.get_channel(self.team_category_id)
+        if not category:
+            logger.error(f"Nie znaleziono kategorii teamów o ID {self.team_category_id}")
+            category = None
 
-            # 8. Ustaw kanał teamu
-            category = ctx.guild.get_channel(self.team_config["category_id"])
-            if not category:
-                logger.error(
-                    f"Nie znaleziono kategorii teamów o ID {self.team_config['category_id']}"
-                )
-                category = None
+        # Create channel permissions
+        overwrites = {
+            ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            team_role: discord.PermissionOverwrite(
+                read_messages=True,
+                send_messages=True,
+                embed_links=True,
+                attach_files=True,
+                read_message_history=True,
+            ),
+            ctx.author: discord.PermissionOverwrite(
+                read_messages=True,
+                send_messages=True,
+                manage_messages=True,
+                manage_channels=True,
+            ),
+        }
 
-            # Create channel permissions
-            overwrites = {
-                ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                team_role: discord.PermissionOverwrite(
-                    read_messages=True,
-                    send_messages=True,
-                    embed_links=True,
-                    attach_files=True,
-                    read_message_history=True,
+        # Create text channel
+        channel_name = name.lower().replace(" ", "-")
+        team_channel = await ctx.guild.create_text_channel(
+            name=channel_name,
+            category=category,
+            topic=f"{ctx.author.id} {team_role.id}",
+            overwrites=overwrites,
+            reason=f"Utworzenie kanału teamu przez {ctx.author.display_name}",
+        )
+
+        # Dodaj prefix teamu dla lepszej organizacji
+        channel_name = f"{self.team_symbol}-{channel_name}"
+
+        logger.info(f"Aktualizacja nazwy kanału teamu z {team_channel.name} na {channel_name}")
+        await team_channel.edit(name=channel_name)
+
+        # Informacja o przynależności do innego teamu
+        user_team_role = await self._get_user_team_role(ctx.author)
+        additional_info = ""
+        if user_team_role and user_team_role.id != team_role.id:
+            additional_info = (
+                f"\n\nJesteś obecnie również członkiem teamu {user_team_role.mention}."
+            )
+
+        # Send success message
+        description = (
+            f"Utworzono team **{self.team_symbol} {name}**!\n\n"
+            f"• **Kanał**: {team_channel.mention}\n"
+            f"• **Rola**: {team_role.mention}\n"
+            f"• **Właściciel**: {ctx.author.mention}\n\n"
+            f"Możesz zarządzać członkami teamu za pomocą komendy `{self.prefix}team member <@użytkownik> [+/-]`."
+            f"{additional_info}"
+        )
+
+        # Use the new method to send the message
+        await self._send_premium_embed(ctx, description=description)
+
+        # Wysyłanie i przypinanie wiadomości informacyjnej na kanale teamu
+        team_info_embed = discord.Embed(
+            title=f"Team **{self.team_symbol} {name}**",
+            description="Witaj w twoim nowym teamie! Oto informacje o nim:",
+            color=team_role.color if team_role.color.value != 0 else discord.Color.blue(),
+        )
+        team_info_embed.add_field(name="Właściciel", value=ctx.author.mention, inline=True)
+        team_info_embed.add_field(name="Rola", value=team_role.mention, inline=True)
+        team_info_embed.add_field(
+            name="Data utworzenia",
+            value=discord.utils.format_dt(datetime.now(timezone.utc), style="f"),
+            inline=True,
+        )
+
+        # Dodaj sekcję z komendami
+        team_info_embed.add_field(
+            name="Dostępne komendy", value=self._get_team_commands_description(), inline=False
+        )
+
+        # Dodaj informację o twojej roli
+        user_premium_role = None
+        for role in ctx.author.roles:
+            if any(r["name"] == role.name for r in self.bot.config["premium_roles"]):
+                user_premium_role = role
+                break
+
+        if user_premium_role:
+            max_members = next(
+                (
+                    r["team_size"]
+                    for r in self.bot.config["premium_roles"]
+                    if r["name"] == user_premium_role.name
                 ),
-                ctx.author: discord.PermissionOverwrite(
-                    read_messages=True,
-                    send_messages=True,
-                    manage_messages=True,
-                    manage_channels=True,
-                ),
-            }
-
-            # Create text channel
-            channel_name = team_name.lower().replace(" ", "-")
-            team_channel = await ctx.guild.create_text_channel(
-                name=channel_name,
-                category=category,
-                topic=f"{ctx.author.id} {team_role.id}",
-                overwrites=overwrites,
-                reason=f"Utworzenie kanału teamu przez {ctx.author.display_name}",
+                10,
             )
-
-            # Informacja o przynależności do innego teamu
-            user_team_role = await self._get_user_team_role(ctx.author)
-            additional_info = ""
-            if user_team_role and user_team_role.id != team_role.id:
-                additional_info = (
-                    f"\n\nJesteś obecnie również członkiem teamu {user_team_role.mention}."
-                )
-
-            # Send success message
-            description = (
-                f"Utworzono team **{self.team_config['symbol']} {name}**!\n\n"
-                f"• **Kanał**: {team_channel.mention}\n"
-                f"• **Rola**: {team_role.mention}\n"
-                f"• **Właściciel**: {ctx.author.mention}\n\n"
-                f"Możesz zarządzać członkami teamu za pomocą komendy `{self.prefix}team member <@użytkownik> [+/-]`."
-                f"{additional_info}"
-            )
-
-            # Use the new method to send the message
-            await self._send_premium_embed(ctx, description=description)
-
-            # Wysyłanie i przypinanie wiadomości informacyjnej na kanale teamu
-            team_info_embed = discord.Embed(
-                title=f"Team **{self.team_config['symbol']} {name}**",
-                description="Witaj w twoim nowym teamie! Oto informacje o nim:",
-                color=team_role.color if team_role.color.value != 0 else discord.Color.blue(),
-            )
-            team_info_embed.add_field(name="Właściciel", value=ctx.author.mention, inline=True)
-            team_info_embed.add_field(name="Rola", value=team_role.mention, inline=True)
             team_info_embed.add_field(
-                name="Data utworzenia",
-                value=discord.utils.format_dt(datetime.now(timezone.utc), style="f"),
-                inline=True,
+                name="Limity teamu",
+                value=f"• Maksymalna liczba członków: **{max_members}**",
+                inline=False,
             )
 
-            # Dodaj sekcję z komendami
-            team_info_embed.add_field(
-                name="Dostępne komendy", value=self._get_team_commands_description(), inline=False
-            )
-
-            # Dodaj informację o twojej roli
-            user_premium_role = None
-            for role in ctx.author.roles:
-                if any(r["name"] == role.name for r in self.bot.config["premium_roles"]):
-                    user_premium_role = role
-                    break
-
-            if user_premium_role:
-                max_members = next(
-                    (
-                        r["team_size"]
-                        for r in self.bot.config["premium_roles"]
-                        if r["name"] == user_premium_role.name
-                    ),
-                    10,
-                )
-                team_info_embed.add_field(
-                    name="Limity teamu",
-                    value=f"• Maksymalna liczba członków: **{max_members}**",
-                    inline=False,
-                )
-
-            # Wyślij i przypnij wiadomość
-            team_info_message = await team_channel.send(embed=team_info_embed)
-            await team_info_message.pin(reason="Informacje o teamie")
-
-        except Exception as e:
-            logger.error(f"Błąd podczas tworzenia teamu: {str(e)}")
-            await self.message_sender.send_error(
-                ctx, f"Wystąpił błąd podczas tworzenia teamu: {str(e)}"
-            )
+        # Wyślij i przypnij wiadomość
+        team_info_message = await team_channel.send(embed=team_info_embed)
+        await team_info_message.pin(reason="Informacje o teamie")
 
     @team.command(name="name")
     @app_commands.describe(name="Nowa nazwa teamu")
@@ -550,7 +561,7 @@ class PremiumCog(commands.Cog):
 
         # Zachowanie emoji jeśli było wcześniej
         current_name_parts = team_role.name.split(" ")
-        team_symbol = self.team_config["symbol"]
+        team_symbol = self.team_symbol
         team_emoji = None
 
         # Sprawdź czy team ma już emoji (format: ☫ 🔥 Nazwa)
@@ -606,7 +617,7 @@ class PremiumCog(commands.Cog):
                 channel_name = channel_name.lower().strip().replace(" ", "-")
 
                 # Dodaj prefix teamu dla lepszej organizacji
-                channel_name = f"☫-{channel_name}"
+                channel_name = f"{self.team_symbol}-{channel_name}"
 
                 logger.info(
                     f"Aktualizacja nazwy kanału teamu z {team_channel.name} na {channel_name}"
@@ -890,100 +901,21 @@ class PremiumCog(commands.Cog):
                     ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
                 )
 
+        # Jeśli przeszliśmy walidację, pobierz ikonę i zastosuj do roli
         try:
-            # Get current name and team symbol
-            current_name_parts = team_role.name.split(" ")
-            team_symbol = self.team_config["symbol"]
+            icon_bytes = await emoji_to_icon(emoji)
+            await team_role.edit(display_icon=icon_bytes)
 
-            # Clean up current name if it has emoji in it
-            if len(current_name_parts) >= 3 and emoji_validator(current_name_parts[1]):
-                new_name = f"{team_symbol} {' '.join(current_name_parts[2:])}"
-            else:
-                new_name = team_role.name
-
-            # Log before conversion attempt
-            logger.info(f"Converting emoji '{emoji}' to role icon format")
-
-            # Convert emoji to role icon format with better error handling
-            try:
-                icon_bytes = await emoji_to_icon(emoji)
-                logger.info(f"Successfully converted emoji to icon, size: {len(icon_bytes)} bytes")
-            except Exception as e:
-                logger.error(f"Failed to convert emoji to icon: {str(e)}")
-                return await self._send_premium_embed(
-                    ctx,
-                    description=f"Nie udało się przekonwertować emoji na format ikony roli: {str(e)}",
-                    color=0xFF0000,
-                )
-
-            # Update role with new icon and cleaned name with better error handling
-            try:
-                logger.info(f"Updating role {team_role.id} with new icon")
-                await team_role.edit(name=new_name, display_icon=icon_bytes)
-                logger.info(f"Successfully updated role icon")
-            except discord.Forbidden as e:
-                logger.error(f"Forbidden error while updating role icon: {str(e)}")
-                return await self._send_premium_embed(
-                    ctx,
-                    description="Bot nie ma wystarczających uprawnień, aby zmienić ikonę roli.",
-                    color=0xFF0000,
-                )
-            except discord.HTTPException as e:
-                logger.error(f"HTTP error while updating role icon: {str(e)}")
-                return await self._send_premium_embed(
-                    ctx,
-                    description=f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}",
-                    color=0xFF0000,
-                )
-            except Exception as e:
-                logger.error(f"Unexpected error while updating role icon: {str(e)}")
-                return await self._send_premium_embed(
-                    ctx,
-                    description=f"Wystąpił nieoczekiwany błąd podczas zmiany emoji teamu: {str(e)}",
-                    color=0xFF0000,
-                )
-
-            # Update channel name if exists
-            team_channels = [c for c in ctx.guild.channels if isinstance(c, discord.TextChannel)]
-            team_channel = None
-
-            for channel in team_channels:
-                if (
-                    channel.topic
-                    and str(ctx.author.id) in channel.topic
-                    and "Team Channel" in channel.topic
-                ):
-                    team_channel = channel
-                    break
-
-            if team_channel:
-                # Update channel name but remove emoji from name
-                channel_name = new_name.lower().replace(" ", "-")
-                await team_channel.edit(name=channel_name)
-
-            # Send success message
-            description = f"Ustawiono emoji {emoji} jako ikonę teamu **{team_role.mention}**."
+            # Wyślij informację o sukcesie
+            description = f"Ustawiono emoji {emoji} jako ikonę teamu **{team_role.mention}**!"
             await self._send_premium_embed(ctx, description=description)
+            logger.info(f"Successfully set emoji as team icon for role {team_role.id}")
 
-        except discord.Forbidden:
-            logger.error("Forbidden error during team emoji update")
-            await self._send_premium_embed(
-                ctx,
-                description="Bot nie ma wystarczających uprawnień, aby zmienić ikonę roli.",
-                color=0xFF0000,
-            )
-        except discord.HTTPException as e:
-            logger.error(f"HTTP error during team emoji update: {str(e)}")
-            await self._send_premium_embed(
-                ctx,
-                description=f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}",
-                color=0xFF0000,
-            )
         except Exception as e:
-            logger.error(f"Error during team emoji update: {str(e)}")
+            logger.error(f"Error setting team emoji: {str(e)}")
             await self._send_premium_embed(
                 ctx,
-                description=f"Wystąpił błąd podczas zmiany emoji teamu: {str(e)}",
+                description=f"Wystąpił błąd podczas ustawiania emoji teamu: {str(e)}",
                 color=0xFF0000,
             )
 
@@ -1037,13 +969,12 @@ class PremiumCog(commands.Cog):
         :return: The team role or None if not found
         """
         # Get team roles that follow the pattern "☫ <name>"
-        team_symbol = self.team_config["symbol"]
         team_roles = [
             role
             for role in member.roles
-            if role.name.startswith(team_symbol)
-            and len(role.name) > len(team_symbol)
-            and role.name[len(team_symbol)] == " "
+            if role.name.startswith(self.team_symbol)
+            and len(role.name) > len(self.team_symbol)
+            and role.name[len(self.team_symbol)] == " "
         ]
 
         # Return the first team role found (there should only be one)
@@ -1232,231 +1163,6 @@ class PremiumCog(commands.Cog):
             f"• `{self.prefix}team color <kolor>` - Ustaw kolor teamu (wymaga rangi zG500+)\n"
             f"• `{self.prefix}team emoji <emoji>` - Ustaw emoji teamu (wymaga rangi zG1000)"
         )
-
-
-# Helper functions
-def emoji_validator(emoji_str: str) -> bool:
-    """
-    Check if a string is a single emoji.
-
-    :param emoji_str: The string to check
-    :return: True if the string is a single emoji, False otherwise
-    """
-    if not emoji_str:
-        return False
-
-    # Check if it's a standard Unicode emoji using the emoji library
-    if emoji.is_emoji(emoji_str):
-        return True
-
-    # Check for Discord custom emoji format: <:name:id> or <a:name:id>
-    if emoji_str.startswith("<") and emoji_str.endswith(">"):
-        parts = emoji_str.strip("<>").split(":")
-
-        # Dla emoji w formacie <:nazwa:id> mamy ['', 'nazwa', 'id>']
-        # Dla emoji w formacie <a:nazwa:id> mamy ['a', 'nazwa', 'id']
-        # Upewnijmy się, że mamy co najmniej 3 części i druga oraz trzecia nie są puste
-        if len(parts) >= 3 and parts[1] and parts[2]:
-            return True
-
-        # Dla innych formatów sprawdź czy wszystkie części są niepuste
-        return len(parts) >= 2 and all(part for part in parts)
-
-    # Special case for when user inputs :name: format instead of <:name:id>
-    if emoji_str.startswith(":") and emoji_str.endswith(":") and len(emoji_str) > 2:
-        # Powiedz użytkownikowi, że nie możemy obsłużyć tego formatu
-        return False
-
-    return False
-
-
-async def emoji_to_icon(emoji_str: str) -> bytes:
-    """
-    Convert an emoji to an image format suitable for Discord role icon.
-
-    :param emoji_str: The emoji string to convert
-    :return: Bytes representation of the image
-    """
-    # Check if it's a custom Discord emoji
-    if emoji_str.startswith("<") and emoji_str.endswith(">"):
-        # Custom emoji format: <:name:id> or <a:name:id>
-        parts = emoji_str.split(":")
-
-        if len(parts) >= 3:
-            # Extract the ID properly, removing the closing ">"
-            emoji_id = parts[-1].replace(">", "")
-            # Check if it's an animated emoji
-            is_animated = emoji_str.startswith("<a:")
-
-            # For animated emoji, always try to get PNG first (first frame)
-            # Only if PNG fails, try GIF and extract first frame
-            if is_animated:
-                # Try PNG first
-                emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.png"
-                logger.info(f"Fetching first frame of animated emoji from URL: {emoji_url}")
-
-                try:
-                    async with httpx.AsyncClient() as client:
-                        response = await client.get(emoji_url)
-                        if response.status_code == 200:
-                            logger.info(f"Successfully downloaded static version of animated emoji")
-                            return response.content
-                except Exception as e:
-                    logger.error(f"Error getting static version of animated emoji: {str(e)}")
-
-                # If PNG failed, try GIF and extract first frame
-                try:
-                    emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.gif"
-                    logger.info(f"Fetching animated emoji from URL: {emoji_url}")
-
-                    async with httpx.AsyncClient() as client:
-                        response = await client.get(emoji_url)
-                        if response.status_code == 200:
-                            # Use PIL to extract first frame
-                            import io
-
-                            from PIL import Image
-
-                            gif = Image.open(io.BytesIO(response.content))
-                            # Convert to RGBA if needed
-                            if gif.mode != "RGBA":
-                                gif = gif.convert("RGBA")
-
-                            # Save first frame as PNG
-                            output = io.BytesIO()
-                            gif.save(output, format="PNG")
-                            output.seek(0)
-                            logger.info(f"Successfully extracted first frame from animated emoji")
-                            return output.getvalue()
-                except Exception as e:
-                    logger.error(f"Error processing animated emoji: {str(e)}")
-            else:
-                # For static emoji, just get PNG
-                emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.png"
-                logger.info(f"Fetching static emoji from URL: {emoji_url}")
-
-                try:
-                    async with httpx.AsyncClient() as client:
-                        response = await client.get(emoji_url)
-                        if response.status_code == 200:
-                            logger.info(f"Successfully downloaded static emoji")
-                            return response.content
-                except Exception as e:
-                    logger.error(f"Error getting static emoji: {str(e)}")
-
-    # For standard Unicode emojis, use the Twemoji CDN to get the emoji image
-    try:
-        # Konwertuj emoji Unicode na kod dla Twemoji
-        codepoints = []
-        for char in emoji_str:
-            # Dla każdego znaku emoji (które mogą składać się z kilku kodów Unicode)
-            # pobierz kod szesnastkowy i dodaj go do listy
-            if ord(char) < 0x10000:  # Podstawowe znaki Unicode
-                codepoints.append(f"{ord(char):x}")
-            else:  # Znaki spoza Basic Multilingual Plane
-                codepoints.append(f"{ord(char):x}")
-
-        # Tworzenie kodu emoji dla Twemoji - używa kresek dla złożonych emoji
-        emoji_code = "-".join(codepoints).lower()
-        logger.info(f"Unicode emoji '{emoji_str}' converted to code: {emoji_code}")
-
-        # Pobieranie emoji z CDN Twemoji
-        emoji_url = (
-            f"https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/{emoji_code}.png"
-        )
-        logger.info(f"Fetching Twemoji from URL: {emoji_url}")
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(emoji_url)
-                if response.status_code == 200:
-                    # Twemoji successfully found
-                    logger.info(f"Successfully downloaded Twemoji from {emoji_url}")
-                    return response.content
-                else:
-                    logger.error(
-                        f"Failed to download Twemoji from {emoji_url}: HTTP {response.status_code}"
-                    )
-                    # Spróbuj alternatywnego źródła Twemoji
-                    alternate_url = f"https://twemoji.maxcdn.com/v/latest/72x72/{emoji_code}.png"
-                    logger.info(f"Trying alternate Twemoji URL: {alternate_url}")
-                    alt_response = await client.get(alternate_url)
-                    if alt_response.status_code == 200:
-                        logger.info(
-                            f"Successfully downloaded Twemoji from alternate URL {alternate_url}"
-                        )
-                        return alt_response.content
-                    else:
-                        logger.error(
-                            f"Failed to download Twemoji from alternate URL: HTTP {alt_response.status_code}"
-                        )
-        except Exception as e:
-            logger.error(f"Error getting Twemoji from URL: {emoji_url}, error: {str(e)}")
-
-        # Jeśli nie udało się pobrać z Twemoji, spróbujmy użyć biblioteki emoji_data_python
-        logger.info("Fallback to rendering emoji with Pillow")
-
-        # Find the emoji using emoji_data_python
-        for e in emoji_data_python.emoji_data:
-            if e.char == emoji_str:
-                emoji_str = e.char
-                break
-
-        # Try to use system fonts
-        img = Image.new("RGBA", (128, 128), (0, 0, 0, 0))  # Transparent background
-        draw = ImageDraw.Draw(img)
-
-        try:
-            # Try common emoji font paths
-            font_paths = [
-                "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",  # Linux
-                "/System/Library/Fonts/Apple Color Emoji.ttc",  # macOS
-                "C:\\Windows\\Fonts\\seguiemj.ttf",  # Windows
-                "/usr/share/fonts/truetype/ancient-scripts/Symbola.ttf",  # Linux fallback
-                "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",  # Another Linux option
-            ]
-
-            font = None
-            for font_path in font_paths:
-                try:
-                    font = ImageFont.truetype(font_path, 109)
-                    break
-                except (IOError, OSError):
-                    continue
-
-            if font is None:
-                # If all font paths fail, try to use a system font
-                font = ImageFont.load_default()
-
-            # Draw the emoji centered with a more visible color (white)
-            draw.text((64, 64), emoji_str, font=font, fill=(255, 255, 255, 255), anchor="mm")
-
-            buffer = io.BytesIO()
-            img.save(buffer, format="PNG")
-            buffer.seek(0)
-            return buffer.read()
-
-        except Exception as e:
-            logger.error(f"Error rendering emoji with Pillow: {str(e)}")
-            # Continue to fallback
-
-    except Exception as e:
-        logger.error(f"Error processing emoji: {str(e)}")
-
-    # Last resort: use a default image
-    img = Image.new("RGBA", (128, 128), (0, 120, 215, 255))  # Discord blue as fallback
-    draw = ImageDraw.Draw(img)
-    # Draw a question mark
-    try:
-        font = ImageFont.load_default()
-        draw.text((64, 64), "?", font=font, fill=(255, 255, 255, 255), anchor="mm")
-    except:
-        pass  # Just use the blue background if text fails
-
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-    return buffer.read()
 
 
 async def setup(bot):
