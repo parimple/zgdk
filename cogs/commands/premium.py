@@ -264,7 +264,7 @@ class PremiumCog(commands.Cog):
         if description:
             # Add premium text to description if available
             if premium_text:
-                full_description = f"{description}\n\n{premium_text}"
+                full_description = f"{description}\n{premium_text}"
             else:
                 full_description = description
 
