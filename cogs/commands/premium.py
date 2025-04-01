@@ -747,7 +747,7 @@ class PremiumCog(commands.Cog):
         )
         if not has_perm:
             return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
-            
+
         # Jeśli nie podano koloru, usuń kolor roli (ustaw domyślny)
         if color is None:
             try:
