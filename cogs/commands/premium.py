@@ -739,7 +739,7 @@ class PremiumCog(commands.Cog):
 
     @team.command(name="color")
     @app_commands.describe(color="Kolor teamu (angielska nazwa, hex lub polska nazwa)")
-    async def team_color(self, ctx, color: str):
+    async def team_color(self, ctx, color: Optional[str] = None):
         """Change your team's color."""
         # Użyj metody pomocniczej do sprawdzenia uprawnień
         has_perm, team_role, error_msg = await self._check_team_permissions(
@@ -747,6 +747,20 @@ class PremiumCog(commands.Cog):
         )
         if not has_perm:
             return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
+            
+        # Jeśli nie podano koloru, usuń kolor roli (ustaw domyślny)
+        if color is None:
+            try:
+                await team_role.edit(color=discord.Color.default())
+                description = f"Usunięto kolor teamu **{team_role.mention}**."
+                return await self._send_premium_embed(ctx, description=description)
+            except Exception as e:
+                logger.error(f"Błąd podczas usuwania koloru teamu: {str(e)}")
+                return await self._send_premium_embed(
+                    ctx,
+                    description=f"Wystąpił błąd podczas usuwania koloru teamu: {str(e)}",
+                    color=0xFF0000,
+                )
 
         try:
             # Próba konwersji koloru na obiekt discord.Color
