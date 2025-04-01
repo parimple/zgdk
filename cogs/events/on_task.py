@@ -97,7 +97,7 @@ class OnTaskEvent(commands.Cog):
 
             if role_price is not None:
                 price_pln = g_to_pln(role_price)
-                price_message = f"Aby przedłużyć tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} ({price_pln:.2f} PLN)."
+                price_message = f"Aby przedłużyć tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} ({price_pln} PLN)."
             else:
                 price_message = (
                     "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."
@@ -133,7 +133,7 @@ class OnTaskEvent(commands.Cog):
             prefix = "[Kanał]" if self.force_channel_notifications else "[DM nie działa]"
 
             await channel.send(
-                f"{prefix} {member.mention}, Twoja rola premium wygaśnie {expiration_str}. \n"
+                f"{prefix} {member.mention}, Twoja rola premium {expiration_str}. \n"
                 f"{price_message}\n"
                 f"Zasil swoje konto, aby ją przedłużyć: {self.bot.config['donate_url']}\n"
                 "Wpisując **TYLKO** swoje id w polu - Twój nick."
@@ -217,7 +217,7 @@ class OnTaskEvent(commands.Cog):
 
             if role_price is not None:
                 price_pln = g_to_pln(role_price)
-                price_message = f"Aby odnowić tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} ({price_pln:.2f} PLN)."
+                price_message = f"Aby odnowić tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} ({price_pln} PLN)."
             else:
                 price_message = (
                     "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."

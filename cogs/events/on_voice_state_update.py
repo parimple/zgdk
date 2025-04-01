@@ -126,24 +126,43 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         :param member: Member object representing the joining member
         :param after: VoiceState object representing the state after the update
         """
+        # Buforowanie kategorii - pobieramy informacje o kategorii tylko raz
+        category = after.channel.category
+        category_id = category.id if category else None
+
+        # Sprawdź, czy w kategorii istnieje pusty kanał
+        empty_channels = []
+        if category:
+            empty_channels = [
+                channel
+                for channel in category.voice_channels
+                if len(channel.members) == 0
+                and channel.id not in self.channels_create
+                and channel.id != self.bot.config["channels_voice"]["afk"]
+            ]
+
         # Determine channel name based on category
         channel_name = member.display_name
-        category_id = after.channel.category.id if after.channel.category else None
 
         logger.info(f"Creating channel in category: {category_id}")
-        logger.info(f"Available formats: {self.bot.config.get('channel_name_formats', {}).keys()}")
+
+        # Optymalizacja: Pobieramy konfigurację formatów tylko raz
+        formats = self.bot.config.get("channel_name_formats", {})
 
         # Check if category has a custom format
-        formats = self.bot.config.get("channel_name_formats", {})
         format_key = category_id  # próbuj najpierw jako int
-        if format_key not in formats:
-            format_key = str(category_id)  # spróbuj jako string
+        custom_format = None
 
         if format_key in formats:
+            custom_format = formats[format_key]
+        elif str(category_id) in formats:
+            custom_format = formats[str(category_id)]
+
+        if custom_format:
             # Get random emoji
             emoji = random.choice(self.bot.config.get("channel_emojis", ["🎮"]))
             # Apply the format
-            channel_name = formats[format_key].format(emoji=emoji)
+            channel_name = custom_format.format(emoji=emoji)
             logger.info(f"Using format for category {category_id}: {channel_name}")
         else:
             # Check if this is a git category
@@ -168,6 +187,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         # Get user limit based on category
         user_limit = 0
         if category_id:
+            # Optymalizacja: Buforujemy konfigurację limitów, pobierając ją tylko raz
             config = self.bot.config.get("default_user_limits", {})
 
             # Sprawdź kategorie git i public
@@ -214,10 +234,37 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                     # Add new overwrite
                     permission_overwrites[target] = overwrite
 
-        # Create the new channel with all permissions and limits
+        # Jeśli istnieje pusty kanał, użyj go zamiast tworzyć nowy
+        if empty_channels:
+            # Użyj pierwszego pustego kanału
+            existing_channel = empty_channels[0]
+            logger.info(f"Wykorzystuję istniejący pusty kanał: {existing_channel.name}")
+
+            # Nie zmieniamy nazwy ani limitu, bo są już ustawione poprawnie
+            # Nie resetujemy uprawnień, bo zostały już zresetowane przy opuszczaniu kanału
+
+            # Dodaj tylko uprawnienia dla właściciela kanału
+            owner_permissions = permission_overwrites.get(member, None)
+            if owner_permissions:
+                await existing_channel.set_permissions(member, overwrite=owner_permissions)
+                logger.info(f"Dodano uprawnienia właściciela dla {member.display_name}")
+
+            # Przenieś członka do kanału
+            await member.move_to(existing_channel)
+
+            # Utwórz fake context i wyślij informację o zajęciu kanału
+            fake_ctx = FakeContext(self.bot, member.guild)
+            await self.message_sender.send_channel_creation_info(
+                existing_channel, fake_ctx, owner=member
+            )
+
+            return
+
+        # Create the new channel with all permissions and limits (gdy nie znaleziono pustego kanału)
+        # Optymalizacja: Tworzenie kanału z wszystkimi parametrami za jednym razem
         new_channel = await self.guild.create_voice_channel(
             channel_name,
-            category=after.channel.category,
+            category=category,
             bitrate=self.guild.bitrate_limit,
             user_limit=user_limit,
             overwrites=permission_overwrites,
@@ -245,6 +292,83 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
         # Usuwamy tylko kanały w kategoriach głosowych
         if before.channel.category and before.channel.category.id in self.vc_categories:
+            # Sprawdź, czy kategoria jest jedną z tych, gdzie zachowujemy puste kanały
+            preserve_categories = [
+                id
+                for key, id in {
+                    "publ": self.bot.config.get("default_user_limits", {})
+                    .get("public_categories", {})
+                    .get("categories", [])[0]
+                    if self.bot.config.get("default_user_limits", {})
+                    .get("public_categories", {})
+                    .get("categories", [])
+                    else None,
+                    "max2": self.bot.config.get("default_user_limits", {})
+                    .get("max_categories", {})
+                    .get("max2", {})
+                    .get("id"),
+                    "max3": self.bot.config.get("default_user_limits", {})
+                    .get("max_categories", {})
+                    .get("max3", {})
+                    .get("id"),
+                    "max4": self.bot.config.get("default_user_limits", {})
+                    .get("max_categories", {})
+                    .get("max4", {})
+                    .get("id"),
+                    "max5": self.bot.config.get("default_user_limits", {})
+                    .get("max_categories", {})
+                    .get("max5", {})
+                    .get("id"),
+                }.items()
+                if id is not None
+            ]
+
+            if before.channel.category.id in preserve_categories:
+                # Sprawdź ile pustych kanałów jest już w tej kategorii
+                empty_channels = [
+                    channel
+                    for channel in before.channel.category.voice_channels
+                    if len(channel.members) == 0
+                    and channel.id not in self.channels_create
+                    and channel.id != self.bot.config["channels_voice"]["afk"]
+                ]
+
+                self.logger.info(
+                    f"Liczba pustych kanałów w kategorii {before.channel.category.name}: {len(empty_channels)}"
+                )
+
+                if len(empty_channels) <= 3:  # Zachowaj kanał, jeśli pustych jest 3 lub mniej
+                    self.logger.info(
+                        f"Zachowuję pusty kanał {before.channel.name} w kategorii {before.channel.category.name}"
+                    )
+
+                    # Zoptymalizacja: Przygotuj wszystkie zmiany uprawnień na raz
+                    clean_perms = self.permission_manager._get_clean_everyone_permissions()
+
+                    # Przygotuj słownik wszystkich uprawnień do ustawienia za jednym razem
+                    new_overwrites = {}
+
+                    # Dodaj czyste uprawnienia dla @everyone
+                    new_overwrites[before.channel.guild.default_role] = clean_perms
+
+                    # Zachowaj tylko uprawnienia dla ról wyciszających
+                    mute_role_ids = [role["id"] for role in self.bot.config["mute_roles"]]
+                    for target, overwrite in before.channel.overwrites.items():
+                        if isinstance(target, discord.Role) and target.id in mute_role_ids:
+                            new_overwrites[target] = overwrite
+
+                    # Ustaw odpowiedni limit użytkowników
+                    user_limit = self.permission_manager._get_default_user_limit(
+                        before.channel.category.id
+                    )
+
+                    # Zastosuj wszystkie zmiany jednym wywołaniem API
+                    await before.channel.edit(overwrites=new_overwrites, user_limit=user_limit)
+
+                    # Zakończ funkcję, nie usuwając kanału
+                    return
+
+            # W pozostałych przypadkach usuń kanał
             await before.channel.delete()
 
 
