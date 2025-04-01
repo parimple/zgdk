@@ -354,8 +354,10 @@ class PremiumCog(commands.Cog):
             existing_team = result.scalar_one_or_none()
 
             if existing_team:
-                await self.message_sender.send_error(
-                    ctx, "Posiadasz już team! Nie możesz stworzyć kolejnego."
+                await self._send_premium_embed(
+                    ctx,
+                    description="Posiadasz już team! Nie możesz stworzyć kolejnego.",
+                    color=0xFF0000
                 )
                 return
 
