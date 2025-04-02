@@ -3,13 +3,14 @@ import logging
 import random
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from datasources.queries import RoleQueries
+from datasources.queries import MemberQueries, RoleQueries
+from utils.message_sender import MessageSender
 from utils.permissions import is_admin, is_mod_or_admin, is_owner_or_admin
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ class ModCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = bot.config
+        self.message_sender = MessageSender(bot)
 
     async def get_target_user(
         self, ctx: commands.Context, user
@@ -382,7 +384,7 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def mute(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
-            await ctx.send("Użyj jednej z podkomend: nick")
+            await ctx.send("Użyj jednej z podkomend: nick, img")
 
     @mute.command(name="nick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę.")
     @is_mod_or_admin()
@@ -391,13 +393,24 @@ class ModCog(commands.Cog):
         """Handle inappropriate nickname by removing color roles and applying punishment."""
         await self.handle_bad_nickname_logic(ctx, user)
 
+    @mute.command(name="img", description="Blokuje możliwość wysyłania obrazków i linków.")
+    @is_mod_or_admin()
+    @discord.app_commands.describe(
+        user="Użytkownik, któremu chcesz zablokować możliwość wysyłania obrazków",
+        duration="Czas trwania blokady, np. 1h, 30m, 1d (puste = blokada stała)",
+    )
+    async def mute_img(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
+        """Handle blocking user from sending images and links."""
+        parsed_duration = self.parse_duration(duration)
+        await self.handle_img_mute_logic(ctx, user, parsed_duration)
+
     @commands.hybrid_group(
         name="unmute", description="Komendy związane z odwyciszaniem użytkowników."
     )
     @is_mod_or_admin()
     async def unmute(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
-            await ctx.send("Użyj jednej z podkomend: nick")
+            await ctx.send("Użyj jednej z podkomend: nick, img")
 
     @unmute.command(name="nick", description="Przywraca możliwość zmiany nicku użytkownikowi.")
     @is_mod_or_admin()
@@ -405,6 +418,13 @@ class ModCog(commands.Cog):
     async def unmute_nick(self, ctx: commands.Context, user: discord.Member):
         """Handle unmuting nickname."""
         await self.handle_unmute_nickname_logic(ctx, user)
+
+    @unmute.command(name="img", description="Przywraca możliwość wysyłania obrazków i linków.")
+    @is_mod_or_admin()
+    @discord.app_commands.describe(user="Użytkownik do odblokowania wysyłania obrazków")
+    async def unmute_img(self, ctx: commands.Context, user: discord.Member):
+        """Handle unmuting image permissions."""
+        await self.handle_unmute_img_logic(ctx, user)
 
     @commands.command(
         name="mutenick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę."
@@ -421,6 +441,21 @@ class ModCog(commands.Cog):
     async def unmutenick_prefix(self, ctx: commands.Context, user: discord.Member):
         """Handle unmuting nickname."""
         await self.handle_unmute_nickname_logic(ctx, user)
+
+    @commands.command(name="muteimg", description="Blokuje możliwość wysyłania obrazków i linków.")
+    @is_mod_or_admin()
+    async def muteimg_prefix(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
+        """Handle blocking user from sending images and links."""
+        parsed_duration = self.parse_duration(duration)
+        await self.handle_img_mute_logic(ctx, user, parsed_duration)
+
+    @commands.command(
+        name="unmuteimg", description="Przywraca możliwość wysyłania obrazków i linków."
+    )
+    @is_mod_or_admin()
+    async def unmuteimg_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Handle unmuting image permissions."""
+        await self.handle_unmute_img_logic(ctx, user)
 
     async def handle_bad_nickname_logic(self, ctx: commands.Context, user: discord.Member):
         """Common logic for handling inappropriate nicknames."""
@@ -523,6 +558,177 @@ class ModCog(commands.Cog):
         except Exception as e:
             logger.error(f"Error handling nickname unmute for user {user.id}: {e}", exc_info=True)
             await ctx.send("Wystąpił błąd podczas odmutowywania nicku.")
+
+    def parse_duration(self, duration_str: str) -> Optional[timedelta]:
+        """
+        Parse a duration string into a timedelta.
+
+        Formats supported:
+        - Empty string or None - treated as permanent (returns None)
+        - Plain number (e.g., "1") - treated as hours
+        - Time units (e.g., "1h", "30m", "1d")
+        - Combined (e.g., "1h30m")
+
+        Returns a timedelta object or None for permanent duration.
+        """
+        if duration_str is None or duration_str.strip() == "":
+            return None  # None indicates permanent mute
+
+        # If it's just a number, treat as hours
+        if duration_str.isdigit():
+            return timedelta(hours=int(duration_str))
+
+        # Try to parse complex duration
+        total_seconds = 0
+        pattern = r"(\d+)([dhms])"
+        matches = re.findall(pattern, duration_str.lower())
+
+        if not matches:
+            # If no valid format found, default to 1 hour
+            logger.warning(f"Invalid duration format: {duration_str}, using default 1 hour")
+            return timedelta(hours=1)
+
+        for value, unit in matches:
+            if unit == "d":
+                total_seconds += int(value) * 86400  # days to seconds
+            elif unit == "h":
+                total_seconds += int(value) * 3600  # hours to seconds
+            elif unit == "m":
+                total_seconds += int(value) * 60  # minutes to seconds
+            elif unit == "s":
+                total_seconds += int(value)  # seconds
+
+        return timedelta(seconds=total_seconds)
+
+    async def handle_img_mute_logic(
+        self, ctx: commands.Context, user: discord.Member, duration: Optional[timedelta]
+    ):
+        """Common logic for handling image mute."""
+        try:
+            # Check if target is a moderator or admin
+            has_mod_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["mod"])
+            has_admin_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["admin"])
+
+            # Only admins can mute mods, and nobody can mute admins
+            if has_admin_role:
+                await ctx.send("Nie możesz zablokować uprawnień administratora.")
+                return
+
+            if has_mod_role and not discord.utils.get(
+                ctx.author.roles, id=self.config["admin_roles"]["admin"]
+            ):
+                await ctx.send("Tylko administrator może zablokować uprawnienia moderatora.")
+                return
+
+            # Remove color roles if present
+            color_roles = [
+                discord.Object(id=role_id) for role_id in self.config["color_roles"].values()
+            ]
+            await user.remove_roles(*color_roles, reason="Blokada wysyłania obrazków i linków")
+
+            # Add mute role
+            mute_role = discord.Object(id=self.config["mute_roles"][2]["id"])  # ☢︎ role
+            await user.add_roles(mute_role, reason="Blokada wysyłania obrazków i linków")
+
+            # Save punishment in database
+            async with self.bot.get_db() as session:
+                # Upewnij się, że użytkownik istnieje w tabeli members
+                await MemberQueries.get_or_add_member(session, user.id)
+
+                # Check if there's an existing mute
+                existing_role = await RoleQueries.get_member_role(
+                    session, user.id, self.config["mute_roles"][2]["id"]
+                )
+
+                if existing_role and existing_role.expiration_date and duration is not None:
+                    time_left = existing_role.expiration_date - datetime.now(timezone.utc)
+                    if time_left > duration:
+                        # Keep the existing longer duration
+                        message = f"Użytkownik {user.mention} posiada już dłuższą blokadę. Obecna kara wygaśnie za {time_left.days}d {time_left.seconds//3600}h {(time_left.seconds//60)%60}m."
+                        await ctx.send(message)
+                        return
+
+                await RoleQueries.add_or_update_role_to_member(
+                    session, user.id, self.config["mute_roles"][2]["id"], duration=duration
+                )
+                await session.commit()
+
+            # Format message based on duration
+            if duration is None:
+                message = f"Zablokowano możliwość wysyłania obrazków i linków dla {user.mention} na stałe."
+            else:
+                # Format duration for user-friendly display
+                duration_str = ""
+                if duration.days > 0:
+                    duration_str += f"{duration.days}d "
+                hours, remainder = divmod(duration.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                if hours > 0:
+                    duration_str += f"{hours}h "
+                if minutes > 0:
+                    duration_str += f"{minutes}m "
+                if seconds > 0 or not duration_str:
+                    duration_str += f"{seconds}s"
+
+                message = f"Zablokowano możliwość wysyłania obrazków i linków dla {user.mention} na {duration_str}."
+
+            # Pobierz informację o planie premium, identycznie jak w module voice
+            _, premium_text = MessageSender._get_premium_text(ctx)
+            if premium_text:
+                message = f"{message}\n{premium_text}"
+
+            embed = discord.Embed(description=message, color=ctx.author.color)
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            logger.error(f"Error handling image mute for user {user.id}: {e}", exc_info=True)
+            await ctx.send("Wystąpił błąd podczas nakładania blokady.")
+
+    async def handle_unmute_img_logic(self, ctx: commands.Context, user: discord.Member):
+        """Common logic for handling image unmuting."""
+        try:
+            # Check if target is a moderator or admin
+            has_mod_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["mod"])
+            has_admin_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["admin"])
+
+            # Only admins can unmute mods
+            if has_admin_role:
+                await ctx.send("Nie możesz zarządzać uprawnieniami administratora.")
+                return
+
+            if has_mod_role and not discord.utils.get(
+                ctx.author.roles, id=self.config["admin_roles"]["admin"]
+            ):
+                await ctx.send("Tylko administrator może zarządzać uprawnieniami moderatora.")
+                return
+
+            # Remove mute role
+            mute_role = discord.Object(id=self.config["mute_roles"][2]["id"])  # ☢︎ role
+            await user.remove_roles(mute_role, reason="Przywrócenie możliwości wysyłania obrazków")
+
+            # Remove role from database
+            async with self.bot.get_db() as session:
+                # Upewnij się, że użytkownik istnieje w tabeli members
+                await MemberQueries.get_or_add_member(session, user.id)
+
+                await RoleQueries.delete_member_role(
+                    session, user.id, self.config["mute_roles"][2]["id"]
+                )
+                await session.commit()
+
+            message = f"Przywrócono możliwość wysyłania obrazków i linków dla {user.mention}."
+
+            # Pobierz informację o planie premium, identycznie jak w module voice
+            _, premium_text = MessageSender._get_premium_text(ctx)
+            if premium_text:
+                message = f"{message}\n{premium_text}"
+
+            embed = discord.Embed(description=message, color=ctx.author.color)
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            logger.error(f"Error handling image unmute for user {user.id}: {e}", exc_info=True)
+            await ctx.send("Wystąpił błąd podczas zdejmowania blokady.")
 
 
 async def setup(bot):

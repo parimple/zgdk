@@ -159,7 +159,9 @@ class OnTaskEvent(commands.Cog):
                 async with self.bot.get_db() as session:
                     db_role = await RoleQueries.get_member_role(session, member.id, role.id)
 
-                    if not db_role or db_role.expiration_date <= now:
+                    if not db_role or (
+                        db_role.expiration_date is not None and db_role.expiration_date <= now
+                    ):
                         try:
                             await member.remove_roles(role)
                             logger.info(
@@ -169,8 +171,8 @@ class OnTaskEvent(commands.Cog):
                                 member.id,
                             )
                             if (
-                                db_role
-                            ):  # Powiadom tylko jeśli rola wygasła (a nie gdy jej brak w DB)
+                                db_role and db_role.expiration_date is not None
+                            ):  # Powiadom tylko jeśli rola wygasła (a nie gdy jej brak w DB lub jest permanentna)
                                 await self.notify_premium_removal(member, db_role, role)
                         except discord.Forbidden:
                             logger.error(

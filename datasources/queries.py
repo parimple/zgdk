@@ -180,12 +180,15 @@ class RoleQueries:
         session: AsyncSession,
         member_id: int,
         role_id: int,
-        duration: timedelta = timedelta(days=30),
+        duration: Optional[timedelta] = timedelta(days=30),
     ):
         """Add a role to a member or update its expiration date if it already exists"""
-        expiration_date = datetime.now(timezone.utc) + duration
         try:
             member_role = await session.get(MemberRole, (member_id, role_id))
+
+            # Calculate expiration date (if duration is None, set it to None for permanent)
+            expiration_date = None if duration is None else datetime.now(timezone.utc) + duration
+
             if member_role:
                 member_role.expiration_date = expiration_date
                 logger.info(f"Updated expiration date for role {role_id} of member {member_id}")
@@ -196,10 +199,10 @@ class RoleQueries:
                 session.add(member_role)
                 logger.info(f"Added new role {role_id} to member {member_id}")
             await session.flush()
-        except IntegrityError:
+        except IntegrityError as e:
             await session.rollback()
             logger.error(
-                f"IntegrityError occurred while adding/updating role {role_id} for member {member_id}"
+                f"IntegrityError occurred while adding/updating role {role_id} for member {member_id}: {str(e)}"
             )
         except Exception as e:
             await session.rollback()
