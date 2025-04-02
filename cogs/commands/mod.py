@@ -16,6 +16,87 @@ from utils.permissions import is_admin, is_mod_or_admin, is_owner_or_admin
 logger = logging.getLogger(__name__)
 
 
+class MuteType:
+    """Definicje typów wyciszeń."""
+
+    NICK = "nick"
+    IMG = "img"
+    TXT = "txt"
+    LIVE = "live"
+    RANK = "rank"
+
+    @staticmethod
+    def get_config():
+        """Zwraca konfigurację dla wszystkich typów wyciszeń."""
+        return {
+            MuteType.NICK: {
+                "role_index": 2,  # ☢︎ role (attach_files_off)
+                "role_id_field": "id",
+                "display_name": "nicku",
+                "action_name": "zmiany nicku",
+                "reason_add": "Niewłaściwy nick",
+                "reason_remove": "Przywrócenie możliwości zmiany nicku",
+                "success_message_add": "Nałożono karę na {user_mention}. Aby odzyskać możliwość zmiany nicku, udaj się na <#{premium_channel}> i zakup dowolną rangę premium.",
+                "success_message_remove": "Przywrócono możliwość {action_name} dla {user_mention}.",
+                "default_duration": timedelta(days=30),
+                "supports_duration": False,
+                "special_actions": ["change_nickname"],
+            },
+            MuteType.IMG: {
+                "role_index": 2,  # ☢︎ role (attach_files_off)
+                "role_id_field": "id",
+                "display_name": "obrazków i linków",
+                "action_name": "wysyłania obrazków i linków",
+                "reason_add": "Blokada wysyłania obrazków i linków",
+                "reason_remove": "Przywrócenie możliwości wysyłania obrazków",
+                "success_message_add": "Zablokowano możliwość {action_name} dla {user_mention} na {duration_text}.",
+                "success_message_remove": "Przywrócono możliwość {action_name} dla {user_mention}.",
+                "default_duration": None,  # Domyślnie permanentny
+                "supports_duration": True,
+                "special_actions": [],
+            },
+            MuteType.TXT: {
+                "role_index": 1,  # ⌀ role (send_messages_off)
+                "role_id_field": "id",
+                "display_name": "wiadomości",
+                "action_name": "wysyłania wiadomości",
+                "reason_add": "Blokada wysyłania wiadomości",
+                "reason_remove": "Przywrócenie możliwości wysyłania wiadomości",
+                "success_message_add": "Zablokowano możliwość {action_name} dla {user_mention} na {duration_text}.",
+                "success_message_remove": "Przywrócono możliwość {action_name} dla {user_mention}.",
+                "default_duration": timedelta(hours=2),
+                "supports_duration": True,
+                "special_actions": [],
+            },
+            MuteType.LIVE: {
+                "role_index": 0,  # ⚠︎ role (stream_off)
+                "role_id_field": "id",
+                "display_name": "streama",
+                "action_name": "streamowania",
+                "reason_add": "Blokada streamowania",
+                "reason_remove": "Przywrócenie możliwości streamowania",
+                "success_message_add": "Zablokowano możliwość {action_name} dla {user_mention} na stałe.",
+                "success_message_remove": "Przywrócono możliwość {action_name} dla {user_mention}.",
+                "default_duration": None,
+                "supports_duration": False,  # Zawsze na stałe
+                "special_actions": ["move_to_afk_and_back"],
+            },
+            MuteType.RANK: {
+                "role_index": 3,  # ♺ role (points_off)
+                "role_id_field": "id",
+                "display_name": "rankingu",
+                "action_name": "zdobywania punktów rankingowych",
+                "reason_add": "Blokada zdobywania punktów",
+                "reason_remove": "Przywrócenie możliwości zdobywania punktów",
+                "success_message_add": "Zablokowano możliwość {action_name} dla {user_mention} na stałe.",
+                "success_message_remove": "Przywrócono możliwość {action_name} dla {user_mention}.",
+                "default_duration": None,
+                "supports_duration": False,  # Zawsze na stałe
+                "special_actions": [],
+            },
+        }
+
+
 class ModCog(commands.Cog):
     """Cog for moderation commands."""
 
@@ -23,6 +104,24 @@ class ModCog(commands.Cog):
         self.bot = bot
         self.config = bot.config
         self.message_sender = MessageSender(bot)
+
+    # Nowa metoda pomocnicza do wyświetlania pomocy dla komend
+    async def send_subcommand_help(self, ctx, command_name):
+        """Wyświetla pomoc dla komend grupowych z informacją o premium.
+
+        :param ctx: Kontekst komendy
+        :param command_name: Nazwa komendy (używana w logach)
+        """
+        base_text = "Użyj jednej z podkomend: nick, img, txt, live, rank"
+
+        # Dodaj informację o premium
+        _, premium_text = MessageSender._get_premium_text(ctx)
+        if premium_text:
+            base_text = f"{base_text}\n{premium_text}"
+
+        embed = MessageSender._create_embed(description=base_text, ctx=ctx)
+        await MessageSender._send_embed(ctx, embed, reply=True)
+        logger.debug(f"Sent subcommand help for {command_name}")
 
     async def get_target_user(
         self, ctx: commands.Context, user
@@ -382,16 +481,29 @@ class ModCog(commands.Cog):
 
     @commands.hybrid_group(name="mute", description="Komendy związane z wyciszaniem użytkowników.")
     @is_mod_or_admin()
-    async def mute(self, ctx: commands.Context):
+    @discord.app_commands.describe(
+        user="Użytkownik do wyciszenia (opcjonalnie, działa jak mute txt)"
+    )
+    async def mute(self, ctx: commands.Context, user: Optional[discord.Member] = None):
+        """Komendy związane z wyciszaniem użytkowników.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do wyciszenia (opcjonalnie, działa jak mute txt)
+        """
         if ctx.invoked_subcommand is None:
-            await ctx.send("Użyj jednej z podkomend: nick, img")
+            if user is not None:
+                # Jeśli podano użytkownika, ale nie podkomendę, działa jak 'mute txt'
+                await self.mute_txt(ctx, user)
+            else:
+                # Użyj wspólnej metody do wyświetlania pomocy
+                await self.send_subcommand_help(ctx, "mute")
 
     @mute.command(name="nick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę.")
     @is_mod_or_admin()
     @discord.app_commands.describe(user="Użytkownik z niewłaściwym nickiem")
     async def mute_nick(self, ctx: commands.Context, user: discord.Member):
-        """Handle inappropriate nickname by removing color roles and applying punishment."""
-        await self.handle_bad_nickname_logic(ctx, user)
+        """Usuwa niewłaściwy nick użytkownika i nadaje karę."""
+        await self.handle_mute_logic(ctx, user, MuteType.NICK)
 
     @mute.command(name="img", description="Blokuje możliwość wysyłania obrazków i linków.")
     @is_mod_or_admin()
@@ -400,164 +512,410 @@ class ModCog(commands.Cog):
         duration="Czas trwania blokady, np. 1h, 30m, 1d (puste = blokada stała)",
     )
     async def mute_img(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
-        """Handle blocking user from sending images and links."""
+        """Blokuje możliwość wysyłania obrazków i linków.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do zablokowania
+        :param duration: Czas trwania blokady (opcjonalnie)
+        """
         parsed_duration = self.parse_duration(duration)
-        await self.handle_img_mute_logic(ctx, user, parsed_duration)
+        await self.handle_mute_logic(ctx, user, MuteType.IMG, parsed_duration)
+
+    @mute.command(name="txt", description="Blokuje możliwość wysyłania wiadomości.")
+    @is_mod_or_admin()
+    @discord.app_commands.describe(
+        user="Użytkownik, któremu chcesz zablokować możliwość wysyłania wiadomości",
+        duration="Czas trwania blokady, np. 1h, 30m, 1d (puste = blokada stała)",
+    )
+    async def mute_txt(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
+        """Blokuje możliwość wysyłania wiadomości.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do zablokowania
+        :param duration: Czas trwania blokady (opcjonalnie)
+        """
+        parsed_duration = self.parse_duration(duration)
+        await self.handle_mute_logic(ctx, user, MuteType.TXT, parsed_duration)
+
+    @mute.command(name="live", description="Blokuje możliwość streamowania.")
+    @is_mod_or_admin()
+    @discord.app_commands.describe(
+        user="Użytkownik, któremu chcesz zablokować możliwość streamowania"
+    )
+    async def mute_live(self, ctx: commands.Context, user: discord.Member):
+        """Blokuje możliwość streamowania.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do zablokowania
+        """
+        await self.handle_mute_logic(ctx, user, MuteType.LIVE)
+
+    @mute.command(name="rank", description="Blokuje możliwość zdobywania punktów rankingowych.")
+    @is_mod_or_admin()
+    @discord.app_commands.describe(
+        user="Użytkownik, któremu chcesz zablokować możliwość zdobywania punktów"
+    )
+    async def mute_rank(self, ctx: commands.Context, user: discord.Member):
+        """Blokuje możliwość zdobywania punktów rankingowych.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do zablokowania
+        """
+        await self.handle_mute_logic(ctx, user, MuteType.RANK)
 
     @commands.hybrid_group(
         name="unmute", description="Komendy związane z odwyciszaniem użytkowników."
     )
     @is_mod_or_admin()
-    async def unmute(self, ctx: commands.Context):
+    @discord.app_commands.describe(
+        user="Użytkownik do odwyciszenia (opcjonalnie, działa jak unmute txt)"
+    )
+    async def unmute(self, ctx: commands.Context, user: Optional[discord.Member] = None):
+        """Komendy związane z odwyciszaniem użytkowników.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do odwyciszenia (opcjonalnie, działa jak unmute txt)
+        """
         if ctx.invoked_subcommand is None:
-            await ctx.send("Użyj jednej z podkomend: nick, img")
+            if user is not None:
+                # Jeśli podano użytkownika, ale nie podkomendę, działa jak 'unmute txt'
+                await self.unmute_txt(ctx, user)
+            else:
+                # Użyj wspólnej metody do wyświetlania pomocy
+                await self.send_subcommand_help(ctx, "unmute")
 
     @unmute.command(name="nick", description="Przywraca możliwość zmiany nicku użytkownikowi.")
     @is_mod_or_admin()
     @discord.app_commands.describe(user="Użytkownik do odmutowania nicku")
     async def unmute_nick(self, ctx: commands.Context, user: discord.Member):
-        """Handle unmuting nickname."""
-        await self.handle_unmute_nickname_logic(ctx, user)
+        """Przywraca możliwość zmiany nicku użytkownikowi.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do odblokowania
+        """
+        await self.handle_mute_logic(ctx, user, MuteType.NICK, unmute=True)
 
     @unmute.command(name="img", description="Przywraca możliwość wysyłania obrazków i linków.")
     @is_mod_or_admin()
     @discord.app_commands.describe(user="Użytkownik do odblokowania wysyłania obrazków")
     async def unmute_img(self, ctx: commands.Context, user: discord.Member):
-        """Handle unmuting image permissions."""
-        await self.handle_unmute_img_logic(ctx, user)
+        """Przywraca możliwość wysyłania obrazków i linków.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do odblokowania
+        """
+        await self.handle_mute_logic(ctx, user, MuteType.IMG, unmute=True)
+
+    @unmute.command(name="txt", description="Przywraca możliwość wysyłania wiadomości.")
+    @is_mod_or_admin()
+    @discord.app_commands.describe(user="Użytkownik do odblokowania wysyłania wiadomości")
+    async def unmute_txt(self, ctx: commands.Context, user: discord.Member):
+        """Przywraca możliwość wysyłania wiadomości.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do odblokowania
+        """
+        await self.handle_mute_logic(ctx, user, MuteType.TXT, unmute=True)
+
+    @unmute.command(name="live", description="Przywraca możliwość streamowania.")
+    @is_mod_or_admin()
+    @discord.app_commands.describe(user="Użytkownik do odblokowania streamowania")
+    async def unmute_live(self, ctx: commands.Context, user: discord.Member):
+        """Przywraca możliwość streamowania.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do odblokowania
+        """
+        await self.handle_mute_logic(ctx, user, MuteType.LIVE, unmute=True)
+
+    @unmute.command(name="rank", description="Przywraca możliwość zdobywania punktów rankingowych.")
+    @is_mod_or_admin()
+    @discord.app_commands.describe(user="Użytkownik do odblokowania zdobywania punktów")
+    async def unmute_rank(self, ctx: commands.Context, user: discord.Member):
+        """Przywraca możliwość zdobywania punktów rankingowych.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do odblokowania
+        """
+        await self.handle_mute_logic(ctx, user, MuteType.RANK, unmute=True)
 
     @commands.command(
         name="mutenick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę."
     )
     @is_mod_or_admin()
     async def mutenick_prefix(self, ctx: commands.Context, user: discord.Member):
-        """Handle inappropriate nickname by removing color roles and applying punishment."""
-        await self.handle_bad_nickname_logic(ctx, user)
+        """Usuwa niewłaściwy nick użytkownika i nadaje karę (wersja prefiksowa)."""
+        await self.handle_mute_logic(ctx, user, MuteType.NICK)
 
     @commands.command(
         name="unmutenick", description="Przywraca możliwość zmiany nicku użytkownikowi."
     )
     @is_mod_or_admin()
     async def unmutenick_prefix(self, ctx: commands.Context, user: discord.Member):
-        """Handle unmuting nickname."""
-        await self.handle_unmute_nickname_logic(ctx, user)
+        """Przywraca możliwość zmiany nicku użytkownikowi (wersja prefiksowa)."""
+        await self.handle_mute_logic(ctx, user, MuteType.NICK, unmute=True)
 
     @commands.command(name="muteimg", description="Blokuje możliwość wysyłania obrazków i linków.")
     @is_mod_or_admin()
     async def muteimg_prefix(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
-        """Handle blocking user from sending images and links."""
+        """Blokuje możliwość wysyłania obrazków i linków (wersja prefiksowa)."""
         parsed_duration = self.parse_duration(duration)
-        await self.handle_img_mute_logic(ctx, user, parsed_duration)
+        await self.handle_mute_logic(ctx, user, MuteType.IMG, parsed_duration)
 
     @commands.command(
         name="unmuteimg", description="Przywraca możliwość wysyłania obrazków i linków."
     )
     @is_mod_or_admin()
     async def unmuteimg_prefix(self, ctx: commands.Context, user: discord.Member):
-        """Handle unmuting image permissions."""
-        await self.handle_unmute_img_logic(ctx, user)
+        """Przywraca możliwość wysyłania obrazków i linków (wersja prefiksowa)."""
+        await self.handle_mute_logic(ctx, user, MuteType.IMG, unmute=True)
 
-    async def handle_bad_nickname_logic(self, ctx: commands.Context, user: discord.Member):
-        """Common logic for handling inappropriate nicknames."""
+    @commands.command(name="mutetxt", description="Blokuje możliwość wysyłania wiadomości.")
+    @is_mod_or_admin()
+    async def mutetxt_prefix(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
+        """Blokuje możliwość wysyłania wiadomości (wersja prefiksowa)."""
+        parsed_duration = self.parse_duration(duration)
+        await self.handle_mute_logic(ctx, user, MuteType.TXT, parsed_duration)
+
+    @commands.command(name="unmutetxt", description="Przywraca możliwość wysyłania wiadomości.")
+    @is_mod_or_admin()
+    async def unmutetxt_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Przywraca możliwość wysyłania wiadomości (wersja prefiksowa)."""
+        await self.handle_mute_logic(ctx, user, MuteType.TXT, unmute=True)
+
+    @commands.command(name="mutelive", description="Blokuje możliwość streamowania.")
+    @is_mod_or_admin()
+    async def mutelive_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Blokuje możliwość streamowania (wersja prefiksowa)."""
+        await self.handle_mute_logic(ctx, user, MuteType.LIVE)
+
+    @commands.command(name="unmutelive", description="Przywraca możliwość streamowania.")
+    @is_mod_or_admin()
+    async def unmutelive_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Przywraca możliwość streamowania (wersja prefiksowa)."""
+        await self.handle_mute_logic(ctx, user, MuteType.LIVE, unmute=True)
+
+    @commands.command(
+        name="muterank", description="Blokuje możliwość zdobywania punktów rankingowych."
+    )
+    @is_mod_or_admin()
+    async def muterank_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Blokuje możliwość zdobywania punktów rankingowych (wersja prefiksowa)."""
+        await self.handle_mute_logic(ctx, user, MuteType.RANK)
+
+    @commands.command(
+        name="unmuterank", description="Przywraca możliwość zdobywania punktów rankingowych."
+    )
+    @is_mod_or_admin()
+    async def unmuterank_prefix(self, ctx: commands.Context, user: discord.Member):
+        """Przywraca możliwość zdobywania punktów rankingowych (wersja prefiksowa)."""
+        await self.handle_mute_logic(ctx, user, MuteType.RANK, unmute=True)
+
+    async def handle_mute_logic(
+        self,
+        ctx: commands.Context,
+        user: discord.Member,
+        mute_type: str,
+        duration: Optional[timedelta] = None,
+        unmute: bool = False,
+    ):
+        """Wspólna logika do obsługi różnych typów wyciszeń.
+
+        :param ctx: Kontekst komendy
+        :param user: Użytkownik do wyciszenia/odciszenia
+        :param mute_type: Typ wyciszenia (z MuteType)
+        :param duration: Czas trwania wyciszenia (None dla permanentnego)
+        :param unmute: Czy to jest operacja odciszenia
+        """
         try:
+            # Pobierz konfigurację dla tego typu wyciszenia
+            mute_configs = MuteType.get_config()
+            if mute_type not in mute_configs:
+                await ctx.send(f"Nieznany typ wyciszenia: {mute_type}")
+                return
+
+            config = mute_configs[mute_type]
+
             # Check if target is a moderator or admin
             has_mod_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["mod"])
             has_admin_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["admin"])
 
             # Only admins can mute mods, and nobody can mute admins
             if has_admin_role:
-                await ctx.send("Nie możesz zmienić nicku administratorowi.")
+                action = "zarządzać" if unmute else "zablokować"
+                await ctx.send(f"Nie możesz {action} uprawnień administratora.")
                 return
 
             if has_mod_role and not discord.utils.get(
                 ctx.author.roles, id=self.config["admin_roles"]["admin"]
             ):
-                await ctx.send("Tylko administrator może zmienić nick moderatorowi.")
+                action = "zarządzać" if unmute else "zablokować"
+                await ctx.send(f"Tylko administrator może {action} uprawnienia moderatora.")
                 return
 
-            # Remove color roles if present
-            color_roles = [
-                discord.Object(id=role_id) for role_id in self.config["color_roles"].values()
-            ]
-            await user.remove_roles(*color_roles, reason="Niewłaściwy nick")
+            # Get role ID based on config
+            role_index = config["role_index"]
+            mute_role_id = self.config["mute_roles"][role_index]["id"]
+            mute_role = discord.Object(id=mute_role_id)
 
-            # Add mute role
-            mute_role = discord.Object(id=self.config["mute_roles"][2]["id"])  # ☢︎ role
-            await user.add_roles(mute_role, reason="Niewłaściwy nick")
+            if unmute:
+                # Remove mute role
+                await user.remove_roles(mute_role, reason=config["reason_remove"])
 
-            # Save punishment in database
-            async with self.bot.get_db() as session:
-                # Check if there's an existing mute
-                existing_role = await RoleQueries.get_member_role(
-                    session, user.id, self.config["mute_roles"][2]["id"]
+                # Remove role from database
+                async with self.bot.get_db() as session:
+                    # Upewnij się, że użytkownik istnieje w tabeli members
+                    await MemberQueries.get_or_add_member(session, user.id)
+
+                    await RoleQueries.delete_member_role(session, user.id, mute_role_id)
+                    await session.commit()
+
+                # Format success message
+                message = config["success_message_remove"].format(
+                    user_mention=user.mention,
+                    action_name=config["action_name"],
+                    premium_channel=self.config["channels"]["premium_info"],
+                )
+            else:
+                # Apply mute
+
+                # Remove color roles if present
+                color_roles = [
+                    discord.Object(id=role_id) for role_id in self.config["color_roles"].values()
+                ]
+                await user.remove_roles(*color_roles, reason=config["reason_add"])
+
+                # Add mute role
+                await user.add_roles(mute_role, reason=config["reason_add"])
+
+                # Set default duration if not specified and the mute type supports it
+                if duration is None and config["supports_duration"]:
+                    duration = config["default_duration"]
+
+                # Save punishment in database
+                async with self.bot.get_db() as session:
+                    # Upewnij się, że użytkownik istnieje w tabeli members
+                    await MemberQueries.get_or_add_member(session, user.id)
+
+                    # Check if there's an existing mute with longer duration
+                    existing_role = await RoleQueries.get_member_role(
+                        session, user.id, mute_role_id
+                    )
+
+                    if existing_role and existing_role.expiration_date and duration is not None:
+                        time_left = existing_role.expiration_date - datetime.now(timezone.utc)
+                        if time_left > duration:
+                            # Keep the existing longer duration
+                            message = f"Użytkownik {user.mention} posiada już dłuższą blokadę. Obecna kara wygaśnie za {time_left.days}d {time_left.seconds//3600}h {(time_left.seconds//60)%60}m."
+                            await ctx.send(message)
+                            return
+
+                    await RoleQueries.add_or_update_role_to_member(
+                        session, user.id, mute_role_id, duration=duration
+                    )
+                    await session.commit()
+
+                # Format duration text
+                if duration is None:
+                    duration_text = "stałe"
+                else:
+                    # Format duration for user-friendly display
+                    duration_text = ""
+                    if duration.days > 0:
+                        duration_text += f"{duration.days}d "
+                    hours, remainder = divmod(duration.seconds, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    if hours > 0:
+                        duration_text += f"{hours}h "
+                    if minutes > 0:
+                        duration_text += f"{minutes}m "
+                    if seconds > 0 or not duration_text:
+                        duration_text += f"{seconds}s"
+
+                # Format success message
+                message = config["success_message_add"].format(
+                    user_mention=user.mention,
+                    duration_text=duration_text,
+                    action_name=config["action_name"],
+                    premium_channel=self.config["channels"]["premium_info"],
                 )
 
-                new_duration = timedelta(days=30)
-                if existing_role and existing_role.expiration_date:
-                    time_left = existing_role.expiration_date - datetime.now(timezone.utc)
-                    if time_left > new_duration:
-                        # Keep the existing longer duration
-                        new_duration = time_left
+                # Execute special actions for this mute type
+                if "change_nickname" in config["special_actions"]:
+                    # Wait 5 seconds before changing nickname
+                    await asyncio.sleep(5)
+                    try:
+                        await user.edit(nick="random", reason="Niewłaściwy nick")
+                    except discord.Forbidden:
+                        await ctx.reply("Nie mogę zmienić nicku tego użytkownika.")
+                    except Exception as e:
+                        logger.error(f"Error changing nickname for user {user.id}: {e}")
+                        await ctx.reply("Wystąpił błąd podczas zmiany nicku.")
 
-                await RoleQueries.add_or_update_role_to_member(
-                    session, user.id, self.config["mute_roles"][2]["id"], duration=new_duration
-                )
-                await session.commit()
+                # Check if user needs to be moved to AFK and back to force stream permission update
+                if (
+                    "move_to_afk_and_back" in config["special_actions"]
+                    and user.voice
+                    and user.voice.channel
+                ):
+                    try:
+                        # Get the AFK channel ID from config
+                        afk_channel_id = self.config["channels_voice"]["afk"]
+                        afk_channel = self.bot.get_channel(afk_channel_id)
 
-            await ctx.reply(
-                f"Nałożono karę na {user.mention}. "
-                f"Aby odzyskać możliwość zmiany nicku, udaj się na <#{self.config['channels']['premium_info']}> "
-                f"i zakup dowolną rangę premium."
+                        if afk_channel:
+                            # Remember original channel
+                            original_channel = user.voice.channel
+
+                            # Move to AFK
+                            await user.move_to(
+                                afk_channel,
+                                reason=f"Wymuszenie aktualizacji uprawnień {config['action_name']}",
+                            )
+                            logger.info(
+                                f"Moved user {user.id} to AFK channel for stream permission update"
+                            )
+
+                            # Wait a moment for Discord to register the move
+                            await asyncio.sleep(1)
+
+                            # Move back to original channel
+                            await user.move_to(
+                                original_channel,
+                                reason=f"Powrót po aktualizacji uprawnień {config['action_name']}",
+                            )
+                            logger.info(
+                                f"Moved user {user.id} back to original channel {original_channel.id}"
+                            )
+                    except discord.Forbidden:
+                        logger.warning(
+                            f"No permission to move user {user.id} between voice channels"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Error moving user {user.id} for stream permission update: {e}"
+                        )
+
+            # Add premium info to message
+            _, premium_text = MessageSender._get_premium_text(ctx)
+            if premium_text:
+                message = f"{message}\n{premium_text}"
+
+            # Send response
+            if mute_type == MuteType.NICK and not unmute:
+                # For nick mute, use reply instead of embed
+                await ctx.reply(message)
+            else:
+                # For other mutes, use embed
+                embed = discord.Embed(description=message, color=ctx.author.color)
+                await ctx.reply(embed=embed)
+
+        except Exception as e:
+            action = "odblokowania" if unmute else "blokowania"
+            logger.error(
+                f"Error handling {action} {mute_type} for user {user.id}: {e}", exc_info=True
             )
-
-            # Wait 5 seconds before changing nickname
-            await asyncio.sleep(5)
-            try:
-                await user.edit(nick="random", reason="Niewłaściwy nick")
-            except discord.Forbidden:
-                await ctx.reply("Nie mogę zmienić nicku tego użytkownika.")
-            except Exception as e:
-                logger.error(f"Error changing nickname for user {user.id}: {e}")
-                await ctx.reply("Wystąpił błąd podczas zmiany nicku.")
-
-        except Exception as e:
-            logger.error(f"Error handling bad nickname for user {user.id}: {e}", exc_info=True)
-            await ctx.reply("Wystąpił błąd podczas nakładania kary.")
-
-    async def handle_unmute_nickname_logic(self, ctx: commands.Context, user: discord.Member):
-        """Common logic for handling nickname unmuting."""
-        try:
-            # Check if target is a moderator or admin
-            has_mod_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["mod"])
-            has_admin_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["admin"])
-
-            # Only admins can unmute mods, and nobody can unmute admins
-            if has_admin_role:
-                await ctx.send("Nie możesz zarządzać nickiem administratora.")
-                return
-
-            if has_mod_role and not discord.utils.get(
-                ctx.author.roles, id=self.config["admin_roles"]["admin"]
-            ):
-                await ctx.send("Tylko administrator może zarządzać nickiem moderatora.")
-                return
-
-            # Remove mute role
-            mute_role = discord.Object(id=self.config["mute_roles"][2]["id"])  # ☢︎ role
-            await user.remove_roles(mute_role, reason="Przywrócenie możliwości zmiany nicku")
-
-            # Remove role from database
-            async with self.bot.get_db() as session:
-                await RoleQueries.delete_member_role(
-                    session, user.id, self.config["mute_roles"][2]["id"]
-                )
-                await session.commit()
-
-            await ctx.send(f"Przywrócono możliwość zmiany nicku dla {user.mention}.")
-
-        except Exception as e:
-            logger.error(f"Error handling nickname unmute for user {user.id}: {e}", exc_info=True)
-            await ctx.send("Wystąpił błąd podczas odmutowywania nicku.")
+            await ctx.send(f"Wystąpił błąd podczas {action}.")
 
     def parse_duration(self, duration_str: str) -> Optional[timedelta]:
         """
@@ -599,136 +957,6 @@ class ModCog(commands.Cog):
                 total_seconds += int(value)  # seconds
 
         return timedelta(seconds=total_seconds)
-
-    async def handle_img_mute_logic(
-        self, ctx: commands.Context, user: discord.Member, duration: Optional[timedelta]
-    ):
-        """Common logic for handling image mute."""
-        try:
-            # Check if target is a moderator or admin
-            has_mod_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["mod"])
-            has_admin_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["admin"])
-
-            # Only admins can mute mods, and nobody can mute admins
-            if has_admin_role:
-                await ctx.send("Nie możesz zablokować uprawnień administratora.")
-                return
-
-            if has_mod_role and not discord.utils.get(
-                ctx.author.roles, id=self.config["admin_roles"]["admin"]
-            ):
-                await ctx.send("Tylko administrator może zablokować uprawnienia moderatora.")
-                return
-
-            # Remove color roles if present
-            color_roles = [
-                discord.Object(id=role_id) for role_id in self.config["color_roles"].values()
-            ]
-            await user.remove_roles(*color_roles, reason="Blokada wysyłania obrazków i linków")
-
-            # Add mute role
-            mute_role = discord.Object(id=self.config["mute_roles"][2]["id"])  # ☢︎ role
-            await user.add_roles(mute_role, reason="Blokada wysyłania obrazków i linków")
-
-            # Save punishment in database
-            async with self.bot.get_db() as session:
-                # Upewnij się, że użytkownik istnieje w tabeli members
-                await MemberQueries.get_or_add_member(session, user.id)
-
-                # Check if there's an existing mute
-                existing_role = await RoleQueries.get_member_role(
-                    session, user.id, self.config["mute_roles"][2]["id"]
-                )
-
-                if existing_role and existing_role.expiration_date and duration is not None:
-                    time_left = existing_role.expiration_date - datetime.now(timezone.utc)
-                    if time_left > duration:
-                        # Keep the existing longer duration
-                        message = f"Użytkownik {user.mention} posiada już dłuższą blokadę. Obecna kara wygaśnie za {time_left.days}d {time_left.seconds//3600}h {(time_left.seconds//60)%60}m."
-                        await ctx.send(message)
-                        return
-
-                await RoleQueries.add_or_update_role_to_member(
-                    session, user.id, self.config["mute_roles"][2]["id"], duration=duration
-                )
-                await session.commit()
-
-            # Format message based on duration
-            if duration is None:
-                message = f"Zablokowano możliwość wysyłania obrazków i linków dla {user.mention} na stałe."
-            else:
-                # Format duration for user-friendly display
-                duration_str = ""
-                if duration.days > 0:
-                    duration_str += f"{duration.days}d "
-                hours, remainder = divmod(duration.seconds, 3600)
-                minutes, seconds = divmod(remainder, 60)
-                if hours > 0:
-                    duration_str += f"{hours}h "
-                if minutes > 0:
-                    duration_str += f"{minutes}m "
-                if seconds > 0 or not duration_str:
-                    duration_str += f"{seconds}s"
-
-                message = f"Zablokowano możliwość wysyłania obrazków i linków dla {user.mention} na {duration_str}."
-
-            # Pobierz informację o planie premium, identycznie jak w module voice
-            _, premium_text = MessageSender._get_premium_text(ctx)
-            if premium_text:
-                message = f"{message}\n{premium_text}"
-
-            embed = discord.Embed(description=message, color=ctx.author.color)
-            await ctx.send(embed=embed)
-
-        except Exception as e:
-            logger.error(f"Error handling image mute for user {user.id}: {e}", exc_info=True)
-            await ctx.send("Wystąpił błąd podczas nakładania blokady.")
-
-    async def handle_unmute_img_logic(self, ctx: commands.Context, user: discord.Member):
-        """Common logic for handling image unmuting."""
-        try:
-            # Check if target is a moderator or admin
-            has_mod_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["mod"])
-            has_admin_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["admin"])
-
-            # Only admins can unmute mods
-            if has_admin_role:
-                await ctx.send("Nie możesz zarządzać uprawnieniami administratora.")
-                return
-
-            if has_mod_role and not discord.utils.get(
-                ctx.author.roles, id=self.config["admin_roles"]["admin"]
-            ):
-                await ctx.send("Tylko administrator może zarządzać uprawnieniami moderatora.")
-                return
-
-            # Remove mute role
-            mute_role = discord.Object(id=self.config["mute_roles"][2]["id"])  # ☢︎ role
-            await user.remove_roles(mute_role, reason="Przywrócenie możliwości wysyłania obrazków")
-
-            # Remove role from database
-            async with self.bot.get_db() as session:
-                # Upewnij się, że użytkownik istnieje w tabeli members
-                await MemberQueries.get_or_add_member(session, user.id)
-
-                await RoleQueries.delete_member_role(
-                    session, user.id, self.config["mute_roles"][2]["id"]
-                )
-                await session.commit()
-
-            message = f"Przywrócono możliwość wysyłania obrazków i linków dla {user.mention}."
-
-            # Pobierz informację o planie premium, identycznie jak w module voice
-            _, premium_text = MessageSender._get_premium_text(ctx)
-            if premium_text:
-                message = f"{message}\n{premium_text}"
-
-            embed = discord.Embed(description=message, color=ctx.author.color)
-            await ctx.send(embed=embed)
-
-        except Exception as e:
-            logger.error(f"Error handling image unmute for user {user.id}: {e}", exc_info=True)
-            await ctx.send("Wystąpił błąd podczas zdejmowania blokady.")
 
 
 async def setup(bot):
