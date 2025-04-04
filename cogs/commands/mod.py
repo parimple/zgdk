@@ -50,10 +50,10 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
-        user="Użytkownik lub ID użytkownika, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
     )
     async def clear_messages(
-        self, ctx: commands.Context, hours: Optional[int] = 1, user: Optional[str] = None
+        self, ctx: commands.Context, hours: Optional[int] = 1, user: Optional[discord.Member] = None
     ):
         await self.message_cleaner.clear_messages(ctx, hours, user, all_channels=False)
 
@@ -63,16 +63,16 @@ class ModCog(commands.Cog):
     )
     @is_mod_or_admin()
     @discord.app_commands.describe(
-        user="Użytkownik lub ID użytkownika, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
     )
     async def clear_all_channels(
-        self, ctx: commands.Context, user: Optional[str] = None, hours: Optional[int] = 1
+        self, ctx: commands.Context, user: Optional[discord.Member] = None, hours: Optional[int] = 1
     ):
         """Usuwa wiadomości użytkownika z ostatnich X godzin na wszystkich kanałach.
         
         :param ctx: Kontekst komendy
-        :param user: Użytkownik lub ID użytkownika
+        :param user: Użytkownik, którego wiadomości mają być usunięte
         :param hours: Liczba godzin wstecz (domyślnie 1)
         """
         await self.message_cleaner.clear_messages(ctx, hours, user, all_channels=True)
@@ -83,10 +83,10 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     @discord.app_commands.describe(
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
-        user="Użytkownik lub ID użytkownika, którego linki i obrazki mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik, którego linki i obrazki mają być usunięte (opcjonalnie dla administratorów)",
     )
     async def clear_images(
-        self, ctx: commands.Context, hours: Optional[int] = 1, user: Optional[str] = None
+        self, ctx: commands.Context, hours: Optional[int] = 1, user: Optional[discord.Member] = None
     ):
         await self.message_cleaner.clear_messages(ctx, hours, user, all_channels=False, images_only=True)
 
