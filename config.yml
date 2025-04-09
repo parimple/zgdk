@@ -23,6 +23,7 @@ channels:
   donation: 960665312200626201
   premium_info: 960665316109713421
   bots: 960665312200626198  # Added bots channel
+  mute_notifications: 1336368306940018739  # Kanał do powiadomień o przywróconych wyciszeniach
 
 gifs:
   donation: "https://media1.tenor.com/m/tn_MOQB9pV4AAAAd/tony-tonylife.gif"
@@ -195,6 +196,9 @@ mute_roles:
   - id: 960665311760248877
     name: "♺"
     description: "points_off"
+
+# Domyślny nickname używany przy mutenick
+default_mute_nickname: "random"
 
 color_roles:
   blue: 960665311730868235

@@ -295,16 +295,38 @@ class RoleQueries:
 
     @staticmethod
     async def get_expired_roles(
-        session: AsyncSession, current_time: datetime, role_type: Optional[str] = None
+        session: AsyncSession,
+        current_time: datetime,
+        role_type: Optional[str] = None,
+        role_ids: Optional[List[int]] = None,
     ) -> List[MemberRole]:
-        """Get roles that have already expired"""
+        """Get roles that have already expired
+
+        :param session: Database session
+        :param current_time: Current time to compare expiration dates against
+        :param role_type: Optional filter by role type (e.g., "premium")
+        :param role_ids: Optional list of specific role IDs to filter by
+        :return: List of expired member roles
+        """
         query = (
             select(MemberRole)
             .options(joinedload(MemberRole.role))
-            .where(MemberRole.expiration_date <= current_time)
+            .where(
+                and_(
+                    MemberRole.expiration_date.isnot(
+                        None
+                    ),  # Don't select roles with no expiration date
+                    MemberRole.expiration_date <= current_time,
+                )
+            )
         )
+
         if role_type:
             query = query.join(Role).where(Role.role_type == role_type)
+
+        if role_ids:
+            query = query.where(MemberRole.role_id.in_(role_ids))
+
         result = await session.execute(query)
         return result.scalars().all()
 
@@ -480,6 +502,21 @@ class RoleQueries:
         except Exception as e:
             logger.error(f"ORM deletion failed for role {role_id}, member {member_id}: {e}")
             return False
+
+    @staticmethod
+    async def get_role_members(session: AsyncSession, role_id: int) -> List[MemberRole]:
+        """Get all members that have a specific role
+
+        :param session: The database session
+        :param role_id: The ID of the role to query
+        :return: List of MemberRole objects for all members with this role
+        """
+        result = await session.execute(
+            select(MemberRole)
+            .options(joinedload(MemberRole.role))
+            .where(MemberRole.role_id == role_id)
+        )
+        return result.scalars().all()
 
 
 class HandledPaymentQueries:

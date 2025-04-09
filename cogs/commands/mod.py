@@ -95,18 +95,22 @@ class ModCog(commands.Cog):
     @commands.hybrid_group(name="mute", description="Komendy związane z wyciszaniem użytkowników.")
     @is_mod_or_admin()
     @discord.app_commands.describe(
-        user="Użytkownik do wyciszenia (opcjonalnie, działa jak mute txt)"
+        user="Użytkownik do wyciszenia (opcjonalnie, działa jak mute txt)",
+        duration="Czas trwania blokady, np. 1h, 30m, 1d (puste = blokada stała)",
     )
-    async def mute(self, ctx: commands.Context, user: Optional[discord.Member] = None):
+    async def mute(
+        self, ctx: commands.Context, user: Optional[discord.Member] = None, duration: str = ""
+    ):
         """Komendy związane z wyciszaniem użytkowników.
 
         :param ctx: Kontekst komendy
         :param user: Użytkownik do wyciszenia (opcjonalnie, działa jak mute txt)
+        :param duration: Czas trwania blokady (opcjonalnie)
         """
         if ctx.invoked_subcommand is None:
             if user is not None:
                 # Jeśli podano użytkownika, ale nie podkomendę, działa jak 'mute txt'
-                await self.mute_txt(ctx, user)
+                await self.mute_txt(ctx, user, duration)  # Przekazujemy parametr duration
             else:
                 # Użyj wspólnej metody do wyświetlania pomocy
                 await self.send_subcommand_help(ctx, "mute")

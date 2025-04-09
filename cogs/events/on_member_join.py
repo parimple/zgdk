@@ -11,7 +11,7 @@ from discord.ext import commands, tasks
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from datasources.queries import InviteQueries, MemberQueries, NotificationLogQueries
+from datasources.queries import InviteQueries, MemberQueries, NotificationLogQueries, RoleQueries
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,10 @@ class OnMemberJoinEvent(commands.Cog):
         self.guild = None
         self.invites = {}
         self.welcome_channel = None
+        # Dodaj flagę - domyślnie True dla powiadomień na kanał (tymczasowo)
+        self.bot.force_channel_notifications = (
+            True  # Jeśli True - wysyła na kanał, False - wysyła na DM
+        )
         self.setup_channels.start()  # pylint: disable=no-member
         self.setup_guild.start()  # pylint: disable=no-member
         # clean_invites will be started after guild is set up
@@ -78,6 +82,207 @@ class OnMemberJoinEvent(commands.Cog):
         if not self.welcome_channel:
             logger.error(f"Failed to get welcome channel with ID {welcome_channel_id}")
 
+    async def restore_mute_roles(self, member):
+        """
+        Przywraca role wyciszenia użytkownikowi, który wrócił na serwer.
+
+        Ta funkcja sprawdza w bazie danych, czy użytkownik miał przypisane role wyciszenia
+        przed wyjściem z serwera, i jeśli tak, przywraca te role.
+
+        :param member: Członek serwera, któremu trzeba przywrócić role
+        :type member: discord.Member
+        """
+        logger.info(f"Sprawdzanie i przywracanie ról wyciszenia dla {member} ({member.id})")
+
+        try:
+            # Pobierz konfigurację ról wyciszenia
+            mute_roles_config = self.bot.config["mute_roles"]
+            mute_role_ids = [role["id"] for role in mute_roles_config]
+
+            # Pobierz ID kanału do powiadomień (używany gdy force_channel_notifications=True)
+            notification_channel_id = self.bot.config["channels"]["mute_notifications"]
+            notification_channel = self.bot.get_channel(notification_channel_id)
+
+            # Flaga do sprawdzenia, czy użytkownik ma NICK mute
+            has_nick_mute = False
+
+            async with self.bot.get_db() as session:
+                # Sprawdź, czy użytkownik ma jakiekolwiek role wyciszenia w bazie danych
+                member_roles = await RoleQueries.get_member_roles(session, member.id)
+
+                # Filtruj tylko role wyciszenia
+                mute_member_roles = [role for role in member_roles if role.role_id in mute_role_ids]
+
+                if not mute_member_roles:
+                    logger.info(
+                        f"Użytkownik {member.id} nie ma żadnych ról wyciszenia do przywrócenia"
+                    )
+                    return
+
+                # Znajdź ID roli dla mutenick (usuń stary kod identyfikujący przez attach_files_off)
+                nick_mute_role_ids = []
+                for role_config in mute_roles_config:
+                    if role_config["description"] == "attach_files_off":
+                        nick_mute_role_ids.append(role_config["id"])
+
+                roles_restored = 0
+
+                # Przywróć każdą rolę wyciszenia
+                for member_role in mute_member_roles:
+                    role_id = member_role.role_id
+                    mute_role = discord.Object(id=role_id)
+
+                    # Znajdź opis roli do logowania
+                    role_desc = next(
+                        (
+                            role["description"]
+                            for role in mute_roles_config
+                            if role["id"] == role_id
+                        ),
+                        "unknown",
+                    )
+
+                    # Sprawdź, czy to NICK mute
+                    if role_id in nick_mute_role_ids:
+                        has_nick_mute = True
+
+                    # Sprawdź, czy rola jest nadal ważna (jeśli ma datę wygaśnięcia)
+                    if member_role.expiration_date and member_role.expiration_date < datetime.now(
+                        timezone.utc
+                    ):
+                        logger.info(
+                            f"Rola wyciszenia {role_id} ({role_desc}) dla {member.id} wygasła, nie przywracam"
+                        )
+                        # Usuń wygasłą rolę z bazy danych
+                        await RoleQueries.delete_member_role(session, member.id, role_id)
+                        continue
+
+                    # Przywróć rolę
+                    try:
+                        await member.add_roles(
+                            mute_role, reason="Przywrócenie wyciszenia po powrocie na serwer"
+                        )
+                        roles_restored += 1
+                        logger.info(
+                            f"Przywrócono rolę wyciszenia {role_id} ({role_desc}) dla {member.id}"
+                        )
+
+                        # Znajdź właściwą nazwę roli
+                        role_name = next(
+                            (role["name"] for role in mute_roles_config if role["id"] == role_id),
+                            "⚠️",
+                        )
+
+                        # Przygotuj treść wiadomości
+                        message_content = f"Przywrócono wyciszenie {role_name} dla {member.mention} po powrocie na serwer."
+
+                        # Wybierz tryb powiadomienia w zależności od flagi
+                        if self.bot.force_channel_notifications:
+                            # Tryb powiadomienia na kanał
+                            if notification_channel:
+                                try:
+                                    await notification_channel.send(
+                                        message_content,
+                                        allowed_mentions=AllowedMentions(users=False),
+                                    )
+                                except discord.HTTPException as e:
+                                    logger.error(
+                                        f"Błąd podczas wysyłania powiadomienia na kanał {notification_channel_id}: {e}"
+                                    )
+                        else:
+                            # Tryb powiadomienia na DM
+                            try:
+                                await member.send(
+                                    f"Twoje wyciszenie {role_name} zostało przywrócone po ponownym dołączeniu do serwera."
+                                )
+                                logger.info(
+                                    f"Wysłano DM do {member.id} o przywróceniu wyciszenia {role_id}"
+                                )
+                            except discord.Forbidden:
+                                logger.error(
+                                    f"Nie można wysłać DM do {member.id}, użytkownik ma zablokowane wiadomości"
+                                )
+                                # Jeśli nie można wysłać DM, spróbuj wysłać na kanał
+                                if notification_channel:
+                                    await notification_channel.send(
+                                        f"[Nie udało się wysłać DM] {message_content}",
+                                        allowed_mentions=AllowedMentions(users=False),
+                                    )
+                            except discord.HTTPException as e:
+                                logger.error(f"Błąd podczas wysyłania DM do {member.id}: {e}")
+                    except discord.Forbidden:
+                        logger.error(
+                            f"Brak uprawnień do przywrócenia roli {role_id} dla {member.id}"
+                        )
+                    except discord.HTTPException as e:
+                        logger.error(
+                            f"Błąd Discord API podczas przywracania roli {role_id} dla {member.id}: {e}"
+                        )
+
+                await session.commit()
+
+                # Jeśli przywrócono role i ma mutenick, zmień nazwę użytkownika
+                if roles_restored > 0 and has_nick_mute:
+                    try:
+                        # Pobierz domyślny nickname z konfiguracji
+                        default_nick = self.bot.config.get("default_mute_nickname", "random")
+                        await member.edit(
+                            nick=default_nick, reason="Przywrócenie mutenick po powrocie na serwer"
+                        )
+                        logger.info(
+                            f"Zmieniono nick użytkownika {member.id} na {default_nick} po przywróceniu mutenick"
+                        )
+                    except discord.Forbidden:
+                        logger.warning(
+                            f"Nie mogę zmienić nicku użytkownika {member.id} po przywróceniu mutenick"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Błąd podczas zmiany nicku użytkownika {member.id} po przywróceniu mutenick: {e}"
+                        )
+
+                if roles_restored > 0:
+                    logger.info(f"Przywrócono {roles_restored} ról wyciszenia dla {member.id}")
+
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas przywracania ról wyciszenia dla {member.id}: {e}", exc_info=True
+            )
+
+    @commands.command()
+    @commands.is_owner()
+    async def toggle_mute_notifications(self, ctx, mode: str = None):
+        """
+        Przełącza tryb powiadomień o przywróconych wyciszeniach.
+
+        :param ctx: Kontekst komendy
+        :param mode: Tryb powiadomień: 'channel' lub 'dm'. Jeśli nie podano, przełącza między trybami.
+        """
+        if mode:
+            if mode.lower() in ["channel", "kanał", "kanal"]:
+                self.bot.force_channel_notifications = True
+                status = "kanał"
+            elif mode.lower() in ["dm", "pm", "private"]:
+                self.bot.force_channel_notifications = False
+                status = "DM"
+            else:
+                await ctx.send("Nieprawidłowy tryb. Dostępne opcje: 'channel' lub 'dm'.")
+                return
+        else:
+            # Przełącz między trybami
+            self.bot.force_channel_notifications = not self.bot.force_channel_notifications
+            status = "kanał" if self.bot.force_channel_notifications else "DM"
+
+        await ctx.send(
+            f"Powiadomienia o przywróconych wyciszeniach będą teraz wysyłane na {status}."
+        )
+        logger.info(f"Zmieniono tryb powiadomień o wyciszeniach na: {status}")
+
+    @property
+    def force_channel_notifications(self):
+        """Get global notification setting from bot"""
+        return self.bot.force_channel_notifications
+
     @commands.Cog.listener()
     async def on_member_join(self, member):
         """
@@ -97,6 +302,9 @@ class OnMemberJoinEvent(commands.Cog):
                 f"Member joined different guild: {member.guild.id} (expected {self.bot.guild_id})"
             )
             return
+
+        # Przywróć role wyciszenia, jeśli były przypisane wcześniej
+        await self.restore_mute_roles(member)
 
         # Check if we have invites dictionary initialized
         if not self.invites:

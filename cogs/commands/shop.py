@@ -163,10 +163,10 @@ class ShopCog(commands.Cog):
                 f"Nowy czas wygaśnięcia: {discord.utils.format_dt(new_expiry, 'R')}"
             )
 
-    @commands.command(name="force_check_roles")
-    @is_admin()
+    @commands.command(name="shop_force_check_roles")
+    @commands.has_permissions(administrator=True)
     async def force_check_roles(self, ctx: Context):
-        """Wymusza sprawdzenie i usunięcie wygasłych ról."""
+        """Wymusza sprawdzenie i ewentualne usunięcie ról premium."""
         now = datetime.now(timezone.utc)
         count = 0
 
