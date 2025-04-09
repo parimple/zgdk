@@ -10,8 +10,8 @@ from discord.ext import commands
 
 from datasources.queries import MemberQueries, RoleQueries
 from utils.message_sender import MessageSender
+from utils.moderation import MessageCleaner, MuteManager, MuteType
 from utils.permissions import is_admin, is_mod_or_admin, is_owner_or_admin
-from utils.moderation import MuteManager, MessageCleaner, MuteType
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +49,10 @@ class ModCog(commands.Cog):
     )
     @is_mod_or_admin()
     @discord.app_commands.describe(
-        user="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik lub ID użytkownika, którego wiadomości mają być usunięte",
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
     )
-    async def clear_messages(
-        self, ctx: commands.Context, user: Optional[discord.Member] = None, hours: Optional[int] = 1
-    ):
+    async def clear_messages(self, ctx: commands.Context, user: str, hours: Optional[int] = 1):
         await self.message_cleaner.clear_messages(ctx, hours, user, all_channels=False)
 
     @commands.hybrid_command(
@@ -63,18 +61,10 @@ class ModCog(commands.Cog):
     )
     @is_mod_or_admin()
     @discord.app_commands.describe(
-        user="Użytkownik, którego wiadomości mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik lub ID użytkownika, którego wiadomości mają być usunięte",
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
     )
-    async def clear_all_channels(
-        self, ctx: commands.Context, user: Optional[discord.Member] = None, hours: Optional[int] = 1
-    ):
-        """Usuwa wiadomości użytkownika z ostatnich X godzin na wszystkich kanałach.
-        
-        :param ctx: Kontekst komendy
-        :param user: Użytkownik, którego wiadomości mają być usunięte
-        :param hours: Liczba godzin wstecz (domyślnie 1)
-        """
+    async def clear_all_channels(self, ctx: commands.Context, user: str, hours: Optional[int] = 1):
         await self.message_cleaner.clear_messages(ctx, hours, user, all_channels=True)
 
     @commands.hybrid_command(
@@ -82,13 +72,13 @@ class ModCog(commands.Cog):
     )
     @is_mod_or_admin()
     @discord.app_commands.describe(
-        user="Użytkownik, którego linki i obrazki mają być usunięte (opcjonalnie dla administratorów)",
+        user="Użytkownik lub ID użytkownika, którego linki i obrazki mają być usunięte",
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
     )
-    async def clear_images(
-        self, ctx: commands.Context, user: Optional[discord.Member] = None, hours: Optional[int] = 1
-    ):
-        await self.message_cleaner.clear_messages(ctx, hours, user, all_channels=False, images_only=True)
+    async def clear_images(self, ctx: commands.Context, user: str, hours: Optional[int] = 1):
+        await self.message_cleaner.clear_messages(
+            ctx, hours, user, all_channels=False, images_only=True
+        )
 
     @commands.command()
     @is_owner_or_admin()
@@ -333,6 +323,37 @@ class ModCog(commands.Cog):
     async def unmuterank_prefix(self, ctx: commands.Context, user: discord.Member):
         """Przywraca możliwość zdobywania punktów rankingowych (wersja prefiksowa)."""
         await self.mute_manager.unmute_user(ctx, user, MuteType.RANK)
+
+    @commands.command(name="userid", description="Wyświetla ID użytkownika o podanej nazwie")
+    @is_mod_or_admin()
+    async def user_id(self, ctx: commands.Context, *, name: str):
+        """Wyświetla ID użytkownika o podanej nazwie.
+
+        :param ctx: Kontekst komendy
+        :param name: Nazwa użytkownika (lub jej część)
+        """
+        matching_members = []
+
+        # Szukaj wszystkich pasujących członków
+        for member in ctx.guild.members:
+            if name.lower() in member.name.lower() or (
+                member.nick and name.lower() in member.nick.lower()
+            ):
+                matching_members.append(member)
+
+        if not matching_members:
+            await ctx.send(f"Nie znaleziono użytkowników pasujących do nazwy '{name}'.")
+            return
+
+        # Wyświetl wszystkie pasujące ID
+        result = "Znaleziono następujących użytkowników:\n"
+        for member in matching_members[:10]:  # Limit do 10 wyników
+            result += f"- **{member.name}** (ID: `{member.id}`)\n"
+
+        if len(matching_members) > 10:
+            result += f"\nPokazano 10 z {len(matching_members)} pasujących użytkowników."
+
+        await ctx.send(result)
 
 
 async def setup(bot):
