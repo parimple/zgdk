@@ -162,7 +162,9 @@ class MessageCleaner:
             deleted_count = await self._delete_messages(ctx, hours, target_id, images_only)
 
         # Wyślij potwierdzenie
-        message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}."
+        # Pobierz emoji proxy_bunny z konfiguracji 
+        proxy_bunny = self.config.get("emojis", {}).get("proxy_bunny", "<a:bunnyProxy:1301144820349403157>")
+        message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}.\nWybierz swój {proxy_bunny}⁠plan"
         embed = discord.Embed(
             description=message,
             color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.green()
