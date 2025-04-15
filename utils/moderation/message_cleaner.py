@@ -34,6 +34,8 @@ class MessageCleaner:
         self.bot = bot
         self.config = bot.config
         self.message_sender = MessageSender()
+        # ID bota, który obsługuje komendy avatara
+        self.avatar_bot_id = 489377322042916885
 
     async def get_target_user(
         self, ctx: commands.Context, user
@@ -211,6 +213,12 @@ class MessageCleaner:
 
             # Jeśli dotarliśmy tutaj i mamy target_id, sprawdzamy czy wiadomość jest od tego użytkownika
             if target_id is not None:
+                # Pobierzmy informację o użytkowniku, aby sprawdzić jego nazwę
+                target_member = ctx.guild.get_member(target_id)
+                target_name = target_member.name.lower() if target_member else None
+                target_id_str = str(target_id)
+                
+                # Sprawdź czy to wiadomość od użytkownika
                 if message.author.id == target_id:
                     logger.info(f"Found message {message.id} from target user {target_id}")
                     # Jeśli images_only, weryfikujemy czy wiadomość ma media
@@ -229,10 +237,18 @@ class MessageCleaner:
                         logger.info(f"Mention message {message.id} has media: {has_media}")
                         return has_media
                     return True
+                
+                # Sprawdź czy to wiadomość od bota avatara zawierająca nazwę użytkownika
+                if message.author.id == self.avatar_bot_id and target_name and message.content.lower().startswith(target_name.lower()):
+                    logger.info(f"Found avatar bot message {message.id} with target username {target_name}")
+                    if images_only:
+                        has_media = bool(message.attachments) or bool(re.search(r"http[s]?://\S+", message.content)) or bool(message.embeds)
+                        logger.info(f"Avatar bot message {message.id} has media: {has_media}")
+                        return has_media
+                    return True
 
                 # Dla wiadomości webhooków, sprawdź czy zawierają ID użytkownika
                 if message.webhook_id:
-                    target_id_str = str(target_id)
                     found_in_content = target_id_str in message.content
                     found_in_attachments = any(
                         target_id_str in attachment.url or target_id_str in attachment.filename
@@ -398,9 +414,9 @@ class MessageCleaner:
                             logger.info(f"Match: Message contains mention of target user {target_id}")
                             return True
 
-                        # Sprawdź czy to wiadomość od konkretnego bota
+                        # Sprawdź czy to wiadomość od bota sprawdzającego avatar
                         if (
-                            message.author.id == 489377322042916885
+                            message.author.id == self.avatar_bot_id
                             and message.embeds
                             and target_name
                         ):
@@ -408,6 +424,11 @@ class MessageCleaner:
                                 if embed.title and target_name in embed.title.lower():
                                     logger.info(f"Match: Message from bot contains target user name {target_name}")
                                     return True
+                            
+                        # Sprawdź czy wiadomość od bota avatara zawiera nazwę użytkownika
+                        if message.author.id == self.avatar_bot_id and target_name and message.content.lower().startswith(target_name.lower()):
+                            logger.info(f"Match: Avatar bot message contains target username {target_name}")
+                            return True
                         
                         # If Drongale's message, log debug info
                         if message.author.name.lower() == "drongale":
