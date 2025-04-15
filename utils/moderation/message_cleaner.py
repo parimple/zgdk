@@ -130,7 +130,7 @@ class MessageCleaner:
         if target_id is None and not ctx.author.guild_permissions.administrator:
             embed = discord.Embed(
                 description="Musisz podać użytkownika, którego wiadomości chcesz usunąć.",
-                color=discord.Color.red()
+                color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
             )
             await ctx.send(embed=embed)
             return
@@ -146,7 +146,7 @@ class MessageCleaner:
             if not confirm:
                 embed = discord.Embed(
                     description="Anulowano usuwanie wiadomości.",
-                    color=discord.Color.blue()
+                    color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
                 )
                 await ctx.send(embed=embed)
                 return
@@ -163,7 +163,7 @@ class MessageCleaner:
         message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}."
         embed = discord.Embed(
             description=message,
-            color=discord.Color.green()
+            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.green()
         )
         await ctx.send(embed=embed)
 
@@ -208,10 +208,11 @@ class MessageCleaner:
             return True
 
         total_deleted = 0
+        user_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
         status_message = await ctx.send(
             embed=discord.Embed(
                 description="Rozpoczynam usuwanie wiadomości...",
-                color=discord.Color.blue()
+                color=user_color
             )
         )
 
@@ -227,7 +228,7 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description=f"Szybko usunięto {total_deleted} najnowszych wiadomości. Kontynuuję usuwanie starszych...",
-                    color=discord.Color.blue()
+                    color=user_color
                 )
             )
 
@@ -244,7 +245,7 @@ class MessageCleaner:
                             await status_message.edit(
                                 embed=discord.Embed(
                                     description=f"Usunięto łącznie {total_deleted} wiadomości. Kontynuuję usuwanie starszych...",
-                                    color=discord.Color.blue()
+                                    color=user_color
                                 )
                             )
                     except discord.NotFound:
@@ -262,7 +263,7 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description="Nie mam uprawnień do usuwania wiadomości na tym kanale.",
-                    color=discord.Color.red()
+                    color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
                 )
             )
             return total_deleted
@@ -271,7 +272,7 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description=f"Wystąpił błąd podczas usuwania wiadomości: {e}",
-                    color=discord.Color.red()
+                    color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
                 )
             )
             return total_deleted
@@ -280,7 +281,7 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description=f"Wystąpił nieoczekiwany błąd: {e}",
-                    color=discord.Color.red()
+                    color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.red()
                 )
             )
             return total_deleted
@@ -295,10 +296,11 @@ class MessageCleaner:
         """Usuwa wiadomości na wszystkich kanałach."""
         time_threshold = ctx.message.created_at - timedelta(hours=hours)
         total_deleted = 0
+        user_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
         status_message = await ctx.send(
             embed=discord.Embed(
                 description="Rozpoczynam usuwanie wiadomości na wszystkich kanałach...",
-                color=discord.Color.blue()
+                color=user_color
             )
         )
 
@@ -390,7 +392,7 @@ class MessageCleaner:
                 await status_message.edit(
                     embed=discord.Embed(
                         description=f"Usunięto łącznie {total_deleted} wiadomości. Trwa sprawdzanie kolejnych kanałów...",
-                        color=discord.Color.blue()
+                        color=user_color
                     )
                 )
             except discord.Forbidden:
@@ -416,7 +418,7 @@ class MessageCleaner:
         embed = discord.Embed(
             title="Potwierdzenie", 
             description=message,
-            color=discord.Color.orange()
+            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.orange()
         )
             
         view = discord.ui.View()
