@@ -164,7 +164,10 @@ class MessageCleaner:
         # Wyślij potwierdzenie
         # Pobierz emoji proxy_bunny z konfiguracji 
         proxy_bunny = self.config.get("emojis", {}).get("proxy_bunny", "<a:bunnyProxy:1301144820349403157>")
-        message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}.\nWybierz swój {proxy_bunny}⁠plan"
+        # Pobierz ID kanału premium_info
+        premium_info_id = self.config.get("channels", {}).get("premium_info", 960665316109713421)
+        
+        message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}.\nWybierz swój {proxy_bunny} <#{premium_info_id}>"
         embed = discord.Embed(
             description=message,
             color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.green()
@@ -240,14 +243,37 @@ class MessageCleaner:
                         return has_media
                     return True
                 
-                # Sprawdź czy to wiadomość od bota avatara zawierająca nazwę użytkownika
-                if message.author.id == self.avatar_bot_id and target_name and message.content.lower().startswith(target_name.lower()):
-                    logger.info(f"Found avatar bot message {message.id} with target username {target_name}")
-                    if images_only:
-                        has_media = bool(message.attachments) or bool(re.search(r"http[s]?://\S+", message.content)) or bool(message.embeds)
-                        logger.info(f"Avatar bot message {message.id} has media: {has_media}")
-                        return has_media
-                    return True
+                # Sprawdź czy to wiadomość od bota avatara
+                if message.author.id == self.avatar_bot_id:
+                    logger.info(f"Checking avatar bot message {message.id}: {message.content}")
+                    
+                    # Sprawdź czy wiadomość zawiera nazwę użytkownika (jeśli dostępna)
+                    avatar_message_match = False
+                    if target_name and message.content.lower().startswith(target_name.lower()):
+                        logger.info(f"Avatar bot message {message.id} matches username {target_name}")
+                        avatar_message_match = True
+                    
+                    # Sprawdź czy w wiadomości jest ID użytkownika (w URL lub tekście)
+                    if target_id_str in message.content:
+                        logger.info(f"Avatar bot message {message.id} contains target ID {target_id}")
+                        avatar_message_match = True
+                    
+                    # Sprawdzamy czy to wiadomość z avatarem (druga linia zawiera "avatar url")
+                    message_lines = message.content.split("\n")
+                    if len(message_lines) > 1 and "avatar url" in message_lines[1].lower():
+                        logger.info(f"Avatar bot message {message.id} contains 'avatar url'")
+                        # To jest wiadomość od bota avatara, czyli odpowiedź na komendę .a
+                        # Jeśli nazwa użytkownika jest pierwszą linią, prawdopodobnie to wiadomość dla tego użytkownika
+                        if target_name and target_name.lower() in message_lines[0].lower():
+                            logger.info(f"Avatar bot message {message.id} first line contains target name {target_name}")
+                            avatar_message_match = True
+                    
+                    if avatar_message_match:
+                        if images_only:
+                            has_media = bool(message.attachments) or bool(re.search(r"http[s]?://\S+", message.content)) or bool(message.embeds)
+                            logger.info(f"Avatar bot message {message.id} has media: {has_media}")
+                            return has_media
+                        return True
 
                 # Dla wiadomości webhooków, sprawdź czy zawierają ID użytkownika
                 if message.webhook_id:
@@ -417,20 +443,30 @@ class MessageCleaner:
                             return True
 
                         # Sprawdź czy to wiadomość od bota sprawdzającego avatar
-                        if (
-                            message.author.id == self.avatar_bot_id
-                            and message.embeds
-                            and target_name
-                        ):
-                            for embed in message.embeds:
-                                if embed.title and target_name in embed.title.lower():
-                                    logger.info(f"Match: Message from bot contains target user name {target_name}")
+                        if message.author.id == self.avatar_bot_id:
+                            # Sprawdź czy wiadomość zawiera nazwę użytkownika (jeśli dostępna)
+                            if target_name and message.content.lower().startswith(target_name.lower()):
+                                logger.info(f"Match: Avatar bot message contains target username {target_name}")
+                                return True
+                                
+                            # Sprawdź czy w wiadomości jest ID użytkownika
+                            if target_id_str in message.content:
+                                logger.info(f"Match: Avatar bot message contains target ID {target_id}")
+                                return True
+                                
+                            # Sprawdź treść wiadomości (zwykle ma format "nazwa użytkownika\navatar url || invite bot")
+                            message_lines = message.content.split("\n")
+                            if len(message_lines) > 1 and "avatar url" in message_lines[1].lower():
+                                logger.info(f"Avatar bot message contains 'avatar url'")
+                                if target_name and target_name.lower() in message_lines[0].lower():
+                                    logger.info(f"Avatar bot message first line contains target name {target_name}")
                                     return True
                             
-                        # Sprawdź czy wiadomość od bota avatara zawiera nazwę użytkownika
-                        if message.author.id == self.avatar_bot_id and target_name and message.content.lower().startswith(target_name.lower()):
-                            logger.info(f"Match: Avatar bot message contains target username {target_name}")
-                            return True
+                            # Sprawdź embedy
+                            for embed in message.embeds:
+                                if embed.title and target_id_str in embed.title:
+                                    logger.info(f"Match: Avatar bot embed contains target ID {target_id}")
+                                    return True
                         
                         # If Drongale's message, log debug info
                         if message.author.name.lower() == "drongale":
