@@ -177,6 +177,7 @@ class MessageCleaner:
         """Usuwa wiadomości na jednym kanale."""
         time_threshold = ctx.message.created_at - timedelta(hours=hours)
         logger.info(f"Deleting messages before {ctx.message.created_at} and after {time_threshold}")
+        logger.info(f"images_only={images_only}, target_id={target_id}")
 
         def is_message_to_delete(message):
             # Skip command message
@@ -188,24 +189,75 @@ class MessageCleaner:
                 logger.info(f"Message too old, skipping: {message.created_at} < {time_threshold}")
                 return False
 
-            # Check if message is from target user
+            # Sprawdź czy wiadomość ma obrazki/linki jeśli images_only=True
+            if images_only:
+                has_image = bool(message.attachments)
+                has_link = bool(re.search(r"http[s]?://\S+", message.content))
+                has_embeds = bool(message.embeds)
+                has_media = has_image or has_link or has_embeds
+                
+                logger.info(f"Checking message ID {message.id} for media: has_image={has_image}, has_link={has_link}, has_embeds={has_embeds}")
+                
+                if not has_media:
+                    logger.info(f"Message {message.id} rejected - no media found")
+                    return False
+                
+                logger.info(f"Message {message.id} has media: {message.content if not has_image else '<with image>'}")
+                
+                # Jeśli ma media i nie ma target_id, możemy zwrócić True
+                if target_id is None:
+                    logger.info(f"Message {message.id} accepted - has media and no target_id specified")
+                    return True
+
+            # Jeśli dotarliśmy tutaj i mamy target_id, sprawdzamy czy wiadomość jest od tego użytkownika
             if target_id is not None:
                 if message.author.id == target_id:
-                    logger.info(f"Found message from target user {target_id}")
+                    logger.info(f"Found message {message.id} from target user {target_id}")
+                    # Jeśli images_only, weryfikujemy czy wiadomość ma media
+                    if images_only:
+                        has_media = bool(message.attachments) or bool(re.search(r"http[s]?://\S+", message.content)) or bool(message.embeds)
+                        logger.info(f"Target message {message.id} has media: {has_media}")
+                        return has_media
                     return True
                     
                 # Check if message mentions target user
                 if f"<@{target_id}>" in message.content or f"<@!{target_id}>" in message.content:
-                    logger.info(f"Found message mentioning target user {target_id}")
+                    logger.info(f"Found message {message.id} mentioning target user {target_id}")
+                    # Jeśli images_only, weryfikujemy czy wiadomość ma media
+                    if images_only:
+                        has_media = bool(message.attachments) or bool(re.search(r"http[s]?://\S+", message.content)) or bool(message.embeds)
+                        logger.info(f"Mention message {message.id} has media: {has_media}")
+                        return has_media
                     return True
 
+                # Dla wiadomości webhooków, sprawdź czy zawierają ID użytkownika
+                if message.webhook_id:
+                    target_id_str = str(target_id)
+                    found_in_content = target_id_str in message.content
+                    found_in_attachments = any(
+                        target_id_str in attachment.url or target_id_str in attachment.filename
+                        for attachment in message.attachments
+                    )
+                    found_in_webhook = target_id_str in str(message.author)
+                    
+                    webhook_match = found_in_content or found_in_attachments or found_in_webhook
+                    logger.info(f"Webhook message {message.id} contains target ID {target_id}: {webhook_match}")
+                    logger.info(f"  - found_in_content: {found_in_content}")
+                    logger.info(f"  - found_in_attachments: {found_in_attachments}")
+                    logger.info(f"  - found_in_webhook: {found_in_webhook}")
+                    logger.info(f"  - webhook author: {message.author}")
+                    
+                    if webhook_match:
+                        logger.info(f"Found webhook message {message.id} containing target ID {target_id}")
+                        return True
+                
+                logger.info(f"Message {message.id} rejected - not from target user {target_id}")
                 return False
 
-            if images_only:
-                has_image = bool(message.attachments)
-                has_link = bool(re.search(r"http[s]?://\S+", message.content))
-                return has_image or has_link
-            return True
+            # Jeśli nie ma target_id i images_only=False, zwracamy True
+            result = not images_only
+            logger.info(f"Message {message.id} accepted: {result}")
+            return result
 
         total_deleted = 0
         user_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
@@ -314,6 +366,21 @@ class MessageCleaner:
                 if not is_bulk_delete and message.created_at < time_threshold:
                     return False
 
+                # Sprawdź czy wiadomość ma obrazki/linki jeśli images_only=True
+                if images_only:
+                    has_image = bool(message.attachments)
+                    has_link = bool(re.search(r"http[s]?://\S+", message.content))
+                    has_embeds = bool(message.embeds)
+                    has_media = has_image or has_link or has_embeds
+                    
+                    if not has_media:
+                        return False
+                    
+                    # Jeśli ma media i nie ma target_id, możemy zwrócić True
+                    if target_id is None:
+                        return True
+
+                # Jeśli dotarliśmy tutaj i mamy target_id, sprawdzamy czy wiadomość jest od tego użytkownika
                 if target_id is not None:
                     target_id_str = str(target_id)
                     target_member = ctx.guild.get_member(target_id)
@@ -345,7 +412,7 @@ class MessageCleaner:
                         # If Drongale's message, log debug info
                         if message.author.name.lower() == "drongale":
                             logger.info(f"No match: Drongale's message (ID: {message.author.id}) doesn't match target ID {target_id}")
-                            
+                        
                         return False
 
                     # Check webhook messages and their content
@@ -361,11 +428,8 @@ class MessageCleaner:
                             return False
                         return True
 
-                if images_only:
-                    has_image = bool(message.attachments)
-                    has_link = bool(re.search(r"http[s]?://\S+", message.content))
-                    return has_image or has_link
-                return True
+                # Jeśli nie ma target_id i images_only=False, zwracamy True
+                return not images_only
 
             try:
                 # First bulk delete the last 100 messages, ignore time
