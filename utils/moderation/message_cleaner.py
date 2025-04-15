@@ -264,11 +264,26 @@ class MessageCleaner:
                         logger.info(f"Avatar bot message {message.id} contains 'avatar url'")
                         # To jest wiadomość od bota avatara, czyli odpowiedź na komendę .a
                         # Jeśli nazwa użytkownika jest pierwszą linią, prawdopodobnie to wiadomość dla tego użytkownika
-                        if target_name and target_name.lower() in message_lines[0].lower():
-                            logger.info(f"Avatar bot message {message.id} first line contains target name {target_name}")
-                            avatar_message_match = True
+                        if target_name:
+                            logger.info(f"Checking if first line '{message_lines[0].lower()}' matches target name '{target_name.lower()}'")
+                            if message_lines[0].lower() == target_name.lower():
+                                logger.info(f"Avatar bot message {message.id} first line matches target name {target_name}")
+                                avatar_message_match = True
+                    
+                    # Sprawdź czy embedy zawierają informacje o użytkowniku
+                    if message.embeds:
+                        for embed in message.embeds:
+                            logger.info(f"Checking embed: title={embed.title}, description={embed.description}")
+                            if embed.title:
+                                if target_name and target_name.lower() in embed.title.lower():
+                                    logger.info(f"Avatar bot message {message.id} embed title contains target name {target_name}")
+                                    avatar_message_match = True
+                                if target_id_str in embed.title:
+                                    logger.info(f"Avatar bot message {message.id} embed title contains target ID {target_id_str}")
+                                    avatar_message_match = True
                     
                     if avatar_message_match:
+                        logger.info(f"Avatar bot message {message.id} matches target user!")
                         if images_only:
                             has_media = bool(message.attachments) or bool(re.search(r"http[s]?://\S+", message.content)) or bool(message.embeds)
                             logger.info(f"Avatar bot message {message.id} has media: {has_media}")
@@ -444,6 +459,8 @@ class MessageCleaner:
 
                         # Sprawdź czy to wiadomość od bota sprawdzającego avatar
                         if message.author.id == self.avatar_bot_id:
+                            logger.info(f"Checking all-channels avatar bot message: {message.content}")
+                            
                             # Sprawdź czy wiadomość zawiera nazwę użytkownika (jeśli dostępna)
                             if target_name and message.content.lower().startswith(target_name.lower()):
                                 logger.info(f"Match: Avatar bot message contains target username {target_name}")
@@ -458,15 +475,23 @@ class MessageCleaner:
                             message_lines = message.content.split("\n")
                             if len(message_lines) > 1 and "avatar url" in message_lines[1].lower():
                                 logger.info(f"Avatar bot message contains 'avatar url'")
-                                if target_name and target_name.lower() in message_lines[0].lower():
-                                    logger.info(f"Avatar bot message first line contains target name {target_name}")
-                                    return True
+                                if target_name:
+                                    logger.info(f"Checking if first line '{message_lines[0].lower()}' matches target name '{target_name.lower()}'")
+                                    if message_lines[0].lower() == target_name.lower():
+                                        logger.info(f"Avatar bot message first line matches target name {target_name}")
+                                        return True
                             
                             # Sprawdź embedy
-                            for embed in message.embeds:
-                                if embed.title and target_id_str in embed.title:
-                                    logger.info(f"Match: Avatar bot embed contains target ID {target_id}")
-                                    return True
+                            if message.embeds:
+                                for embed in message.embeds:
+                                    logger.info(f"Checking all-channels embed: title={embed.title}, description={embed.description}")
+                                    if embed.title:
+                                        if target_name and target_name.lower() in embed.title.lower():
+                                            logger.info(f"Avatar bot message embed title contains target name {target_name}")
+                                            return True
+                                        if target_id_str in embed.title:
+                                            logger.info(f"Avatar bot message embed title contains target ID {target_id_str}")
+                                            return True
                         
                         # If Drongale's message, log debug info
                         if message.author.name.lower() == "drongale":
