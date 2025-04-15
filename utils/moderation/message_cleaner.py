@@ -33,7 +33,7 @@ class MessageCleaner:
         """
         self.bot = bot
         self.config = bot.config
-        self.message_sender = MessageSender(bot)
+        self.message_sender = MessageSender()
 
     async def get_target_user(
         self, ctx: commands.Context, user
@@ -128,7 +128,11 @@ class MessageCleaner:
 
         # Jeśli nie podano ID i nie jest się adminem, wymagaj podania użytkownika
         if target_id is None and not ctx.author.guild_permissions.administrator:
-            await self.message_sender.send_error(ctx, "Musisz podać użytkownika, którego wiadomości chcesz usunąć.")
+            embed = discord.Embed(
+                description="Musisz podać użytkownika, którego wiadomości chcesz usunąć.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
             return
 
         # Jeśli nie podano ID i jest się adminem, pytaj o potwierdzenie
@@ -140,7 +144,11 @@ class MessageCleaner:
             )
             confirm = await self.confirm_action(ctx, confirm_message)
             if not confirm:
-                await self.message_sender.send_info(ctx, "Anulowano usuwanie wiadomości.")
+                embed = discord.Embed(
+                    description="Anulowano usuwanie wiadomości.",
+                    color=discord.Color.blue()
+                )
+                await ctx.send(embed=embed)
                 return
 
         # Usuń wiadomości
@@ -151,9 +159,13 @@ class MessageCleaner:
         else:
             deleted_count = await self._delete_messages(ctx, hours, target_id, images_only)
 
-        # Wyślij potwierdzenie jako embed
+        # Wyślij potwierdzenie
         message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}."
-        await self.message_sender.send_success(ctx, message)
+        embed = discord.Embed(
+            description=message,
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
 
     async def _delete_messages(
         self,
@@ -196,7 +208,12 @@ class MessageCleaner:
             return True
 
         total_deleted = 0
-        status_message = await self.message_sender.send_info(ctx, "Rozpoczynam usuwanie wiadomości...")
+        status_message = await ctx.send(
+            embed=discord.Embed(
+                description="Rozpoczynam usuwanie wiadomości...",
+                color=discord.Color.blue()
+            )
+        )
 
         try:
             # First bulk delete - for the last 100 messages, ignore time limit
@@ -209,7 +226,7 @@ class MessageCleaner:
             
             await status_message.edit(
                 embed=discord.Embed(
-                    description=f"Szybko usunięto {total_deleted} najnowszych wiadomości. Kontynuuję usuwanie starszych...", 
+                    description=f"Szybko usunięto {total_deleted} najnowszych wiadomości. Kontynuuję usuwanie starszych...",
                     color=discord.Color.blue()
                 )
             )
@@ -242,24 +259,30 @@ class MessageCleaner:
 
         except discord.Forbidden:
             logger.error("No permission to delete messages in this channel")
-            await status_message.edit(embed=discord.Embed(
-                description="Nie mam uprawnień do usuwania wiadomości na tym kanale.",
-                color=discord.Color.red()
-            ))
+            await status_message.edit(
+                embed=discord.Embed(
+                    description="Nie mam uprawnień do usuwania wiadomości na tym kanale.",
+                    color=discord.Color.red()
+                )
+            )
             return total_deleted
         except discord.HTTPException as e:
             logger.error(f"HTTP error while deleting messages: {e}")
-            await status_message.edit(embed=discord.Embed(
-                description=f"Wystąpił błąd podczas usuwania wiadomości: {e}",
-                color=discord.Color.red()
-            ))
+            await status_message.edit(
+                embed=discord.Embed(
+                    description=f"Wystąpił błąd podczas usuwania wiadomości: {e}",
+                    color=discord.Color.red()
+                )
+            )
             return total_deleted
         except Exception as e:
             logger.error(f"Unexpected error in _delete_messages: {e}", exc_info=True)
-            await status_message.edit(embed=discord.Embed(
-                description=f"Wystąpił nieoczekiwany błąd: {e}",
-                color=discord.Color.red()
-            ))
+            await status_message.edit(
+                embed=discord.Embed(
+                    description=f"Wystąpił nieoczekiwany błąd: {e}",
+                    color=discord.Color.red()
+                )
+            )
             return total_deleted
     
     async def _delete_messages_all_channels(
@@ -272,7 +295,12 @@ class MessageCleaner:
         """Usuwa wiadomości na wszystkich kanałach."""
         time_threshold = ctx.message.created_at - timedelta(hours=hours)
         total_deleted = 0
-        status_message = await self.message_sender.send_info(ctx, "Rozpoczynam usuwanie wiadomości na wszystkich kanałach...")
+        status_message = await ctx.send(
+            embed=discord.Embed(
+                description="Rozpoczynam usuwanie wiadomości na wszystkich kanałach...",
+                color=discord.Color.blue()
+            )
+        )
 
         for channel in ctx.guild.text_channels:
             if not channel.permissions_for(ctx.guild.me).manage_messages:
