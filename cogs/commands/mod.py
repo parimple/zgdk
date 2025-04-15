@@ -328,11 +328,8 @@ class ModCog(commands.Cog):
         """Przywraca możliwość zdobywania punktów rankingowych (wersja prefiksowa)."""
         await self.mute_manager.unmute_user(ctx, user, MuteType.RANK)
 
-    @commands.hybrid_command(name="userid", description="Wyświetla ID użytkownika o podanej nazwie")
+    @commands.command(name="userid", description="Wyświetla ID użytkownika o podanej nazwie")
     @is_mod_or_admin()
-    @discord.app_commands.describe(
-        name="Nazwa użytkownika (lub jej część) do wyszukania"
-    )
     async def user_id(self, ctx: commands.Context, *, name: str):
         """Wyświetla ID użytkownika o podanej nazwie.
         
