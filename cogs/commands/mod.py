@@ -49,7 +49,7 @@ class ModCog(commands.Cog):
     )
     @is_mod_or_admin()
     @discord.app_commands.describe(
-        user="Użytkownik, którego wiadomości mają być usunięte", 
+        user="Użytkownik, którego wiadomości mają być usunięte",
         hours="Liczba godzin wstecz, z których usunąć wiadomości (domyślnie 1)",
     )
     async def clear_messages(
@@ -82,7 +82,9 @@ class ModCog(commands.Cog):
     async def clear_images(
         self, ctx: commands.Context, user: discord.Member, hours: Optional[int] = 1
     ):
-        await self.message_cleaner.clear_messages(ctx, hours, user, all_channels=False, images_only=True)
+        await self.message_cleaner.clear_messages(
+            ctx, hours, user, all_channels=False, images_only=True
+        )
 
     @commands.command()
     @is_owner_or_admin()
@@ -336,7 +338,7 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def user_id(self, ctx: commands.Context, *, name: str):
         """Wyświetla ID użytkownika o podanej nazwie.
-        
+
         :param ctx: Kontekst komendy
         :param name: Nazwa użytkownika (lub jej część)
         """
