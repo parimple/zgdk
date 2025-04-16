@@ -37,24 +37,39 @@ class OnTaskEvent(commands.Cog):
     @tasks.loop(minutes=1)
     async def check_roles_expiry(self):
         """Check for expiring roles and remove them - both premium and mute roles"""
-        logger.info("Starting check_roles_expiry task")
+        # Informacja o rozpoczęciu będzie logowana tylko jeśli zadanie faktycznie coś zrobi
+        log_start = False
+        log_completed = False
+        changes_made = False
 
         # 1. Sprawdź wygasłe role wyciszenia (częściej sprawdzane, co minutę)
         mute_role_ids = [role["id"] for role in self.bot.config["mute_roles"]]
         mutes_removed = await self.role_manager.check_expired_roles(
             role_ids=mute_role_ids, notification_handler=self.notify_mute_removal
         )
+        
+        # Jeśli usunięto jakieś role wyciszenia, zapisz tę informację i pokaż podsumowanie
+        if mutes_removed > 0:
+            log_start = True
+            log_completed = True
+            changes_made = True
+            logger.info(f"Removed {mutes_removed} expired mute roles")
 
         # 2. Co godzinę sprawdź również role premium
         now = datetime.now(timezone.utc)
         hour_mark = now.minute == 0
 
         if hour_mark:
+            premium_notifications_sent = 0
             # Sprawdź wygasające w ciągu 24h role premium dla powiadomień
             expiration_threshold = now + timedelta(hours=24)
             async with self.bot.get_db() as session:
                 expiring_roles = await RoleQueries.get_member_premium_roles(session)
-                logger.info("Found %d premium roles", len(expiring_roles))
+                
+                # Logujemy tylko jeśli znaleziono role premium (i tylko przy godzinowym sprawdzeniu)
+                if expiring_roles:
+                    log_start = True
+                
                 for member_role, role in expiring_roles:
                     if now < member_role.expiration_date <= expiration_threshold:
                         member = self.bot.guild.get_member(member_role.member_id)
@@ -74,17 +89,34 @@ class OnTaskEvent(commands.Cog):
                                     await NotificationLogQueries.add_or_update_notification_log(
                                         session, member.id, "premium_role_expiry"
                                     )
+                                    premium_notifications_sent += 1
+                                    changes_made = True
                 await session.commit()
+            
+            # Loguj informacje o powiadomieniach tylko jeśli jakieś wysłano
+            if premium_notifications_sent > 0:
+                log_start = True
+                log_completed = True
+                logger.info(f"Sent {premium_notifications_sent} premium expiry notifications")
 
             # Sprawdź i usuń wygasłe role premium
             premium_removed = await self.role_manager.check_expired_roles(
                 role_type="premium", notification_handler=self.notify_premium_removal
             )
 
-            logger.info(f"Removed {premium_removed} expired premium roles")
+            # Loguj informacje o usuniętych rolach premium tylko jeśli jakieś usunięto
+            if premium_removed > 0:
+                log_start = True
+                log_completed = True
+                changes_made = True
+                logger.info(f"Removed {premium_removed} expired premium roles")
 
-        logger.info(f"Removed {mutes_removed} expired mute roles")
-        logger.info("Finished check_roles_expiry task")
+        # Logowanie tylko jeśli coś się działo
+        if log_start:
+            logger.info("Starting check_roles_expiry task")
+            
+        if log_completed or changes_made:
+            logger.info("Finished check_roles_expiry task")
 
     async def notify_premium_expiry(self, member, member_role, role):
         """Notify user about expiring premium membership"""
