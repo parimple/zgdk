@@ -57,10 +57,6 @@ class MessageCleaner:
                     target_id = int(user)
                     logger.info(f"Converted input to target_id: {target_id}")
                 
-                    # Pobierz informacje o wszystkich członkach serwera dla debugowania
-                    logger.info(f"Server has {len(ctx.guild.members)} members")
-                    logger.info(f"Looking for member with ID: {target_id}")
-                    
                     # Najpierw sprawdź, czy użytkownik jest w pamięci podręcznej
                     target_member = ctx.guild.get_member(target_id)
                     
@@ -71,18 +67,6 @@ class MessageCleaner:
                             logger.info(f"Found member from API: {target_member.name} (ID: {target_member.id})")
                         except discord.NotFound:
                             logger.warning(f"Member with ID {target_id} not found in API")
-                            
-                            # Szukaj użytkownika po ID w wiadomościach kanału
-                            logger.info(f"Trying to find messages from user with ID {target_id} in current channel")
-                            found_messages = False
-                            async for message in ctx.channel.history(limit=50):
-                                if message.author.id == target_id:
-                                    logger.info(f"Found message from user ID {target_id}: {message.author.name}")
-                                    found_messages = True
-                                    break
-                            
-                            if not found_messages:
-                                logger.warning(f"No messages found from user ID {target_id} in current channel")
                     else:
                         logger.info(f"Found member in cache: {target_member.name} (ID: {target_member.id})")
                 
@@ -235,7 +219,6 @@ class MessageCleaner:
 
             # Skip old messages
             if not is_bulk_delete and message.created_at < time_threshold:
-                logger.info(f"Message too old, skipping: {message.created_at} < {time_threshold}")
                 return False
 
             # Sprawdź czy wiadomość ma obrazki/linki jeśli images_only=True
@@ -245,23 +228,11 @@ class MessageCleaner:
                 has_embeds = bool(message.embeds)
                 has_media = has_image or has_link or has_embeds
 
-                logger.info(
-                    f"Checking message ID {message.id} for media: has_image={has_image}, has_link={has_link}, has_embeds={has_embeds}"
-                )
-
                 if not has_media:
-                    logger.info(f"Message {message.id} rejected - no media found")
                     return False
-
-                logger.info(
-                    f"Message {message.id} has media: {message.content if not has_image else '<with image>'}"
-                )
 
                 # Jeśli ma media i nie ma target_id, możemy zwrócić True
                 if target_id is None:
-                    logger.info(
-                        f"Message {message.id} accepted - has media and no target_id specified"
-                    )
                     return True
 
             # Jeśli dotarliśmy tutaj i mamy target_id, sprawdzamy czy wiadomość jest od tego użytkownika
@@ -271,18 +242,12 @@ class MessageCleaner:
                 target_name = target_member.name.lower() if target_member else None
                 target_id_str = str(target_id)
                 
-                # Log każdą wiadomość do sprawdzenia
-                logger.info(f"Checking message ID {message.id} from {message.author.name} ({message.author.id}) against target_id: {target_id}")
-                logger.info(f"Message content: {message.content[:50]}{'...' if len(message.content) > 50 else ''}")
-                
                 # Sprawdź content wiadomości
                 if target_id_str in message.content:
-                    logger.info(f"Message {message.id} contains user ID in content")
                     return True
                 
                 # Sprawdź czy to wiadomość od użytkownika
                 if message.author.id == target_id:
-                    logger.info(f"Found message {message.id} from target user {target_id}")
                     # Jeśli images_only, weryfikujemy czy wiadomość ma media
                     if images_only:
                         has_media = (
@@ -290,13 +255,11 @@ class MessageCleaner:
                             or bool(re.search(r"http[s]?://\S+", message.content))
                             or bool(message.embeds)
                         )
-                        logger.info(f"Target message {message.id} has media: {has_media}")
                         return has_media
                     return True
 
                 # Check if message mentions target user
                 if f"<@{target_id}>" in message.content or f"<@!{target_id}>" in message.content:
-                    logger.info(f"Found message {message.id} mentioning target user {target_id}")
                     # Jeśli images_only, weryfikujemy czy wiadomość ma media
                     if images_only:
                         has_media = (
@@ -304,72 +267,45 @@ class MessageCleaner:
                             or bool(re.search(r"http[s]?://\S+", message.content))
                             or bool(message.embeds)
                         )
-                        logger.info(f"Mention message {message.id} has media: {has_media}")
                         return has_media
                     return True
 
                 # Sprawdź czy to wiadomość od bota avatara
                 if message.author.id == self.avatar_bot_id:
-                    logger.info(f"Checking avatar bot message {message.id}: {message.content}")
-
                     # Sprawdź czy wiadomość zawiera nazwę użytkownika (jeśli dostępna)
                     avatar_message_match = False
                     if target_name and message.content.lower().startswith(target_name.lower()):
-                        logger.info(
-                            f"Avatar bot message {message.id} matches username {target_name}"
-                        )
                         avatar_message_match = True
 
                     # Sprawdź czy w wiadomości jest ID użytkownika (w URL lub tekście)
                     if target_id_str in message.content:
-                        logger.info(
-                            f"Avatar bot message {message.id} contains target ID {target_id}"
-                        )
                         avatar_message_match = True
 
                     # Sprawdzamy czy to wiadomość z avatarem (druga linia zawiera "avatar url")
                     message_lines = message.content.split("\n")
                     if len(message_lines) > 1 and "avatar url" in message_lines[1].lower():
-                        logger.info(f"Avatar bot message {message.id} contains 'avatar url'")
                         # To jest wiadomość od bota avatara, czyli odpowiedź na komendę .a
                         # Jeśli nazwa użytkownika jest pierwszą linią, prawdopodobnie to wiadomość dla tego użytkownika
                         if target_name:
-                            logger.info(
-                                f"Checking if first line '{message_lines[0].lower()}' matches target name '{target_name.lower()}'"
-                            )
                             if message_lines[0].lower() == target_name.lower():
-                                logger.info(
-                                    f"Avatar bot message {message.id} first line matches target name {target_name}"
-                                )
                                 avatar_message_match = True
 
                     # Sprawdź czy embedy zawierają informacje o użytkowniku
                     if message.embeds:
                         for embed in message.embeds:
-                            logger.info(
-                                f"Checking embed: title={embed.title}, description={embed.description}"
-                            )
                             if embed.title:
                                 if target_name and target_name.lower() in embed.title.lower():
-                                    logger.info(
-                                        f"Avatar bot message {message.id} embed title contains target name {target_name}"
-                                    )
                                     avatar_message_match = True
                                 if target_id_str in embed.title:
-                                    logger.info(
-                                        f"Avatar bot message {message.id} embed title contains target ID {target_id_str}"
-                                    )
                                     avatar_message_match = True
 
                     if avatar_message_match:
-                        logger.info(f"Avatar bot message {message.id} matches target user!")
                         if images_only:
                             has_media = (
                                 bool(message.attachments)
                                 or bool(re.search(r"http[s]?://\S+", message.content))
                                 or bool(message.embeds)
                             )
-                            logger.info(f"Avatar bot message {message.id} has media: {has_media}")
                             return has_media
                         return True
 
@@ -383,40 +319,26 @@ class MessageCleaner:
                     found_in_webhook = target_id_str in str(message.author)
 
                     webhook_match = found_in_content or found_in_attachments or found_in_webhook
-                    logger.info(
-                        f"Webhook message {message.id} contains target ID {target_id}: {webhook_match}"
-                    )
-                    logger.info(f"  - found_in_content: {found_in_content}")
-                    logger.info(f"  - found_in_attachments: {found_in_attachments}")
-                    logger.info(f"  - found_in_webhook: {found_in_webhook}")
-                    logger.info(f"  - webhook author: {message.author}")
 
                     if webhook_match:
-                        logger.info(
-                            f"Found webhook message {message.id} containing target ID {target_id}"
-                        )
                         return True
 
                 # Dodatkowe sprawdzenie dla powiązanych wiadomości po treści
                 if target_name:
                     # Sprawdź czy wiadomość zawiera nazwę użytkownika
                     if target_name.lower() in message.content.lower():
-                        logger.info(f"Message {message.id} contains username {target_name}")
                         return True
                     
                     # Sprawdź czy wiadomość jest odpowiedzią na wiadomość użytkownika
                     if message.reference and message.reference.resolved:
                         ref_msg = message.reference.resolved
                         if hasattr(ref_msg, 'author') and ref_msg.author.id == target_id:
-                            logger.info(f"Message {message.id} is a reply to target user {target_id}")
                             return True
 
-                logger.info(f"Message {message.id} rejected - not from target user {target_id}")
                 return False
 
             # Jeśli nie ma target_id i images_only=False, zwracamy True
             result = not images_only
-            logger.info(f"Message {message.id} accepted: {result}")
             return result
 
         total_deleted = 0
@@ -523,178 +445,20 @@ class MessageCleaner:
             960665316109713423
         ])
         
-        logger.info(f"Excluded categories: {excluded_categories}")
+        logger.info(f"Starting message deletion across channels, excluding categories: {excluded_categories}")
 
         for channel in ctx.guild.text_channels:
             # Pomijamy kanał, na którym wywołano komendę (jeśli podano)
             if exclude_channel and channel.id == exclude_channel.id:
-                logger.info(f"Skipping current channel {channel.name} ({channel.id})")
                 continue
                 
             # Pomijamy kanały z wykluczonych kategorii
             if channel.category_id and channel.category_id in excluded_categories:
-                logger.info(f"Skipping channel {channel.name} ({channel.id}) from excluded category {channel.category_id}")
                 continue
                 
             # Pomijamy kanały, do których nie mamy uprawnień
             if not channel.permissions_for(ctx.guild.me).manage_messages:
-                logger.info(f"No permission to delete messages in channel {channel.name} ({channel.id})")
                 continue
-
-            logger.info(f"Processing channel {channel.name} ({channel.id})")
-
-            def is_message_to_delete(message):
-                # Skip messages older than threshold - but only for the second pass
-                # In first pass (bulk delete) we check all recent 100 messages regardless of time
-                if not is_bulk_delete and message.created_at < time_threshold:
-                    return False
-
-                # Sprawdź czy wiadomość ma obrazki/linki jeśli images_only=True
-                if images_only:
-                    has_image = bool(message.attachments)
-                    has_link = bool(re.search(r"http[s]?://\S+", message.content))
-                    has_embeds = bool(message.embeds)
-                    has_media = has_image or has_link or has_embeds
-
-                    if not has_media:
-                        return False
-
-                    # Jeśli ma media i nie ma target_id, możemy zwrócić True
-                    if target_id is None:
-                        return True
-
-                # Jeśli dotarliśmy tutaj i mamy target_id, sprawdzamy czy wiadomość jest od tego użytkownika
-                if target_id is not None:
-                    target_id_str = str(target_id)
-                    target_member = ctx.guild.get_member(target_id)
-                    target_name = target_member.name.lower() if target_member else None
-                    
-                    # Log każdą wiadomość do sprawdzenia
-                    logger.info(f"Checking message ID {message.id} from {message.author.name} ({message.author.id}) against target_id: {target_id}")
-                    logger.info(f"Message content: {message.content[:50]}{'...' if len(message.content) > 50 else ''}")
-                    
-                    # Sprawdź content wiadomości
-                    if target_id_str in message.content:
-                        logger.info(f"Message {message.id} contains user ID in content")
-                        return True
-
-                    # Sprawdź zwykłe wiadomości (nie webhook)
-                    if not message.webhook_id:
-                        # Sprawdź czy wiadomość jest od tego użytkownika
-                        if message.author.id == target_id:
-                            logger.info(
-                                f"Match: Message author ID {message.author.id} equals target ID {target_id}"
-                            )
-                            return True
-
-                        # Sprawdź czy wiadomość zawiera wzmiankę o użytkowniku
-                        if (
-                            f"<@{target_id}>" in message.content
-                            or f"<@!{target_id}>" in message.content
-                        ):
-                            logger.info(
-                                f"Match: Message contains mention of target user {target_id}"
-                            )
-                            return True
-
-                        # Sprawdź czy to wiadomość od bota sprawdzającego avatar
-                        if message.author.id == self.avatar_bot_id:
-                            logger.info(
-                                f"Checking all-channels avatar bot message: {message.content}"
-                            )
-
-                            # Sprawdź czy wiadomość zawiera nazwę użytkownika (jeśli dostępna)
-                            if target_name and message.content.lower().startswith(
-                                target_name.lower()
-                            ):
-                                logger.info(
-                                    f"Match: Avatar bot message contains target username {target_name}"
-                                )
-                                return True
-
-                            # Sprawdź czy w wiadomości jest ID użytkownika
-                            if target_id_str in message.content:
-                                logger.info(
-                                    f"Match: Avatar bot message contains target ID {target_id}"
-                                )
-                                return True
-
-                            # Sprawdź treść wiadomości (zwykle ma format "nazwa użytkownika\navatar url || invite bot")
-                            message_lines = message.content.split("\n")
-                            if len(message_lines) > 1 and "avatar url" in message_lines[1].lower():
-                                logger.info(f"Avatar bot message contains 'avatar url'")
-                                if target_name:
-                                    logger.info(
-                                        f"Checking if first line '{message_lines[0].lower()}' matches target name '{target_name.lower()}'"
-                                    )
-                                    if message_lines[0].lower() == target_name.lower():
-                                        logger.info(
-                                            f"Avatar bot message first line matches target name {target_name}"
-                                        )
-                                        return True
-
-                            # Sprawdź embedy
-                            if message.embeds:
-                                for embed in message.embeds:
-                                    logger.info(
-                                        f"Checking all-channels embed: title={embed.title}, description={embed.description}"
-                                    )
-                                    if embed.title:
-                                        if (
-                                            target_name
-                                            and target_name.lower() in embed.title.lower()
-                                        ):
-                                            logger.info(
-                                                f"Avatar bot message embed title contains target name {target_name}"
-                                            )
-                                            return True
-                                        if target_id_str in embed.title:
-                                            logger.info(
-                                                f"Avatar bot message embed title contains target ID {target_id_str}"
-                                            )
-                                            return True
-                        
-                        # Dodatkowe sprawdzenie dla powiązanych wiadomości po treści
-                        if target_name:
-                            # Sprawdź czy wiadomość zawiera nazwę użytkownika
-                            if target_name.lower() in message.content.lower():
-                                logger.info(f"Message {message.id} contains username {target_name}")
-                                return True
-                            
-                            # Sprawdź czy wiadomość jest odpowiedzią na wiadomość użytkownika
-                            if message.reference and message.reference.resolved:
-                                ref_msg = message.reference.resolved
-                                if hasattr(ref_msg, 'author') and ref_msg.author.id == target_id:
-                                    logger.info(f"Message {message.id} is a reply to target user {target_id}")
-                                    return True
-
-                        # If Drongale's message, log debug info
-                        if "drongale" in message.author.name.lower():
-                            logger.info(
-                                f"Checking Drongale's message (ID: {message.author.id}, name: {message.author.name})"
-                            )
-                            logger.info(f"Message content: {message.content[:100]}...")
-                            if target_id == 1347753042417684491:
-                                logger.info("Target ID is for Drongale - this message should match!")
-                                return True
-
-                    # Check webhook messages and their content
-                    else:
-                        found_in_content = target_id_str in message.content
-                        found_in_attachments = any(
-                            target_id_str in attachment.url or target_id_str in attachment.filename
-                            for attachment in message.attachments
-                        )
-                        found_in_webhook = target_id_str in str(message.author)
-
-                        if found_in_content or found_in_attachments or found_in_webhook:
-                            logger.info(f"Found webhook message containing target ID {target_id}")
-                            return True
-                        
-                        return False
-
-                # Jeśli nie ma target_id i images_only=False, zwracamy True
-                return not images_only
 
             try:
                 # First bulk delete the last 100 messages, ignore time
@@ -703,7 +467,7 @@ class MessageCleaner:
                 total_deleted += len(deleted)
                 
                 if len(deleted) > 0:
-                    logger.info(f"Bulk deleted {len(deleted)} messages from {channel.name}")
+                    logger.info(f"Deleted {len(deleted)} messages from {channel.name}")
 
                 # Then delete older messages with time limit
                 is_bulk_delete = False
@@ -721,7 +485,6 @@ class MessageCleaner:
                         except discord.Forbidden:
                             pass
                         except Exception as e:
-                            logger.error(f"Error deleting message: {e}")
                             pass
                 
                 if channel_deleted > 0:
@@ -734,15 +497,14 @@ class MessageCleaner:
                     )
                 )
             except discord.Forbidden:
-                logger.warning(f"Forbidden to delete messages in {channel.name}")
                 continue
-            except discord.HTTPException as e:
-                logger.error(f"HTTP error in {channel.name}: {e}")
+            except discord.HTTPException:
                 continue
             except Exception as e:
-                logger.error(f"Unexpected error in {channel.name}: {e}", exc_info=True)
+                logger.error(f"Error in channel {channel.name}: {e}", exc_info=True)
                 continue
 
+        logger.info(f"Finished deleting messages across channels, total deleted: {total_deleted}")
         await status_message.delete()
         return total_deleted
 
