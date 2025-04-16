@@ -188,13 +188,18 @@ class MessageCleaner:
                 await ctx.send(embed=embed)
                 return
 
-        # Usuń wiadomości
+        # Usuń wiadomości - najpierw z bieżącego kanału, a dopiero potem z innych
+        deleted_count = 0
+        
+        # Zawsze zaczynamy od kanału, w którym została wywołana komenda
+        deleted_count = await self._delete_messages(ctx, hours, target_id, images_only)
+        
+        # Jeśli flagę all_channels jest True, to dodatkowo usuwamy z pozostałych kanałów
         if all_channels:
-            deleted_count = await self._delete_messages_all_channels(
-                ctx, hours, target_id, images_only
+            all_channels_deleted = await self._delete_messages_all_channels(
+                ctx, hours, target_id, images_only, exclude_channel=ctx.channel
             )
-        else:
-            deleted_count = await self._delete_messages(ctx, hours, target_id, images_only)
+            deleted_count += all_channels_deleted
 
         # Wyślij potwierdzenie
         # Pobierz emoji proxy_bunny z konfiguracji
@@ -496,6 +501,7 @@ class MessageCleaner:
         hours: int,
         target_id: Optional[int] = None,
         images_only: bool = False,
+        exclude_channel: Optional[discord.TextChannel] = None,
     ) -> int:
         """Usuwa wiadomości na wszystkich kanałach."""
         time_threshold = ctx.message.created_at - timedelta(hours=hours)
@@ -503,14 +509,39 @@ class MessageCleaner:
         user_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
         status_message = await ctx.send(
             embed=discord.Embed(
-                description="Rozpoczynam usuwanie wiadomości na wszystkich kanałach...",
+                description="Rozpoczynam usuwanie wiadomości na pozostałych kanałach...",
                 color=user_color,
             )
         )
 
+        # Pobierz listę ID kategorii do pominięcia
+        excluded_categories = self.config.get("excluded_categories", [
+            1127590722015604766,  # Dodane domyślne ID kategorii do pominięcia
+            960665312200626199,
+            960665312376807530,
+            960665315895836698,
+            960665316109713423
+        ])
+        
+        logger.info(f"Excluded categories: {excluded_categories}")
+
         for channel in ctx.guild.text_channels:
-            if not channel.permissions_for(ctx.guild.me).manage_messages:
+            # Pomijamy kanał, na którym wywołano komendę (jeśli podano)
+            if exclude_channel and channel.id == exclude_channel.id:
+                logger.info(f"Skipping current channel {channel.name} ({channel.id})")
                 continue
+                
+            # Pomijamy kanały z wykluczonych kategorii
+            if channel.category_id and channel.category_id in excluded_categories:
+                logger.info(f"Skipping channel {channel.name} ({channel.id}) from excluded category {channel.category_id}")
+                continue
+                
+            # Pomijamy kanały, do których nie mamy uprawnień
+            if not channel.permissions_for(ctx.guild.me).manage_messages:
+                logger.info(f"No permission to delete messages in channel {channel.name} ({channel.id})")
+                continue
+
+            logger.info(f"Processing channel {channel.name} ({channel.id})")
 
             def is_message_to_delete(message):
                 # Skip messages older than threshold - but only for the second pass
@@ -670,9 +701,13 @@ class MessageCleaner:
                 is_bulk_delete = True
                 deleted = await channel.purge(limit=100, check=is_message_to_delete)
                 total_deleted += len(deleted)
+                
+                if len(deleted) > 0:
+                    logger.info(f"Bulk deleted {len(deleted)} messages from {channel.name}")
 
                 # Then delete older messages with time limit
                 is_bulk_delete = False
+                channel_deleted = 0
                 async for message in channel.history(
                     limit=None, after=time_threshold, oldest_first=False
                 ):
@@ -680,12 +715,17 @@ class MessageCleaner:
                         try:
                             await message.delete()
                             total_deleted += 1
+                            channel_deleted += 1
                         except discord.NotFound:
                             pass
                         except discord.Forbidden:
                             pass
                         except Exception as e:
+                            logger.error(f"Error deleting message: {e}")
                             pass
+                
+                if channel_deleted > 0:
+                    logger.info(f"Deleted {channel_deleted} older messages from {channel.name}")
 
                 await status_message.edit(
                     embed=discord.Embed(
@@ -694,8 +734,13 @@ class MessageCleaner:
                     )
                 )
             except discord.Forbidden:
+                logger.warning(f"Forbidden to delete messages in {channel.name}")
                 continue
-            except discord.HTTPException:
+            except discord.HTTPException as e:
+                logger.error(f"HTTP error in {channel.name}: {e}")
+                continue
+            except Exception as e:
+                logger.error(f"Unexpected error in {channel.name}: {e}", exc_info=True)
                 continue
 
         await status_message.delete()
