@@ -52,32 +52,67 @@ class MessageCleaner:
             logger.info(f"User is discord.User/Member with ID: {target_id} and name: {user.name}")
         else:
             try:
-                target_id = int(user)
-                logger.info(f"Converted input to target_id: {target_id}")
-
-                # Pobierz i wypisz informacje o wszystkich członkach o podobnych nazwach
-                guild_members = ctx.guild.members
-                for member in guild_members:
-                    if "drongale" in member.name.lower() or "1pow" in member.name.lower():
-                        logger.info(f"Found similar member - Name: {member.name}, ID: {member.id}")
-
-                target_member = ctx.guild.get_member(target_id)
-                if target_member is None:
-                    logger.info(f"Member not found in cache, trying to fetch from API")
-                    try:
-                        target_member = await ctx.guild.fetch_member(target_id)
-                        logger.info(f"Found member from API: {target_member.name}")
-                    except discord.NotFound:
-                        logger.info(f"Member not found in API either, ID appears invalid")
-                else:
-                    logger.info(f"Found member in cache: {target_member.name}")
-            except ValueError:
-                logger.error(f"Invalid ID format: {user}")
-                await ctx.send("Nieprawidłowe ID użytkownika.")
-                return None, None
-            except discord.NotFound:
-                logger.error(f"User with ID {target_id} not found on the server")
-                await ctx.send("Nie znaleziono użytkownika o podanym ID na tym serwerze.")
+                # Próbuj najpierw przekonwertować na int (jeśli to ID)
+                try:
+                    target_id = int(user)
+                    logger.info(f"Converted input to target_id: {target_id}")
+                
+                    # Pobierz informacje o wszystkich członkach serwera dla debugowania
+                    logger.info(f"Server has {len(ctx.guild.members)} members")
+                    logger.info(f"Looking for member with ID: {target_id}")
+                    
+                    # Najpierw sprawdź, czy użytkownik jest w pamięci podręcznej
+                    target_member = ctx.guild.get_member(target_id)
+                    
+                    if target_member is None:
+                        logger.info(f"Member not found in cache, trying to fetch from API")
+                        try:
+                            target_member = await ctx.guild.fetch_member(target_id)
+                            logger.info(f"Found member from API: {target_member.name} (ID: {target_member.id})")
+                        except discord.NotFound:
+                            logger.warning(f"Member with ID {target_id} not found in API")
+                            
+                            # Szukaj użytkownika po ID w wiadomościach kanału
+                            logger.info(f"Trying to find messages from user with ID {target_id} in current channel")
+                            found_messages = False
+                            async for message in ctx.channel.history(limit=50):
+                                if message.author.id == target_id:
+                                    logger.info(f"Found message from user ID {target_id}: {message.author.name}")
+                                    found_messages = True
+                                    break
+                            
+                            if not found_messages:
+                                logger.warning(f"No messages found from user ID {target_id} in current channel")
+                    else:
+                        logger.info(f"Found member in cache: {target_member.name} (ID: {target_member.id})")
+                
+                except ValueError:
+                    # Jeśli to nie ID, spróbuj znaleźć użytkownika po nazwie lub części nazwy
+                    logger.info(f"Input '{user}' is not a valid ID, trying to find by name")
+                    
+                    user_str = str(user).lower()
+                    found_members = []
+                    
+                    for member in ctx.guild.members:
+                        if (user_str in member.name.lower() or 
+                            (member.nick and user_str in member.nick.lower())):
+                            found_members.append(member)
+                            logger.info(f"Found member by name: {member.name} (ID: {member.id})")
+                    
+                    if found_members:
+                        target_member = found_members[0]  # Weź pierwszego znalezionego
+                        target_id = target_member.id
+                        logger.info(f"Using first found member: {target_member.name} (ID: {target_id})")
+                        
+                        if len(found_members) > 1:
+                            await ctx.send(f"Znaleziono {len(found_members)} użytkowników pasujących do '{user}'. Używam: {target_member.name} (ID: {target_id})")
+                    else:
+                        logger.warning(f"No members found matching '{user}'")
+                        await ctx.send(f"Nie znaleziono użytkownika pasującego do '{user}'.")
+                        return None, None
+            except Exception as e:
+                logger.error(f"Error finding user: {e}", exc_info=True)
+                await ctx.send(f"Błąd podczas wyszukiwania użytkownika: {e}")
                 return None, None
 
         return target_id, target_member
@@ -230,7 +265,16 @@ class MessageCleaner:
                 target_member = ctx.guild.get_member(target_id)
                 target_name = target_member.name.lower() if target_member else None
                 target_id_str = str(target_id)
-
+                
+                # Log każdą wiadomość do sprawdzenia
+                logger.info(f"Checking message ID {message.id} from {message.author.name} ({message.author.id}) against target_id: {target_id}")
+                logger.info(f"Message content: {message.content[:50]}{'...' if len(message.content) > 50 else ''}")
+                
+                # Sprawdź content wiadomości
+                if target_id_str in message.content:
+                    logger.info(f"Message {message.id} contains user ID in content")
+                    return True
+                
                 # Sprawdź czy to wiadomość od użytkownika
                 if message.author.id == target_id:
                     logger.info(f"Found message {message.id} from target user {target_id}")
@@ -347,6 +391,20 @@ class MessageCleaner:
                             f"Found webhook message {message.id} containing target ID {target_id}"
                         )
                         return True
+
+                # Dodatkowe sprawdzenie dla powiązanych wiadomości po treści
+                if target_name:
+                    # Sprawdź czy wiadomość zawiera nazwę użytkownika
+                    if target_name.lower() in message.content.lower():
+                        logger.info(f"Message {message.id} contains username {target_name}")
+                        return True
+                    
+                    # Sprawdź czy wiadomość jest odpowiedzią na wiadomość użytkownika
+                    if message.reference and message.reference.resolved:
+                        ref_msg = message.reference.resolved
+                        if hasattr(ref_msg, 'author') and ref_msg.author.id == target_id:
+                            logger.info(f"Message {message.id} is a reply to target user {target_id}")
+                            return True
 
                 logger.info(f"Message {message.id} rejected - not from target user {target_id}")
                 return False
@@ -479,6 +537,15 @@ class MessageCleaner:
                     target_id_str = str(target_id)
                     target_member = ctx.guild.get_member(target_id)
                     target_name = target_member.name.lower() if target_member else None
+                    
+                    # Log każdą wiadomość do sprawdzenia
+                    logger.info(f"Checking message ID {message.id} from {message.author.name} ({message.author.id}) against target_id: {target_id}")
+                    logger.info(f"Message content: {message.content[:50]}{'...' if len(message.content) > 50 else ''}")
+                    
+                    # Sprawdź content wiadomości
+                    if target_id_str in message.content:
+                        logger.info(f"Message {message.id} contains user ID in content")
+                        return True
 
                     # Sprawdź zwykłe wiadomości (nie webhook)
                     if not message.webhook_id:
@@ -555,14 +622,30 @@ class MessageCleaner:
                                                 f"Avatar bot message embed title contains target ID {target_id_str}"
                                             )
                                             return True
+                        
+                        # Dodatkowe sprawdzenie dla powiązanych wiadomości po treści
+                        if target_name:
+                            # Sprawdź czy wiadomość zawiera nazwę użytkownika
+                            if target_name.lower() in message.content.lower():
+                                logger.info(f"Message {message.id} contains username {target_name}")
+                                return True
+                            
+                            # Sprawdź czy wiadomość jest odpowiedzią na wiadomość użytkownika
+                            if message.reference and message.reference.resolved:
+                                ref_msg = message.reference.resolved
+                                if hasattr(ref_msg, 'author') and ref_msg.author.id == target_id:
+                                    logger.info(f"Message {message.id} is a reply to target user {target_id}")
+                                    return True
 
                         # If Drongale's message, log debug info
-                        if message.author.name.lower() == "drongale":
+                        if "drongale" in message.author.name.lower():
                             logger.info(
-                                f"No match: Drongale's message (ID: {message.author.id}) doesn't match target ID {target_id}"
+                                f"Checking Drongale's message (ID: {message.author.id}, name: {message.author.name})"
                             )
-
-                        return False
+                            logger.info(f"Message content: {message.content[:100]}...")
+                            if target_id == 1347753042417684491:
+                                logger.info("Target ID is for Drongale - this message should match!")
+                                return True
 
                     # Check webhook messages and their content
                     else:
@@ -573,9 +656,11 @@ class MessageCleaner:
                         )
                         found_in_webhook = target_id_str in str(message.author)
 
-                        if not (found_in_content or found_in_attachments or found_in_webhook):
-                            return False
-                        return True
+                        if found_in_content or found_in_attachments or found_in_webhook:
+                            logger.info(f"Found webhook message containing target ID {target_id}")
+                            return True
+                        
+                        return False
 
                 # Jeśli nie ma target_id i images_only=False, zwracamy True
                 return not images_only
