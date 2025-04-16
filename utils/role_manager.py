@@ -72,6 +72,15 @@ class RoleManager:
         start_time = datetime.now()
         now = datetime.now(timezone.utc)
         removed_count = 0
+        
+        # Liczniki dla statystyk
+        stats = {
+            "non_existent_members": 0,
+            "non_existent_roles": 0, 
+            "roles_not_assigned": 0,
+            "skipped_member_ids": set(),  # Unikalne ID użytkowników
+            "skipped_role_ids": set(),    # Unikalne ID ról
+        }
 
         # Sprawdź czy serwer jest dostępny
         if not hasattr(self.bot, "guild") or self.bot.guild is None:
@@ -110,24 +119,20 @@ class RoleManager:
                     # Pobierz obiekt użytkownika
                     member = self.bot.guild.get_member(member_role.member_id)
                     if not member:
-                        logger.info(
-                            f"Skipping expired role {member_role.role_id} for non-existent member {member_role.member_id}"
-                        )
+                        stats["non_existent_members"] += 1
+                        stats["skipped_member_ids"].add(member_role.member_id)
                         continue
 
                     # Pobierz obiekt roli Discord
                     role = self.bot.guild.get_role(member_role.role_id)
                     if not role:
-                        logger.info(
-                            f"Skipping expired role ID {member_role.role_id} - role no longer exists"
-                        )
+                        stats["non_existent_roles"] += 1
+                        stats["skipped_role_ids"].add(member_role.role_id)
                         continue
 
                     # Sprawdź czy użytkownik faktycznie ma tę rolę
                     if role not in member.roles:
-                        logger.info(
-                            f"Skipping expired role {role.name} ({role.id}) for {member.display_name} - role not assigned"
-                        )
+                        stats["roles_not_assigned"] += 1
                         continue
 
                     # Dodaj do słownika do przetwarzania
@@ -224,11 +229,21 @@ class RoleManager:
 
                 await session.commit()
 
+                # Loguj statystyki pominięć
+                if stats["non_existent_members"] > 0:
+                    logger.info(f"Skipped {stats['non_existent_members']} roles for {len(stats['skipped_member_ids'])} non-existent members")
+                
+                if stats["non_existent_roles"] > 0:
+                    logger.info(f"Skipped {stats['non_existent_roles']} non-existent roles for {len(stats['skipped_role_ids'])} unique IDs")
+                
+                if stats["roles_not_assigned"] > 0:
+                    logger.info(f"Skipped {stats['roles_not_assigned']} roles not actually assigned to members")
+                
                 # Rejestruj metryki wydajności
                 end_time = datetime.now()
                 duration = (end_time - start_time).total_seconds()
                 logger.info(
-                    f"Role expiry check completed in {duration:.2f}s - Removed {removed_count} roles"
+                    f"Role expiry check completed in {duration:.2f}s - Processed {len(expired_roles)} roles, removed {removed_count}, skipped {stats['non_existent_members'] + stats['non_existent_roles'] + stats['roles_not_assigned']}"
                 )
 
                 return removed_count
