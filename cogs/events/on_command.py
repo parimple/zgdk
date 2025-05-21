@@ -28,6 +28,10 @@ class OnCommandEvent(commands.Cog):
         """On Command Error Event"""
         if isinstance(exception, commands.CommandNotFound):
             return
+        elif isinstance(exception, commands.MemberNotFound):
+            logger.warning(f"MemberNotFound error for command '{ctx.command}': {exception}")
+            await ctx.send(f"Nie znaleziono użytkownika: {exception.argument}")
+            return
 
         logger.error(
             "An error occurred while executing command '%s': %s",

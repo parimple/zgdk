@@ -345,3 +345,11 @@ excluded_categories:
   - 960665312376807530 
   - 960665315895836698
   - 960665316109713423
+
+# Konfiguracja dla zadania audytującego role premium
+audit_settings:
+  premium_role_ids_for_audit:
+    - 1306588378829164565  # zG50
+    - 1306588380141846528  # zG100
+    - 1317129475271557221  # zG500
+    - 1321432424101576705  # zG1000

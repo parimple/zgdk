@@ -261,22 +261,41 @@ class RoleQueries:
 
     @staticmethod
     async def get_member_premium_roles(
-        session: AsyncSession, member_id: Optional[int] = None
+        session: AsyncSession, member_id: int
     ) -> list[tuple[MemberRole, Role]]:
-        """Get all active premium roles of a member or all members if member_id is None"""
-        now = datetime.now(timezone.utc)
-        query = (
-            select(MemberRole, Role)
-            .join(Role, MemberRole.role_id == Role.id)
-            .where((Role.role_type == "premium") & (MemberRole.expiration_date > now))
-            .options(joinedload(MemberRole.role))
-        )
+        """Pobiera wszystkie role premium użytkownika, aktywne i wygasłe."""
+        try:
+            # Poprawna logika zapytania: pobiera wszystkie role premium użytkownika (aktywne i wygasłe).
+            query = (
+                select(MemberRole, Role)
+                .join(Role, MemberRole.role_id == Role.id)
+                .where((MemberRole.member_id == member_id) & (Role.role_type == "premium"))
+            )
+            logger.info(
+                f"Executing query for member_id {member_id} in get_member_premium_roles: {query}"
+            )
+            result = await session.execute(query)
 
-        if member_id is not None:
-            query = query.where(MemberRole.member_id == member_id)
+            # Logowanie .first() dla wglądu w pierwszy potencjalny wiersz
+            # Musimy być ostrożni, .first() może skonsumować wynik, więc lepiej wykonać to na nowym zapytaniu lub na kopii
+            # Dla uproszczenia, po prostu zalogujemy i zobaczymy, czy .all() nadal działa.
+            # W idealnym świecie, jeśli .first() konsumuje, należałoby ponownie wykonać zapytanie dla .all().
+            temp_result_for_first = await session.execute(
+                query
+            )  # Wykonaj zapytanie ponownie dla .first()
+            first_row = temp_result_for_first.first()
+            logger.info(f"Query result.first() for member_id {member_id}: {first_row}")
 
-        result = await session.execute(query)
-        return result.unique().all()
+            fetched_roles = result.all()  # Użyj oryginalnego wyniku dla .all()
+            logger.info(
+                f"Fetched roles via result.all() for member_id {member_id} (count: {len(fetched_roles)}): {fetched_roles}"
+            )
+            return fetched_roles
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas pobierania ról premium użytkownika {member_id}: {e}", exc_info=True
+            )
+            return []
 
     @staticmethod
     async def get_expiring_roles(
@@ -972,7 +991,9 @@ class InviteQueries:
                 )
                 session.add(invite)
             else:
-                invite.creator_id = creator_id
+                # Update existing invite
+                if creator_id is not None:  # Only update if new creator_id is not None
+                    invite.creator_id = creator_id
                 invite.uses = uses
                 if last_used_at is not None:
                     invite.last_used_at = last_used_at

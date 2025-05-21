@@ -76,19 +76,19 @@ class RoleManager:
         start_time = datetime.now()
         now = datetime.now(timezone.utc)
         removed_count = 0
-        
+
         # Utworzenie unikalnego klucza dla tego konkretnego sprawdzenia
         check_key = f"{role_type}_{str(role_ids)}"
-        
+
         # Liczniki dla statystyk
         stats = {
             "non_existent_members": 0,
-            "non_existent_roles": 0, 
+            "non_existent_roles": 0,
             "roles_not_assigned": 0,
             "skipped_member_ids": set(),  # Unikalne ID użytkowników
-            "skipped_role_ids": set(),    # Unikalne ID ról
-            "expired_roles_count": 0,     # Liczba wygasłych ról znalezionych w bazie
-            "removed_count": 0,           # Liczba usuniętych ról
+            "skipped_role_ids": set(),  # Unikalne ID ról
+            "expired_roles_count": 0,  # Liczba wygasłych ról znalezionych w bazie
+            "removed_count": 0,  # Liczba usuniętych ról
         }
 
         # Sprawdź czy serwer jest dostępny
@@ -96,10 +96,15 @@ class RoleManager:
             logger.error("Guild not available - skipping expired roles check")
             return 0
 
-        # Na początku sprawdzania logujemy tylko podstawową informację
-        logger.info(f"Checking expired roles: type={role_type}, specific_ids={role_ids}")
+        # Zmiana poziomu logowania z INFO na DEBUG
+        logger.debug(f"Checking expired roles: type={role_type}, specific_ids={role_ids}")
 
         try:
+            # Zapamiętaj poprzedni stan pominiętych członków dla tego klucza
+            previous_skipped_ids = RoleManager._last_check_results.get(check_key, {}).get(
+                "skipped_member_ids", set()
+            )
+
             async with self.bot.get_db() as session:
                 # Pobierz wygasłe role z bazy danych
                 expired_roles = await RoleQueries.get_expired_roles(
@@ -116,12 +121,16 @@ class RoleManager:
 
                 # Zapisz liczbę wygasłych ról
                 stats["expired_roles_count"] = len(expired_roles)
-                
+
                 # Sprawdź czy zmieniła się liczba wygasłych ról
-                last_expired_count = RoleManager._last_check_results.get(check_key, {}).get("expired_roles_count", -1)
+                last_expired_count = RoleManager._last_check_results.get(check_key, {}).get(
+                    "expired_roles_count", -1
+                )
                 if last_expired_count != stats["expired_roles_count"]:
-                    logger.info(f"Found {stats['expired_roles_count']} expired roles to process (changed from {last_expired_count})")
-                
+                    logger.info(
+                        f"Found {stats['expired_roles_count']} expired roles to process (changed from {last_expired_count})"
+                    )
+
                 # Zidentyfikuj rolę mutenick (rola o indeksie 2 w konfiguracji)
                 nick_mute_role_id = None
                 for role_config in self.config["mute_roles"]:
@@ -139,6 +148,7 @@ class RoleManager:
                     # Pobierz obiekt użytkownika
                     member = self.bot.guild.get_member(member_role.member_id)
                     if not member:
+                        # Zamiast logować ostrzeżenie tutaj, dodajemy ID do statystyk
                         stats["non_existent_members"] += 1
                         stats["skipped_member_ids"].add(member_role.member_id)
                         continue
@@ -252,32 +262,40 @@ class RoleManager:
 
                 # Pobierz poprzednie statystyki i porównaj
                 last_stats = RoleManager._last_check_results.get(check_key, {})
-                
+
                 # Loguj statystyki pominięć tylko jeśli coś się zmieniło
                 stats_changed = False
-                
+
                 # Sprawdź czy zmieniła się liczba pominiętych ról dla nieistniejących użytkowników
                 if stats["non_existent_members"] != last_stats.get("non_existent_members", -1):
                     stats_changed = True
                     if stats["non_existent_members"] > 0:
-                        logger.info(f"Skipped {stats['non_existent_members']} roles for {len(stats['skipped_member_ids'])} non-existent members")
-                
+                        logger.info(
+                            f"Skipped {stats['non_existent_members']} roles for {len(stats['skipped_member_ids'])} non-existent members"
+                        )
+
                 # Sprawdź czy zmieniła się liczba pominiętych nieistniejących ról
                 if stats["non_existent_roles"] != last_stats.get("non_existent_roles", -1):
                     stats_changed = True
                     if stats["non_existent_roles"] > 0:
-                        logger.info(f"Skipped {stats['non_existent_roles']} non-existent roles for {len(stats['skipped_role_ids'])} unique IDs")
-                
+                        logger.info(
+                            f"Skipped {stats['non_existent_roles']} non-existent roles for {len(stats['skipped_role_ids'])} unique IDs"
+                        )
+
                 # Sprawdź czy zmieniła się liczba pominiętych nieprzypisanych ról
                 if stats["roles_not_assigned"] != last_stats.get("roles_not_assigned", -1):
                     stats_changed = True
                     if stats["roles_not_assigned"] > 0:
-                        logger.info(f"Skipped {stats['roles_not_assigned']} roles not actually assigned to members")
-                
+                        logger.info(
+                            f"Skipped {stats['roles_not_assigned']} roles not actually assigned to members"
+                        )
+
                 # Sprawdź czy usunięto jakieś role lub czy zmieniła się liczba usuniętych ról
-                if removed_count > 0 or stats["removed_count"] != last_stats.get("removed_count", -1):
+                if removed_count > 0 or stats["removed_count"] != last_stats.get(
+                    "removed_count", -1
+                ):
                     stats_changed = True
-                
+
                 # Rejestruj metryki wydajności tylko jeśli coś się zmieniło lub jeśli coś zostało usunięte
                 if stats_changed or removed_count > 0:
                     end_time = datetime.now()
@@ -285,15 +303,22 @@ class RoleManager:
                     logger.info(
                         f"Role expiry check completed in {duration:.2f}s - Processed {len(expired_roles)} roles, removed {removed_count}, skipped {stats['non_existent_members'] + stats['non_existent_roles'] + stats['roles_not_assigned']}"
                     )
-                
+
                 # Zapisz bieżące statystyki jako ostatnie
                 RoleManager._last_check_results[check_key] = stats.copy()
                 RoleManager._last_check_timestamp = now
 
+                # Logowanie zagregowanych informacji o pominiętych członkach tylko jeśli lista się zmieniła
+                current_skipped_ids = stats["skipped_member_ids"]
+                if current_skipped_ids and current_skipped_ids != previous_skipped_ids:
+                    logger.info(
+                        f"RoleManager: Skipped processing for {stats['non_existent_members']} members not found in guild cache. IDs: {list(current_skipped_ids)}"
+                    )
+
                 return removed_count
 
         except Exception as e:
-            logger.error(f"Critical error in check_expired_roles: {e}", exc_info=True)
+            logger.error(f"Error in check_expired_roles: {e}", exc_info=True)
             return 0
 
     async def send_default_notification(self, member: discord.Member, role: discord.Role):

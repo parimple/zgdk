@@ -47,7 +47,7 @@ class OnTaskEvent(commands.Cog):
         mutes_removed = await self.role_manager.check_expired_roles(
             role_ids=mute_role_ids, notification_handler=self.notify_mute_removal
         )
-        
+
         # Jeśli usunięto jakieś role wyciszenia, zapisz tę informację i pokaż podsumowanie
         if mutes_removed > 0:
             log_start = True
@@ -65,11 +65,11 @@ class OnTaskEvent(commands.Cog):
             expiration_threshold = now + timedelta(hours=24)
             async with self.bot.get_db() as session:
                 expiring_roles = await RoleQueries.get_member_premium_roles(session)
-                
+
                 # Logujemy tylko jeśli znaleziono role premium (i tylko przy godzinowym sprawdzeniu)
                 if expiring_roles:
                     log_start = True
-                
+
                 for member_role, role in expiring_roles:
                     if now < member_role.expiration_date <= expiration_threshold:
                         member = self.bot.guild.get_member(member_role.member_id)
@@ -92,7 +92,7 @@ class OnTaskEvent(commands.Cog):
                                     premium_notifications_sent += 1
                                     changes_made = True
                 await session.commit()
-            
+
             # Loguj informacje o powiadomieniach tylko jeśli jakieś wysłano
             if premium_notifications_sent > 0:
                 log_start = True
@@ -114,7 +114,7 @@ class OnTaskEvent(commands.Cog):
         # Logowanie tylko jeśli coś się działo
         if log_start:
             logger.info("Starting check_roles_expiry task")
-            
+
         if log_completed or changes_made:
             logger.info("Finished check_roles_expiry task")
 
@@ -249,13 +249,30 @@ class OnTaskEvent(commands.Cog):
         async with self.bot.get_db() as session:
             expired_roles = await RoleQueries.get_expired_roles(session, now)
             if not expired_roles:
-                await ctx.send("Nie znaleziono wygasłych ról.")
+                await ctx.send("No expired roles found.")
                 return
 
-            for role in expired_roles:
-                await ctx.send(
-                    f"Expired role: Member ID: {role.member_id}, Role ID: {role.role_id}, Expiration Date: {role.expiration_date}"
+            embed = discord.Embed(title="Expired Roles", color=discord.Color.orange())
+            for mr in expired_roles:
+                role_name = mr.role.name if mr.role else "Unknown Role"
+                member = self.bot.guild.get_member(mr.member_id)
+                member_name = (
+                    member.display_name if member else f"Unknown Member (ID: {mr.member_id})"
                 )
+                expiry_formatted = discord.utils.format_dt(mr.expiration_date, "F")
+                embed.add_field(
+                    name=f"Role: {role_name} for {member_name}",
+                    value=f"Role ID: {mr.role_id}\\nMember ID: {mr.member_id}\\nExpired: {expiry_formatted}",
+                    inline=False,
+                )
+                if len(embed.fields) == 25:
+                    await ctx.send(embed=embed)
+                    embed = discord.Embed(
+                        title="Expired Roles (Cont.)", color=discord.Color.orange()
+                    )
+
+            if embed.fields:
+                await ctx.send(embed=embed)
 
     @commands.command()
     @commands.is_owner()
@@ -355,6 +372,141 @@ class OnTaskEvent(commands.Cog):
             f"Sprawdzono i usunięto wygasłe role:\n- Premium: {premium_removed}\n- Wyciszenia: {mutes_removed}"
         )
 
+    @tasks.loop(hours=12)  # Uruchamiaj co 12 godzin
+    async def audit_discord_premium_roles(self):
+        """Audytuje role premium na Discord i porównuje z bazą danych."""
+        logger.info("Starting premium roles audit...")
+        guild = self.bot.guild
+        if not guild:
+            logger.error("Audit: Guild not found. Skipping audit.")
+            return
+
+        # Odczytaj ID ról premium z konfiguracji
+        audit_config = self.bot.config.get("audit_settings", {})
+        premium_role_ids = audit_config.get("premium_role_ids_for_audit", [])
+
+        if not premium_role_ids:
+            logger.warning(
+                "Audit: No premium_role_ids_for_audit defined in config. Skipping audit."
+            )
+            return
+
+        actions_taken_summary = []
+
+        for role_id in premium_role_ids:
+            discord_role = guild.get_role(role_id)
+            if not discord_role:
+                logger.warning(f"Audit: Role ID {role_id} not found on server. Skipping.")
+                continue
+
+            logger.info(f"Audit: Checking role '{discord_role.name}' (ID: {discord_role.id})")
+            members_with_role = discord_role.members
+
+            if not members_with_role:
+                logger.info(f"Audit: No members found with role '{discord_role.name}'.")
+                continue
+
+            for member in members_with_role:
+                logger.debug(
+                    f"Audit: Checking member {member.display_name} (ID: {member.id}) for role '{discord_role.name}'."
+                )
+                async with self.bot.get_db() as session:
+                    try:
+                        db_member_role_entry = await RoleQueries.get_member_role(
+                            session, member.id, discord_role.id
+                        )
+
+                        if db_member_role_entry is None:
+                            logger.warning(
+                                f"Audit: Member {member.display_name} (ID: {member.id}) has role '{discord_role.name}' on Discord, but no DB entry. Removing from Discord."
+                            )
+                            try:
+                                await member.remove_roles(
+                                    discord_role, reason="Audit: Brak wpisu w bazie danych"
+                                )
+                                actions_taken_summary.append(
+                                    f"Usunięto rolę '{discord_role.name}' od {member.mention} (brak w DB)."
+                                )
+                                logger.info(
+                                    f"Audit: Removed role '{discord_role.name}' from {member.display_name} (no DB entry)."
+                                )
+                            except discord.Forbidden:
+                                logger.error(
+                                    f"Audit: Forbidden to remove role '{discord_role.name}' from {member.display_name}."
+                                )
+                            except Exception as e_remove:
+                                logger.error(
+                                    f"Audit: Error removing role '{discord_role.name}' from {member.display_name}: {e_remove}"
+                                )
+
+                        elif (
+                            db_member_role_entry.expiration_date
+                            and db_member_role_entry.expiration_date <= datetime.now(timezone.utc)
+                        ):
+                            logger.warning(
+                                f"Audit: Member {member.display_name} (ID: {member.id}) has role '{discord_role.name}' on Discord, but it's expired in DB (Exp: {db_member_role_entry.expiration_date}). Removing."
+                            )
+                            try:
+                                await member.remove_roles(
+                                    discord_role, reason="Audit: Rola wygasła wg bazy danych"
+                                )
+                                await remove_premium_role_mod_permissions(
+                                    session, self.bot, member.id
+                                )  # Pamiętaj o imporcie
+                                await RoleQueries.delete_member_role(
+                                    session, member.id, discord_role.id
+                                )
+                                await session.commit()
+                                actions_taken_summary.append(
+                                    f"Usunięto wygasłą rolę '{discord_role.name}' od {member.mention}."
+                                )
+                                logger.info(
+                                    f"Audit: Corrected expired role '{discord_role.name}' for {member.display_name}."
+                                )
+                            except discord.Forbidden:
+                                logger.error(
+                                    f"Audit: Forbidden to remove role or manage permissions for {member.display_name} during expiry correction."
+                                )
+                            except Exception as e_correct:
+                                logger.error(
+                                    f"Audit: Error correcting expired role for {member.display_name}: {e_correct}"
+                                )
+                                await session.rollback()
+                        # else: Role in DB is active or permanent, all good. No action needed.
+
+                    except Exception as e_session:
+                        logger.error(
+                            f"Audit: Error processing member {member.display_name} for role '{discord_role.name}': {e_session}",
+                            exc_info=True,
+                        )
+                        await session.rollback()
+
+        if actions_taken_summary:
+            summary_message = "Przeprowadzono audyt ról premium. Wykonane akcje:\n- " + "\n- ".join(
+                actions_taken_summary
+            )
+            # TODO: Send summary_message to an admin channel
+            logger.info(
+                f"Premium roles audit completed. Actions taken: {len(actions_taken_summary)}"
+            )
+            logger.info("Audit Summary:\n" + "\n".join(actions_taken_summary))
+
+        else:
+            logger.info("Premium roles audit completed. No inconsistencies found or actions taken.")
+
+    @audit_discord_premium_roles.before_loop
+    async def before_audit_premium_roles(self):
+        """Wait for bot to be ready and guild to be set before starting audit task"""
+        logger.info("Waiting for bot to be ready before starting premium roles audit task")
+        await self.bot.wait_until_ready()
+        while self.bot.guild is None:
+            logger.info("Audit: Waiting for guild to be set...")
+            await asyncio.sleep(5)  # Czekaj nieco dłużej, bo to rzadsze zadanie
+        logger.info("Audit: Bot is ready and guild is set, audit task will start on schedule.")
+
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(OnTaskEvent(bot))
+    """Setup function for OnTaskEvent cog."""
+    cog = OnTaskEvent(bot)
+    await bot.add_cog(cog)
+    cog.audit_discord_premium_roles.start()  # Uruchomienie nowej pętli

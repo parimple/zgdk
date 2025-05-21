@@ -155,7 +155,9 @@ class InfoCog(commands.Cog):
 
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, member.id)
-            premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+            all_member_premium_roles = await RoleQueries.get_member_premium_roles(
+                session, member.id
+            )
             bypass_until = await MemberQueries.get_voice_bypass_status(session, member.id)
 
             # Get owned teams from database
@@ -177,9 +179,26 @@ class InfoCog(commands.Cog):
 
         current_time = datetime.now(timezone.utc)
         logger.info(f"Current time: {current_time}")
-        for member_role, role in premium_roles:
+        # Filtruj role premium, aby przetwarzać tylko aktywne w logice profilu
+        active_premium_roles = []
+        if all_member_premium_roles:
+            active_premium_roles = [
+                (mr, r)
+                for mr, r in all_member_premium_roles
+                if mr.expiration_date is None or mr.expiration_date > current_time
+            ]
+            logger.info(f"All premium roles for {member.id}: {all_member_premium_roles}")
+            logger.info(f"Active premium roles for {member.id}: {active_premium_roles}")
+
+        # Logowanie wygasłych ról dla celów diagnostycznych, jeśli jakieś są
+        expired_premium_roles_in_profile_check = [
+            (mr, r)
+            for mr, r in all_member_premium_roles
+            if mr.expiration_date is not None and mr.expiration_date <= current_time
+        ]
+        if expired_premium_roles_in_profile_check:
             logger.info(
-                f"Role {role.id} expiration: {member_role.expiration_date}, Is expired: {member_role.expiration_date <= current_time}"
+                f"Found expired premium roles in DB for {member.id} during profile check: {expired_premium_roles_in_profile_check}"
             )
 
         embed = discord.Embed(
@@ -208,15 +227,20 @@ class InfoCog(commands.Cog):
             else "Brak danych",
         )
 
-        if premium_roles:
-            premium_role = premium_roles[0][1]
-            roles = [role for role in roles if role.id != premium_role.id]
+        if active_premium_roles:  # Użyj przefiltrowanych aktywnych ról
+            # Jeśli są aktywne role premium, usuń je z ogólnej listy ról, aby uniknąć duplikacji
+            # Zakładamy, że interesuje nas tylko jedna, najwyższa aktywna rola premium do specjalnego wyświetlenia
+            # Ta logika może wymagać dostosowania, jeśli użytkownik może mieć wiele aktywnych ról premium jednocześnie
+            if active_premium_roles:  # Dodatkowe sprawdzenie, czy lista nie jest pusta
+                # Sortuj role premium (jeśli jest ich wiele aktywnych) np. po ID, nazwie lub specjalnym polu, jeśli istnieje
+                # Dla uproszczenia, bierzemy pierwszą z listy aktywnych
+                # Można by tu dodać logikę wyboru 'najważniejszej' aktywnej roli, jeśli jest ich więcej
+                main_active_premium_role_obj = active_premium_roles[0][1]  # Obiekt discord.Role
+                roles = [role for role in roles if role.id != main_active_premium_role_obj.id]
 
-        if roles:
-            embed.add_field(name="Role:", value=" ".join([role.mention for role in roles]))
-
-        if premium_roles:
-            PremiumManager.add_premium_roles_to_embed(ctx, embed, premium_roles)
+            PremiumManager.add_premium_roles_to_embed(
+                ctx, embed, active_premium_roles
+            )  # Przekaż listę aktywnych ról
 
         # Add team ownership information right after premium roles
         if owned_teams:
@@ -236,7 +260,9 @@ class InfoCog(commands.Cog):
         if member.banner:
             embed.set_image(url=member.banner.url)
 
-        view = ProfileView(self.bot, member, premium_roles, ctx.author)
+        view = ProfileView(
+            self.bot, member, active_premium_roles, ctx.author
+        )  # Przekaż aktywne role do widoku
         await ctx.send(embed=embed, view=view)
 
     @commands.hybrid_command(name="roles", description="Lists all roles in the database")
@@ -589,22 +615,150 @@ class InfoCog(commands.Cog):
             )
             await ctx.send(embed=embed)
 
+    @commands.command(name="force_check_user_premium_roles", aliases=["fcpr"])
+    @is_admin()
+    async def force_check_user_premium_roles(self, ctx: commands.Context, member: discord.Member):
+        """Ręcznie sprawdza i usuwa wygasłe role premium dla danego użytkownika."""
+        now = datetime.now(timezone.utc)
+        removed_roles_count = 0
+        checked_roles_count = 0
+        messages = []
+
+        async with self.bot.get_db() as session:
+            # Pobierz wszystkie role premium użytkownika (aktywne i wygasłe)
+            member_premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+            checked_roles_count = len(member_premium_roles)
+
+            if not member_premium_roles:
+                await ctx.send(f"{member.mention} nie ma żadnych ról premium w bazie danych.")
+                return
+
+            for member_role_db, role_db in member_premium_roles:
+                if member_role_db.expiration_date <= now:
+                    # Rola wygasła
+                    discord_role = ctx.guild.get_role(role_db.id)
+                    if not discord_role:
+                        messages.append(
+                            f"⚠️ Rola premium `{role_db.name}` (ID: {role_db.id}) znaleziona w bazie jako wygasła, ale nie istnieje na serwerze Discord. Pomijam."
+                        )
+                        # Rozważ usunięcie z bazy danych, jeśli rola nie istnieje na serwerze
+                        # await RoleQueries.delete_member_role(session, member.id, role_db.id)
+                        continue
+
+                    if discord_role in member.roles:
+                        try:
+                            # 1. Usuń rolę z Discord
+                            await member.remove_roles(
+                                discord_role, reason="Ręczne usunięcie wygasłej roli premium"
+                            )
+                            messages.append(
+                                f"✅ Usunięto wygasłą rolę premium `{discord_role.name}` z {member.mention}."
+                            )
+                            logger.info(
+                                f"ForceCheck: Removed expired premium role {discord_role.name} (ID: {discord_role.id}) from {member.display_name} (ID: {member.id})"
+                            )
+
+                            # 2. Usuń powiązane uprawnienia (teamy, mod voice)
+                            await remove_premium_role_mod_permissions(session, self.bot, member.id)
+                            messages.append(
+                                f"ℹ️ Usunięto powiązane uprawnienia (teamy, mod voice) dla {member.mention}."
+                            )
+                            logger.info(
+                                f"ForceCheck: Removed associated mod permissions and teams for {member.display_name} (ID: {member.id})"
+                            )
+
+                            # 3. Usuń rolę z bazy danych
+                            await RoleQueries.delete_member_role(
+                                session, member.id, discord_role.id
+                            )
+                            await session.commit()  # Commit po każdej udanej operacji usunięcia z DB
+                            messages.append(
+                                f"✅ Usunięto wpis roli `{discord_role.name}` z bazy danych dla {member.mention}."
+                            )
+                            logger.info(
+                                f"ForceCheck: Deleted role {discord_role.name} (ID: {discord_role.id}) from database for {member.display_name} (ID: {member.id})"
+                            )
+                            removed_roles_count += 1
+
+                        except discord.Forbidden:
+                            messages.append(
+                                f"❌ Błąd uprawnień: Nie można usunąć roli `{discord_role.name}` od {member.mention}."
+                            )
+                            logger.error(
+                                f"ForceCheck: Permission error removing role {discord_role.name} from {member.display_name}"
+                            )
+                        except Exception as e:
+                            messages.append(
+                                f"❌ Wystąpił nieoczekiwany błąd podczas usuwania roli `{discord_role.name}`: {e}"
+                            )
+                            logger.error(
+                                f"ForceCheck: Unexpected error removing role {discord_role.name} from {member.display_name}: {e}",
+                                exc_info=True,
+                            )
+                            await session.rollback()  # Wycofaj zmiany w razie błędu
+                    else:
+                        messages.append(
+                            f"ℹ️ Wygasła rola premium `{discord_role.name}` znaleziona w bazie, ale {member.mention} jej nie posiada na Discord. Rozważam usunięcie z bazy."
+                        )
+                        # Można dodać logikę automatycznego czyszczenia takich wpisów z bazy
+                        try:
+                            await RoleQueries.delete_member_role(
+                                session, member.id, discord_role.id
+                            )
+                            await session.commit()
+                            messages.append(
+                                f'✅ Usunięto "niepotrzebny" wpis roli `{discord_role.name}` z bazy danych dla {member.mention}.'
+                            )
+                            logger.info(
+                                f"ForceCheck: Cleaned up non-possessed expired role {discord_role.name} (ID: {discord_role.id}) from database for {member.display_name} (ID: {member.id})"
+                            )
+                        except Exception as e:
+                            messages.append(
+                                f"❌ Błąd podczas czyszczenia wpisu roli `{discord_role.name}` z bazy: {e}"
+                            )
+                            logger.error(
+                                f"ForceCheck: Error cleaning up database for role {discord_role.name} for {member.display_name}: {e}",
+                                exc_info=True,
+                            )
+                            await session.rollback()
+                else:
+                    # Rola nie wygasła
+                    messages.append(
+                        f"ℹ️ Rola premium `{role_db.name}` (ID: {role_db.id}) jest nadal aktywna dla {member.mention} (wygasa: {discord.utils.format_dt(member_role_db.expiration_date, 'R')})."
+                    )
+
+            # Końcowy commit jeśli były jakieś operacje bez indywidualnych commitów (choć staramy się ich unikać w pętli)
+            # await session.commit() # Raczej niepotrzebne jeśli commitujemy po każdym usunięciu z DB
+
+        final_message = (
+            f"Sprawdzono {checked_roles_count} ról premium dla {member.mention}. Usunięto {removed_roles_count} wygasłych ról.\n\nSzczegóły:\n"
+            + "\n".join(messages)
+        )
+
+        if len(final_message) > 2000:
+            await ctx.send(
+                f"Sprawdzono {checked_roles_count} ról premium dla {member.mention}. Usunięto {removed_roles_count} wygasłych ról. Logi są zbyt długie, sprawdź konsolę bota."
+            )
+            logger.info(f"ForceCheck Summary for {member.display_name}:\n" + "\n".join(messages))
+        else:
+            await ctx.send(final_message)
+
 
 class ProfileView(discord.ui.View):
     """View for profile command."""
 
-    def __init__(self, bot, member: discord.Member, premium_roles, viewer: discord.Member):
+    def __init__(self, bot, member: discord.Member, active_premium_roles, viewer: discord.Member):
         super().__init__()
         self.bot = bot
         self.member = member
-        self.premium_roles = premium_roles
+        self.active_premium_roles = active_premium_roles  # Zmieniono nazwę atrybutu
         self.viewer = viewer
 
         # Add buttons based on conditions
         if viewer.id == member.id:
             self.add_item(BuyRoleButton(bot, member, viewer))
-            if premium_roles:
-                self.add_item(SellRoleButton(bot, premium_roles, member.id))
+            if active_premium_roles:  # Użyj active_premium_roles
+                self.add_item(SellRoleButton(bot, active_premium_roles, member.id))
 
 
 class BuyRoleButton(discord.ui.Button):
@@ -626,10 +780,10 @@ class BuyRoleButton(discord.ui.Button):
 class SellRoleButton(discord.ui.Button):
     """Button for selling roles."""
 
-    def __init__(self, bot, premium_roles, owner_id: int, **kwargs):
+    def __init__(self, bot, active_premium_roles, owner_id: int, **kwargs):
         super().__init__(style=discord.ButtonStyle.red, label="Sprzedaj rangę", emoji="💰", **kwargs)
         self.bot = bot
-        self.premium_roles = premium_roles
+        self.active_premium_roles = active_premium_roles  # Zmieniono nazwę atrybutu
         self.owner_id = owner_id
         self.is_selling = False
 
@@ -650,7 +804,15 @@ class SellRoleButton(discord.ui.Button):
 
         self.is_selling = True
         try:
-            member_role, role = self.premium_roles[0]
+            # Używamy pierwszej roli z listy aktywnych ról premium do sprzedaży
+            # To założenie może wymagać zmiany, jeśli użytkownik może mieć wiele aktywnych ról i powinien móc wybrać którą sprzedać
+            if not self.active_premium_roles:
+                await interaction.response.send_message(
+                    "Nie masz żadnych aktywnych ról premium do sprzedania.", ephemeral=True
+                )
+                return
+
+            member_role, role = self.active_premium_roles[0]
 
             # Verify if user still has the role by checking role IDs
             user_role_ids = [r.id for r in interaction.user.roles]

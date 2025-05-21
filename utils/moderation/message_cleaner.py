@@ -56,40 +56,49 @@ class MessageCleaner:
                 try:
                     target_id = int(user)
                     logger.info(f"Converted input to target_id: {target_id}")
-                
+
                     # Najpierw sprawdź, czy użytkownik jest w pamięci podręcznej
                     target_member = ctx.guild.get_member(target_id)
-                    
+
                     if target_member is None:
                         logger.info(f"Member not found in cache, trying to fetch from API")
                         try:
                             target_member = await ctx.guild.fetch_member(target_id)
-                            logger.info(f"Found member from API: {target_member.name} (ID: {target_member.id})")
+                            logger.info(
+                                f"Found member from API: {target_member.name} (ID: {target_member.id})"
+                            )
                         except discord.NotFound:
                             logger.warning(f"Member with ID {target_id} not found in API")
                     else:
-                        logger.info(f"Found member in cache: {target_member.name} (ID: {target_member.id})")
-                
+                        logger.info(
+                            f"Found member in cache: {target_member.name} (ID: {target_member.id})"
+                        )
+
                 except ValueError:
                     # Jeśli to nie ID, spróbuj znaleźć użytkownika po nazwie lub części nazwy
                     logger.info(f"Input '{user}' is not a valid ID, trying to find by name")
-                    
+
                     user_str = str(user).lower()
                     found_members = []
-                    
+
                     for member in ctx.guild.members:
-                        if (user_str in member.name.lower() or 
-                            (member.nick and user_str in member.nick.lower())):
+                        if user_str in member.name.lower() or (
+                            member.nick and user_str in member.nick.lower()
+                        ):
                             found_members.append(member)
                             logger.info(f"Found member by name: {member.name} (ID: {member.id})")
-                    
+
                     if found_members:
                         target_member = found_members[0]  # Weź pierwszego znalezionego
                         target_id = target_member.id
-                        logger.info(f"Using first found member: {target_member.name} (ID: {target_id})")
-                        
+                        logger.info(
+                            f"Using first found member: {target_member.name} (ID: {target_id})"
+                        )
+
                         if len(found_members) > 1:
-                            await ctx.send(f"Znaleziono {len(found_members)} użytkowników pasujących do '{user}'. Używam: {target_member.name} (ID: {target_id})")
+                            await ctx.send(
+                                f"Znaleziono {len(found_members)} użytkowników pasujących do '{user}'. Używam: {target_member.name} (ID: {target_id})"
+                            )
                     else:
                         logger.warning(f"No members found matching '{user}'")
                         await ctx.send(f"Nie znaleziono użytkownika pasującego do '{user}'.")
@@ -174,10 +183,10 @@ class MessageCleaner:
 
         # Usuń wiadomości - najpierw z bieżącego kanału, a dopiero potem z innych
         deleted_count = 0
-        
+
         # Zawsze zaczynamy od kanału, w którym została wywołana komenda
         deleted_count = await self._delete_messages(ctx, hours, target_id, images_only)
-        
+
         # Jeśli flagę all_channels jest True, to dodatkowo usuwamy z pozostałych kanałów
         if all_channels:
             all_channels_deleted = await self._delete_messages_all_channels(
@@ -241,11 +250,11 @@ class MessageCleaner:
                 target_member = ctx.guild.get_member(target_id)
                 target_name = target_member.name.lower() if target_member else None
                 target_id_str = str(target_id)
-                
+
                 # Sprawdź content wiadomości
                 if target_id_str in message.content:
                     return True
-                
+
                 # Sprawdź czy to wiadomość od użytkownika
                 if message.author.id == target_id:
                     # Jeśli images_only, weryfikujemy czy wiadomość ma media
@@ -328,11 +337,11 @@ class MessageCleaner:
                     # Sprawdź czy wiadomość zawiera nazwę użytkownika
                     if target_name.lower() in message.content.lower():
                         return True
-                    
+
                     # Sprawdź czy wiadomość jest odpowiedzią na wiadomość użytkownika
                     if message.reference and message.reference.resolved:
                         ref_msg = message.reference.resolved
-                        if hasattr(ref_msg, 'author') and ref_msg.author.id == target_id:
+                        if hasattr(ref_msg, "author") and ref_msg.author.id == target_id:
                             return True
 
                 return False
@@ -437,25 +446,30 @@ class MessageCleaner:
         )
 
         # Pobierz listę ID kategorii do pominięcia
-        excluded_categories = self.config.get("excluded_categories", [
-            1127590722015604766,  # Dodane domyślne ID kategorii do pominięcia
-            960665312200626199,
-            960665312376807530,
-            960665315895836698,
-            960665316109713423
-        ])
-        
-        logger.info(f"Starting message deletion across channels, excluding categories: {excluded_categories}")
+        excluded_categories = self.config.get(
+            "excluded_categories",
+            [
+                1127590722015604766,  # Dodane domyślne ID kategorii do pominięcia
+                960665312200626199,
+                960665312376807530,
+                960665315895836698,
+                960665316109713423,
+            ],
+        )
+
+        logger.info(
+            f"Starting message deletion across channels, excluding categories: {excluded_categories}"
+        )
 
         for channel in ctx.guild.text_channels:
             # Pomijamy kanał, na którym wywołano komendę (jeśli podano)
             if exclude_channel and channel.id == exclude_channel.id:
                 continue
-                
+
             # Pomijamy kanały z wykluczonych kategorii
             if channel.category_id and channel.category_id in excluded_categories:
                 continue
-                
+
             # Pomijamy kanały, do których nie mamy uprawnień
             if not channel.permissions_for(ctx.guild.me).manage_messages:
                 continue
@@ -465,7 +479,7 @@ class MessageCleaner:
                 is_bulk_delete = True
                 deleted = await channel.purge(limit=100, check=is_message_to_delete)
                 total_deleted += len(deleted)
-                
+
                 if len(deleted) > 0:
                     logger.info(f"Deleted {len(deleted)} messages from {channel.name}")
 
@@ -486,7 +500,7 @@ class MessageCleaner:
                             pass
                         except Exception as e:
                             pass
-                
+
                 if channel_deleted > 0:
                     logger.info(f"Deleted {channel_deleted} older messages from {channel.name}")
 
