@@ -140,10 +140,15 @@ class OnTaskEvent(commands.Cog):
         reason_details: str,
         include_renewal_info: bool = False,
         log_prefix: str = "Notification",
+        renewal_action_verb: str = "odnowić",
+        renewal_payment_action_prefix: str = "",
     ):
         """Wysyła sformatowane powiadomienie do użytkownika."""
         try:
-            full_message = f"{title_prefix}: {role_name}\\n{reason_details}"
+            if title_prefix:  # If title_prefix is provided, use the "prefix: role_name" structure
+                full_message = f"{title_prefix}: {role_name}\n{reason_details}"
+            else:  # Otherwise, assume reason_details contains the full main message
+                full_message = reason_details
 
             if include_renewal_info:
                 role_price_info = next(
@@ -152,13 +157,14 @@ class OnTaskEvent(commands.Cog):
                 if role_price_info and "price" in role_price_info:
                     price = role_price_info["price"]
                     price_pln = g_to_pln(price)
-                    full_message += (
-                        f"\\nAby ją odnowić, potrzebujesz {price}{CURRENCY_UNIT} ({price_pln} PLN)."
-                    )
-                    full_message += f"\\nZasil swoje konto: {self.bot.config['donate_url']}"
-                    full_message += "\\nWpisując **TYLKO** swoje id w polu - Twój nick."
+                    full_message += f"\nAby ją {renewal_action_verb}, potrzebujesz {price}{CURRENCY_UNIT} ({price_pln} PLN)."
+                    full_message += f"\nZasil swoje konto{renewal_payment_action_prefix}: {self.bot.config['donate_url']}"
+                    full_message += "\nWpisując **TYLKO** swoje id w polu - Twój nick."
                 else:
-                    full_message += "\\nSkontaktuj się z administracją w sprawie odnowienia."
+                    full_message += "\nSkontaktuj się z administracją w sprawie odnowienia."
+
+            # Replace escaped newlines with actual newlines for sending
+            full_message = full_message.replace("\\n", "\n")
 
             logger.info(
                 f"{log_prefix}: Sending notification to {member.display_name} ({member.id}) for role {role_name}."
@@ -182,27 +188,31 @@ class OnTaskEvent(commands.Cog):
     async def notify_premium_expiry(self, member, member_role, role):
         """Notify user about expiring premium membership"""
         expiration_str = discord.utils.format_dt(member_role.expiration_date, "R")
-        reason = f"Twoja rola premium wygaśnie {expiration_str}."
+        main_message = f"Twoja rola premium {role.name} wygaśnie {expiration_str}."
         await self._send_notification_template(
             member,
             role.name,
-            title_prefix="Wygasająca rola premium",
-            reason_details=reason,
+            title_prefix="",  # Empty title_prefix to use main_message directly
+            reason_details=main_message,
             include_renewal_info=True,
             log_prefix="Expiry",
+            renewal_action_verb="przedłużyć",
+            renewal_payment_action_prefix=", aby ją przedłużyć",
         )
 
     async def notify_premium_removal(self, member, member_role, role):
         """Notify user about removed premium membership"""
         expiration_str = discord.utils.format_dt(member_role.expiration_date, "R")
-        reason = f"Twoja rola premium wygasła {expiration_str}."
+        main_message = f"Twoja rola premium {role.name} wygasła {expiration_str}."
         await self._send_notification_template(
             member,
             role.name,
-            title_prefix="Usunięta rola premium",
-            reason_details=reason,
+            title_prefix="",  # Empty title_prefix to use main_message directly
+            reason_details=main_message,
             include_renewal_info=True,
             log_prefix="Removal",
+            renewal_action_verb="odnowić",
+            renewal_payment_action_prefix=", aby ją odnowić",
         )
         try:
             async with self.bot.get_db() as session:
@@ -241,26 +251,29 @@ class OnTaskEvent(commands.Cog):
     ):
         """Powiadamia użytkownika o usunięciu roli w wyniku audytu."""
         role_name = discord_role.name
-        title = "Audyt Roli Premium"
-        reason_details = ""
+        main_message_body = ""
         include_renewal = False
+        local_renewal_payment_action_prefix = ""  # Domyślnie pusty
 
         if db_expiration_date:
             expiration_str = discord.utils.format_dt(db_expiration_date, "R")
-            reason_details = f"Twoja rola premium {role_name} wygasła {expiration_str} i została usunięta w ramach korekty systemowej."
+            main_message_body = f"Twoja rola premium {role_name} wygasła {expiration_str} i została usunięta w ramach korekty systemowej."
             include_renewal = True
+            local_renewal_payment_action_prefix = ", aby ją odnowić"  # Ustawiamy dla spójności
         else:
-            reason_details = (
+            main_message_body = (
                 f"Twoja rola premium {role_name} została usunięta z powodu {audit_reason_key}."
             )
 
         await self._send_notification_template(
             member,
-            role_name,
-            title_prefix=title,
-            reason_details=reason_details,
+            role_name,  # Nadal potrzebne dla wyszukania ceny w _send_notification_template
+            title_prefix="",  # Kluczowa zmiana: używamy main_message_body jako głównej treści
+            reason_details=main_message_body,
             include_renewal_info=include_renewal,
             log_prefix="AuditRemoval",
+            # renewal_action_verb domyślnie jest "odnowić", co jest tutaj odpowiednie
+            renewal_payment_action_prefix=local_renewal_payment_action_prefix,
         )
 
     @check_roles_expiry.before_loop
