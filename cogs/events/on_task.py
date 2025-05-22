@@ -64,33 +64,47 @@ class OnTaskEvent(commands.Cog):
             # Sprawdź wygasające w ciągu 24h role premium dla powiadomień
             expiration_threshold = now + timedelta(hours=24)
             async with self.bot.get_db() as session:
-                expiring_roles = await RoleQueries.get_member_premium_roles(session)
+                # Fetch all MemberRole entries that are premium
+                all_premium_member_roles = await RoleQueries.get_all_premium_roles(session)
 
                 # Logujemy tylko jeśli znaleziono role premium (i tylko przy godzinowym sprawdzeniu)
-                if expiring_roles:
+                if all_premium_member_roles:
                     log_start = True
 
-                for member_role, role in expiring_roles:
-                    if now < member_role.expiration_date <= expiration_threshold:
-                        member = self.bot.guild.get_member(member_role.member_id)
-                        if member:
-                            guild_role = self.bot.guild.get_role(role.id)
-                            if guild_role and guild_role in member.roles:
-                                notification_log = (
-                                    await NotificationLogQueries.get_notification_log(
-                                        session, member.id, "premium_role_expiry"
-                                    )
+                for member_role_db in all_premium_member_roles:
+                    # Ensure expiration_date is not None before comparison
+                    if (
+                        member_role_db.expiration_date
+                        and now < member_role_db.expiration_date <= expiration_threshold
+                    ):
+                        member = self.bot.guild.get_member(member_role_db.member_id)
+                        if not member:
+                            logger.debug(
+                                f"Member {member_role_db.member_id} not found in cache for premium expiry notification."
+                            )
+                            continue  # Skip if member not in cache
+
+                        guild_role = self.bot.guild.get_role(member_role_db.role_id)
+                        if not guild_role:
+                            logger.warning(
+                                f"Role ID {member_role_db.role_id} not found on server for premium expiry notification."
+                            )
+                            continue  # Skip if role not on server
+
+                        if guild_role in member.roles:
+                            notification_log = await NotificationLogQueries.get_notification_log(
+                                session, member.id, "premium_role_expiry"
+                            )
+                            if not notification_log or now - notification_log.sent_at > timedelta(
+                                hours=24
+                            ):
+                                # Pass the MemberRole and discord.Role objects to the notification handler
+                                await self.notify_premium_expiry(member, member_role_db, guild_role)
+                                await NotificationLogQueries.add_or_update_notification_log(
+                                    session, member.id, "premium_role_expiry"
                                 )
-                                if (
-                                    not notification_log
-                                    or now - notification_log.sent_at > timedelta(hours=24)
-                                ):
-                                    await self.notify_premium_expiry(member, member_role, role)
-                                    await NotificationLogQueries.add_or_update_notification_log(
-                                        session, member.id, "premium_role_expiry"
-                                    )
-                                    premium_notifications_sent += 1
-                                    changes_made = True
+                                premium_notifications_sent += 1
+                                changes_made = True
                 await session.commit()
 
             # Loguj informacje o powiadomieniach tylko jeśli jakieś wysłano
@@ -118,39 +132,41 @@ class OnTaskEvent(commands.Cog):
         if log_completed or changes_made:
             logger.info("Finished check_roles_expiry task")
 
-    async def notify_premium_expiry(self, member, member_role, role):
-        """Notify user about expiring premium membership"""
+    async def _send_notification_template(
+        self,
+        member: discord.Member,
+        role_name: str,
+        title_prefix: str,
+        reason_details: str,
+        include_renewal_info: bool = False,
+        log_prefix: str = "Notification",
+    ):
+        """Wysyła sformatowane powiadomienie do użytkownika."""
         try:
-            expiration_date = member_role.expiration_date
-            expiration_str = discord.utils.format_dt(expiration_date, "R")
+            full_message = f"{title_prefix}: {role_name}\\n{reason_details}"
 
-            role_price = next(
-                (r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role.name),
-                None,
-            )
-
-            if role_price is not None:
-                price_pln = g_to_pln(role_price)
-                price_message = f"Aby przedłużyć tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} ({price_pln} PLN)."
-            else:
-                price_message = (
-                    "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."
+            if include_renewal_info:
+                role_price_info = next(
+                    (r for r in self.bot.config["premium_roles"] if r["name"] == role_name), None
                 )
+                if role_price_info and "price" in role_price_info:
+                    price = role_price_info["price"]
+                    price_pln = g_to_pln(price)
+                    full_message += (
+                        f"\\nAby ją odnowić, potrzebujesz {price}{CURRENCY_UNIT} ({price_pln} PLN)."
+                    )
+                    full_message += f"\\nZasil swoje konto: {self.bot.config['donate_url']}"
+                    full_message += "\\nWpisując **TYLKO** swoje id w polu - Twój nick."
+                else:
+                    full_message += "\\nSkontaktuj się z administracją w sprawie odnowienia."
 
-            logger.info("Sending expiry notification to %s (%d)", member.display_name, member.id)
-
-            message = (
-                f"Twoja rola premium {role.name} wygaśnie {expiration_str}. \n"
-                f"{price_message}\n"
-                f"Zasil swoje konto, aby ją przedłużyć: {self.bot.config['donate_url']}\n"
-                "Wpisując **TYLKO** swoje id w polu - Twój nick."
+            logger.info(
+                f"{log_prefix}: Sending notification to {member.display_name} ({member.id}) for role {role_name}."
             )
+
+            await self.role_manager.send_notification(member, full_message)
+
             id_message = f"```{member.id}```"
-
-            # Użyj RoleManager do wysyłania powiadomień
-            await self.role_manager.send_notification(member, message)
-
-            # ID wysyłamy osobno
             if not self.force_channel_notifications:
                 await member.send(id_message)
             else:
@@ -159,48 +175,36 @@ class OnTaskEvent(commands.Cog):
                     await channel.send(id_message)
 
         except Exception as e:
-            logger.error(f"Error sending premium expiry notification: {e}")
+            logger.error(
+                f"{log_prefix}: Error sending notification for role {role_name}: {e}", exc_info=True
+            )
+
+    async def notify_premium_expiry(self, member, member_role, role):
+        """Notify user about expiring premium membership"""
+        expiration_str = discord.utils.format_dt(member_role.expiration_date, "R")
+        reason = f"Twoja rola premium wygaśnie {expiration_str}."
+        await self._send_notification_template(
+            member,
+            role.name,
+            title_prefix="Wygasająca rola premium",
+            reason_details=reason,
+            include_renewal_info=True,
+            log_prefix="Expiry",
+        )
 
     async def notify_premium_removal(self, member, member_role, role):
         """Notify user about removed premium membership"""
+        expiration_str = discord.utils.format_dt(member_role.expiration_date, "R")
+        reason = f"Twoja rola premium wygasła {expiration_str}."
+        await self._send_notification_template(
+            member,
+            role.name,
+            title_prefix="Usunięta rola premium",
+            reason_details=reason,
+            include_renewal_info=True,
+            log_prefix="Removal",
+        )
         try:
-            role_price = next(
-                (r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role.name),
-                None,
-            )
-
-            if role_price is not None:
-                price_pln = g_to_pln(role_price)
-                price_message = f"Aby odnowić tę rangę, potrzebujesz {role_price}{CURRENCY_UNIT} ({price_pln} PLN)."
-            else:
-                price_message = (
-                    "Skontaktuj się z administracją, aby uzyskać informacje o cenie odnowienia."
-                )
-
-            expiration_date = discord.utils.format_dt(member_role.expiration_date, "R")
-
-            logger.info("Sending removal notification to %s (%d)", member.display_name, member.id)
-
-            message = (
-                f"Twoja rola premium {role.name} wygasła {expiration_date}. \n"
-                f"{price_message}\n"
-                f"Zasil swoje konto, aby ją odnowić: {self.bot.config['donate_url']}\n"
-                "Wpisując **TYLKO** swoje id w polu - Twój nick."
-            )
-            id_message = f"```{member.id}```"
-
-            # Użyj RoleManager do wysyłania powiadomień
-            await self.role_manager.send_notification(member, message)
-
-            # ID wysyłamy osobno
-            if not self.force_channel_notifications:
-                await member.send(id_message)
-            else:
-                channel = self.bot.get_channel(self.notification_channel_id)
-                if channel:
-                    await channel.send(id_message)
-
-            # Dodatkowo usuń uprawnienia moderatorów nadane przez tego użytkownika
             async with self.bot.get_db() as session:
                 await remove_premium_role_mod_permissions(session, self.bot, member.id)
                 await session.commit()
@@ -209,24 +213,55 @@ class OnTaskEvent(commands.Cog):
                     member.display_name,
                     member.id,
                 )
-
         except Exception as e:
-            logger.error(f"Error sending premium removal notification: {e}")
+            logger.error(f"Error in notify_premium_removal specific logic: {e}", exc_info=True)
 
     async def notify_mute_removal(self, member, member_role, role):
         """Powiadomienie o automatycznym usunięciu wyciszenia."""
-        try:
-            # Znajdź opis roli dla powiadomienia
-            role_desc = next(
-                (r["description"] for r in self.bot.config["mute_roles"] if r["id"] == role.id), ""
+        role_desc = next(
+            (r["description"] for r in self.bot.config["mute_roles"] if r["id"] == role.id), ""
+        )
+        if role_desc:
+            reason = f"Twoje wyciszenie ({role.name}) wygasło i zostało automatycznie usunięte."
+            await self._send_notification_template(
+                member,
+                role.name,
+                title_prefix="Usunięte wyciszenie",
+                reason_details=reason,
+                include_renewal_info=False,
+                log_prefix="MuteRemoval",
             )
-            if role_desc:
-                message = (
-                    f"Twoje wyciszenie ({role.name}) wygasło i zostało automatycznie usunięte."
-                )
-                await self.role_manager.send_notification(member, message)
-        except Exception as e:
-            logger.error(f"Error sending mute removal notification: {e}")
+
+    async def notify_audit_role_removal(
+        self,
+        member: discord.Member,
+        discord_role: discord.Role,
+        db_expiration_date: Optional[datetime] = None,
+        audit_reason_key: str = "niespójności systemowej",
+    ):
+        """Powiadamia użytkownika o usunięciu roli w wyniku audytu."""
+        role_name = discord_role.name
+        title = "Audyt Roli Premium"
+        reason_details = ""
+        include_renewal = False
+
+        if db_expiration_date:
+            expiration_str = discord.utils.format_dt(db_expiration_date, "R")
+            reason_details = f"Twoja rola premium {role_name} wygasła {expiration_str} i została usunięta w ramach korekty systemowej."
+            include_renewal = True
+        else:
+            reason_details = (
+                f"Twoja rola premium {role_name} została usunięta z powodu {audit_reason_key}."
+            )
+
+        await self._send_notification_template(
+            member,
+            role_name,
+            title_prefix=title,
+            reason_details=reason_details,
+            include_renewal_info=include_renewal,
+            log_prefix="AuditRemoval",
+        )
 
     @check_roles_expiry.before_loop
     async def before_tasks(self):
@@ -424,6 +459,18 @@ class OnTaskEvent(commands.Cog):
                                 await member.remove_roles(
                                     discord_role, reason="Audit: Brak wpisu w bazie danych"
                                 )
+                                # Powiadomienie użytkownika
+                                await self.notify_audit_role_removal(
+                                    member,
+                                    discord_role,
+                                    audit_reason_key="braku wpisu w bazie danych",
+                                )
+                                # Usuń też powiązane uprawnienia na wszelki wypadek
+                                await remove_premium_role_mod_permissions(
+                                    session, self.bot, member.id
+                                )
+                                await session.commit()  # Commit po usunięciu uprawnień
+
                                 actions_taken_summary.append(
                                     f"Usunięto rolę '{discord_role.name}' od {member.mention} (brak w DB)."
                                 )
@@ -452,11 +499,19 @@ class OnTaskEvent(commands.Cog):
                                 )
                                 await remove_premium_role_mod_permissions(
                                     session, self.bot, member.id
-                                )  # Pamiętaj o imporcie
+                                )
                                 await RoleQueries.delete_member_role(
                                     session, member.id, discord_role.id
                                 )
                                 await session.commit()
+                                # Powiadomienie użytkownika
+                                await self.notify_audit_role_removal(
+                                    member,
+                                    discord_role,
+                                    db_expiration_date=db_member_role_entry.expiration_date,
+                                    audit_reason_key="wygaśnięcia w bazie danych",
+                                )
+
                                 actions_taken_summary.append(
                                     f"Usunięto wygasłą rolę '{discord_role.name}' od {member.mention}."
                                 )

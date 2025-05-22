@@ -131,6 +131,143 @@ class MessageCleaner:
                 return False
         return True
 
+    def _is_message_to_delete_filter(
+        self,
+        message: discord.Message,
+        ctx: commands.Context,
+        target_id: Optional[int],
+        images_only: bool,
+        time_threshold: datetime,
+        is_bulk_delete: bool,
+    ) -> bool:
+        # Skip command message
+        if message.id == ctx.message.id:
+            return False
+
+        # Skip old messages if not bulk deleting (bulk delete handles this differently)
+        if not is_bulk_delete and message.created_at < time_threshold:
+            return False
+
+        # Sprawdź czy wiadomość ma obrazki/linki jeśli images_only=True
+        if images_only:
+            has_image = bool(message.attachments)
+            has_link = bool(re.search(r"http[s]?://\S+", message.content))
+            has_embeds = bool(message.embeds)
+            has_media = has_image or has_link or has_embeds
+
+            if not has_media:
+                return False
+
+            # Jeśli ma media i nie ma target_id, możemy zwrócić True
+            if target_id is None:
+                return True
+
+        # Jeśli dotarliśmy tutaj i mamy target_id, sprawdzamy czy wiadomość jest od tego użytkownika
+        if target_id is not None:
+            # Pobierzmy informację o użytkowniku, aby sprawdzić jego nazwę
+            target_member = ctx.guild.get_member(target_id)
+            target_name = target_member.name.lower() if target_member else None
+            target_id_str = str(target_id)
+
+            # Sprawdź content wiadomości
+            if target_id_str in message.content:
+                return True
+
+            # Sprawdź czy to wiadomość od użytkownika
+            if message.author.id == target_id:
+                # Jeśli images_only, weryfikujemy czy wiadomość ma media
+                if images_only:
+                    has_media = (
+                        bool(message.attachments)
+                        or bool(re.search(r"http[s]?://\S+", message.content))
+                        or bool(message.embeds)
+                    )
+                    return has_media
+                return True
+
+            # Check if message mentions target user
+            if f"<@{target_id}>" in message.content or f"<@!{target_id}>" in message.content:
+                # Jeśli images_only, weryfikujemy czy wiadomość ma media
+                if images_only:
+                    has_media = (
+                        bool(message.attachments)
+                        or bool(re.search(r"http[s]?://\S+", message.content))
+                        or bool(message.embeds)
+                    )
+                    return has_media
+                return True
+
+            # Sprawdź czy to wiadomość od bota avatara
+            if message.author.id == self.avatar_bot_id:
+                # Sprawdź czy wiadomość zawiera nazwę użytkownika (jeśli dostępna)
+                avatar_message_match = False
+                if target_name and message.content.lower().startswith(target_name.lower()):
+                    avatar_message_match = True
+
+                # Sprawdź czy w wiadomości jest ID użytkownika (w URL lub tekście)
+                if target_id_str in message.content:
+                    avatar_message_match = True
+
+                # Sprawdzamy czy to wiadomość z avatarem (druga linia zawiera "avatar url")
+                message_lines = message.content.split("\n")
+                if len(message_lines) > 1 and "avatar url" in message_lines[1].lower():
+                    # To jest wiadomość od bota avatara, czyli odpowiedź na komendę .a
+                    # Jeśli nazwa użytkownika jest pierwszą linią, prawdopodobnie to wiadomość dla tego użytkownika
+                    if target_name:
+                        if message_lines[0].lower() == target_name.lower():
+                            avatar_message_match = True
+
+                # Sprawdź czy embedy zawierają informacje o użytkowniku
+                if message.embeds:
+                    for embed in message.embeds:
+                        if embed.title:
+                            if target_name and target_name.lower() in embed.title.lower():
+                                avatar_message_match = True
+                            if target_id_str in embed.title:
+                                avatar_message_match = True
+
+                if avatar_message_match:
+                    if images_only:
+                        has_media = (
+                            bool(message.attachments)
+                            or bool(re.search(r"http[s]?://\S+", message.content))
+                            or bool(message.embeds)
+                        )
+                        return has_media
+                    return True
+
+            # Dla wiadomości webhooków, sprawdź czy zawierają ID użytkownika
+            if message.webhook_id:
+                found_in_content = target_id_str in message.content
+                found_in_attachments = any(
+                    target_id_str in attachment.url or target_id_str in attachment.filename
+                    for attachment in message.attachments
+                )
+                found_in_webhook = target_id_str in str(message.author)
+
+                webhook_match = found_in_content or found_in_attachments or found_in_webhook
+
+                if webhook_match:
+                    return True
+
+            # Dodatkowe sprawdzenie dla powiązanych wiadomości po treści
+            if target_name:
+                # Sprawdź czy wiadomość zawiera nazwę użytkownika
+                if target_name.lower() in message.content.lower():
+                    return True
+
+                # Sprawdź czy wiadomość jest odpowiedzią na wiadomość użytkownika
+                if message.reference and message.reference.resolved:
+                    ref_msg = message.reference.resolved
+                    if hasattr(ref_msg, "author") and ref_msg.author.id == target_id:
+                        return True
+
+            return False
+
+        # Jeśli nie ma target_id i images_only=False, zwracamy True
+        result = not images_only
+        return result
+
     async def clear_messages(
         self,
         ctx: commands.Context,
@@ -221,135 +358,6 @@ class MessageCleaner:
         logger.info(f"Deleting messages before {ctx.message.created_at} and after {time_threshold}")
         logger.info(f"images_only={images_only}, target_id={target_id}")
 
-        def is_message_to_delete(message):
-            # Skip command message
-            if message.id == ctx.message.id:
-                return False
-
-            # Skip old messages
-            if not is_bulk_delete and message.created_at < time_threshold:
-                return False
-
-            # Sprawdź czy wiadomość ma obrazki/linki jeśli images_only=True
-            if images_only:
-                has_image = bool(message.attachments)
-                has_link = bool(re.search(r"http[s]?://\S+", message.content))
-                has_embeds = bool(message.embeds)
-                has_media = has_image or has_link or has_embeds
-
-                if not has_media:
-                    return False
-
-                # Jeśli ma media i nie ma target_id, możemy zwrócić True
-                if target_id is None:
-                    return True
-
-            # Jeśli dotarliśmy tutaj i mamy target_id, sprawdzamy czy wiadomość jest od tego użytkownika
-            if target_id is not None:
-                # Pobierzmy informację o użytkowniku, aby sprawdzić jego nazwę
-                target_member = ctx.guild.get_member(target_id)
-                target_name = target_member.name.lower() if target_member else None
-                target_id_str = str(target_id)
-
-                # Sprawdź content wiadomości
-                if target_id_str in message.content:
-                    return True
-
-                # Sprawdź czy to wiadomość od użytkownika
-                if message.author.id == target_id:
-                    # Jeśli images_only, weryfikujemy czy wiadomość ma media
-                    if images_only:
-                        has_media = (
-                            bool(message.attachments)
-                            or bool(re.search(r"http[s]?://\S+", message.content))
-                            or bool(message.embeds)
-                        )
-                        return has_media
-                    return True
-
-                # Check if message mentions target user
-                if f"<@{target_id}>" in message.content or f"<@!{target_id}>" in message.content:
-                    # Jeśli images_only, weryfikujemy czy wiadomość ma media
-                    if images_only:
-                        has_media = (
-                            bool(message.attachments)
-                            or bool(re.search(r"http[s]?://\S+", message.content))
-                            or bool(message.embeds)
-                        )
-                        return has_media
-                    return True
-
-                # Sprawdź czy to wiadomość od bota avatara
-                if message.author.id == self.avatar_bot_id:
-                    # Sprawdź czy wiadomość zawiera nazwę użytkownika (jeśli dostępna)
-                    avatar_message_match = False
-                    if target_name and message.content.lower().startswith(target_name.lower()):
-                        avatar_message_match = True
-
-                    # Sprawdź czy w wiadomości jest ID użytkownika (w URL lub tekście)
-                    if target_id_str in message.content:
-                        avatar_message_match = True
-
-                    # Sprawdzamy czy to wiadomość z avatarem (druga linia zawiera "avatar url")
-                    message_lines = message.content.split("\n")
-                    if len(message_lines) > 1 and "avatar url" in message_lines[1].lower():
-                        # To jest wiadomość od bota avatara, czyli odpowiedź na komendę .a
-                        # Jeśli nazwa użytkownika jest pierwszą linią, prawdopodobnie to wiadomość dla tego użytkownika
-                        if target_name:
-                            if message_lines[0].lower() == target_name.lower():
-                                avatar_message_match = True
-
-                    # Sprawdź czy embedy zawierają informacje o użytkowniku
-                    if message.embeds:
-                        for embed in message.embeds:
-                            if embed.title:
-                                if target_name and target_name.lower() in embed.title.lower():
-                                    avatar_message_match = True
-                                if target_id_str in embed.title:
-                                    avatar_message_match = True
-
-                    if avatar_message_match:
-                        if images_only:
-                            has_media = (
-                                bool(message.attachments)
-                                or bool(re.search(r"http[s]?://\S+", message.content))
-                                or bool(message.embeds)
-                            )
-                            return has_media
-                        return True
-
-                # Dla wiadomości webhooków, sprawdź czy zawierają ID użytkownika
-                if message.webhook_id:
-                    found_in_content = target_id_str in message.content
-                    found_in_attachments = any(
-                        target_id_str in attachment.url or target_id_str in attachment.filename
-                        for attachment in message.attachments
-                    )
-                    found_in_webhook = target_id_str in str(message.author)
-
-                    webhook_match = found_in_content or found_in_attachments or found_in_webhook
-
-                    if webhook_match:
-                        return True
-
-                # Dodatkowe sprawdzenie dla powiązanych wiadomości po treści
-                if target_name:
-                    # Sprawdź czy wiadomość zawiera nazwę użytkownika
-                    if target_name.lower() in message.content.lower():
-                        return True
-
-                    # Sprawdź czy wiadomość jest odpowiedzią na wiadomość użytkownika
-                    if message.reference and message.reference.resolved:
-                        ref_msg = message.reference.resolved
-                        if hasattr(ref_msg, "author") and ref_msg.author.id == target_id:
-                            return True
-
-                return False
-
-            # Jeśli nie ma target_id i images_only=False, zwracamy True
-            result = not images_only
-            return result
-
         total_deleted = 0
         user_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
         status_message = await ctx.send(
@@ -358,9 +366,12 @@ class MessageCleaner:
 
         try:
             # First bulk delete - for the last 100 messages, ignore time limit
-            is_bulk_delete = True
             deleted = await ctx.channel.purge(
-                limit=100, check=is_message_to_delete, before=ctx.message
+                limit=100,
+                check=lambda m: self._is_message_to_delete_filter(
+                    m, ctx, target_id, images_only, time_threshold, is_bulk_delete=True
+                ),
+                before=ctx.message,
             )
             total_deleted += len(deleted)
             logger.info(f"Bulk deleted {len(deleted)} messages")
@@ -373,11 +384,12 @@ class MessageCleaner:
             )
 
             # Then delete older messages with time limit
-            is_bulk_delete = False
             async for message in ctx.channel.history(
                 limit=None, before=ctx.message, after=time_threshold, oldest_first=False
             ):
-                if is_message_to_delete(message):
+                if self._is_message_to_delete_filter(
+                    message, ctx, target_id, images_only, time_threshold, is_bulk_delete=False
+                ):
                     try:
                         await message.delete()
                         total_deleted += 1
@@ -476,20 +488,25 @@ class MessageCleaner:
 
             try:
                 # First bulk delete the last 100 messages, ignore time
-                is_bulk_delete = True
-                deleted = await channel.purge(limit=100, check=is_message_to_delete)
+                deleted = await channel.purge(
+                    limit=100,
+                    check=lambda m: self._is_message_to_delete_filter(
+                        m, ctx, target_id, images_only, time_threshold, is_bulk_delete=True
+                    ),
+                )
                 total_deleted += len(deleted)
 
                 if len(deleted) > 0:
                     logger.info(f"Deleted {len(deleted)} messages from {channel.name}")
 
                 # Then delete older messages with time limit
-                is_bulk_delete = False
                 channel_deleted = 0
                 async for message in channel.history(
                     limit=None, after=time_threshold, oldest_first=False
                 ):
-                    if is_message_to_delete(message):
+                    if self._is_message_to_delete_filter(
+                        message, ctx, target_id, images_only, time_threshold, is_bulk_delete=False
+                    ):
                         try:
                             await message.delete()
                             total_deleted += 1

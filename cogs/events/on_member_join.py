@@ -409,9 +409,32 @@ class OnMemberJoinEvent(commands.Cog):
 
     async def process_unknown_invite(self, member: discord.Member):
         """Process member join when invite is unknown"""
-        logger.info(
-            "No invite identified for member %s, processing as unknown", member.display_name
-        )
+        logger.info(f"No invite identified for member {member.display_name}, processing as unknown")
+
+        # Bezpieczne sprawdzenie self.guild i self.guild.vanity_url_code
+        vanity_code = "nieznany"
+        if self.guild and hasattr(self.guild, "vanity_url_code") and self.guild.vanity_url_code:
+            vanity_code = self.guild.vanity_url_code
+        elif not self.guild:
+            logger.warning("process_unknown_invite: self.guild is None, cannot get vanity URL.")
+        elif not hasattr(self.guild, "vanity_url_code"):
+            logger.warning("process_unknown_invite: self.guild has no attribute 'vanity_url_code'.")
+
+        embed_data = {
+            "title": "Dołączenie bez zaproszenia (lub nieznane)",
+            "description": f"Użytkownik {member.mention} ({member.id}) dołączył do serwera.",
+            "color": discord.Color.orange(),
+            "fields": [
+                (
+                    "Czas dołączenia",
+                    discord.utils.format_dt(datetime.now(timezone.utc), "F"),
+                    False,
+                ),
+                ("Prawdopodobny powód", "Użyto linku vanity lub bezpośredniego dołączenia", False),
+                ("Vanity URL", f"Kod: {vanity_code}", False),
+            ],
+            "thumbnail_url": member.display_avatar.url,
+        }
 
         async with self.bot.get_db() as session:
             try:

@@ -142,38 +142,88 @@ class RoleManager:
                     logger.warning("Couldn't find mutenick role ID in config")
 
                 # Grupuj role według użytkowników dla zoptymalizowanego przetwarzania
-                # Słownik: {member_id: [(member_role, role_obj)]}
-                member_roles = {}
+                # Słownik: {member_id: {"member": discord.Member, "roles": [(member_role, role_obj)]}}
+                member_data_map: Dict[int, Dict[str, Any]] = {}
+
                 for member_role in expired_roles:
-                    # Pobierz obiekt użytkownika
-                    member = self.bot.guild.get_member(member_role.member_id)
-                    if not member:
-                        # Zamiast logować ostrzeżenie tutaj, dodajemy ID do statystyk
+                    member: Optional[discord.Member] = None
+                    # Sprawdź, czy już pobraliśmy tego użytkownika
+                    if member_role.member_id in member_data_map:
+                        member = member_data_map[member_role.member_id]["member"]
+                    else:
+                        try:
+                            member = await self.bot.guild.fetch_member(member_role.member_id)
+                            # Zapisz pobranego użytkownika, aby uniknąć wielokrotnego fetchowania
+                            member_data_map[member_role.member_id] = {"member": member, "roles": []}
+                        except discord.NotFound:
+                            logger.info(
+                                f"Member with ID {member_role.member_id} not found (left server?), skipping role {member_role.role_id} and cleaning DB."
+                            )
+                            stats["non_existent_members"] += 1
+                            stats["skipped_member_ids"].add(member_role.member_id)
+                            await RoleQueries.delete_member_role(
+                                session, member_role.member_id, member_role.role_id
+                            )
+                            removed_count += 1  # Count DB removal as an action
+                            stats["removed_count"] += 1
+                            continue
+                        except Exception as e:
+                            logger.error(f"Error fetching member {member_role.member_id}: {e}")
+                            stats["non_existent_members"] += 1
+                            stats["skipped_member_ids"].add(member_role.member_id)
+                            # Don't delete from DB on unknown error, might be temporary
+                            continue
+
+                    if (
+                        not member
+                    ):  # Powinno być obsłużone przez wyjątki powyżej, ale jako dodatkowe zabezpieczenie
                         stats["non_existent_members"] += 1
                         stats["skipped_member_ids"].add(member_role.member_id)
+                        logger.warning(
+                            f"Member object is None for ID {member_role.member_id} despite fetch attempt, skipping role."
+                        )
+                        # Consider if DB cleanup is needed here too, though it implies an earlier fetch issue not caught by NotFound
                         continue
 
-                    # Pobierz obiekt roli Discord
                     role = self.bot.guild.get_role(member_role.role_id)
                     if not role:
+                        logger.info(
+                            f"Role ID {member_role.role_id} not found on server for member {member_role.member_id}. Cleaning DB."
+                        )
                         stats["non_existent_roles"] += 1
                         stats["skipped_role_ids"].add(member_role.role_id)
+                        await RoleQueries.delete_member_role(
+                            session, member_role.member_id, member_role.role_id
+                        )
+                        removed_count += 1  # Count DB removal
+                        stats["removed_count"] += 1
                         continue
 
-                    # Sprawdź czy użytkownik faktycznie ma tę rolę
                     if role not in member.roles:
+                        logger.info(
+                            f"Role {role.name} (ID: {role.id}) was in DB for member {member.display_name} (ID: {member.id}) but not assigned on Discord. Cleaning DB."
+                        )
                         stats["roles_not_assigned"] += 1
+                        await RoleQueries.delete_member_role(
+                            session, member_role.member_id, member_role.role_id
+                        )
+                        removed_count += 1  # Count DB removal
+                        stats["removed_count"] += 1
                         continue
 
-                    # Dodaj do słownika do przetwarzania
-                    if member.id not in member_roles:
-                        member_roles[member.id] = []
-                    member_roles[member.id].append((member_role, role))
+                    # Dodaj parę (member_role, role) do listy ról użytkownika
+                    # This part is reached only if member exists, role exists, and member has the role.
+                    member_data_map[member_role.member_id]["roles"].append((member_role, role))
 
                 # Przetwarzaj role pogrupowane według użytkowników
-                for member_id, role_pairs in member_roles.items():
-                    member = self.bot.guild.get_member(member_id)
-                    if not member:
+                for member_id, data in member_data_map.items():
+                    member = data["member"]
+                    role_pairs = data["roles"]
+
+                    if not member or not role_pairs:  # Dodatkowe sprawdzenie
+                        logger.warning(
+                            f"Skipping member_id {member_id} due to missing member object or roles list in map."
+                        )
                         continue
 
                     roles_to_remove = []
