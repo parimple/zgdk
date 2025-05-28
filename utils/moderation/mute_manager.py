@@ -138,6 +138,49 @@ class MuteManager:
                     # Usuwamy rolę z bazy danych
                     await RoleQueries.delete_member_role(session, user.id, mute_role_id)
                     await session.commit()
+                logger.info(
+                    f"Successfully removed role {mute_role_id} from DB for user {user.id} during unmute {mute_type.type_name}"
+                )
+
+                # Reset nickname if it's a NICK unmute and the current nick is the default mute nick
+                if mute_type.type_name == MuteType.NICK:
+                    default_nick = self.config.get("default_mute_nickname", "random")
+                    # Pobierz świeży obiekt użytkownika, aby mieć pewność co do aktualnego nicku
+                    # To ważne, bo user.nick mógłby być nieaktualny jeśli rola wpływała na nick
+                    try:
+                        # Używamy fetch_member, aby mieć pewność, że dane są aktualne po usunięciu roli
+                        updated_user = await ctx.guild.fetch_member(user.id)
+                        if updated_user and updated_user.nick == default_nick:
+                            logger.info(
+                                f"User {user.id} ({user.display_name}) has default mute nick '{default_nick}'. Resetting nickname."
+                            )
+                            await updated_user.edit(
+                                nick=None, reason="Nick unmute - resetting to default"
+                            )
+                            logger.info(
+                                f"Successfully reset nickname for user {user.id} after NICK unmute."
+                            )
+                        elif updated_user:
+                            logger.info(
+                                f"User {user.id} current nick is '{updated_user.nick}', not resetting as it's not the default mute nick '{default_nick}'."
+                            )
+                        else:  # updated_user is None
+                            logger.warning(
+                                f"Could not fetch updated user {user.id} to check nick for reset, skipping nick reset."
+                            )
+                    except discord.Forbidden:
+                        logger.error(
+                            f"Permission error trying to reset nickname for user {user.id} after NICK unmute."
+                        )
+                    except discord.HTTPException as e_nick_reset:
+                        logger.error(
+                            f"HTTP error trying to reset nickname for user {user.id} after NICK unmute: {e_nick_reset}"
+                        )
+                    except Exception as e_general_nick_reset:
+                        logger.error(
+                            f"General error trying to reset nickname for user {user.id} after NICK unmute: {e_general_nick_reset}",
+                            exc_info=True,
+                        )
 
                 # Format success message
                 message = mute_type.success_message_remove.format(

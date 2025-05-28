@@ -220,93 +220,164 @@ class RoleManager:
                     member = data["member"]
                     role_pairs = data["roles"]
 
-                    if not member or not role_pairs:  # Dodatkowe sprawdzenie
+                    if not member or not role_pairs:
                         logger.warning(
                             f"Skipping member_id {member_id} due to missing member object or roles list in map."
                         )
                         continue
 
-                    roles_to_remove = []
-                    role_objects = []
-
-                    for member_role, role in role_pairs:
-                        roles_to_remove.append((member_role.member_id, member_role.role_id))
-                        role_objects.append(role)
+                    # Przygotuj listę obiektów ról discord.Role do usunięcia
+                    discord_roles_to_remove_on_discord: List[discord.Role] = [
+                        rp[1] for rp in role_pairs
+                    ]
 
                     # Sprawdź, czy użytkownik ma mutenick i czy ma domyślny nick przed usunięciem ról
-                    has_nick_mute_before = nick_mute_role_id and discord.utils.get(
-                        member.roles, id=nick_mute_role_id
-                    )
                     default_nick = self.config.get("default_mute_nickname", "random")
-                    is_default_nick = member.nick == default_nick
 
-                    # Sprawdź, czy wygasające role zawierają mutenick
-                    nick_mute_expiring = any(role.id == nick_mute_role_id for role in role_objects)
+                    if (
+                        not discord_roles_to_remove_on_discord
+                    ):  # Jeśli lista jest pusta, przejdź dalej
+                        logger.debug(
+                            f"No Discord roles to remove for member {member.display_name} ({member.id}), skipping Discord interaction."
+                        )
+                        continue
 
-                    # Usuń role z użytkownika w jednej operacji
                     try:
-                        if role_objects:
-                            await member.remove_roles(*role_objects, reason="Role wygasły")
+                        # Krok 1: Spróbuj usunąć role na Discordzie
+                        await member.remove_roles(
+                            *discord_roles_to_remove_on_discord, reason="Role wygasły"
+                        )
+                        logger.info(
+                            f"Successfully removed {len(discord_roles_to_remove_on_discord)} roles from {member.display_name} ({member.id}) on Discord."
+                        )
 
-                            # Sprawdź, czy użytkownik nadal ma mutenick po usunięciu
-                            has_nick_mute_after = False
-                            if nick_mute_role_id and not nick_mute_expiring:
-                                has_nick_mute_after = (
-                                    discord.utils.get(member.roles, id=nick_mute_role_id)
-                                    is not None
+                        # Krok 2: Jeśli usunięcie na Discordzie się powiodło, usuń z bazy danych i wyślij powiadomienia
+                        for member_role_db_entry, role_obj in role_pairs:
+                            try:
+                                await RoleQueries.delete_member_role(
+                                    session,
+                                    member_role_db_entry.member_id,
+                                    member_role_db_entry.role_id,
                                 )
-
-                            # Jeśli użytkownik miał mutenick z domyślnym nickiem, a ten wygasł,
-                            # ale jednocześnie ma inne mutenick role, przywróć domyślny nick
-                            if has_nick_mute_before and is_default_nick and has_nick_mute_after:
-                                # Poczekaj chwilę na zastosowanie zmian ról
-                                await asyncio.sleep(0.5)
-                                await member.edit(
-                                    nick=default_nick,
-                                    reason="Zachowanie domyślnego nicku po wygaśnięciu roli",
-                                )
-                                logger.info(
-                                    f"Preserved default nickname '{default_nick}' for {member.display_name} ({member.id}) with mutenick"
-                                )
-
-                            # Usuń role z bazy danych
-                            for member_id, role_id in roles_to_remove:
-                                await RoleQueries.delete_member_role(session, member_id, role_id)
                                 removed_count += 1
                                 stats["removed_count"] += 1
-
-                                # Dodaj log powiadomienia
-                                notification_tag = f"{role_type or 'role'}_expired"
-                                await NotificationLogQueries.add_or_update_notification_log(
-                                    session, member_id, notification_tag
+                                logger.debug(
+                                    f"Successfully deleted role ID {member_role_db_entry.role_id} for member {member_role_db_entry.member_id} from DB."
                                 )
 
-                            logger.info(
-                                f"Removed {len(role_objects)} expired roles from {member.display_name} ({member.id})"
+                                notification_tag = f"{role_type or 'role'}_expired"
+                                await NotificationLogQueries.add_or_update_notification_log(
+                                    session, member_role_db_entry.member_id, notification_tag
+                                )
+
+                                if notification_handler:
+                                    await notification_handler(
+                                        member, member_role_db_entry, role_obj
+                                    )
+                                else:
+                                    # Logika dla domyślnego powiadomienia, jeśli jest potrzebna i nie ma handlera
+                                    # (zakładając, że wysyłamy powiadomienie o każdym pomyślnym usunięciu)
+                                    # await self.send_default_notification(member, role_obj) # Odkomentuj/dostosuj w razie potrzeby
+                                    pass  # Obecnie handler jest przekazywany z OnTaskEvent
+
+                            except Exception as e_db_notify:
+                                logger.error(
+                                    f"Error during DB delete or notification for role {role_obj.name} (member {member.id}): {e_db_notify}",
+                                    exc_info=True,
+                                )
+                                # Kontynuuj z następną rolą, ale zaloguj błąd.
+                                # Nie chcemy, aby błąd przy jednej roli zatrzymał przetwarzanie innych.
+
+                        # Logika związana z mutenick po pomyślnym usunięciu ról
+                        if nick_mute_role_id:  # Sprawdź tylko jeśli mutenick jest skonfigurowany
+                            await asyncio.sleep(
+                                0.5
+                            )  # Daj Discordowi chwilę na przetworzenie usunięcia ról
+                            # Pobierz świeży obiekt członka, aby mieć pewność co do aktualnych ról i nicku
+                            try:
+                                updated_member = await self.bot.guild.fetch_member(member.id)
+                                if not updated_member:  # Na wypadek gdyby fetch_member zwrócił None
+                                    logger.warning(
+                                        f"Could not fetch updated member {member.id} after role removal, skipping nick logic."
+                                    )
+                                    continue  # Przejdź do następnego członka w pętli member_data_map
+                            except discord.NotFound:
+                                logger.info(
+                                    f"Member {member.id} not found after role removal, likely left. Skipping nick logic."
+                                )
+                                continue
+                            except Exception as e_fetch:
+                                logger.error(
+                                    f"Error fetching updated member {member.id}: {e_fetch}, skipping nick logic."
+                                )
+                                continue
+
+                            current_nick = updated_member.nick
+                            member_roles_after_removal = updated_member.roles
+
+                            has_nick_mute_role_after_removal = (
+                                discord.utils.get(member_roles_after_removal, id=nick_mute_role_id)
+                                is not None
+                            )
+                            was_nick_mute_role_removed = any(
+                                role.id == nick_mute_role_id
+                                for role in discord_roles_to_remove_on_discord
                             )
 
-                            # Wysyłaj powiadomienia
-                            for i, (member_role, role) in enumerate(role_pairs):
+                            # Scenariusz 1: Rola mutenick została właśnie usunięta
+                            if was_nick_mute_role_removed:
+                                if current_nick == default_nick:
+                                    try:
+                                        await updated_member.edit(
+                                            nick=None,
+                                            reason="Wyciszenie nicku wygasło, resetowanie nicku",
+                                        )
+                                        logger.info(
+                                            f"Reset nickname for {updated_member.display_name} ({updated_member.id}) as their mute nick role expired."
+                                        )
+                                    except Exception as e_nick_reset:
+                                        logger.error(
+                                            f"Failed to reset nick for {updated_member.display_name} after mute nick expiry: {e_nick_reset}"
+                                        )
+                                # Jeśli nick nie był domyślnym nickiem wyciszenia, nie robimy nic - użytkownik mógł go zmienić.
+
+                            # Scenariusz 2: Inna rola wygasła, ale użytkownik nadal ma mutenick i miał domyślny nick
+                            elif has_nick_mute_role_after_removal and current_nick == default_nick:
+                                # Ten warunek jest bardziej precyzyjny - sprawdzamy czy *nadal* ma mutenick
+                                # i czy *nadal* ma domyślny nick. Jeśli tak, upewniamy się, że nick jest zachowany.
+                                # Teoretycznie, jeśli nic się nie zmieniło z nickiem, ponowne edit nie jest konieczne,
+                                # ale dla pewności można to zostawić, lub dodać warunek `member.nick != default_nick`
+                                # (czyli `current_nick` przed `fetch_member` nie był `default_nick`), ale to komplikuje.
+                                # Bezpieczniej jest po prostu próbować ustawić, jeśli warunki są spełnione.
                                 try:
-                                    if notification_handler:
-                                        await notification_handler(member, member_role, role)
-                                    else:
-                                        # Użyj domyślnego powiadomienia, ale ogranicz liczbę
-                                        if (
-                                            i == 0 or len(role_pairs) <= 3
-                                        ):  # Wyślij dla pierwszej i gdy max 3 role
-                                            await self.send_default_notification(member, role)
-                                except Exception as e:
-                                    logger.error(f"Error sending role expiry notification: {e}")
+                                    await updated_member.edit(
+                                        nick=default_nick,
+                                        reason="Zachowanie domyślnego nicku po wygaśnięciu innej roli (nadal ma mutenick)",
+                                    )
+                                    logger.info(
+                                        f"Ensured default nickname '{default_nick}' for {updated_member.display_name} ({updated_member.id}) as they still have a mute nick role."
+                                    )
+                                except Exception as e_nick:
+                                    logger.error(
+                                        f"Failed to ensure default nick for {updated_member.display_name}: {e_nick}"
+                                    )
 
                     except discord.Forbidden:
                         logger.error(
-                            f"Permission error removing roles from {member.display_name} ({member.id})"
+                            f"PERMISSION ERROR removing roles from {member.display_name} ({member.id}). Roles NOT deleted from DB. Audit should catch this."
                         )
-                    except Exception as e:
+                        # WAŻNE: Nie usuwamy z DB, jeśli usunięcie z Discorda się nie powiodło z powodu braku uprawnień.
+                    except discord.HTTPException as e_http:
                         logger.error(
-                            f"Error removing roles from {member.display_name} ({member.id}): {e}"
+                            f"HTTP ERROR {e_http.status} (code: {e_http.code}) removing roles from {member.display_name} ({member.id}): {e_http.text}. Roles NOT deleted from DB. Audit should catch this."
                         )
+                        # WAŻNE: Nie usuwamy z DB, jeśli usunięcie z Discorda się nie powiodło z powodu błędu HTTP.
+                    except Exception as e_main_remove:
+                        logger.error(
+                            f"GENERAL ERROR removing roles from {member.display_name} ({member.id}): {e_main_remove}. Roles NOT deleted from DB. Audit should catch this.",
+                            exc_info=True,
+                        )
+                        # WAŻNE: Nie usuwamy z DB przy innych błędach.
 
                 await session.commit()
 

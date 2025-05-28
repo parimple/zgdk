@@ -187,6 +187,17 @@ class OnTaskEvent(commands.Cog):
 
     async def notify_premium_expiry(self, member, member_role, role):
         """Notify user about expiring premium membership"""
+        current_time = datetime.now(timezone.utc)
+        # Check if the role is actually expiring in the future.
+        # member_role.expiration_date should be > current_time for this notification.
+        if not member_role.expiration_date or member_role.expiration_date <= current_time:
+            logger.warning(
+                f"notify_premium_expiry called for a role that is not in the future or already expired. Member: {member.id}, Role: {role.id}, Expiration: {member_role.expiration_date}. This should be handled by removal logic."
+            )
+            # Do not send a confusing "will expire X time ago" message.
+            # The check_roles_expiry loop should ideally not call this function in this state.
+            return
+
         expiration_str = discord.utils.format_dt(member_role.expiration_date, "R")
         main_message = f"Twoja rola premium {role.name} wygaśnie {expiration_str}."
         await self._send_notification_template(
