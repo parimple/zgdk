@@ -166,7 +166,12 @@ class ShopCog(commands.Cog):
     @commands.command(name="shop_force_check_roles")
     @commands.has_permissions(administrator=True)
     async def force_check_roles(self, ctx: Context):
-        """Wymusza sprawdzenie i ewentualne usunięcie ról premium."""
+        """
+        Wymusza sprawdzenie i ewentualne usunięcie ról premium.
+
+        UWAGA: Ta komenda tylko usuwa wygasłe role bez zwrotu pieniędzy.
+        Do dobrowolnej sprzedaży ról przez użytkowników służy przycisk "Sprzedaj rangę" w profilu.
+        """
         now = datetime.now(timezone.utc)
         count = 0
 
