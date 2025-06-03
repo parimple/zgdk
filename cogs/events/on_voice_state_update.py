@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import random
+from collections import deque
 
 import discord
 from discord.ext import commands
@@ -36,6 +37,25 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         self.channels_create = self.bot.config["channels_create"]
         self.vc_categories = self.bot.config["vc_categories"]
 
+        # Queue dla operacji autokick
+        self.autokick_queue = asyncio.Queue()
+        self.autokick_worker_task = None
+
+        # Cache dla kategorii i ich konfiguracji
+        self._category_config_cache = {}
+        self._empty_channels_cache = {}
+        self._cache_refresh_time = 0
+
+        # Performance metrics
+        self.metrics = {
+            "channels_created": 0,
+            "channels_reused": 0,
+            "autokicks_queued": 0,
+            "autokicks_executed": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
+        }
+
     @commands.Cog.listener()
     async def on_ready(self):
         """Set guild when bot is ready"""
@@ -46,6 +66,76 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
         logger.info("Setting guild for VoicePermissionManager in OnVoiceStateUpdateEvent")
         self.permission_manager.guild = self.guild
+
+        # Start autokick worker
+        if self.autokick_worker_task is None:
+            self.autokick_worker_task = asyncio.create_task(self._autokick_worker())
+            logger.info("Started autokick worker task")
+
+    async def _autokick_worker(self):
+        """Worker task dla przetwarzania operacji autokick"""
+        while True:
+            try:
+                # Pobierz zadanie z queue (czekaj max 1 sekundę)
+                try:
+                    autokick_data = await asyncio.wait_for(self.autokick_queue.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue
+
+                member, channel, matching_owners = autokick_data
+
+                # Sprawdź czy member nadal jest w kanale (może już wyszedł)
+                if member not in channel.members:
+                    continue
+
+                # Wykonaj autokick
+                await self._execute_autokick(member, channel, matching_owners)
+
+            except Exception as e:
+                self.logger.error(f"Error in autokick worker: {str(e)}")
+                await asyncio.sleep(1)
+
+    async def _execute_autokick(self, member, channel, matching_owners):
+        """Wykonuje faktyczny autokick"""
+        try:
+            self.metrics["autokicks_executed"] += 1
+            # Get the first matching owner
+            owner = None
+            for owner_id in matching_owners:
+                potential_owner = channel.guild.get_member(owner_id)
+                if potential_owner and potential_owner in channel.members:
+                    owner = potential_owner
+                    self.logger.info(f"Found owner {owner.id} in channel members")
+                    break
+
+            if not owner:
+                self.logger.warning(f"No owner found for autokick of member {member.id}")
+                return
+
+            # Move member to AFK channel
+            afk_channel = self.guild.get_channel(self.bot.config["channels_voice"]["afk"])
+            if afk_channel:
+                await member.move_to(afk_channel)
+                self.logger.info(f"Moved member {member.id} to AFK channel {afk_channel.id}")
+            else:
+                await member.move_to(None)
+                self.logger.info(f"Disconnected member {member.id} (no AFK channel)")
+
+            # Set connect permission to False
+            current_perms = channel.overwrites_for(member) or discord.PermissionOverwrite()
+            current_perms.connect = False
+            await channel.set_permissions(member, overwrite=current_perms)
+            self.logger.info(
+                f"Set connect=False permission for member {member.id} in channel {channel.id}"
+            )
+
+            # Send notification
+            await self.message_sender.send_autokick_notification(channel, member, owner)
+            self.logger.info(f"Sent autokick notification for member {member.id}")
+        except discord.Forbidden:
+            self.logger.warning(f"Failed to autokick {member.id} (no permission)")
+        except Exception as e:
+            self.logger.error(f"Failed to autokick {member.id}: {str(e)}")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -80,59 +170,67 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         # self.logger.info(f"Should kick member {member.id}: {should_kick}")
 
         if should_kick and matching_owners:
-            try:
-                # Get the first matching owner
-                owner = None
-                for owner_id in matching_owners:
-                    potential_owner = channel.guild.get_member(owner_id)
-                    if potential_owner and potential_owner in channel.members:
-                        owner = potential_owner
-                        self.logger.info(f"Found owner {owner.id} in channel members")
+            self.metrics["autokicks_queued"] += 1
+            await self.autokick_queue.put((member, channel, matching_owners))
+            logger.info(
+                f"Queued autokick for {member.display_name} (owners: {len(matching_owners)})"
+            )
+
+    async def _get_category_config(self, category_id):
+        """Pobiera konfigurację kategorii z cache"""
+        current_time = asyncio.get_event_loop().time()
+
+        # Refresh cache co 60 sekund
+        if current_time - self._cache_refresh_time > 60:
+            self._category_config_cache.clear()
+            self._empty_channels_cache.clear()
+            self._cache_refresh_time = current_time
+            logger.info("Cache refreshed - cleared category and empty channels cache")
+
+        if category_id not in self._category_config_cache:
+            self.metrics["cache_misses"] += 1
+            config = self.bot.config.get("default_user_limits", {})
+
+            # Sprawdź kategorie git i public
+            user_limit = 0
+            for cat_type in ["git_categories", "public_categories"]:
+                cat_config = config.get(cat_type, {})
+                if category_id in cat_config.get("categories", []):
+                    user_limit = cat_config.get("limit", 0)
+                    break
+
+            # Sprawdź kategorie max
+            if user_limit == 0:
+                max_categories = config.get("max_categories", {})
+                for max_type, max_config in max_categories.items():
+                    if category_id == max_config.get("id"):
+                        user_limit = max_config.get("limit", 0)
                         break
 
-                if not owner:
-                    self.logger.warning(f"No owner found for autokick of member {member.id}")
-                    return
+            # Cache formatów nazw
+            formats = self.bot.config.get("channel_name_formats", {})
+            custom_format = formats.get(category_id) or formats.get(str(category_id))
 
-                # Move member to AFK channel
-                afk_channel = self.guild.get_channel(self.bot.config["channels_voice"]["afk"])
-                if afk_channel:
-                    await member.move_to(afk_channel)
-                    self.logger.info(f"Moved member {member.id} to AFK channel {afk_channel.id}")
-                else:
-                    await member.move_to(None)
-                    self.logger.info(f"Disconnected member {member.id} (no AFK channel)")
+            # Cache czy to kategoria clean permissions
+            is_clean_perms = category_id in self.bot.config.get("clean_permission_categories", [])
 
-                # Set connect permission to False
-                current_perms = channel.overwrites_for(member) or discord.PermissionOverwrite()
-                current_perms.connect = False
-                await channel.set_permissions(member, overwrite=current_perms)
-                self.logger.info(
-                    f"Set connect=False permission for member {member.id} in channel {channel.id}"
-                )
+            self._category_config_cache[category_id] = {
+                "user_limit": user_limit,
+                "custom_format": custom_format,
+                "is_clean_perms": is_clean_perms,
+            }
+            logger.info(
+                f"Cached config for category {category_id}: limit={user_limit}, format={bool(custom_format)}, clean_perms={is_clean_perms}"
+            )
+        else:
+            self.metrics["cache_hits"] += 1
 
-                # Send notification
-                await self.message_sender.send_autokick_notification(channel, member, owner)
-                self.logger.info(f"Sent autokick notification for member {member.id}")
-            except discord.Forbidden:
-                self.logger.warning(f"Failed to autokick {member.id} (no permission)")
-            except Exception as e:
-                self.logger.error(f"Failed to autokick {member.id}: {str(e)}")
+        return self._category_config_cache[category_id]
 
-    async def handle_create_channel(self, member, after):
-        """
-        Handle the creation of a new voice channel when a member joins a creation channel.
-
-        :param member: Member object representing the joining member
-        :param after: VoiceState object representing the state after the update
-        """
-        # Buforowanie kategorii - pobieramy informacje o kategorii tylko raz
-        category = after.channel.category
-        category_id = category.id if category else None
-
-        # Sprawdź, czy w kategorii istnieje pusty kanał
-        empty_channels = []
-        if category:
+    async def _get_empty_channels(self, category):
+        """Pobiera puste kanały z cache"""
+        if category.id not in self._empty_channels_cache:
+            self.metrics["cache_misses"] += 1
             empty_channels = [
                 channel
                 for channel in category.voice_channels
@@ -140,30 +238,38 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                 and channel.id not in self.channels_create
                 and channel.id != self.bot.config["channels_voice"]["afk"]
             ]
+            self._empty_channels_cache[category.id] = empty_channels
+            logger.info(f"Cached {len(empty_channels)} empty channels for category {category.name}")
+        else:
+            self.metrics["cache_hits"] += 1
+
+        return self._empty_channels_cache[category.id]
+
+    async def handle_create_channel(self, member, after):
+        """
+        Handle the creation of a new voice channel when a member joins a creation channel.
+        Ulepszona wersja z cache i optymalizacjami.
+        """
+        category = after.channel.category
+        category_id = category.id if category else None
+
+        if not category_id:
+            return
+
+        # Pobierz konfigurację kategorii z cache
+        config = await self._get_category_config(category_id)
+
+        # Sprawdź puste kanały z cache
+        empty_channels = await self._get_empty_channels(category)
 
         # Determine channel name based on category
         channel_name = member.display_name
 
-        logger.info(f"Creating channel in category: {category_id}")
-
-        # Optymalizacja: Pobieramy konfigurację formatów tylko raz
-        formats = self.bot.config.get("channel_name_formats", {})
-
-        # Check if category has a custom format
-        format_key = category_id  # próbuj najpierw jako int
-        custom_format = None
-
-        if format_key in formats:
-            custom_format = formats[format_key]
-        elif str(category_id) in formats:
-            custom_format = formats[str(category_id)]
-
-        if custom_format:
+        if config["custom_format"]:
             # Get random emoji
             emoji = random.choice(self.bot.config.get("channel_emojis", ["🎮"]))
-            # Apply the format
-            channel_name = custom_format.format(emoji=emoji)
-            logger.info(f"Using format for category {category_id}: {channel_name}")
+            channel_name = config["custom_format"].format(emoji=emoji)
+            logger.info(f"Using cached format for category {category_id}: {channel_name}")
         else:
             # Check if this is a git category
             git_categories = (
@@ -174,49 +280,24 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             if category_id in git_categories:
                 channel_name = f"- {channel_name}"
                 logger.info(f"Added dash prefix for git category: {channel_name}")
-            else:
-                logger.info(
-                    f"No format found for category {category_id}, using default name: {channel_name}"
-                )
 
         # Get default permission overwrites
         permission_overwrites = self.permission_manager.get_default_permission_overwrites(
             self.guild, member
         )
 
-        # Get user limit based on category
-        user_limit = 0
-        if category_id:
-            # Optymalizacja: Buforujemy konfigurację limitów, pobierając ją tylko raz
-            config = self.bot.config.get("default_user_limits", {})
+        # Use cached user limit
+        user_limit = config["user_limit"]
 
-            # Sprawdź kategorie git i public
-            for cat_type in ["git_categories", "public_categories"]:
-                cat_config = config.get(cat_type, {})
-                if category_id in cat_config.get("categories", []):
-                    user_limit = cat_config.get("limit", 0)
-                    logger.info(f"Setting {cat_type} limit: {user_limit}")
-                    break
-
-            # Sprawdź kategorie max
-            if user_limit == 0:  # jeśli nie znaleziono limitu w git/public
-                max_categories = config.get("max_categories", {})
-                for max_type, max_config in max_categories.items():
-                    if category_id == max_config.get("id"):
-                        user_limit = max_config.get("limit", 0)
-                        logger.info(f"Setting max channel limit for {max_type}: {user_limit}")
-                        break
-
-        # Check if this is a clean permissions category (max/public)
-        is_clean_perms = category_id in self.bot.config.get("clean_permission_categories", [])
+        # Check if this is a clean permissions category (cached)
+        is_clean_perms = config["is_clean_perms"]
         if is_clean_perms:
-            # Set clean permissions for @everyone
             permission_overwrites[
                 self.guild.default_role
             ] = self.permission_manager._get_clean_everyone_permissions()
             logger.info(f"Set clean permissions for @everyone in category {category_id}")
 
-        # Add permissions from database (always, except @everyone for clean_perms categories)
+        # Add permissions from database
         db_overwrites = await self.permission_manager.add_db_overwrites_to_permissions(
             self.guild, member.id, permission_overwrites, is_clean_perms=is_clean_perms
         )
@@ -225,25 +306,20 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         if db_overwrites:
             for target, overwrite in db_overwrites.items():
                 if target in permission_overwrites:
-                    # Update existing overwrite
                     current = permission_overwrites[target]
                     for perm, value in overwrite._values.items():
                         if value is not None:
                             setattr(current, perm, value)
                 else:
-                    # Add new overwrite
                     permission_overwrites[target] = overwrite
 
-        # Jeśli istnieje pusty kanał, użyj go zamiast tworzyć nowy
+        # Wykorzystaj istniejący pusty kanał jeśli dostępny
         if empty_channels:
-            # Użyj pierwszego pustego kanału
+            self.metrics["channels_reused"] += 1
             existing_channel = empty_channels[0]
             logger.info(f"Wykorzystuję istniejący pusty kanał: {existing_channel.name}")
 
-            # Nie zmieniamy nazwy ani limitu, bo są już ustawione poprawnie
-            # Nie resetujemy uprawnień, bo zostały już zresetowane przy opuszczaniu kanału
-
-            # Dodaj tylko uprawnienia dla właściciela kanału
+            # Dodaj uprawnienia właściciela
             owner_permissions = permission_overwrites.get(member, None)
             if owner_permissions:
                 await existing_channel.set_permissions(member, overwrite=owner_permissions)
@@ -252,16 +328,18 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             # Przenieś członka do kanału
             await member.move_to(existing_channel)
 
-            # Utwórz fake context i wyślij informację o zajęciu kanału
+            # Usuń z cache pustych kanałów
+            self._empty_channels_cache[category_id].remove(existing_channel)
+
+            # Wyślij informację o zajęciu kanału
             fake_ctx = FakeContext(self.bot, member.guild)
             await self.message_sender.send_channel_creation_info(
                 existing_channel, fake_ctx, owner=member
             )
-
             return
 
-        # Create the new channel with all permissions and limits (gdy nie znaleziono pustego kanału)
-        # Optymalizacja: Tworzenie kanału z wszystkimi parametrami za jednym razem
+        # Utwórz nowy kanał
+        self.metrics["channels_created"] += 1
         new_channel = await self.guild.create_voice_channel(
             channel_name,
             category=category,
@@ -269,19 +347,25 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             user_limit=user_limit,
             overwrites=permission_overwrites,
         )
+        logger.info(f"Created new channel: {channel_name} with limit={user_limit}")
 
         # Move member to the new channel
         await member.move_to(new_channel)
 
-        # Create fake context and send channel creation info
+        # Send channel creation info
         fake_ctx = FakeContext(self.bot, member.guild)
         await self.message_sender.send_channel_creation_info(new_channel, fake_ctx, owner=member)
+
+    def cog_unload(self):
+        """Cleanup when cog is unloaded"""
+        if self.autokick_worker_task:
+            self.autokick_worker_task.cancel()
+            logger.info("Cancelled autokick worker task")
 
     async def handle_channel_leave(self, before):
         """
         Handle the deletion of a voice channel when all members leave.
-
-        :param before: VoiceState object representing the state before the update
+        Ulepszona wersja z optymalizacjami.
         """
         # Nie usuwamy kanałów create ani AFK
         if (

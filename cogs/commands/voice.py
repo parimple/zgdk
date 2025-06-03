@@ -323,6 +323,61 @@ class VoiceCog(commands.Cog):
             # Przywracamy oryginalnego autora
             ctx.author = original_author
 
+    @commands.hybrid_command(name="voice_stats", description="Statystyki systemu voice")
+    @commands.has_permissions(administrator=True)
+    async def voice_stats(self, ctx):
+        """Wyświetla statystyki systemu voice."""
+        # Pobierz event handler
+        voice_event = None
+        for cog in self.bot.cogs.values():
+            if hasattr(cog, "metrics"):
+                voice_event = cog
+                break
+
+        if not voice_event:
+            await ctx.send("❌ Nie znaleziono handlera voice events")
+            return
+
+        metrics = voice_event.metrics
+
+        # Cache statistics
+        cache_total = metrics["cache_hits"] + metrics["cache_misses"]
+        cache_hit_rate = (metrics["cache_hits"] / cache_total * 100) if cache_total > 0 else 0
+
+        embed = discord.Embed(title="📊 Statystyki systemu Voice", color=discord.Color.blue())
+
+        embed.add_field(
+            name="🏗️ Kanały",
+            value=f"Utworzone: {metrics['channels_created']}\nPonownie użyte: {metrics['channels_reused']}",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="🥾 Autokick",
+            value=f"Kolejka: {metrics['autokicks_queued']}\nWykonane: {metrics['autokicks_executed']}",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="💾 Cache",
+            value=f"Trafienia: {cache_hit_rate:.1f}%\nHits: {metrics['cache_hits']}\nMisses: {metrics['cache_misses']}",
+            inline=True,
+        )
+
+        # Worker status
+        worker_status = (
+            "🟢 Aktywny"
+            if voice_event.autokick_worker_task and not voice_event.autokick_worker_task.done()
+            else "🔴 Nieaktywny"
+        )
+        embed.add_field(name="⚙️ Worker", value=worker_status, inline=True)
+
+        # Queue size
+        queue_size = voice_event.autokick_queue.qsize()
+        embed.add_field(name="📋 Kolejka", value=f"{queue_size} zadań", inline=True)
+
+        await ctx.send(embed=embed)
+
 
 async def setup(bot):
     """This function is called when the cog is loaded."""

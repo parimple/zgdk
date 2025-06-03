@@ -38,9 +38,9 @@ class PremiumChecker:
         # TIER_T - Requires only T>0
         CommandTier.TIER_T: ["limit"],
         # TIER_1 - Requires (booster/invite role + T>0) or any premium
-        CommandTier.TIER_1: ["speak", "connect", "text"],
+        CommandTier.TIER_1: ["speak", "connect", "text", "reset"],
         # TIER_2 - Requires any premium role (zG50+)
-        CommandTier.TIER_2: ["view", "mod", "live", "reset", "color"],
+        CommandTier.TIER_2: ["view", "mod", "live", "color"],
         # TIER_3 - Requires high premium role (zG500+)
         CommandTier.TIER_3: ["autokick"],
     }
