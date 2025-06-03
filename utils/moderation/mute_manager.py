@@ -551,14 +551,18 @@ class MuteManager:
             # Pobierz odpowiedni kanał logów z konfiguracji w zależności od typu akcji
             log_config_key = "unmute_logs" if unmute else "mute_logs"
             log_channel_id = self.config.get("channels", {}).get(log_config_key)
-            
+
             if not log_channel_id:
-                logger.warning(f"Brak konfiguracji kanału logów {'odciszeń' if unmute else 'wyciszeń'} ({log_config_key})")
+                logger.warning(
+                    f"Brak konfiguracji kanału logów {'odciszeń' if unmute else 'wyciszeń'} ({log_config_key})"
+                )
                 return
 
             log_channel = self.bot.get_channel(log_channel_id)
             if not log_channel:
-                logger.error(f"Nie można znaleźć kanału logów {'odciszeń' if unmute else 'wyciszeń'} o ID: {log_channel_id}")
+                logger.error(
+                    f"Nie można znaleźć kanału logów {'odciszeń' if unmute else 'wyciszeń'} o ID: {log_channel_id}"
+                )
                 return
 
             # Przygotuj informacje o akcji

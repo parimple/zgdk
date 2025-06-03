@@ -252,7 +252,7 @@ class OnTaskEvent(commands.Cog):
                 include_renewal_info=False,
                 log_prefix="MuteRemoval",
             )
-            
+
             # Log the automatic unmute action to the log channel
             await self._log_automatic_unmute_action(member, member_role, role)
 
@@ -599,9 +599,11 @@ class OnTaskEvent(commands.Cog):
         try:
             # Pobierz kanał logów dla unmute'ów z konfiguracji
             log_channel_id = self.bot.config.get("channels", {}).get("unmute_logs")
-            
+
             if not log_channel_id:
-                logger.warning("Brak konfiguracji kanału logów odciszeń (unmute_logs) dla automatycznego unmute")
+                logger.warning(
+                    "Brak konfiguracji kanału logów odciszeń (unmute_logs) dla automatycznego unmute"
+                )
                 return
 
             log_channel = self.bot.get_channel(log_channel_id)
@@ -611,21 +613,20 @@ class OnTaskEvent(commands.Cog):
 
             # Znajdź typ wyciszenia na podstawie konfiguracji
             mute_type_info = next(
-                (r for r in self.bot.config["mute_roles"] if r["id"] == role.id), 
-                {"description": "unknown", "name": "Nieznane"}
+                (r for r in self.bot.config["mute_roles"] if r["id"] == role.id),
+                {"description": "unknown", "name": "Nieznane"},
             )
-            
+
             # Mapowanie opisów na czytelne nazwy
             mute_type_display_mapping = {
                 "stream_off": "STREAM",
-                "send_messages_off": "WIADOMOŚCI", 
+                "send_messages_off": "WIADOMOŚCI",
                 "attach_files_off": "PLIKI/OBRAZY",
-                "points_off": "RANKING"
+                "points_off": "RANKING",
             }
-            
+
             mute_type_display = mute_type_display_mapping.get(
-                mute_type_info["description"], 
-                mute_type_info["description"].upper()
+                mute_type_info["description"], mute_type_info["description"].upper()
             )
 
             # Stwórz embed z informacjami o automatycznym odciszeniu
@@ -649,12 +650,8 @@ class OnTaskEvent(commands.Cog):
 
             # Informacja o wygaśnięciu
             if member_role.expiration_date:
-                expiry_str = discord.utils.format_dt(member_role.expiration_date, 'f')
-                embed.add_field(
-                    name="⏰ Wygasło", 
-                    value=expiry_str, 
-                    inline=True
-                )
+                expiry_str = discord.utils.format_dt(member_role.expiration_date, "f")
+                embed.add_field(name="⏰ Wygasło", value=expiry_str, inline=True)
 
             embed.add_field(
                 name="📋 Typ wyciszenia",
@@ -663,9 +660,7 @@ class OnTaskEvent(commands.Cog):
             )
 
             embed.add_field(
-                name="🔄 Sposób odciszenia", 
-                value="Automatyczne sprawdzenie systemu", 
-                inline=False
+                name="🔄 Sposób odciszenia", value="Automatyczne sprawdzenie systemu", inline=False
             )
 
             # Dodaj thumbnail z avatarem użytkownika
