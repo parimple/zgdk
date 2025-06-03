@@ -25,7 +25,8 @@ channels:
   premium_info: 960665316109713421
   bots: 960665312200626198  # Added bots channel
   mute_notifications: 1336368306940018739  # Kanał do powiadomień o przywróconych wyciszeniach
-  mute_logs: 1379568677623562300  # Kanał do logowania wszystkich wyciszeń
+  mute_logs: 1379568677623562300  # Kanał do logowania wyciszeń (mute)
+  unmute_logs: 1379568677623562300  # Kanał do logowania odciszeń (unmute) - obecnie ten sam co mute_logs
 
 gifs:
   donation: "https://media1.tenor.com/m/tn_MOQB9pV4AAAAd/tony-tonylife.gif"
