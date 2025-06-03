@@ -252,6 +252,9 @@ class OnTaskEvent(commands.Cog):
                 include_renewal_info=False,
                 log_prefix="MuteRemoval",
             )
+            
+            # Log the automatic unmute action to the log channel
+            await self._log_automatic_unmute_action(member, member_role, role)
 
     async def notify_audit_role_removal(
         self,
@@ -582,6 +585,102 @@ class OnTaskEvent(commands.Cog):
             logger.info("Audit: Waiting for guild to be set...")
             await asyncio.sleep(5)  # Czekaj nieco dłużej, bo to rzadsze zadanie
         logger.info("Audit: Bot is ready and guild is set, audit task will start on schedule.")
+
+    async def _log_automatic_unmute_action(self, member, member_role, role):
+        """Loguje automatyczne odciszenie na kanale logów.
+
+        :param member: Użytkownik, któremu wygasło wyciszenie
+        :type member: discord.Member
+        :param member_role: Obiekt roli z bazy danych
+        :type member_role: MemberRole
+        :param role: Rola Discord, która została usunięta
+        :type role: discord.Role
+        """
+        try:
+            # Pobierz kanał logów dla unmute'ów z konfiguracji
+            log_channel_id = self.bot.config.get("channels", {}).get("unmute_logs")
+            
+            if not log_channel_id:
+                logger.warning("Brak konfiguracji kanału logów odciszeń (unmute_logs) dla automatycznego unmute")
+                return
+
+            log_channel = self.bot.get_channel(log_channel_id)
+            if not log_channel:
+                logger.error(f"Nie można znaleźć kanału logów odciszeń o ID: {log_channel_id}")
+                return
+
+            # Znajdź typ wyciszenia na podstawie konfiguracji
+            mute_type_info = next(
+                (r for r in self.bot.config["mute_roles"] if r["id"] == role.id), 
+                {"description": "unknown", "name": "Nieznane"}
+            )
+            
+            # Mapowanie opisów na czytelne nazwy
+            mute_type_display_mapping = {
+                "stream_off": "STREAM",
+                "send_messages_off": "WIADOMOŚCI", 
+                "attach_files_off": "PLIKI/OBRAZY",
+                "points_off": "RANKING"
+            }
+            
+            mute_type_display = mute_type_display_mapping.get(
+                mute_type_info["description"], 
+                mute_type_info["description"].upper()
+            )
+
+            # Stwórz embed z informacjami o automatycznym odciszeniu
+            embed = discord.Embed(
+                title=f"🔓 AUTOMATYCZNE ODCISZENIE - {mute_type_display}",
+                color=discord.Color.green(),
+                timestamp=datetime.now(timezone.utc),
+            )
+
+            embed.add_field(
+                name="👤 Użytkownik",
+                value=f"{member.mention}\n`{member.name}` (`{member.id}`)",
+                inline=True,
+            )
+
+            embed.add_field(
+                name="🤖 Moderator",
+                value="**System** (automatyczne)\n`Wygaśnięcie czasu`",
+                inline=True,
+            )
+
+            # Informacja o wygaśnięciu
+            if member_role.expiration_date:
+                expiry_str = discord.utils.format_dt(member_role.expiration_date, 'f')
+                embed.add_field(
+                    name="⏰ Wygasło", 
+                    value=expiry_str, 
+                    inline=True
+                )
+
+            embed.add_field(
+                name="📋 Typ wyciszenia",
+                value=f"`{mute_type_info['description']}` - {mute_type_display}",
+                inline=False,
+            )
+
+            embed.add_field(
+                name="🔄 Sposób odciszenia", 
+                value="Automatyczne sprawdzenie systemu", 
+                inline=False
+            )
+
+            # Dodaj thumbnail z avatarem użytkownika
+            embed.set_thumbnail(url=member.display_avatar.url)
+
+            # Wyślij log na kanał
+            await log_channel.send(embed=embed)
+
+            logger.info(
+                f"Logged automatic unmute action for user {member.id} "
+                f"({mute_type_info['description']}) to channel {log_channel_id}"
+            )
+
+        except Exception as e:
+            logger.error(f"Error logging automatic unmute action: {e}", exc_info=True)
 
 
 async def setup(bot: commands.Bot):
