@@ -268,7 +268,76 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def mutenick_prefix(self, ctx: commands.Context, user: discord.Member):
         """Usuwa niewłaściwy nick użytkownika i nadaje karę (wersja prefiksowa)."""
-        await self.mute_manager.mute_user(ctx, user, MuteType.NICK)
+        try:
+            logger.info(
+                f"mutenick command started for user {user.id} ({user.display_name}) by {ctx.author.id}"
+            )
+
+            # Sprawdź aktualny nick przed rozpoczęciem
+            default_nick = self.config.get("default_mute_nickname", "random")
+            original_nick = user.nick or user.name
+            logger.info(
+                f"User {user.id} original nick: '{original_nick}', target nick: '{default_nick}'"
+            )
+
+            # Wykonaj standardową logikę mutenick
+            await self.mute_manager.mute_user(ctx, user, MuteType.NICK)
+
+            # Dodatkowe sprawdzenie po 3 sekundach, czy nick został faktycznie ustawiony
+            import asyncio
+
+            await asyncio.sleep(3)
+
+            # Pobierz świeży obiekt użytkownika
+            updated_user = ctx.guild.get_member(user.id)
+            if updated_user:
+                current_nick = updated_user.nick or updated_user.name
+                logger.info(f"After mutenick, user {user.id} nick is: '{current_nick}'")
+
+                # Sprawdź czy nick to faktycznie "random"
+                if current_nick != default_nick:
+                    logger.warning(
+                        f"Nick verification failed for user {user.id}: expected '{default_nick}', got '{current_nick}'. Attempting to fix..."
+                    )
+                    try:
+                        await updated_user.edit(
+                            nick=default_nick,
+                            reason="Wymuszenie poprawnego nicku mutenick - weryfikacja",
+                        )
+                        logger.info(
+                            f"Successfully enforced nick '{default_nick}' for user {user.id}"
+                        )
+
+                        # Wyślij dodatkową informację do moderatora
+                        await ctx.send(
+                            f"⚠️ **Dodatkowa weryfikacja**: Wymuszono poprawny nick `{default_nick}` dla {updated_user.mention}"
+                        )
+
+                    except discord.Forbidden:
+                        logger.error(
+                            f"Failed to enforce nick for user {user.id} - permission denied"
+                        )
+                        await ctx.send(
+                            f"❌ **Ostrzeżenie**: Nie udało się wymusić nicku `{default_nick}` dla {updated_user.mention} - brak uprawnień!"
+                        )
+
+                    except Exception as nick_error:
+                        logger.error(f"Failed to enforce nick for user {user.id}: {nick_error}")
+                        await ctx.send(
+                            f"❌ **Ostrzeżenie**: Błąd podczas wymuszania nicku dla {updated_user.mention}: {nick_error}"
+                        )
+                else:
+                    logger.info(
+                        f"Nick verification successful for user {user.id}: '{current_nick}'"
+                    )
+            else:
+                logger.warning(f"Could not fetch updated user {user.id} for nick verification")
+
+            logger.info(f"mutenick command completed successfully for user {user.id}")
+
+        except Exception as e:
+            logger.error(f"Error in mutenick command for user {user.id}: {e}", exc_info=True)
+            await ctx.send(f"Wystąpił błąd podczas wykonywania komendy mutenick: {e}")
 
     @commands.command(
         name="unmutenick", description="Przywraca możliwość zmiany nicku użytkownikowi."
