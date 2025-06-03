@@ -7,6 +7,7 @@ owner_id: 956602391891947592
 # Emoji configuration
 emojis:
   proxy_bunny: "<a:bunnyProxy:1301144820349403157>"
+  mastercard: "<:mastercard:1270433919233425545>"
 
 # Konfiguracja systemu legacy - do usunięcia po migracji
 legacy_system:

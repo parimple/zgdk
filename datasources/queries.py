@@ -443,11 +443,11 @@ class RoleQueries:
     ) -> Optional[MemberRole]:
         """Get a specific member role"""
         result = await session.execute(
-            select(MemberRole)
-            .options(joinedload(MemberRole.role))
-            .where(and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id))
+            select(MemberRole).where(
+                and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id)
+            )
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     @staticmethod
     async def safe_delete_member_role(session: AsyncSession, member_id: int, role_id: int):
@@ -536,6 +536,23 @@ class RoleQueries:
             .where(MemberRole.role_id == role_id)
         )
         return result.scalars().all()
+
+    @staticmethod
+    async def count_unique_premium_users(session: AsyncSession) -> int:
+        """Count unique members who have ever had any premium role (including expired)"""
+        try:
+            query = (
+                select(func.count(func.distinct(MemberRole.member_id)))
+                .select_from(MemberRole)
+                .join(Role, MemberRole.role_id == Role.id)
+                .where(Role.role_type == "premium")
+            )
+            result = await session.execute(query)
+            count = result.scalar()
+            return count if count is not None else 0
+        except Exception as e:
+            logger.error(f"Error counting unique premium users: {e}")
+            return 200  # Fallback number
 
 
 class HandledPaymentQueries:
