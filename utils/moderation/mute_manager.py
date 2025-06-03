@@ -330,6 +330,9 @@ class MuteManager:
             embed = discord.Embed(description=message, color=ctx.author.color)
             await ctx.reply(embed=embed)
 
+            # Log the mute/unmute action to the log channel
+            await self._log_mute_action(ctx, user, mute_type, duration, unmute)
+
         except discord.Forbidden as e:
             action = "odblokowania" if unmute else "blokowania"
             logger.error(
@@ -522,3 +525,99 @@ class MuteManager:
             logger.error(
                 f"Błąd podczas przywracania domyślnego nicku dla użytkownika {user.id}: {e}"
             )
+
+    async def _log_mute_action(
+        self,
+        ctx: commands.Context,
+        user: discord.Member,
+        mute_type: MuteType,
+        duration: Optional[timedelta] = None,
+        unmute: bool = False,
+    ):
+        """Loguje akcję wyciszenia/odciszenia na kanale logów.
+
+        :param ctx: Kontekst komendy
+        :type ctx: discord.ext.commands.Context
+        :param user: Użytkownik, który został wyciszony/odciszony
+        :type user: discord.Member
+        :param mute_type: Typ wyciszenia
+        :type mute_type: MuteType
+        :param duration: Czas trwania wyciszenia (None dla permanentnego)
+        :type duration: Optional[timedelta]
+        :param unmute: Czy to jest operacja odciszenia
+        :type unmute: bool
+        """
+        try:
+            # Pobierz kanał logów z konfiguracji
+            log_channel_id = self.config.get("channels", {}).get("mute_logs")
+            if not log_channel_id:
+                logger.warning("Brak konfiguracji kanału logów wyciszeń (mute_logs)")
+                return
+
+            log_channel = self.bot.get_channel(log_channel_id)
+            if not log_channel:
+                logger.error(f"Nie można znaleźć kanału logów wyciszeń o ID: {log_channel_id}")
+                return
+
+            # Przygotuj informacje o akcji
+            action = "🔓 ODCISZENIE" if unmute else "🔇 WYCISZENIE"
+            moderator = ctx.author
+
+            # Przygotuj informacje o czasie trwania
+            if unmute:
+                duration_info = "N/A"
+            elif duration is None:
+                duration_info = "Permanentne"
+            else:
+                # Oblicz datę wygaśnięcia dla Discord timestamp
+                now = datetime.now(timezone.utc)
+                expiration_date = now + duration
+                duration_info = f"Do {discord.utils.format_dt(expiration_date, 'f')}"
+
+            # Przygotuj opis akcji
+            mute_type_name = mute_type.display_name.upper()
+
+            # Stwórz embed z informacjami o akcji
+            embed = discord.Embed(
+                title=f"{action} - {mute_type_name}",
+                color=discord.Color.red() if not unmute else discord.Color.green(),
+                timestamp=datetime.now(timezone.utc),
+            )
+
+            embed.add_field(
+                name="👤 Użytkownik",
+                value=f"{user.mention}\n`{user.name}` (`{user.id}`)",
+                inline=True,
+            )
+
+            embed.add_field(
+                name="👮 Moderator",
+                value=f"{moderator.mention}\n`{moderator.name}` (`{moderator.id}`)",
+                inline=True,
+            )
+
+            embed.add_field(name="⏰ Czas trwania", value=duration_info, inline=True)
+
+            embed.add_field(
+                name="📋 Typ wyciszenia",
+                value=f"`{mute_type.type_name}` - {mute_type.action_name}",
+                inline=False,
+            )
+
+            embed.add_field(
+                name="📍 Kanał", value=f"{ctx.channel.mention} (`{ctx.channel.name}`)", inline=False
+            )
+
+            # Dodaj thumbnail z avatarem użytkownika
+            embed.set_thumbnail(url=user.display_avatar.url)
+
+            # Wyślij log na kanał
+            await log_channel.send(embed=embed)
+
+            logger.info(
+                f"Logged {'unmute' if unmute else 'mute'} action for user {user.id} "
+                f"({mute_type.type_name}) by {moderator.id} to channel {log_channel_id}"
+            )
+
+        except Exception as e:
+            logger.error(f"Error logging mute action: {e}", exc_info=True)

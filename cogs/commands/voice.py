@@ -302,6 +302,27 @@ class VoiceCog(commands.Cog):
         )
         await self.message_sender.send_permission_reset(ctx, target)
 
+    @commands.hybrid_command(
+        name="debug_access", description="Sprawdza alternatywny dostęp dla użytkownika"
+    )
+    @discord.app_commands.describe(
+        target="Użytkownik do sprawdzenia (opcjonalnie, domyślnie sprawdza ciebie)",
+    )
+    async def debug_access(self, ctx, target: Optional[Member] = None):
+        """Sprawdza alternatywny dostęp dla użytkownika."""
+        target_user = target or ctx.author
+
+        # Tymczasowo podmieniamy autora w kontekście
+        original_author = ctx.author
+        ctx.author = target_user
+
+        try:
+            debug_info = await self.premium_checker.debug_alternative_access(ctx)
+            await ctx.send(f"```\n{debug_info}\n```")
+        finally:
+            # Przywracamy oryginalnego autora
+            ctx.author = original_author
+
 
 async def setup(bot):
     """This function is called when the cog is loaded."""

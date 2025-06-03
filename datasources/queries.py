@@ -1112,6 +1112,18 @@ class InviteQueries:
         result = await session.execute(query)
         return result.scalars().all()
 
+    @staticmethod
+    async def get_member_invite_count(session: AsyncSession, member_id: int) -> int:
+        """Get total count of invites (uses) for a specific member."""
+        try:
+            query = select(func.sum(Invite.uses)).where(Invite.creator_id == member_id)
+            result = await session.execute(query)
+            count = result.scalar()
+            return count if count is not None else 0
+        except Exception as e:
+            logger.error(f"Error getting invite count for member {member_id}: {e}")
+            return 0
+
 
 class AutoKickQueries:
     """Class for AutoKick Queries"""

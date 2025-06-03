@@ -8,10 +8,11 @@ from enum import IntEnum
 from functools import wraps
 from typing import List, Optional, Tuple
 
+import discord
 from discord.ext import commands
 
 from datasources.models import Member
-from datasources.queries import MemberQueries
+from datasources.queries import InviteQueries, MemberQueries
 from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,152 @@ class PremiumChecker:
             role.id in [self.BOOSTER_ROLE_ID, self.INVITE_ROLE_ID] for role in ctx.author.roles
         )
 
+    def has_discord_invite_in_status(self, ctx: commands.Context) -> bool:
+        """Check if user has 'discord.gg/zagadka' in their status."""
+        target_text = "discord.gg/zagadka"
+
+        # Check activities (games, spotify, etc.)
+        if ctx.author.activities:
+            for activity in ctx.author.activities:
+                # Check activity name
+                if (
+                    hasattr(activity, "name")
+                    and activity.name
+                    and target_text in activity.name.lower()
+                ):
+                    return True
+                # Check activity details
+                if (
+                    hasattr(activity, "details")
+                    and activity.details
+                    and target_text in activity.details.lower()
+                ):
+                    return True
+                # Check activity state
+                if (
+                    hasattr(activity, "state")
+                    and activity.state
+                    and target_text in activity.state.lower()
+                ):
+                    return True
+                # Check custom status (discord.CustomActivity)
+                if isinstance(activity, discord.CustomActivity):
+                    if activity.name and target_text in activity.name.lower():
+                        return True
+
+        # Try through guild member as well
+        try:
+            guild_member = ctx.guild.get_member(ctx.author.id)
+            if guild_member and guild_member.activities:
+                for activity in guild_member.activities:
+                    if (
+                        hasattr(activity, "name")
+                        and activity.name
+                        and target_text in activity.name.lower()
+                    ):
+                        return True
+                    if (
+                        hasattr(activity, "details")
+                        and activity.details
+                        and target_text in activity.details.lower()
+                    ):
+                        return True
+                    if (
+                        hasattr(activity, "state")
+                        and activity.state
+                        and target_text in activity.state.lower()
+                    ):
+                        return True
+                    if isinstance(activity, discord.CustomActivity):
+                        if activity.name and target_text in activity.name.lower():
+                            return True
+        except Exception:
+            pass
+
+        return False
+
+    async def has_alternative_bypass_access(self, ctx: commands.Context) -> bool:
+        """
+        Check if user qualifies for alternative bypass access.
+        Requirements: booster role + 4+ invites + discord.gg/zagadka in status
+        """
+        if not self.has_booster_roles(ctx):
+            return False
+
+        if not self.has_discord_invite_in_status(ctx):
+            return False
+
+        # Check invite count
+        async with self.bot.get_db() as session:
+            invite_count = await InviteQueries.get_member_invite_count(session, ctx.author.id)
+            return invite_count >= 4
+
+    async def debug_alternative_access(self, ctx: commands.Context) -> str:
+        """Debug function to check alternative access requirements."""
+        has_booster = self.has_booster_roles(ctx)
+        has_status = self.has_discord_invite_in_status(ctx)
+
+        async with self.bot.get_db() as session:
+            invite_count = await InviteQueries.get_member_invite_count(session, ctx.author.id)
+
+        # Debug activities
+        activities_debug = []
+        if ctx.author.activities:
+            for i, activity in enumerate(ctx.author.activities):
+                activity_info = f"Activity {i}: type={type(activity).__name__}"
+                if hasattr(activity, "name") and activity.name:
+                    activity_info += f", name='{activity.name}'"
+                if hasattr(activity, "details") and activity.details:
+                    activity_info += f", details='{activity.details}'"
+                if hasattr(activity, "state") and activity.state:
+                    activity_info += f", state='{activity.state}'"
+                # Special handling for CustomActivity
+                if isinstance(activity, discord.CustomActivity):
+                    activity_info += f" [CUSTOM STATUS]"
+                activities_debug.append(activity_info)
+        else:
+            activities_debug.append("No activities found")
+
+        # Additional debug info
+        debug_extra = [
+            f"User ID: {ctx.author.id}",
+            f"User roles: {[role.name for role in ctx.author.roles]}",
+            f"Activities count: {len(ctx.author.activities) if ctx.author.activities else 0}",
+            f"Status: {ctx.author.status}",
+            f"Is on mobile: {ctx.author.is_on_mobile()}",
+            f"Desktop status: {ctx.author.desktop_status}",
+            f"Mobile status: {ctx.author.mobile_status}",
+            f"Web status: {ctx.author.web_status}",
+        ]
+
+        # Try to access member through guild to get more presence info
+        try:
+            guild_member = ctx.guild.get_member(ctx.author.id)
+            if guild_member:
+                debug_extra.append(
+                    f"Guild member activities: {len(guild_member.activities) if guild_member.activities else 0}"
+                )
+                if guild_member.activities:
+                    for i, activity in enumerate(guild_member.activities):
+                        debug_extra.append(f"Guild Activity {i}: {type(activity).__name__}")
+                        if hasattr(activity, "name"):
+                            debug_extra.append(f"  - name: {activity.name}")
+        except Exception as e:
+            debug_extra.append(f"Guild member fetch error: {e}")
+
+        activities_text = "\n".join(activities_debug)
+        extra_text = "\n".join(debug_extra)
+
+        return (
+            f"Debug alternative access for {ctx.author.mention}:\n"
+            f"- Has booster role: {has_booster}\n"
+            f"- Has discord.gg/zagadka in status: {has_status}\n"
+            f"- Invite count: {invite_count}/4\n"
+            f"- Qualifies: {has_booster and has_status and invite_count >= 4}\n\n"
+            f"Activities debug:\n{activities_text}\n\n"
+            f"Extra debug:\n{extra_text}"
+        )
+
     def has_premium_role(self, ctx: commands.Context, min_tier: str = "zG50") -> bool:
         """
         Check if user has required premium role or higher.
@@ -119,6 +266,7 @@ class PremiumChecker:
 
             has_booster = checker.has_booster_roles(ctx)
             has_bypass = await checker.has_active_bypass(ctx)
+            has_alternative_access = await checker.has_alternative_bypass_access(ctx)
             has_premium = checker.has_premium_role(ctx)
             has_high_premium = checker.has_premium_role(ctx, "zG500")
 
@@ -126,18 +274,18 @@ class PremiumChecker:
             if command_tier == CommandTier.TIER_0:
                 return True
 
-            # TIER_T - Requires only T>0
+            # TIER_T - Requires only T>0 OR alternative access (booster + 4 invites + status)
             if command_tier == CommandTier.TIER_T:
-                if not has_bypass and not has_premium:
+                if not has_bypass and not has_premium and not has_alternative_access:
                     await checker.message_sender.send_bypass_expired(ctx)
                     return False
                 return True
 
-            # TIER_1 - Requires (booster/invite role + T>0) or any premium
+            # TIER_1 - Requires (booster/invite role + T>0) or any premium OR alternative access
             if command_tier == CommandTier.TIER_1:
                 if has_premium:
                     return True
-                if has_booster and has_bypass:
+                if has_booster and (has_bypass or has_alternative_access):
                     return True
                 if has_booster:
                     await checker.message_sender.send_bypass_expired(ctx)
@@ -193,6 +341,7 @@ class PremiumChecker:
 
             has_booster = checker.has_booster_roles(ctx)
             has_bypass = await checker.has_active_bypass(ctx)
+            has_alternative_access = await checker.has_alternative_bypass_access(ctx)
             has_premium = checker.has_premium_role(ctx)
             has_high_premium = checker.has_premium_role(ctx, "zG500")
 
@@ -214,18 +363,18 @@ class PremiumChecker:
             if command_tier == CommandTier.TIER_0:
                 return True
 
-            # TIER_T - Requires only T>0
+            # TIER_T - Requires only T>0 OR alternative access (booster + 4 invites + status)
             if command_tier == CommandTier.TIER_T:
-                if not has_bypass and not has_premium:
+                if not has_bypass and not has_premium and not has_alternative_access:
                     await checker.message_sender.send_bypass_expired(ctx)
                     return False
                 return True
 
-            # TIER_1 - Requires (booster/invite role + T>0) or any premium
+            # TIER_1 - Requires (booster/invite role + T>0) or any premium OR alternative access
             if command_tier == CommandTier.TIER_1:
                 if has_premium:
                     return True
-                if (has_booster or is_channel_mod) and has_bypass:
+                if (has_booster or is_channel_mod) and (has_bypass or has_alternative_access):
                     return True
                 if has_booster or is_channel_mod:
                     await checker.message_sender.send_bypass_expired(ctx)
@@ -235,8 +384,12 @@ class PremiumChecker:
 
             # TIER_2 - Requires any premium role
             if command_tier == CommandTier.TIER_2:
-                # Special case for view and live - allow channel mods with active bypass
-                if command_name in ["view", "live"] and is_channel_mod and has_bypass:
+                # Special case for view and live - allow channel mods with active bypass or alternative access
+                if (
+                    command_name in ["view", "live"]
+                    and is_channel_mod
+                    and (has_bypass or has_alternative_access)
+                ):
                     return True
 
                 # For all TIER_2 commands, require premium unless exception above
