@@ -332,14 +332,12 @@ class MessageCleaner:
             deleted_count += all_channels_deleted
 
         # Wyślij potwierdzenie
-        # Pobierz emoji proxy_bunny z konfiguracji
-        proxy_bunny = self.config.get("emojis", {}).get(
-            "proxy_bunny", "<a:bunnyProxy:1301144820349403157>"
-        )
+        # Pobierz emoji mastercard z konfiguracji
+        mastercard = self.config.get("emojis", {}).get("mastercard", "💳")
         # Pobierz ID kanału premium_info
         premium_info_id = self.config.get("channels", {}).get("premium_info", 960665316109713421)
 
-        message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}.\nWybierz swój {proxy_bunny} <#{premium_info_id}>"
+        message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}.\nWybierz swój <#{premium_info_id}> {mastercard}"
         embed = discord.Embed(
             description=message,
             color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.green(),

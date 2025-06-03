@@ -843,14 +843,14 @@ class MessageSender:
         if not hasattr(ctx, "bot") or not hasattr(ctx.bot, "config"):
             return "", ""
 
-        proxy_bunny = ctx.bot.config.get("emojis", {}).get("proxy_bunny", "")
+        mastercard = ctx.bot.config.get("emojis", {}).get("mastercard", "💳")
         premium_channel_id = ctx.bot.config["channels"]["premium_info"]
         premium_channel = ctx.guild.get_channel(premium_channel_id)
 
         premium_text = (
-            f"Wybierz swój {proxy_bunny}{premium_channel.mention}"
+            f"Wybierz swój {premium_channel.mention} {mastercard}"
             if premium_channel
-            else f"Wybierz swój {proxy_bunny}<#{premium_channel_id}>"
+            else f"Wybierz swój <#{premium_channel_id}> {mastercard}"
         )
 
         if not channel:

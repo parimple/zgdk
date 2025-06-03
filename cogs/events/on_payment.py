@@ -273,6 +273,7 @@ class OnPaymentEvent(commands.Cog):
                         role_name=role_name,
                         style=discord.ButtonStyle.success,
                         label="Kup rangę",
+                        emoji=self.bot.config.get("emojis", {}).get("mastercard", "💳"),
                     )
                 )
                 view.add_item(

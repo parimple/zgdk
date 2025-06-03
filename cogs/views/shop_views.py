@@ -37,7 +37,7 @@ class PaymentsView(discord.ui.View):
                 session, offset=self.current_offset, limit=10
             )
 
-        embed = discord.Embed(title="Wszystkie płatności")
+        embed = MessageSender._create_embed(title="Wszystkie płatności", ctx=self.ctx.author)
         for payment in payments:
             name = f"ID płatności: {payment.id}"
             value = (
@@ -86,7 +86,8 @@ class RoleShopView(discord.ui.View):
         self.member = member
         self.premium_roles = premium_roles
         self.premium_manager = PremiumRoleManager(bot, self.guild)
-        self.message_sender = MessageSender()
+        # Initialize MessageSender with bot instance for consistency
+        self.message_sender = MessageSender(bot)
 
         # Tworzenie podstawowej mapy cen
         self.base_price_map = {role["name"]: role["price"] for role in premium_roles}
@@ -127,6 +128,13 @@ class RoleShopView(discord.ui.View):
         description_button = discord.ui.Button(label="Opis ról", style=discord.ButtonStyle.primary)
         description_button.callback = self.show_role_description
         self.add_item(description_button)
+
+        # Przycisk "Moje ID"
+        my_id_button = discord.ui.Button(
+            label="Moje ID", style=discord.ButtonStyle.secondary, emoji="🆔"
+        )
+        my_id_button.callback = self.show_my_id
+        self.add_item(my_id_button)
 
         donate_url = self.bot.config.get("donate_url")
         if donate_url:
@@ -177,6 +185,13 @@ class RoleShopView(discord.ui.View):
             else:  # Ceny miesięczne
                 price_map[role_name] = base_price
         return price_map
+
+    def _add_premium_text_to_description(self, description: str) -> str:
+        """Helper method to add premium text to description consistently."""
+        _, premium_text = self.message_sender._get_premium_text(self.ctx)
+        if premium_text:
+            return f"{description}\n{premium_text}"
+        return description
 
     def create_button_callback(self, role_name):
         """Create a button callback for the specified role name."""
@@ -262,176 +277,50 @@ class RoleShopView(discord.ui.View):
                     )
 
                     if current_role_config and new_role_config:
-                        # Show choice view for both upgrading and downgrading
-                        if current_role_config["price"] != new_role_config["price"]:
-                            # Calculate refund for current role
-                            refund_amount = calculate_refund(
-                                current_member_role.expiration_date, current_role_config["price"]
+                        # Check if it's the same role first
+                        if current_role.name == role_name:
+                            # Same role - extend it directly
+                            extend_days = (
+                                MONTHLY_DURATION
+                                if duration_days == MONTHLY_DURATION
+                                else YEARLY_DURATION
+                            )
+                            old_expiry = current_member_role.expiration_date
+
+                            logger.info(
+                                f"[SHOP] Extending same role {role_name} for {member.display_name}:"
+                                f"\n - Current expiry: {old_expiry}"
+                                f"\n - Days to add: {extend_days}"
+                                f"\n - New expiry: {old_expiry + timedelta(days=extend_days)}"
                             )
 
-                            # Create embed with user's color
-                            embed = discord.Embed(
-                                color=member.color
-                                if member.color.value != 0
-                                else discord.Color.blue()
+                            # Update expiration date
+                            current_member_role.expiration_date = old_expiry + timedelta(
+                                days=extend_days
                             )
 
-                            if current_role_config["price"] > new_role_config["price"]:
-                                # Downgrade case
-                                days_to_add = int(
-                                    price / current_role_config["price"] * MONTHLY_DURATION
-                                )
-
-                                logger.info(
-                                    f"[SHOP] Calculating extension for {member.display_name}:"
-                                    f"\n - Current role: {current_role.name}"
-                                    f"\n - Target role: {role_name}"
-                                    f"\n - Price paid: {price}G"
-                                    f"\n - Current role price: {current_role_config['price']}G"
-                                    f"\n - Price ratio: {price}/{current_role_config['price']}"
-                                    f"\n - Base days: {MONTHLY_DURATION}"
-                                    f"\n - Days to add: {days_to_add}"
-                                )
-
-                                embed.description = (
-                                    f"Dostępne opcje:\n"
-                                    f"1️⃣ **Przedłuż swoją rangę {current_role.name}** o {days_to_add} dni (usuwa wszystkie muty)\n"
-                                    f"2️⃣ **Kup nową rangę {role_name}** i otrzymaj {refund_amount}G zwrotu za obecną rolę\n"
-                                    f"❌ **Anuluj operację**"
-                                )
-                            else:
-                                # Upgrade case
-                                embed.description = (
-                                    f"Dostępne opcje:\n"
-                                    f"1️⃣ **Kup nową rangę {role_name}** i otrzymaj {refund_amount}G zwrotu za obecną rolę {current_role.name}\n"
-                                    f"❌ **Anuluj operację**"
-                                )
-
-                            # Show choice view
-                            view = LowerRoleChoiceView(
-                                self.bot,
-                                member,
-                                current_role.name,
-                                role_name,
-                                price,
-                                days_to_add
-                                if current_role_config["price"] > new_role_config["price"]
-                                else 0,
-                                is_upgrade=current_role_config["price"] < new_role_config["price"],
+                            # Remove mute roles and update balance
+                            await self.premium_manager.remove_mute_roles(member)
+                            await MemberQueries.add_to_wallet_balance(
+                                session, self.viewer.id, -price
                             )
 
-                            # Send initial message with options as ephemeral
-                            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+                            # Save changes
+                            await session.flush()
+                            await session.refresh(current_member_role)
 
-                            try:
-                                await view.wait()
-                            except RuntimeError:
-                                # Handle potential async generator issues
-                                return
+                            # Send confirmation message using MessageSender
+                            success_description = f"✅ Gratulacje! Przedłużyłeś rangę **{role_name}** o {extend_days} dni. Wszystkie blokady zostały usunięte – miłego korzystania!\nBóg zapłać!"
+                            # Add premium text directly to description like MessageSender does
+                            success_description = self._add_premium_text_to_description(
+                                success_description
+                            )
 
-                            if view.value == "cancel" or view.value == "timeout":
-                                await interaction.followup.send(
-                                    "Operacja została anulowana - nie dokonano wyboru w wyznaczonym czasie."
-                                    if view.value == "timeout"
-                                    else "Anulowałeś operację.",
-                                    ephemeral=True,
-                                )
-                                return
+                            embed = MessageSender._create_embed(
+                                description=success_description, ctx=member
+                            )
 
-                            elif view.value == "extend":
-                                # Extend the current role and remove mutes
-                                expiration_date = current_member_role.expiration_date + timedelta(
-                                    days=days_to_add
-                                )
-                                logger.info(
-                                    f"[SHOP] Extending role {current_role.name} for {member.display_name}:"
-                                    f"\n - Current expiry: {current_member_role.expiration_date}"
-                                    f"\n - Days to add: {days_to_add}"
-                                    f"\n - New expiry: {expiration_date}"
-                                )
-
-                                current_member_role.expiration_date = expiration_date
-                                await MemberQueries.add_to_wallet_balance(
-                                    session, self.viewer.id, -price
-                                )
-
-                                # Remove mute roles
-                                await self.premium_manager.remove_mute_roles(member)
-
-                                await session.commit()
-                                await session.refresh(current_member_role)
-
-                                logger.info(
-                                    f"[SHOP] After commit - role {current_role.name} expiry confirmed as: {current_member_role.expiration_date}"
-                                )
-
-                                # Send public confirmation
-                                embed = discord.Embed(
-                                    color=member.color
-                                    if member.color.value != 0
-                                    else discord.Color.green()
-                                )
-                                # Add premium text to embed description
-                                _, premium_text = self.message_sender._get_premium_text(self.ctx)
-                                if premium_text:
-                                    embed.description = f"{embed.description}\n{premium_text}"
-                                embed.description = (
-                                    f"Przedłużyłeś swoją rangę **{current_role.name}** "
-                                    f"o {days_to_add} dni (usunięto wszystkie muty!)."
-                                )
-                                await interaction.followup.send(embed=embed, ephemeral=False)
-
-                            elif view.value in ["buy_lower", "buy_higher"]:
-                                # Calculate refund for the old role
-                                refund = calculate_refund(
-                                    current_member_role.expiration_date,
-                                    current_role_config["price"],
-                                )
-
-                                # Remove old role
-                                await member.remove_roles(current_role)
-                                await RoleQueries.delete_member_role(
-                                    session, member.id, current_role.id
-                                )
-
-                                # Add refund to wallet
-                                if refund > 0:
-                                    await MemberQueries.add_to_wallet_balance(
-                                        session, member.id, refund
-                                    )
-
-                                # Remove mute roles before adding new role
-                                await self.premium_manager.remove_mute_roles(member)
-
-                                # Add new role - use MONTHLY_DURATION without bonus days for role changes
-                                duration = timedelta(days=MONTHLY_DURATION)
-                                await RoleQueries.add_role_to_member(
-                                    session, member.id, role.id, duration
-                                )
-                                await member.add_roles(role)
-
-                                # Deduct price from wallet
-                                await MemberQueries.add_to_wallet_balance(
-                                    session, self.viewer.id, -price
-                                )
-                                await session.commit()
-
-                                # Send public confirmation
-                                embed = discord.Embed(
-                                    color=member.color
-                                    if member.color.value != 0
-                                    else discord.Color.green()
-                                )
-                                # Add premium text to embed description
-                                _, premium_text = self.message_sender._get_premium_text(self.ctx)
-                                if premium_text:
-                                    embed.description = f"{embed.description}\n{premium_text}"
-                                embed.description = (
-                                    f"{'Zamieniłeś' if view.value == 'buy_lower' else 'Ulepszyłeś'} "
-                                    f"swoją rangę **{current_role.name}** na **{role_name}**. "
-                                    f"Otrzymałeś {refund}G zwrotu za poprzednią rolę."
-                                )
-                                await interaction.followup.send(embed=embed, ephemeral=False)
+                            await interaction.followup.send(embed=embed, ephemeral=False)
 
                             # Update the original shop embed with new expiration date
                             premium_roles = await RoleQueries.get_member_premium_roles(
@@ -449,71 +338,252 @@ class RoleShopView(discord.ui.View):
                             await interaction.message.edit(embed=updated_embed)
                             return
 
+                        # Calculate refund for current role
+                        refund_amount = calculate_refund(
+                            current_member_role.expiration_date, current_role_config["price"]
+                        )
+
+                        if current_role_config["price"] > new_role_config["price"]:
+                            # Downgrade case
+                            days_to_add = int(
+                                price / current_role_config["price"] * MONTHLY_DURATION
+                            )
+
+                            logger.info(
+                                f"[SHOP] Calculating extension for {member.display_name}:"
+                                f"\n - Current role: {current_role.name}"
+                                f"\n - Target role: {role_name}"
+                                f"\n - Price paid: {price}G"
+                                f"\n - Current role price: {current_role_config['price']}G"
+                                f"\n - Price ratio: {price}/{current_role_config['price']}"
+                                f"\n - Base days: {MONTHLY_DURATION}"
+                                f"\n - Days to add: {days_to_add}"
+                            )
+
+                            description = (
+                                f"Dostępne opcje:\n"
+                                f"1️⃣ **Przedłuż swoją rangę {current_role.name}** o {days_to_add} dni (usuwa wszystkie muty)\n"
+                                f"2️⃣ **Kup nową rangę {role_name}** i otrzymaj **{refund_amount}G** zwrotu za obecną rolę\n"
+                                f"❌ **Anuluj operację**"
+                            )
                         else:
-                            # Same role or upgrade - handle directly
-                            if current_role.name == role_name:
-                                # Same role - extend it
-                                extend_days = (
-                                    MONTHLY_DURATION
-                                    if duration_days == MONTHLY_DURATION
-                                    else YEARLY_DURATION
-                                )
-                                old_expiry = current_member_role.expiration_date
+                            # Upgrade case
+                            days_to_add = 0  # No extension for upgrades
+                            description = (
+                                f"Dostępne opcje:\n"
+                                f"1️⃣ **Kup nową rangę {role_name}** i otrzymaj **{refund_amount}G** zwrotu za obecną rolę **{current_role.name}**\n"
+                                f"❌ **Anuluj operację**"
+                            )
 
-                                # Update expiration date
-                                current_member_role.expiration_date = old_expiry + timedelta(
-                                    days=extend_days
-                                )
+                        # Create embed with MessageSender for consistency
+                        embed = MessageSender._create_embed(
+                            description=description,
+                            ctx=member,
+                        )
 
-                                # Remove mute roles and update balance
-                                await self.premium_manager.remove_mute_roles(member)
+                        # Show choice view
+                        view = LowerRoleChoiceView(
+                            self.bot,
+                            member,
+                            current_role.name,
+                            role_name,
+                            price,
+                            days_to_add,
+                            is_upgrade=current_role_config["price"] < new_role_config["price"],
+                        )
+
+                        # Send initial message with options as ephemeral
+                        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+                        try:
+                            await view.wait()
+                        except RuntimeError:
+                            # Handle potential async generator issues
+                            return
+
+                        if view.value == "cancel" or view.value == "timeout":
+                            await interaction.followup.send(
+                                "Operacja została anulowana - nie dokonano wyboru w wyznaczonym czasie."
+                                if view.value == "timeout"
+                                else "Anulowałeś operację.",
+                                ephemeral=True,
+                            )
+                            return
+
+                        elif view.value == "extend":
+                            # Extend the current role and remove mutes
+                            expiration_date = current_member_role.expiration_date + timedelta(
+                                days=view.days_to_add
+                            )
+                            logger.info(
+                                f"[SHOP] Extending role {current_role.name} for {member.display_name}:"
+                                f"\n - Current expiry: {current_member_role.expiration_date}"
+                                f"\n - Days to add: {view.days_to_add}"
+                                f"\n - New expiry: {expiration_date}"
+                            )
+
+                            current_member_role.expiration_date = expiration_date
+                            await MemberQueries.add_to_wallet_balance(
+                                session, self.viewer.id, -price
+                            )
+
+                            # Remove mute roles
+                            await self.premium_manager.remove_mute_roles(member)
+
+                            await session.commit()
+                            await session.refresh(current_member_role)
+
+                            logger.info(
+                                f"[SHOP] After commit - role {current_role.name} expiry confirmed as: {current_member_role.expiration_date}"
+                            )
+
+                            # Send public confirmation
+                            success_description = f"✅ Gratulacje! Przedłużyłeś rangę **{current_role.name}** o {view.days_to_add} dni. Wszystkie blokady zostały usunięte – miłego korzystania!\nBóg zapłać!"
+                            # Add premium text directly to description like MessageSender does
+                            success_description = self._add_premium_text_to_description(
+                                success_description
+                            )
+
+                            embed = MessageSender._create_embed(
+                                description=success_description, ctx=member
+                            )
+
+                            await interaction.followup.send(embed=embed, ephemeral=False)
+
+                        elif view.value in ["buy_lower", "buy_higher"]:
+                            # Calculate refund for the old role
+                            refund = calculate_refund(
+                                current_member_role.expiration_date,
+                                current_role_config["price"],
+                            )
+
+                            # Remove old role
+                            await member.remove_roles(current_role)
+                            await RoleQueries.delete_member_role(
+                                session, member.id, current_role.id
+                            )
+
+                            # Add refund to wallet
+                            if refund > 0:
                                 await MemberQueries.add_to_wallet_balance(
-                                    session, self.viewer.id, -price
+                                    session, member.id, refund
                                 )
 
-                                # Save changes
-                                await session.flush()
-                                await session.refresh(current_member_role)
+                            # Remove mute roles before adding new role
+                            await self.premium_manager.remove_mute_roles(member)
 
-                                logger.info(
-                                    f"[SHOP] Extended same role {role_name} for {member.display_name}:"
-                                    f"\n - Old expiry: {old_expiry}"
-                                    f"\n - Days added: {extend_days}"
-                                    f"\n - New expiry: {current_member_role.expiration_date}"
-                                )
+                            # Add new role - use MONTHLY_DURATION without bonus days for role changes
+                            duration = timedelta(days=MONTHLY_DURATION)
+                            await RoleQueries.add_role_to_member(
+                                session, member.id, role.id, duration
+                            )
+                            await member.add_roles(role)
 
-                                # Send confirmation
-                                embed = discord.Embed(color=discord.Color.green())
-                                base_description = f"Przedłużyłeś rolę **{role_name}** o {extend_days} dni (usunięto wszystkie muty)!"
-                                _, premium_text = self.message_sender._get_premium_text(self.ctx)
-                                if premium_text:
-                                    embed.description = f"{base_description}\n{premium_text}"
-                                else:
-                                    embed.description = base_description
+                            # Deduct price from wallet
+                            await MemberQueries.add_to_wallet_balance(
+                                session, self.viewer.id, -price
+                            )
+                            await session.commit()
 
-                                await interaction.followup.send(embed=embed, ephemeral=False)
-
-                                # Update the original shop embed with new expiration date
-                                premium_roles = await RoleQueries.get_member_premium_roles(
-                                    session, member.id
-                                )
-                                updated_embed = await create_shop_embed(
-                                    self.ctx,
-                                    self.balance - price,  # Update balance
-                                    self.role_price_map,
-                                    premium_roles,
-                                    self.page,
-                                    self.viewer,
-                                    self.member,
-                                )
-                                await interaction.message.edit(embed=updated_embed)
-                                return
+                            # Send public confirmation
+                            if view.value == "buy_lower":
+                                success_description = f"🎉 Gratulacje! Zamieniłeś swoją rangę **{current_role.name}** na **{role_name}** i otrzymałeś **{refund}G** zwrotu. Dzięki, że wspierasz naszą społeczność!"
                             else:
-                                # Remove lower role when upgrading
-                                await RoleQueries.delete_member_role(
-                                    session, member.id, current_role.id
-                                )
-                                await member.remove_roles(current_role)
+                                success_description = f"🚀 Gratulacje! Ulepszyłeś rangę **{current_role.name}** do **{role_name}** i otrzymałeś **{refund}G** zwrotu. Świetny wybór!"
+
+                            embed = MessageSender._create_embed(
+                                description=success_description,
+                                ctx=member,
+                            )
+                            # Add premium text directly to description like MessageSender does
+                            embed.description = self._add_premium_text_to_description(
+                                embed.description
+                            )
+                            await interaction.followup.send(embed=embed, ephemeral=False)
+
+                        # Update the original shop embed with new expiration date
+                        premium_roles = await RoleQueries.get_member_premium_roles(
+                            session, member.id
+                        )
+                        updated_embed = await create_shop_embed(
+                            self.ctx,
+                            self.balance - price,  # Update balance
+                            self.role_price_map,
+                            premium_roles,
+                            self.page,
+                            self.viewer,
+                            self.member,
+                        )
+                        await interaction.message.edit(embed=updated_embed)
+                        return
+
+                    else:
+                        # Same role or upgrade - handle directly
+                        if current_role.name == role_name:
+                            # Same role - extend it
+                            extend_days = (
+                                MONTHLY_DURATION
+                                if duration_days == MONTHLY_DURATION
+                                else YEARLY_DURATION
+                            )
+                            old_expiry = current_member_role.expiration_date
+
+                            # Update expiration date
+                            current_member_role.expiration_date = old_expiry + timedelta(
+                                days=extend_days
+                            )
+
+                            # Remove mute roles and update balance
+                            await self.premium_manager.remove_mute_roles(member)
+                            await MemberQueries.add_to_wallet_balance(
+                                session, self.viewer.id, -price
+                            )
+
+                            # Save changes
+                            await session.flush()
+                            await session.refresh(current_member_role)
+
+                            logger.info(
+                                f"[SHOP] Extended same role {role_name} for {member.display_name}:"
+                                f"\n - Old expiry: {old_expiry}"
+                                f"\n - Days added: {extend_days}"
+                                f"\n - New expiry: {current_member_role.expiration_date}"
+                            )
+
+                            # Send confirmation message using MessageSender
+                            success_description = f"✅ Gratulacje! Przedłużyłeś rangę **{current_role.name}** o {extend_days} dni. Wszystkie blokady zostały usunięte – miłego korzystania!\nBóg zapłać!"
+                            # Add premium text directly to description like MessageSender does
+                            success_description = self._add_premium_text_to_description(
+                                success_description
+                            )
+
+                            embed = MessageSender._create_embed(
+                                description=success_description, ctx=member
+                            )
+
+                            await interaction.followup.send(embed=embed, ephemeral=False)
+
+                            # Update the original shop embed with new expiration date
+                            premium_roles = await RoleQueries.get_member_premium_roles(
+                                session, member.id
+                            )
+                            updated_embed = await create_shop_embed(
+                                self.ctx,
+                                self.balance - price,  # Update balance
+                                self.role_price_map,
+                                premium_roles,
+                                self.page,
+                                self.viewer,
+                                self.member,
+                            )
+                            await interaction.message.edit(embed=updated_embed)
+                            return
+                        else:
+                            # Remove lower role when upgrading
+                            await RoleQueries.delete_member_role(
+                                session, member.id, current_role.id
+                            )
+                            await member.remove_roles(current_role)
 
                 # Normal purchase flow
                 if role in member.roles:
@@ -573,16 +643,16 @@ class RoleShopView(discord.ui.View):
                         await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -price)
                         await session.commit()
 
-                        # Send confirmation message
-                        embed = discord.Embed(
-                            color=member.color if member.color.value != 0 else discord.Color.green()
+                        # Send confirmation message using MessageSender
+                        success_description = f"✅ Gratulacje! Przedłużyłeś rangę **{role_name}** o {extend_days} dni. Wszystkie blokady zostały usunięte – miłego korzystania!\nBóg zapłać!"
+                        # Add premium text directly to description like MessageSender does
+                        success_description = self._add_premium_text_to_description(
+                            success_description
                         )
-                        base_description = f"Przedłużyłeś rolę **{role_name}** o {extend_days} dni (usunięto wszystkie muty)!"
-                        _, premium_text = self.message_sender._get_premium_text(self.ctx)
-                        if premium_text:
-                            embed.description = f"{base_description}\n{premium_text}"
-                        else:
-                            embed.description = base_description
+
+                        embed = MessageSender._create_embed(
+                            description=success_description, ctx=member
+                        )
 
                         await interaction.followup.send(embed=embed, ephemeral=False)
 
@@ -640,16 +710,12 @@ class RoleShopView(discord.ui.View):
                         f"\n - Role exists in Discord: {role in member.roles}"
                     )
 
-                # Send confirmation for new purchase
-                embed = discord.Embed(
-                    color=member.color if member.color.value != 0 else discord.Color.green()
-                )
-                base_description = f"Zakupiłeś rolę **{role_name}** na {MONTHLY_DURATION} dni (usunięto wszystkie muty)!"
-                _, premium_text = self.message_sender._get_premium_text(self.ctx)
-                if premium_text:
-                    embed.description = f"{base_description}\n{premium_text}"
-                else:
-                    embed.description = base_description
+                # Send confirmation message using MessageSender
+                success_description = f"✅ Gratulacje! Zakupiłeś rangę **{role_name}** na 30 dni. Wszystkie blokady zostały usunięte – miłego korzystania!\nBóg zapłać!"
+                # Add premium text directly to description like MessageSender does
+                success_description = self._add_premium_text_to_description(success_description)
+
+                embed = MessageSender._create_embed(description=success_description, ctx=member)
 
                 await interaction.followup.send(embed=embed, ephemeral=False)
 
@@ -666,10 +732,7 @@ class RoleShopView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            _, premium_text = self.message_sender._get_premium_text(self.ctx)
-            base_text = "Oto twój własny widok sklepu:"
-            if premium_text:
-                base_text = f"{base_text}\n{premium_text}"
+            base_text = self._add_premium_text_to_description("Oto twój własny widok sklepu:")
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -709,10 +772,7 @@ class RoleShopView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            _, premium_text = self.message_sender._get_premium_text(self.ctx)
-            base_text = "Oto twój własny widok sklepu:"
-            if premium_text:
-                base_text = f"{base_text}\n{premium_text}"
+            base_text = self._add_premium_text_to_description("Oto twój własny widok sklepu:")
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -752,10 +812,7 @@ class RoleShopView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            _, premium_text = self.message_sender._get_premium_text(self.ctx)
-            base_text = "Oto twój własny widok sklepu:"
-            if premium_text:
-                base_text = f"{base_text}\n{premium_text}"
+            base_text = self._add_premium_text_to_description("Oto twój własny widok sklepu:")
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -795,6 +852,12 @@ class RoleShopView(discord.ui.View):
             self.member,
         )
 
+    async def show_my_id(self, interaction: discord.Interaction):
+        """Show the user's ID in a copyable format."""
+        user_id = interaction.user.id
+        message = f"🆔 **Twoje Discord ID:**\n```\n{user_id}\n```\n💡 *Kliknij w ramkę aby zaznaczyć i skopiować ID*"
+        await interaction.response.send_message(message, ephemeral=True)
+
 
 class BuyRoleButton(discord.ui.Button):
     """Button for buying a role."""
@@ -810,11 +873,15 @@ class BuyRoleButton(discord.ui.Button):
         """
         kwargs.setdefault("style", discord.ButtonStyle.primary)
         kwargs.setdefault("label", "Kup rolę")
+        kwargs.setdefault(
+            "emoji", bot.config.get("emojis", {}).get("mastercard", "💳") if bot else "💳"
+        )
         super().__init__(**kwargs)
         self.bot = bot
         self.member = member
         self.role_name = role_name
-        self.message_sender = MessageSender()
+        # Initialize MessageSender with bot instance if available, otherwise without
+        self.message_sender = MessageSender(bot) if bot else MessageSender()
 
     async def callback(self, interaction: discord.Interaction):
         """Handle the button click."""
@@ -855,7 +922,8 @@ class RoleDescriptionView(discord.ui.View):
         self.balance = balance
         self.viewer = viewer
         self.member = member
-        self.message_sender = MessageSender()
+        # Initialize MessageSender with bot instance for consistency
+        self.message_sender = MessageSender(bot)
 
         # Add buttons
         previous_button = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary)
@@ -866,6 +934,7 @@ class RoleDescriptionView(discord.ui.View):
             label="Kup rangę",
             style=discord.ButtonStyle.primary,
             disabled=premium_roles[page - 1]["price"] > balance,
+            emoji=self.bot.config.get("emojis", {}).get("mastercard", "💳"),
         )
         buy_button.callback = self.buy_role
         self.add_item(buy_button)
@@ -885,6 +954,13 @@ class RoleDescriptionView(discord.ui.View):
         next_button = discord.ui.Button(label="➡️", style=discord.ButtonStyle.secondary)
         next_button.callback = self.next_page
         self.add_item(next_button)
+
+    def _add_premium_text_to_description(self, description: str) -> str:
+        """Helper method to add premium text to description consistently."""
+        _, premium_text = self.message_sender._get_premium_text(self.ctx)
+        if premium_text:
+            return f"{description}\n{premium_text}"
+        return description
 
     async def create_view_for_user(
         self, interaction: discord.Interaction
@@ -919,10 +995,7 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            _, premium_text = self.message_sender._get_premium_text(self.ctx)
-            base_text = "Oto twój własny widok opisu ról:"
-            if premium_text:
-                base_text = f"{base_text}\n{premium_text}"
+            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -948,10 +1021,7 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            _, premium_text = self.message_sender._get_premium_text(self.ctx)
-            base_text = "Oto twój własny widok opisu ról:"
-            if premium_text:
-                base_text = f"{base_text}\n{premium_text}"
+            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -977,16 +1047,14 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            _, premium_text = self.message_sender._get_premium_text(self.ctx)
-            base_text = "Oto twój własny widok opisu ról:"
-            if premium_text:
-                base_text = f"{base_text}\n{premium_text}"
+            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
             return
 
         role_name = self.premium_roles[self.page - 1]["name"]
+        role_price = self.premium_roles[self.page - 1]["price"]
         role_shop_view = RoleShopView(
             self.ctx,
             self.bot,
@@ -996,17 +1064,16 @@ class RoleDescriptionView(discord.ui.View):
             self.viewer,
             self.member,
         )
-        await role_shop_view.handle_buy_role(interaction, role_name, self.member, duration_days=30)
+        await role_shop_view.handle_buy_role(
+            interaction, role_name, self.member, duration_days=30, price=role_price
+        )
 
     async def go_to_shop(self, interaction: discord.Interaction):
         """Go to the role shop view."""
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            _, premium_text = self.message_sender._get_premium_text(self.ctx)
-            base_text = "Oto twój własny widok opisu ról:"
-            if premium_text:
-                base_text = f"{base_text}\n{premium_text}"
+            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
