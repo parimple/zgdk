@@ -50,3 +50,47 @@ We welcome contributions to this project. If you are interested in contributing,
 ## License
 
 This project is licensed under the MIT License.
+
+## Funkcje głosowe
+
+System zarządzania kanałami głosowymi z zaawansowanymi uprawnieniami.
+
+### Komendy głosowe
+- **speak/s** - Zarządzanie uprawnieniem mówienia
+- **view/v** - Zarządzanie uprawnieniem widzenia kanału
+- **connect/c** - Zarządzanie uprawnieniem połączenia
+- **text/t** - Zarządzanie uprawnieniem pisania
+- **live/lv** - Zarządzanie uprawnieniem streamowania
+- **mod/m** - Zarządzanie moderatorami kanału
+- **autokick/ak** - Zarządzanie listą autokick
+- **reset/r** - Reset uprawnień kanału lub użytkownika
+- **limit/l** - Ustawienie limitu użytkowników
+- **voicechat/vc** - Informacje o kanale głosowym
+
+### Automatyczne funkcje
+- **Tworzenie kanałów** - Automatyczne tworzenie kanałów głosowych
+- **Autokick** - Automatyczne wykopywanie niepożądanych użytkowników
+- **Zarządzanie uprawnieniami** - Persistentne uprawnienia użytkowników
+- **Optymalizacja wydajności** - Cache i asynchroniczne operacje
+
+### Persistentne uprawnienia
+System automatycznie przywraca uprawnienia użytkowników po ponownym dołączeniu na serwer:
+
+1. **Gdy użytkownik opuszcza serwer:**
+   - Discord automatycznie usuwa uprawnienia z kanałów
+   - Dane pozostają zapisane w bazie danych
+
+2. **Gdy użytkownik wraca na serwer:**
+   - System sprawdza zapisane uprawnienia w bazie przy dołączaniu do kanału
+   - Automatycznie aplikuje ograniczenia gdy właściciel kanału jest obecny
+   - Sprawdza czy właściciel nadal ma uprawnienia do kanału (priority_speaker)
+
+3. **Diagnostyka:**
+   - `voice_stats` - Statystyki systemu z metrykami przywróconych uprawnień
+   - `debug_permissions` - Szczegółowe informacje o uprawnieniach użytkownika
+
+**Przykład:** Jeśli użytkownik miał zabronione połączenie (`c-`) od konkretnego właściciela kanału, a następnie opuścił serwer i wrócił, system automatycznie przywróci to ograniczenie gdy dołączy do kanału tego właściciela (jeśli właściciel nadal jest w kanale).
+
+### Diagnostyczne komendy
+- **voice_stats** - Statystyki systemu voice (tylko admini)
+- **debug_permissions** - Sprawdzanie uprawnień w bazie danych (tylko admini)

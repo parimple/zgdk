@@ -364,6 +364,19 @@ class VoiceCog(commands.Cog):
             inline=True,
         )
 
+        # Get permissions metrics from on_member_join cog
+        permissions_restored = 0
+        for cog in self.bot.cogs.values():
+            if hasattr(cog, "voice_permissions_restored"):
+                permissions_restored = cog.voice_permissions_restored
+                break
+
+        embed.add_field(
+            name="🔐 Uprawnienia",
+            value=f"Przywrócone: {permissions_restored}",
+            inline=True,
+        )
+
         # Worker status
         worker_status = (
             "🟢 Aktywny"
@@ -377,6 +390,102 @@ class VoiceCog(commands.Cog):
         embed.add_field(name="📋 Kolejka", value=f"{queue_size} zadań", inline=True)
 
         await ctx.send(embed=embed)
+
+    @commands.hybrid_command(
+        name="debug_permissions", description="Sprawdza uprawnienia użytkownika w bazie danych"
+    )
+    @commands.has_permissions(administrator=True)
+    @discord.app_commands.describe(
+        target="Użytkownik do sprawdzenia uprawnień",
+    )
+    async def debug_permissions(self, ctx, target: Optional[Member] = None):
+        """Sprawdza uprawnienia użytkownika zapisane w bazie danych."""
+        target_user = target or ctx.author
+
+        from datasources.queries import ChannelPermissionQueries
+
+        try:
+            async with self.bot.get_db() as session:
+                # Get permissions where user is the target
+                target_permissions = await ChannelPermissionQueries.get_permissions_for_target(
+                    session, target_user.id
+                )
+
+                # Get permissions where user is the owner
+                owner_permissions = await ChannelPermissionQueries.get_permissions_for_member(
+                    session, target_user.id
+                )
+
+            embed = discord.Embed(
+                title=f"🔐 Uprawnienia dla {target_user.display_name}", color=discord.Color.blue()
+            )
+
+            # Permissions where user is the target (restrictions applied to them)
+            if target_permissions:
+                target_info = []
+                for perm in target_permissions:
+                    owner = ctx.guild.get_member(perm.member_id)
+                    owner_name = owner.display_name if owner else f"ID:{perm.member_id}"
+                    allow_perms = discord.Permissions(perm.allow_permissions_value)
+                    deny_perms = discord.Permissions(perm.deny_permissions_value)
+
+                    perm_list = []
+                    for perm_name, value in allow_perms:
+                        if value:
+                            perm_list.append(f"✅ {perm_name}")
+                    for perm_name, value in deny_perms:
+                        if value:
+                            perm_list.append(f"❌ {perm_name}")
+
+                    if perm_list:
+                        target_info.append(f"**{owner_name}**: {', '.join(perm_list)}")
+
+                embed.add_field(
+                    name="🎯 Ograniczenia na użytkowniku",
+                    value="\n".join(target_info[:10]) if target_info else "Brak",
+                    inline=False,
+                )
+            else:
+                embed.add_field(name="🎯 Ograniczenia na użytkowniku", value="Brak", inline=False)
+
+            # Permissions where user is the owner (permissions they granted)
+            if owner_permissions:
+                owner_info = []
+                for perm in owner_permissions:
+                    target_member = ctx.guild.get_member(perm.target_id)
+                    if target_member:
+                        target_name = target_member.display_name
+                    else:
+                        target_name = f"ID:{perm.target_id}"
+
+                    allow_perms = discord.Permissions(perm.allow_permissions_value)
+                    deny_perms = discord.Permissions(perm.deny_permissions_value)
+
+                    perm_list = []
+                    for perm_name, value in allow_perms:
+                        if value:
+                            perm_list.append(f"✅ {perm_name}")
+                    for perm_name, value in deny_perms:
+                        if value:
+                            perm_list.append(f"❌ {perm_name}")
+
+                    if perm_list:
+                        owner_info.append(f"**{target_name}**: {', '.join(perm_list)}")
+
+                embed.add_field(
+                    name="👑 Uprawnienia przyznane przez użytkownika",
+                    value="\n".join(owner_info[:10]) if owner_info else "Brak",
+                    inline=False,
+                )
+            else:
+                embed.add_field(
+                    name="👑 Uprawnienia przyznane przez użytkownika", value="Brak", inline=False
+                )
+
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            await ctx.send(f"❌ Błąd przy sprawdzaniu uprawnień: {str(e)}")
 
 
 async def setup(bot):

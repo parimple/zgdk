@@ -11,7 +11,7 @@ from discord.ext import commands, tasks
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from datasources.queries import InviteQueries, MemberQueries, NotificationLogQueries, RoleQueries
+from datasources.queries import InviteQueries, MemberQueries, NotificationLogQueries, RoleQueries, ChannelPermissionQueries
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,8 @@ class OnMemberJoinEvent(commands.Cog):
         self.bot.force_channel_notifications = (
             True  # Jeśli True - wysyła na kanał, False - wysyła na DM
         )
+        # Metryki dla przywracania uprawnień głosowych
+        self.voice_permissions_restored = 0
         self.setup_channels.start()  # pylint: disable=no-member
         self.setup_guild.start()  # pylint: disable=no-member
         # clean_invites will be started after guild is set up
@@ -305,6 +307,9 @@ class OnMemberJoinEvent(commands.Cog):
 
         # Przywróć role wyciszenia, jeśli były przypisane wcześniej
         await self.restore_mute_roles(member)
+        
+        # Przywróć uprawnienia głosowe, jeśli były przypisane wcześniej
+        await self.restore_voice_permissions(member)
 
         # Check if we have invites dictionary initialized
         if not self.invites:
@@ -657,32 +662,113 @@ class OnMemberJoinEvent(commands.Cog):
 
     @clean_invites.before_loop
     async def before_clean_invites(self):
-        """Ensure guild is set before starting clean_invites task"""
-        if not self.guild:
-            logger.info("Waiting for guild to be set before starting clean_invites...")
-            while not self.guild:
-                await asyncio.sleep(1)
-
+        """Ensure the cog is ready before starting the clean_invites task"""
+        logger.info("Waiting for on_member_join cog to be ready...")
+        while self.guild is None:
+            logger.info("Guild not set yet, waiting...")
+            await asyncio.sleep(1)
+        logger.info("On_member_join cog is ready, starting clean_invites task")
+        
     async def notify_invite_deleted(self, user_id: int, invite_id: str):
-        user = self.guild.get_member(user_id)
-        if user:
+        """
+        Notify user that their invite was deleted
+        
+        :param user_id: User ID who created the invite
+        :param invite_id: Invite ID that was deleted
+        """
+        try:
+            # Get the member
+            member = self.guild.get_member(user_id)
+            if not member:
+                logger.warning(f"Member {user_id} not found, cannot notify about deleted invite")
+                return
+                
+            # Send notification
+            await member.send(
+                f"Twoje zaproszenie `{invite_id}` zostało usunięte z powodu braku użycia przez ponad 30 dni."
+            )
+            logger.info(f"Notified {member} about deleted invite {invite_id}")
+            
+        except Exception as e:
+            logger.error(f"Error notifying user {user_id} about deleted invite {invite_id}: {e}")
+
+    async def restore_voice_permissions(self, member):
+        """
+        Przywraca uprawnienia głosowe użytkownikowi, który wrócił na serwer.
+        
+        Sprawdza w bazie danych wszystkie uprawnienia gdzie użytkownik jest targetem,
+        a następnie aplikuje je na kanałach gdzie właściciele są aktualnie obecni.
+        """
+        logger.info(f"Sprawdzanie uprawnień głosowych dla {member.display_name} ({member.id})")
+        
+        try:
             async with self.bot.get_db() as session:
-                notification_log = await NotificationLogQueries.get_notification_log(
-                    session, user_id, "invite_deleted"
+                # Pobierz wszystkie uprawnienia gdzie ten użytkownik jest targetem
+                target_permissions = await ChannelPermissionQueries.get_permissions_for_target(
+                    session, member.id
                 )
-                if not notification_log or (
-                    datetime.now(timezone.utc) - notification_log.sent_at
-                ) > timedelta(hours=24):
-                    try:
-                        # await user.send(
-                        #     f"Twoje zaproszenie o kodzie {invite_id} zostało usunięte z powodu nieaktywności. Jeśli chcesz zaprosić kogoś na serwer, musisz stworzyć nowe zaproszenie."
-                        # )
-                        await NotificationLogQueries.add_or_update_notification_log(
-                            session, user_id, "invite_deleted"
-                        )
-                    except discord.Forbidden:
-                        logger.warning(f"Could not send DM to user {user_id}")
-            await session.commit()
+                
+                if not target_permissions:
+                    logger.info(f"Brak zapisanych uprawnień głosowych dla {member.display_name}")
+                    return
+                
+                logger.info(
+                    f"Znaleziono {len(target_permissions)} zapisanych uprawnień głosowych dla {member.display_name}"
+                )
+                
+                permissions_applied = 0
+                
+                # Dla każdego uprawnienia sprawdź czy właściciel jest w kanale głosowym
+                for permission in target_permissions:
+                    owner = self.guild.get_member(permission.member_id)
+                    if not owner:
+                        continue  # Właściciel już nie jest na serwerze
+                    
+                    # Sprawdź czy właściciel jest w jakimś kanale głosowym i ma priority_speaker
+                    if not owner.voice or not owner.voice.channel:
+                        continue  # Właściciel nie jest w kanale głosowym
+                    
+                    channel = owner.voice.channel
+                    
+                    # Sprawdź czy właściciel ma uprawnienia priority_speaker w tym kanale
+                    owner_perms = channel.overwrites_for(owner)
+                    if not (owner_perms and owner_perms.priority_speaker):
+                        continue  # Właściciel nie jest właścicielem tego kanału
+                    
+                    # Konwertuj uprawnienia z bazy na Discord PermissionOverwrite
+                    allow_perms = discord.Permissions(permission.allow_permissions_value)
+                    deny_perms = discord.Permissions(permission.deny_permissions_value)
+                    overwrite = discord.PermissionOverwrite.from_pair(allow_perms, deny_perms)
+                    
+                    # Pobierz aktualne uprawnienia użytkownika w kanale
+                    current_member_perms = channel.overwrites_for(member)
+                    if current_member_perms:
+                        # Scal z istniejącymi uprawnieniami
+                        for perm_name, value in overwrite._values.items():
+                            if value is not None:
+                                setattr(current_member_perms, perm_name, value)
+                        await channel.set_permissions(member, overwrite=current_member_perms)
+                    else:
+                        # Ustaw nowe uprawnienia
+                        await channel.set_permissions(member, overwrite=overwrite)
+                    
+                    permissions_applied += 1
+                    self.voice_permissions_restored += 1
+                    logger.info(
+                        f"Przywrócono uprawnienia głosowe dla {member.display_name} w kanale {channel.name} "
+                        f"(właściciel: {owner.display_name}, allow: {permission.allow_permissions_value}, "
+                        f"deny: {permission.deny_permissions_value})"
+                    )
+                
+                if permissions_applied > 0:
+                    logger.info(
+                        f"Przywrócono łącznie {permissions_applied} uprawnień głosowych dla {member.display_name}"
+                    )
+        
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas przywracania uprawnień głosowych dla {member.id}: {str(e)}"
+            )
 
 
 async def setup(bot: commands.Bot):
