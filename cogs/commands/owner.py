@@ -8,9 +8,13 @@ from typing import Literal, Optional
 import discord
 from discord import app_commands
 from discord.ext import commands
+from discord.ext.commands import Greedy
+from discord.ui import Button, View
 
+from datasources.queries import HandledPaymentQueries, MemberQueries
 from utils.message_sender import MessageSender
 from utils.permissions import is_zagadka_owner
+from utils.premium import PaymentData, PremiumManager, TipplyDataProvider
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +147,71 @@ class OwnerCog(commands.Cog):
 
         # Aktualizuj wiadomość z wynikami
         await message.edit(content=None, embed=embed)
+
+    @commands.hybrid_command(
+        name="przypisz_wplate", description="Ręcznie przypisuje wpłatę do użytkownika."
+    )
+    @is_zagadka_owner()
+    @app_commands.describe(
+        uzytkownik="Użytkownik, do którego ma być przypisana wpłata",
+        id_wplaty="ID wpłaty z bazy danych",
+    )
+    async def przypisz_wplate(
+        self, ctx: commands.Context, uzytkownik: discord.Member, id_wplaty: int
+    ):
+        """Manually assign a payment to a user."""
+        await ctx.defer(ephemeral=True)
+
+        async with self.bot.get_db() as session:
+            payment = await HandledPaymentQueries.get_payment_by_id(session, id_wplaty)
+
+            if not payment:
+                await ctx.send(f"Nie znaleziono wpłaty o ID: `{id_wplaty}`", ephemeral=True)
+                return
+
+            if payment.member_id is not None:
+                original_user = self.bot.get_user(payment.member_id)
+                await ctx.send(
+                    f"Ta wpłata jest już przypisana do użytkownika: `{original_user.display_name if original_user else payment.member_id}`.",
+                    ephemeral=True,
+                )
+                return
+
+            # Przypisanie member_id do płatności
+            payment.member_id = uzytkownik.id
+            await session.flush()
+
+            # Logika podobna do handle_payment
+            payment_data = self.bot.payment_data_class(
+                name=uzytkownik.display_name,
+                amount=payment.amount,
+                paid_at=payment.paid_at,
+                payment_type=payment.payment_type,
+            )
+
+            try:
+                # Wyszukanie OnPaymentEvent coga, aby użyć jego metod
+                payment_cog = self.bot.get_cog("OnPaymentEvent")
+                if not payment_cog:
+                    await ctx.send("Błąd: Nie można znaleźć coga OnPaymentEvent.", ephemeral=True)
+                    return
+
+                # Użycie istniejącej logiki do obsługi płatności
+                await payment_cog.handle_payment(session, payment_data)
+                await session.commit()
+                await ctx.send(
+                    f"Pomyślnie przypisano wpłatę `{id_wplaty}` do użytkownika {uzytkownik.mention}.",
+                    ephemeral=True,
+                )
+                logger.info(
+                    f"Admin {ctx.author.display_name} manually assigned payment {id_wplaty} to {uzytkownik.display_name}"
+                )
+            except Exception as e:
+                await session.rollback()
+                logger.error(
+                    f"Error manually assigning payment {id_wplaty} by {ctx.author.display_name}: {e}"
+                )
+                await ctx.send(f"Wystąpił błąd podczas przypisywania wpłaty: {e}", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

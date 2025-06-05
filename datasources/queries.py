@@ -605,8 +605,20 @@ class HandledPaymentQueries:
 
     @staticmethod
     async def get_payment_by_id(session: AsyncSession, payment_id: int) -> Optional[HandledPayment]:
-        """Fetch a payment by its ID."""
+        """Get a payment by its ID"""
         return await session.get(HandledPayment, payment_id)
+
+    @staticmethod
+    async def get_payment_by_name_and_amount(
+        session: AsyncSession, name: str, amount: int
+    ) -> Optional[HandledPayment]:
+        """Get the last payment by name and amount"""
+        result = await session.execute(
+            select(HandledPayment)
+            .where(HandledPayment.name == name, HandledPayment.amount == amount)
+            .order_by(HandledPayment.paid_at.desc())
+        )
+        return result.scalars().first()
 
 
 class ChannelPermissionQueries:

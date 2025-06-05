@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import sessionmaker
 
 from datasources.models import Base
+from utils.premium import PaymentData
 
 intents = discord.Intents.all()
 
@@ -59,6 +60,7 @@ class Zagadka(commands.Bot):
         )
         self.SessionLocal = sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
         self.base = Base
+        self.payment_data_class = PaymentData
 
         super().__init__(
             command_prefix=config.get("prefix"),

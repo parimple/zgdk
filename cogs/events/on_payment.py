@@ -13,7 +13,7 @@ from discord.ext import commands, tasks
 
 from cogs.ui.shop_embeds import create_shop_embed
 from cogs.views.shop_views import BuyRoleButton, RoleShopView
-from datasources.queries import MemberQueries, RoleQueries
+from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
 from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager, TipplyDataProvider
 from utils.premium_logic import PremiumRoleManager
@@ -148,8 +148,35 @@ class OnPaymentEvent(commands.Cog):
                 return
 
         member = await self.premium_manager.get_member(payment_data.name)
+
         if member is None:
             logger.error("Member not found: %s", payment_data.name)
+            # Try to find the payment record to get its ID for the admin command
+            payment_record = await HandledPaymentQueries.get_payment_by_name_and_amount(
+                session, payment_data.name, payment_data.amount
+            )
+            channel_id = self.bot.config["channels"]["donation"]
+            channel = self.bot.get_channel(channel_id)
+            if channel and payment_record:
+                embed = discord.Embed(
+                    title="❓ Nie znaleziono użytkownika dla wpłaty",
+                    description=(
+                        f"Otrzymano wpłatę od **{payment_data.name}** na kwotę **{payment_data.amount} {CURRENCY_UNIT}**, "
+                        "ale nie udało się znaleźć pasującego użytkownika na serwerze."
+                    ),
+                    color=discord.Color.orange(),
+                )
+                embed.add_field(
+                    name="⚙️ Akcja dla administratora",
+                    value=(
+                        "Aby ręcznie przypisać tę wpłatę do użytkownika, użyj komendy:\n"
+                        f"`/przypisz_wplate uzytkownik:@nazwa_użytkownika id_wplaty:{payment_record.id}`"
+                    ),
+                    inline=False,
+                )
+                embed.set_footer(text=f"ID Wpłaty: {payment_record.id}")
+                embed.timestamp = payment_data.paid_at
+                await channel.send(embed=embed)
             return
 
         # Ensure member exists in database before proceeding

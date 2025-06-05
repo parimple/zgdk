@@ -53,7 +53,7 @@ class ShopCog(commands.Cog):
         )
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
-    @commands.command(name="add", description="Dodaje środki G.")
+    @commands.hybrid_command(name="addbalance", description="Dodaje środki G.")
     @is_zagadka_owner()
     async def add_balance(self, ctx: Context, user: discord.User, amount: int):
         """Add balance to a user's wallet."""
@@ -79,7 +79,7 @@ class ShopCog(commands.Cog):
 
         await ctx.reply(f"Dodano {amount} do portfela {user.mention}.")
 
-    @commands.command(name="assign_payment")
+    @commands.hybrid_command(name="assign_payment")
     @is_admin()
     async def assign_payment(self, ctx: Context, payment_id: int, user: discord.Member):
         """Assign a payment ID to a user."""
