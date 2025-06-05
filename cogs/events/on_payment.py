@@ -35,6 +35,9 @@ class OnPaymentEvent(commands.Cog):
         self.premium_manager = PremiumManager(bot)
         self.data_provider = TipplyDataProvider(bot.get_db)
         self.role_manager = None
+        # Add role_service
+        from utils.services.role_service import RoleService
+        self.role_service = RoleService(bot)
         self.check_payments.start()  # pylint: disable=no-member
         self.processing_locks = {}  # Lock per user ID
         self._guild_ready = asyncio.Event()

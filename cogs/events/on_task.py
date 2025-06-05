@@ -14,6 +14,7 @@ from cogs.commands.info import remove_premium_role_mod_permissions
 from datasources.queries import ChannelPermissionQueries, NotificationLogQueries, RoleQueries
 from utils.currency import CURRENCY_UNIT, g_to_pln
 from utils.role_manager import RoleManager
+from utils.services.role_service import RoleService
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,9 @@ class OnTaskEvent(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        # Use both the old role_manager for backward compatibility and the new role_service
         self.role_manager = RoleManager(bot)
+        self.role_service = RoleService(bot)
         self.check_roles_expiry.start()  # pylint: disable=no-member
         self.notification_channel_id = 1336368306940018739
         # Set default channel notifications to True
@@ -44,7 +47,9 @@ class OnTaskEvent(commands.Cog):
 
         # 1. Sprawdź wygasłe role wyciszenia (częściej sprawdzane, co minutę)
         mute_role_ids = [role["id"] for role in self.bot.config["mute_roles"]]
-        mutes_removed = await self.role_manager.check_expired_roles(
+        
+        # Use the new role_service
+        success, message, mutes_removed = await self.role_service.check_expired_roles(
             role_ids=mute_role_ids, notification_handler=self.notify_mute_removal
         )
 
