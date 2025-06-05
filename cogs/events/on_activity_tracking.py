@@ -25,24 +25,35 @@ class OnActivityTracking(commands.Cog):
         self.voice_members: Dict[int, Set[int]] = {}  # channel_id -> set of member_ids
         self.promotion_members: Set[int] = set()  # members with promotion in status
 
-        # Start background tasks when bot is ready
-        self.bot.loop.create_task(self.wait_for_ready())
+        # Start background tasks (use same pattern as other cogs)
+        self.voice_point_tracker.start()
+        self.promotion_checker.start()
 
-    async def wait_for_ready(self):
-        """Wait for bot to be ready before starting tasks."""
-        await self.bot.wait_until_ready()
-        if self.bot.guild:
-            self.activity_manager.set_guild(self.bot.guild)
-            logger.info("Activity Manager: Guild set, starting tracking tasks")
-            self.voice_point_tracker.start()
-            self.promotion_checker.start()
-        else:
-            logger.warning("Activity Manager: No guild set, cannot start tracking")
+    def _has_points_off_role(self, member: discord.Member) -> bool:
+        """Check if member has the 'points_off' role based on config."""
+        mute_roles = self.bot.config.get("mute_roles", [])
+        points_off_role = None
+        
+        # Find the points_off role from config
+        for role_config in mute_roles:
+            if role_config.get("description") == "points_off":
+                points_off_role = role_config.get("name")
+                break
+        
+        if not points_off_role:
+            # Fallback to hardcoded if not found in config
+            points_off_role = "♺"
+        
+        return any(role.name == points_off_role for role in member.roles)
+
+
 
     def cog_unload(self):
         """Clean up when cog is unloaded."""
         self.voice_point_tracker.cancel()
         self.promotion_checker.cancel()
+
+
 
     @commands.Cog.listener()
     async def on_voice_state_update(
@@ -74,8 +85,8 @@ class OnActivityTracking(commands.Cog):
         if message.author.bot or not message.guild or message.guild != self.bot.guild:
             return
 
-        # Skip if member has "points_off" role (♺ role)
-        if any(role.name == "♺" for role in message.author.roles):
+        # Skip if member has "points_off" role
+        if self._has_points_off_role(message.author):
             return
 
         try:
@@ -105,8 +116,8 @@ class OnActivityTracking(commands.Cog):
                             member_ids.discard(member_id)
                             continue
 
-                        # Skip if member has "points_off" role (♺ role)
-                        if any(role.name == "♺" for role in member.roles):
+                        # Skip if member has "points_off" role
+                        if self._has_points_off_role(member):
                             continue
 
                         # Skip if muted or deafened
@@ -146,8 +157,8 @@ class OnActivityTracking(commands.Cog):
                     if member.bot:
                         continue
 
-                    # Skip if member has "points_off" role (♺ role)
-                    if any(role.name == "♺" for role in member.roles):
+                    # Skip if member has "points_off" role
+                    if self._has_points_off_role(member):
                         continue
 
                     # Check for promotion
@@ -180,11 +191,21 @@ class OnActivityTracking(commands.Cog):
     async def before_voice_tracker(self):
         """Wait for bot to be ready before starting voice tracker."""
         await self.bot.wait_until_ready()
+        if self.bot.guild:
+            self.activity_manager.set_guild(self.bot.guild)
+            logger.info("Activity Manager: Guild set for voice tracker")
+        else:
+            logger.warning("Activity Manager: No guild set for voice tracker")
 
     @promotion_checker.before_loop
     async def before_promotion_checker(self):
         """Wait for bot to be ready before starting promotion checker."""
         await self.bot.wait_until_ready()
+        if self.bot.guild:
+            self.activity_manager.set_guild(self.bot.guild)
+            logger.info("Activity Manager: Guild set for promotion checker")
+        else:
+            logger.warning("Activity Manager: No guild set for promotion checker")
 
     # Admin commands for testing/management
     @commands.hybrid_command(name="activity_debug")
