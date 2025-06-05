@@ -212,6 +212,10 @@ admin_roles:
   mod: 960665311953174564  # ID roli moderatora (✪)
   admin: 960665311953174565  # ID roli administratora (✪)
 
+gender_roles:
+  male: 960665311701528599  # ID roli mężczyzny
+  female: 960665311701528600  # ID roli kobiety
+
 premium_roles:
   - name: "zG50"
     premium: "Git"
