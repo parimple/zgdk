@@ -10,7 +10,7 @@ from discord.ext import commands
 
 from datasources.queries import MemberQueries, RoleQueries
 from utils.message_sender import MessageSender
-from utils.moderation import MessageCleaner, MuteManager, MuteType
+from utils.moderation import MessageCleaner, MuteManager, MuteType, GenderManager, GenderType
 from utils.permissions import is_admin, is_mod_or_admin, is_owner_or_admin
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ class ModCog(commands.Cog):
         self.message_sender = MessageSender(bot)
         self.mute_manager = MuteManager(bot)
         self.message_cleaner = MessageCleaner(bot)
+        self.gender_manager = GenderManager(bot)
 
     # Nowa metoda pomocnicza do wyświetlania pomocy dla komend
     async def send_subcommand_help(self, ctx, command_name):
@@ -411,48 +412,7 @@ class ModCog(commands.Cog):
         :param ctx: Kontekst komendy
         :param user: Użytkownik do nadania roli mężczyzny
         """
-        try:
-            male_role_id = self.config.get("gender_roles", {}).get("male")
-            female_role_id = self.config.get("gender_roles", {}).get("female")
-            
-            if not male_role_id:
-                await ctx.send("❌ Role płci nie są skonfigurowane.", ephemeral=True)
-                return
-                
-            male_role = ctx.guild.get_role(male_role_id)
-            female_role = ctx.guild.get_role(female_role_id) if female_role_id else None
-            
-            if not male_role:
-                await ctx.send("❌ Nie znaleziono roli męskiej na serwerze.", ephemeral=True)
-                return
-            
-            # Usuń rolę kobiecą jeśli ją ma
-            roles_to_remove = []
-            if female_role and female_role in user.roles:
-                roles_to_remove.append(female_role)
-            
-            # Sprawdź czy już ma rolę męską
-            if male_role in user.roles:
-                if roles_to_remove:
-                    await user.remove_roles(*roles_to_remove, reason=f"Zmiana płci na męską - komenda przez {ctx.author}")
-                    await ctx.send(f"✅ Usunięto rolę kobiecą dla {user.mention} (już miał rolę męską)")
-                else:
-                    await ctx.send(f"ℹ️ {user.mention} już ma rolę męską")
-                return
-            
-            # Dodaj rolę męską i usuń kobiecą jeśli trzeba
-            await user.add_roles(male_role, reason=f"Nadanie roli męskiej - komenda przez {ctx.author}")
-            if roles_to_remove:
-                await user.remove_roles(*roles_to_remove, reason=f"Zmiana płci na męską - komenda przez {ctx.author}")
-            
-            await ctx.send(f"✅ Nadano rolę **{male_role.name}** dla {user.mention}")
-            logger.info(f"Nadano rolę męską ({male_role.name}) użytkownikowi {user.id} przez {ctx.author.id}")
-            
-        except discord.Forbidden:
-            await ctx.send("❌ Brak uprawnień do zarządzania rolami tego użytkownika.")
-        except Exception as e:
-            logger.error(f"Błąd podczas nadawania roli męskiej użytkownikowi {user.id}: {e}")
-            await ctx.send(f"❌ Wystąpił błąd podczas nadawania roli: {e}")
+        await self.gender_manager.assign_gender_role(ctx, user, GenderType.MALE)
 
     @commands.command(name="female", description="Nadaje rolę kobiety użytkownikowi")
     @is_mod_or_admin()
@@ -462,48 +422,7 @@ class ModCog(commands.Cog):
         :param ctx: Kontekst komendy
         :param user: Użytkownik do nadania roli kobiety
         """
-        try:
-            male_role_id = self.config.get("gender_roles", {}).get("male")
-            female_role_id = self.config.get("gender_roles", {}).get("female")
-            
-            if not female_role_id:
-                await ctx.send("❌ Role płci nie są skonfigurowane.", ephemeral=True)
-                return
-                
-            female_role = ctx.guild.get_role(female_role_id)
-            male_role = ctx.guild.get_role(male_role_id) if male_role_id else None
-            
-            if not female_role:
-                await ctx.send("❌ Nie znaleziono roli kobiecej na serwerze.", ephemeral=True)
-                return
-            
-            # Usuń rolę męską jeśli ją ma
-            roles_to_remove = []
-            if male_role and male_role in user.roles:
-                roles_to_remove.append(male_role)
-            
-            # Sprawdź czy już ma rolę kobiecą
-            if female_role in user.roles:
-                if roles_to_remove:
-                    await user.remove_roles(*roles_to_remove, reason=f"Zmiana płci na kobiecą - komenda przez {ctx.author}")
-                    await ctx.send(f"✅ Usunięto rolę męską dla {user.mention} (już miał rolę kobiecą)")
-                else:
-                    await ctx.send(f"ℹ️ {user.mention} już ma rolę kobiecą")
-                return
-            
-            # Dodaj rolę kobiecą i usuń męską jeśli trzeba
-            await user.add_roles(female_role, reason=f"Nadanie roli kobiecej - komenda przez {ctx.author}")
-            if roles_to_remove:
-                await user.remove_roles(*roles_to_remove, reason=f"Zmiana płci na kobiecą - komenda przez {ctx.author}")
-            
-            await ctx.send(f"✅ Nadano rolę **{female_role.name}** dla {user.mention}")
-            logger.info(f"Nadano rolę kobiecą ({female_role.name}) użytkownikowi {user.id} przez {ctx.author.id}")
-            
-        except discord.Forbidden:
-            await ctx.send("❌ Brak uprawnień do zarządzania rolami tego użytkownika.")
-        except Exception as e:
-            logger.error(f"Błąd podczas nadawania roli kobiecej użytkownikowi {user.id}: {e}")
-            await ctx.send(f"❌ Wystąpił błąd podczas nadawania roli: {e}")
+        await self.gender_manager.assign_gender_role(ctx, user, GenderType.FEMALE)
 
     @commands.command(name="userid", description="Wyświetla ID użytkownika o podanej nazwie")
     @is_mod_or_admin()
