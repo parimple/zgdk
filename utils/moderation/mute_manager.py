@@ -218,7 +218,11 @@ class MuteManager:
                 # Jeśli użytkownik ma włączone mutenick i już ma domyślny nick, upewnij się,
                 # że nick nie zostanie zmieniony przez dodanie/usunięcie ról
                 # WAŻNE: Nie robimy tego dla IMG, bo używa tej samej roli co NICK
-                if has_nick_mute and is_default_nick and mute_type.type_name not in [MuteType.NICK, MuteType.IMG]:
+                if (
+                    has_nick_mute
+                    and is_default_nick
+                    and mute_type.type_name not in [MuteType.NICK, MuteType.IMG]
+                ):
                     # Sprawdź, czy nick został zmieniony przez dodanie roli i natychmiast przywróć
                     current_name = user.nick
                     if current_name != default_nick:
