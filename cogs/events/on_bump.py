@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -281,6 +282,9 @@ class OnBumpEvent(commands.Cog):
                 f"Message ID: {message.id}\n"
                 f"Flags: {message.flags}"
             )
+
+            # Note: on_message_edit will handle Dzik slash command updates
+
             return True
 
         # Extract message content
@@ -410,6 +414,37 @@ class OnBumpEvent(commands.Cog):
 
         logger.debug(f"Unhandled bot message: {message_content}")
         return False
+
+    @commands.Cog.listener()
+    async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        """Handle message edits from bump bots (especially Dzik slash responses)."""
+        # Skip if not in bump channel or not from relevant bots
+        if not after.guild or after.author.id not in [DISBOARD["id"], DZIK["id"], DISCADIA["id"]]:
+            return
+
+        # Only process if the message changed significantly (content or embeds)
+        if (
+            before.content == after.content
+            and len(before.embeds) == len(after.embeds)
+            and all(e1.description == e2.description for e1, e2 in zip(before.embeds, after.embeds))
+        ):
+            return
+
+        # Special handling for Dzik slash response edits (thinking -> final)
+        if (
+            after.author.id == DZIK["id"]
+            and after.type == discord.MessageType.chat_input_command
+            and not before.embeds
+            and after.embeds
+        ):
+            logger.info(
+                f"Detected Dzik slash response edit: {before.id} -> final state with embeds"
+            )
+            await self.handle_dzik_bump(after)
+            return
+
+        # Process other edited messages as normal
+        await self.on_message(after)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):

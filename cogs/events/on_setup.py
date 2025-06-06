@@ -87,6 +87,14 @@ class OnSetupEvent(commands.Cog):
             {"name": "$2"},
         ]
         await self.ensure_roles_in_db_and_guild(temporary_roles, "temporary")
+
+        # Gender roles
+        gender_roles = [
+            {"name": "♂"},  # Male role
+            {"name": "♀"},  # Female role
+        ]
+        await self.ensure_roles_in_db_and_guild(gender_roles, "gender")
+
         logger.info("Roles setup complete")
 
     @tasks.loop(count=1)

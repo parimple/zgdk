@@ -173,4 +173,4 @@ class GenderType:
         :returns: Lista typów ról płci.
         :rtype: list
         """
-        return [cls.MALE, cls.FEMALE] 
+        return [cls.MALE, cls.FEMALE]

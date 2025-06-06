@@ -90,7 +90,7 @@ class OnMemberJoinEvent(commands.Cog):
         if not self.welcome_channel:
             logger.error(f"Failed to get welcome channel with ID {welcome_channel_id}")
 
-    async def restore_mute_roles(self, member):
+    async def restore_mute_roles_OLD_UNUSED(self, member):
         """
         Przywraca role wyciszenia użytkownikowi, który wrócił na serwer.
 
@@ -311,10 +311,10 @@ class OnMemberJoinEvent(commands.Cog):
             )
             return
 
-        # Przywróć role wyciszenia, jeśli były przypisane wcześniej
-        await self.restore_mute_roles(member)
+        # Przywróć wszystkie role jednocześnie (muty, gender)
+        await self.restore_all_roles(member)
 
-        # Przywróć uprawnienia głosowe, jeśli były przypisane wcześniej
+        # Przywróć uprawnienia głosowe osobno (to nie są role)
         await self.restore_voice_permissions(member)
 
         # Check if we have invites dictionary initialized
@@ -697,6 +697,73 @@ class OnMemberJoinEvent(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error notifying user {user_id} about deleted invite {invite_id}: {e}")
+
+    async def restore_all_roles(self, member):
+        """
+        Przywraca wszystkie role jednocześnie (muty, gender) dla użytkownika.
+
+        Zbiera wszystkie role z bazy danych i nadaje je jednym wywołaniem Discord API.
+        Bardziej wydajne niż osobne wywołania dla każdego typu roli.
+        """
+        logger.info(
+            f"Sprawdzanie i przywracanie wszystkich ról dla {member.display_name} ({member.id})"
+        )
+
+        roles_to_add = []
+
+        try:
+            async with self.bot.get_db() as session:
+                # Pobierz wszystkie role użytkownika z bazy danych
+                all_role_records = await RoleQueries.get_roles_for_member(session, member.id)
+
+                if all_role_records:
+                    for role_record in all_role_records:
+                        # Sprawdź czy rola istnieje na serwerze
+                        discord_role = self.guild.get_role(role_record.role_id)
+                        if not discord_role:
+                            logger.warning(f"Rola {role_record.role_id} nie istnieje na serwerze")
+                            continue
+
+                        # Sprawdź czy użytkownik już ma tę rolę
+                        if discord_role in member.roles:
+                            logger.info(f"Użytkownik już ma rolę {discord_role.name}")
+                            continue
+
+                        # Dodaj role wyciszenia (mute types)
+                        if role_record.role_type in ["text", "voice", "full"]:
+                            # Sprawdź czy role wyciszenia nie wygasły
+                            if (
+                                role_record.expiration_date
+                                and role_record.expiration_date < datetime.now(timezone.utc)
+                            ):
+                                logger.info(f"Rola wyciszenia {discord_role.name} wygasła, pomijam")
+                                continue
+                            roles_to_add.append(discord_role)
+                            logger.info(
+                                f"Zaplanowano przywrócenie roli wyciszenia {role_record.role_type}: {discord_role.name}"
+                            )
+
+                        # Dodaj role gender
+                        elif role_record.role_type == "gender":
+                            roles_to_add.append(discord_role)
+                            logger.info(
+                                f"Zaplanowano przywrócenie roli gender: {discord_role.name}"
+                            )
+
+                # Nadaj wszystkie role jednocześnie
+                if roles_to_add:
+                    await member.add_roles(
+                        *roles_to_add, reason="Przywracanie ról po powrocie na serwer"
+                    )
+                    role_names = [role.name for role in roles_to_add]
+                    logger.info(
+                        f"Przywrócono {len(roles_to_add)} ról dla {member.display_name}: {', '.join(role_names)}"
+                    )
+                else:
+                    logger.info(f"Użytkownik {member.id} nie ma żadnych ról do przywrócenia")
+
+        except Exception as e:
+            logger.error(f"Błąd podczas przywracania ról dla {member.id}: {str(e)}")
 
     async def restore_voice_permissions(self, member):
         """

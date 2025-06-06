@@ -10,7 +10,7 @@ from discord.ext import commands
 
 from datasources.queries import MemberQueries, RoleQueries
 from utils.message_sender import MessageSender
-from utils.moderation import MessageCleaner, MuteManager, MuteType, GenderManager, GenderType
+from utils.moderation import GenderManager, GenderType, MessageCleaner, MuteManager, MuteType
 from utils.permissions import is_admin, is_mod_or_admin, is_owner_or_admin
 
 logger = logging.getLogger(__name__)
@@ -408,7 +408,7 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def male(self, ctx: commands.Context, user: discord.Member):
         """Nadaje rolę mężczyzny użytkownikowi.
-        
+
         :param ctx: Kontekst komendy
         :param user: Użytkownik do nadania roli mężczyzny
         """
@@ -418,7 +418,7 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def female(self, ctx: commands.Context, user: discord.Member):
         """Nadaje rolę kobiety użytkownikowi.
-        
+
         :param ctx: Kontekst komendy
         :param user: Użytkownik do nadania roli kobiety
         """

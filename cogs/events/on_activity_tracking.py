@@ -33,27 +33,23 @@ class OnActivityTracking(commands.Cog):
         """Check if member has the 'points_off' role based on config."""
         mute_roles = self.bot.config.get("mute_roles", [])
         points_off_role = None
-        
+
         # Find the points_off role from config
         for role_config in mute_roles:
             if role_config.get("description") == "points_off":
                 points_off_role = role_config.get("name")
                 break
-        
+
         if not points_off_role:
             # Fallback to hardcoded if not found in config
             points_off_role = "♺"
-        
+
         return any(role.name == points_off_role for role in member.roles)
-
-
 
     def cog_unload(self):
         """Clean up when cog is unloaded."""
         self.voice_point_tracker.cancel()
         self.promotion_checker.cancel()
-
-
 
     @commands.Cog.listener()
     async def on_voice_state_update(
