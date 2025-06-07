@@ -165,7 +165,7 @@ class OnActivityTracking(commands.Cog):
                     # Check for anti-promotion (promoting other servers)
                     if await self.activity_manager.check_member_antipromo_status(member):
                         # Log but don't reset points automatically (as per user request)
-                        logger.warning(
+                        logger.debug(
                             f"Member {member.display_name} ({member.id}) is promoting other servers"
                         )
 
