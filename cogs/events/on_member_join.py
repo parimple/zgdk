@@ -714,7 +714,7 @@ class OnMemberJoinEvent(commands.Cog):
         try:
             async with self.bot.get_db() as session:
                 # Pobierz wszystkie role użytkownika z bazy danych
-                all_role_records = await RoleQueries.get_roles_for_member(session, member.id)
+                all_role_records = await RoleQueries.get_member_roles(session, member.id)
 
                 if all_role_records:
                     for role_record in all_role_records:
@@ -730,7 +730,7 @@ class OnMemberJoinEvent(commands.Cog):
                             continue
 
                         # Dodaj role wyciszenia (mute types)
-                        if role_record.role_type in ["text", "voice", "full"]:
+                        if role_record.role.role_type in ["text", "voice", "full"]:
                             # Sprawdź czy role wyciszenia nie wygasły
                             if (
                                 role_record.expiration_date
@@ -740,11 +740,11 @@ class OnMemberJoinEvent(commands.Cog):
                                 continue
                             roles_to_add.append(discord_role)
                             logger.info(
-                                f"Zaplanowano przywrócenie roli wyciszenia {role_record.role_type}: {discord_role.name}"
+                                f"Zaplanowano przywrócenie roli wyciszenia {role_record.role.role_type}: {discord_role.name}"
                             )
 
                         # Dodaj role gender
-                        elif role_record.role_type == "gender":
+                        elif role_record.role.role_type == "gender":
                             roles_to_add.append(discord_role)
                             logger.info(
                                 f"Zaplanowano przywrócenie roli gender: {discord_role.name}"
