@@ -11,7 +11,14 @@ import discord
 from discord.ext import commands, tasks
 
 from cogs.commands.info import remove_premium_role_mod_permissions
-from datasources.queries import ChannelPermissionQueries, NotificationLogQueries, RoleQueries
+from datasources.queries import (
+    ChannelPermissionQueries,
+    NotificationLogQueries,
+    RoleQueries,
+    HandledPaymentQueries,
+    MemberQueries,
+    ModerationLogQueries,
+)
 from utils.currency import CURRENCY_UNIT, g_to_pln
 from utils.role_manager import RoleManager
 
@@ -252,6 +259,42 @@ class OnTaskEvent(commands.Cog):
                 include_renewal_info=False,
                 log_prefix="MuteRemoval",
             )
+
+            # Log the automatic unmute action to database
+            try:
+                async with self.bot.get_db() as session:
+                    # Mapuj opis roli na typ mute'a
+                    mute_type_mapping = {
+                        "stream_off": "live",
+                        "send_messages_off": "txt", 
+                        "attach_files_off": "img",  # lub "nick" w zależności od kontekstu
+                        "points_off": "rank"
+                    }
+                    mute_type = mute_type_mapping.get(role_desc, "unknown")
+                    
+                    # Użyj ID bota jako moderatora dla automatycznych akcji
+                    bot_id = self.bot.user.id
+                    
+                    # Upewnij się, że użytkownicy istnieją w bazie
+                    await MemberQueries.get_or_add_member(session, member.id)
+                    await MemberQueries.get_or_add_member(session, bot_id)
+                    
+                    # Zapisz automatyczne unmute do logu
+                    await ModerationLogQueries.log_mute_action(
+                        session=session,
+                        target_user_id=member.id,
+                        moderator_id=bot_id,  # Bot jako moderator dla automatycznych akcji
+                        action_type="unmute",
+                        mute_type=mute_type,
+                        duration_seconds=None,
+                        reason="Automatyczne usunięcie - wygaśnięcie czasu",
+                        channel_id=0,  # Brak kanału dla automatycznych akcji
+                    )
+                    await session.commit()
+                    
+                    logger.info(f"Saved automatic unmute to database: user {member.id}, type {mute_type}")
+            except Exception as db_error:
+                logger.error(f"Error saving automatic unmute to database: {db_error}", exc_info=True)
 
             # Log the automatic unmute action to the log channel
             await self._log_automatic_unmute_action(member, member_role, role)

@@ -13,7 +13,7 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from datasources.queries import MemberQueries, RoleQueries
+from datasources.queries import MemberQueries, ModerationLogQueries, RoleQueries
 from utils.message_sender import MessageSender
 from utils.moderation.mute_type import MuteType
 
@@ -539,7 +539,7 @@ class MuteManager:
         duration: Optional[timedelta] = None,
         unmute: bool = False,
     ):
-        """Loguje akcję wyciszenia/odciszenia na kanale logów.
+        """Loguje akcję wyciszenia/odciszenia na kanale logów i w bazie danych.
 
         :param ctx: Kontekst komendy
         :type ctx: discord.ext.commands.Context
@@ -553,6 +553,39 @@ class MuteManager:
         :type unmute: bool
         """
         try:
+            # Zapisz akcję do bazy danych
+            try:
+                async with self.bot.get_db() as session:
+                    # Upewnij się, że użytkownicy istnieją w bazie
+                    await MemberQueries.get_or_add_member(session, user.id)
+                    await MemberQueries.get_or_add_member(session, ctx.author.id)
+                    
+                    # Oblicz czas trwania w sekundach
+                    duration_seconds = None
+                    if duration is not None:
+                        duration_seconds = int(duration.total_seconds())
+                    
+                    # Zapisz log akcji
+                    await ModerationLogQueries.log_mute_action(
+                        session=session,
+                        target_user_id=user.id,
+                        moderator_id=ctx.author.id,
+                        action_type="unmute" if unmute else "mute",
+                        mute_type=mute_type.type_name,
+                        duration_seconds=duration_seconds,
+                        reason=None,  # Możemy to rozszerzyć w przyszłości
+                        channel_id=ctx.channel.id,
+                    )
+                    await session.commit()
+                    
+                    logger.info(
+                        f"Saved {'unmute' if unmute else 'mute'} action to database: "
+                        f"user {user.id}, moderator {ctx.author.id}, type {mute_type.type_name}"
+                    )
+            except Exception as db_error:
+                logger.error(f"Error saving mute action to database: {db_error}", exc_info=True)
+                # Kontynuuj z logowaniem na kanale nawet jeśli baza danych zawiedzie
+
             # Pobierz odpowiedni kanał logów z konfiguracji w zależności od typu akcji
             log_config_key = "unmute_logs" if unmute else "mute_logs"
             log_channel_id = self.config.get("channels", {}).get(log_config_key)
