@@ -466,36 +466,38 @@ class ModCog(commands.Cog):
         """
         if limit > 50:
             limit = 50
-        
+
         try:
             async with self.bot.get_db() as session:
                 # Pobierz historię mute'ów
                 history = await ModerationLogQueries.get_user_mute_history(session, user.id, limit)
-                
+
                 if not history:
                     embed = discord.Embed(
                         title="Historia mute'ów",
                         description=f"Użytkownik {user.mention} nie ma żadnych akcji moderatorskich w historii.",
-                        color=discord.Color.green()
+                        color=discord.Color.green(),
                     )
                     await ctx.reply(embed=embed)
                     return
-                
+
                 # Stwórz embed z historią
                 embed = discord.Embed(
                     title=f"Historia mute'ów - {user.display_name}",
                     description=f"Ostatnie {len(history)} akcji moderatorskich",
-                    color=user.color or discord.Color.blue()
+                    color=user.color or discord.Color.blue(),
                 )
                 embed.set_thumbnail(url=user.display_avatar.url)
-                
+
                 # Dodaj pola z historią (maksymalnie 25 pól na embed)
                 for i, log in enumerate(history[:25]):
                     action_emoji = "🔇" if log.action_type == "mute" else "🔓"
                     moderator_name = "Nieznany"
                     if log.moderator:
-                        moderator_name = log.moderator.id  # Będziemy pokazywać ID, bo nie mamy dostępu do nazwy
-                    
+                        moderator_name = (
+                            log.moderator.id
+                        )  # Będziemy pokazywać ID, bo nie mamy dostępu do nazwy
+
                     # Formatuj czas trwania
                     duration_text = "Permanentne"
                     if log.duration_seconds:
@@ -507,32 +509,32 @@ class ModCog(commands.Cog):
                             duration_text = f"{minutes}m"
                         else:
                             duration_text = f"{seconds}s"
-                    
+
                     # Formatuj typ mute'a
                     mute_type_text = log.mute_type.upper() if log.mute_type else "N/A"
-                    
+
                     field_value = (
                         f"**Typ:** {mute_type_text}\n"
                         f"**Moderator:** <@{log.moderator_id}>\n"
                         f"**Czas:** {duration_text if log.action_type == 'mute' else 'N/A'}\n"
                         f"**Data:** {discord.utils.format_dt(log.created_at, 'f')}"
                     )
-                    
+
                     embed.add_field(
                         name=f"{action_emoji} {log.action_type.upper()} #{len(history) - i}",
                         value=field_value,
-                        inline=True
+                        inline=True,
                     )
-                
+
                 if len(history) > 25:
                     embed.add_field(
                         name="ℹ️ Informacja",
                         value=f"Pokazano 25 z {len(history)} akcji. Użyj mniejszego limitu dla nowszych akcji.",
-                        inline=False
+                        inline=False,
                     )
-                
+
                 await ctx.reply(embed=embed)
-                
+
         except Exception as e:
             logger.error(f"Error retrieving mute history for user {user.id}: {e}", exc_info=True)
             await ctx.send("Wystąpił błąd podczas pobierania historii mute'ów.")
@@ -547,64 +549,62 @@ class ModCog(commands.Cog):
         """
         if days > 365:
             days = 365
-        
+
         try:
             async with self.bot.get_db() as session:
                 stats = await ModerationLogQueries.get_mute_statistics(session, days)
-                
+
                 # Stwórz embed ze statystykami
                 embed = discord.Embed(
                     title="📊 Statystyki mute'ów",
                     description=f"Podsumowanie z ostatnich {days} dni",
                     color=discord.Color.orange(),
-                    timestamp=datetime.now(timezone.utc)
+                    timestamp=datetime.now(timezone.utc),
                 )
-                
+
                 # Ogólne statystyki
                 embed.add_field(
                     name="📋 Ogólne",
                     value=f"**Całkowite mute'y:** {stats['total_mutes']}",
-                    inline=False
+                    inline=False,
                 )
-                
+
                 # Statystyki według typu mute'a
-                if stats['mute_types']:
+                if stats["mute_types"]:
                     types_text = ""
-                    for mute_type, count in stats['mute_types'].items():
+                    for mute_type, count in stats["mute_types"].items():
                         types_text += f"**{mute_type.upper()}:** {count}\n"
-                    
+
                     embed.add_field(
-                        name="🏷️ Według typu",
-                        value=types_text or "Brak danych",
-                        inline=True
+                        name="🏷️ Według typu", value=types_text or "Brak danych", inline=True
                     )
-                
+
                 # Top mutowani użytkownicy
-                if stats['top_muted_users']:
+                if stats["top_muted_users"]:
                     users_text = ""
-                    for i, (user_id, count) in enumerate(stats['top_muted_users'][:5], 1):
+                    for i, (user_id, count) in enumerate(stats["top_muted_users"][:5], 1):
                         users_text += f"{i}. <@{user_id}> - {count} mute'ów\n"
-                    
+
                     embed.add_field(
                         name="👤 Najczęściej mutowani",
                         value=users_text or "Brak danych",
-                        inline=True
+                        inline=True,
                     )
-                
+
                 # Top moderatorzy
-                if stats['top_moderators']:
+                if stats["top_moderators"]:
                     mods_text = ""
-                    for i, (mod_id, count) in enumerate(stats['top_moderators'][:5], 1):
+                    for i, (mod_id, count) in enumerate(stats["top_moderators"][:5], 1):
                         mods_text += f"{i}. <@{mod_id}> - {count} akcji\n"
-                    
+
                     embed.add_field(
                         name="👮 Najaktywniejszi moderatorzy",
                         value=mods_text or "Brak danych",
-                        inline=True
+                        inline=True,
                     )
-                
+
                 await ctx.reply(embed=embed)
-                
+
         except Exception as e:
             logger.error(f"Error retrieving mute statistics: {e}", exc_info=True)
             await ctx.send("Wystąpił błąd podczas pobierania statystyk mute'ów.")
@@ -620,33 +620,47 @@ class ModCog(commands.Cog):
         """
         if days > 365:
             days = 365
-        
+
         try:
             async with self.bot.get_db() as session:
                 mute_count = await ModerationLogQueries.get_user_mute_count(session, user.id, days)
-                
+
                 # Stwórz embed z wynikiem
-                color = discord.Color.green() if mute_count == 0 else discord.Color.orange() if mute_count < 5 else discord.Color.red()
-                
+                color = (
+                    discord.Color.green()
+                    if mute_count == 0
+                    else discord.Color.orange()
+                    if mute_count < 5
+                    else discord.Color.red()
+                )
+
                 embed = discord.Embed(
                     title="📊 Liczba mute'ów",
                     description=f"Użytkownik {user.mention} miał **{mute_count}** mute'ów w ostatnich {days} dniach.",
-                    color=color
+                    color=color,
                 )
                 embed.set_thumbnail(url=user.display_avatar.url)
-                
+
                 # Dodaj ocenę
                 if mute_count == 0:
-                    embed.add_field(name="✅ Ocena", value="Użytkownik nie ma żadnych mute'ów!", inline=False)
+                    embed.add_field(
+                        name="✅ Ocena", value="Użytkownik nie ma żadnych mute'ów!", inline=False
+                    )
                 elif mute_count < 3:
-                    embed.add_field(name="⚠️ Ocena", value="Niewiele mute'ów - dobry użytkownik", inline=False)
+                    embed.add_field(
+                        name="⚠️ Ocena", value="Niewiele mute'ów - dobry użytkownik", inline=False
+                    )
                 elif mute_count < 10:
-                    embed.add_field(name="⚠️ Ocena", value="Średnio problematyczny użytkownik", inline=False)
+                    embed.add_field(
+                        name="⚠️ Ocena", value="Średnio problematyczny użytkownik", inline=False
+                    )
                 else:
-                    embed.add_field(name="🚫 Ocena", value="Bardzo problematyczny użytkownik!", inline=False)
-                
+                    embed.add_field(
+                        name="🚫 Ocena", value="Bardzo problematyczny użytkownik!", inline=False
+                    )
+
                 await ctx.reply(embed=embed)
-                
+
         except Exception as e:
             logger.error(f"Error retrieving mute count for user {user.id}: {e}", exc_info=True)
             await ctx.send("Wystąpił błąd podczas sprawdzania liczby mute'ów.")

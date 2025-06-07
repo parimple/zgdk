@@ -233,8 +233,12 @@ class ModerationLog(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     target_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), nullable=False)
     moderator_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), nullable=False)
-    action_type: Mapped[str] = mapped_column(String, nullable=False)  # 'mute', 'unmute', 'kick', 'ban'
-    mute_type: Mapped[str] = mapped_column(String, nullable=True)  # 'nick', 'img', 'txt', 'live', 'rank'
+    action_type: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # 'mute', 'unmute', 'kick', 'ban'
+    mute_type: Mapped[str] = mapped_column(
+        String, nullable=True
+    )  # 'nick', 'img', 'txt', 'live', 'rank'
     duration_seconds: Mapped[int] = mapped_column(Integer, nullable=True)  # NULL = permanentny
     reason: Mapped[str] = mapped_column(String, nullable=True)
     channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)

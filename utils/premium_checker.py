@@ -151,9 +151,11 @@ class PremiumChecker:
         if not self.has_discord_invite_in_status(ctx):
             return False
 
-        # Check invite count
+        # Check invite count (with validation like legacy system)
         async with self.bot.get_db() as session:
-            invite_count = await InviteQueries.get_member_invite_count(session, ctx.author.id)
+            invite_count = await InviteQueries.get_member_valid_invite_count(
+                session, ctx.author.id, ctx.guild, min_days=7
+            )
             return invite_count >= 4
 
     async def debug_alternative_access(self, ctx: commands.Context) -> str:
@@ -162,7 +164,9 @@ class PremiumChecker:
         has_status = self.has_discord_invite_in_status(ctx)
 
         async with self.bot.get_db() as session:
-            invite_count = await InviteQueries.get_member_invite_count(session, ctx.author.id)
+            invite_count = await InviteQueries.get_member_valid_invite_count(
+                session, ctx.author.id, ctx.guild, min_days=7
+            )
 
         # Debug activities
         activities_debug = []

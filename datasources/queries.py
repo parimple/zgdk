@@ -1138,6 +1138,65 @@ class InviteQueries:
             logger.error(f"Error getting invite count for member {member_id}: {e}")
             return 0
 
+    @staticmethod
+    async def get_member_valid_invite_count(
+        session: AsyncSession, member_id: int, guild, min_days: int = 7
+    ) -> int:
+        """
+        Get count of valid invites for a specific member (like in legacy system).
+        Only counts users who:
+        - Are still on the server
+        - Have an avatar
+        - Have joined_at timestamp
+        - Account age difference (joined_at - created_at) > min_days
+
+        :param session: Database session
+        :param member_id: ID of the member whose invites to count
+        :param guild: Discord guild object
+        :param min_days: Minimum account age difference in days (default 7)
+        :return: Count of valid invites
+        """
+        try:
+            # Get all members invited by this user from database
+            query = select(Member).where(Member.current_inviter_id == member_id)
+            result = await session.execute(query)
+            invited_members = result.scalars().all()
+
+            valid_count = 0
+
+            for db_member in invited_members:
+                # Get Discord member object
+                discord_member = guild.get_member(db_member.id)
+
+                if not discord_member:
+                    # User is no longer on the server
+                    continue
+
+                if not discord_member.avatar:
+                    # User has no avatar
+                    continue
+
+                if not discord_member.joined_at:
+                    # No joined_at timestamp
+                    continue
+
+                # Check account age difference
+                account_age_diff = discord_member.joined_at - discord_member.created_at
+                if account_age_diff <= timedelta(days=min_days):
+                    # Account too new (potential bot/fake account)
+                    continue
+
+                valid_count += 1
+
+            logger.debug(
+                f"Valid invite count for member {member_id}: {valid_count} (from {len(invited_members)} total)"
+            )
+            return valid_count
+
+        except Exception as e:
+            logger.error(f"Error getting valid invite count for member {member_id}: {e}")
+            return 0
+
 
 class AutoKickQueries:
     """Class for AutoKick Queries"""
@@ -1387,7 +1446,7 @@ class ModerationLogQueries:
             channel_id=channel_id,
             expires_at=expires_at,
         )
-        
+
         session.add(moderation_log)
         await session.flush()
         return moderation_log
@@ -1408,12 +1467,10 @@ class ModerationLogQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def get_user_mute_count(
-        session: AsyncSession, user_id: int, days_back: int = 30
-    ) -> int:
+    async def get_user_mute_count(session: AsyncSession, user_id: int, days_back: int = 30) -> int:
         """Zlicza ile razy użytkownik był mutowany w ostatnich X dniach"""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
-        
+
         result = await session.execute(
             select(func.count(ModerationLog.id))
             .where(ModerationLog.target_user_id == user_id)
@@ -1424,15 +1481,15 @@ class ModerationLogQueries:
 
     @staticmethod
     async def get_moderator_actions(
-        session: AsyncSession, 
-        moderator_id: int, 
+        session: AsyncSession,
+        moderator_id: int,
         action_type: Optional[str] = None,
         days_back: int = 30,
-        limit: int = 100
+        limit: int = 100,
     ) -> List[ModerationLog]:
         """Pobiera akcje wykonane przez moderatora"""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
-        
+
         query = (
             select(ModerationLog)
             .options(joinedload(ModerationLog.target_user))
@@ -1441,20 +1498,18 @@ class ModerationLogQueries:
             .order_by(ModerationLog.created_at.desc())
             .limit(limit)
         )
-        
+
         if action_type:
             query = query.where(ModerationLog.action_type == action_type)
-            
+
         result = await session.execute(query)
         return result.scalars().all()
 
     @staticmethod
-    async def get_mute_statistics(
-        session: AsyncSession, days_back: int = 30
-    ) -> Dict[str, any]:
+    async def get_mute_statistics(session: AsyncSession, days_back: int = 30) -> Dict[str, any]:
         """Pobiera statystyki mute'ów z ostatnich X dni"""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
-        
+
         # Wszystkie mute'y w okresie
         total_mutes_result = await session.execute(
             select(func.count(ModerationLog.id))
@@ -1462,7 +1517,7 @@ class ModerationLogQueries:
             .where(ModerationLog.created_at >= cutoff_date)
         )
         total_mutes = total_mutes_result.scalar() or 0
-        
+
         # Statystyki według typu mute'a
         mute_types_result = await session.execute(
             select(ModerationLog.mute_type, func.count(ModerationLog.id))
@@ -1473,7 +1528,7 @@ class ModerationLogQueries:
             .order_by(func.count(ModerationLog.id).desc())
         )
         mute_types = dict(mute_types_result.all())
-        
+
         # Top użytkownicy z największą liczbą mute'ów
         top_muted_users_result = await session.execute(
             select(ModerationLog.target_user_id, func.count(ModerationLog.id))
@@ -1484,7 +1539,7 @@ class ModerationLogQueries:
             .limit(10)
         )
         top_muted_users = top_muted_users_result.all()
-        
+
         # Top moderatorzy z największą aktywnością
         top_moderators_result = await session.execute(
             select(ModerationLog.moderator_id, func.count(ModerationLog.id))
@@ -1495,26 +1550,21 @@ class ModerationLogQueries:
             .limit(10)
         )
         top_moderators = top_moderators_result.all()
-        
+
         return {
             "total_mutes": total_mutes,
             "mute_types": mute_types,
             "top_muted_users": top_muted_users,
             "top_moderators": top_moderators,
-            "period_days": days_back
+            "period_days": days_back,
         }
 
     @staticmethod
-    async def get_recent_actions(
-        session: AsyncSession, limit: int = 20
-    ) -> List[ModerationLog]:
+    async def get_recent_actions(session: AsyncSession, limit: int = 20) -> List[ModerationLog]:
         """Pobiera ostatnie akcje moderatorskie"""
         result = await session.execute(
             select(ModerationLog)
-            .options(
-                joinedload(ModerationLog.target_user),
-                joinedload(ModerationLog.moderator)
-            )
+            .options(joinedload(ModerationLog.target_user), joinedload(ModerationLog.moderator))
             .order_by(ModerationLog.created_at.desc())
             .limit(limit)
         )

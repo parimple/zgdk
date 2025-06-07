@@ -177,6 +177,12 @@ class InfoCog(commands.Cog):
             )
             colors = colors_query.scalars().all()
 
+            # Get invite count for this member (with validation like legacy system)
+            # Use 7 days as minimum account age (like in legacy with GUILD["join_days"])
+            invite_count = await InviteQueries.get_member_valid_invite_count(
+                session, member.id, ctx.guild, min_days=7
+            )
+
         current_time = datetime.now(timezone.utc)
         logger.info(f"Current time: {current_time}")
         # Filtruj role premium, aby przetwarzać tylko aktywne w logice profilu
@@ -201,10 +207,30 @@ class InfoCog(commands.Cog):
                 f"Found expired premium roles in DB for {member.id} during profile check: {expired_premium_roles_in_profile_check}"
             )
 
+        # Check for active mute roles
+        mute_roles_config = self.bot.config.get("mute_roles", [])
+        active_mutes = []
+        has_any_mute = False
+
+        for mute_config in mute_roles_config:
+            mute_role = ctx.guild.get_role(mute_config["id"])
+            if mute_role and mute_role in member.roles:
+                has_any_mute = True
+                # Map role descriptions to user-friendly names
+                mute_display_names = {
+                    "stream_off": "Stream",
+                    "send_messages_off": "Wiadomości",
+                    "attach_files_off": "Obrazki/Linki",
+                    "points_off": "Ranking",
+                }
+                display_name = mute_display_names.get(
+                    mute_config["description"], mute_config["name"]
+                )
+                active_mutes.append(display_name)
+
         embed = discord.Embed(
             title=f"{member}",
             color=member.color,
-            timestamp=ctx.message.created_at,
         )
 
         embed.set_thumbnail(url=member.display_avatar.url)
@@ -226,6 +252,14 @@ class InfoCog(commands.Cog):
             if member.joined_at
             else "Brak danych",
         )
+
+        # Add invite count
+        embed.add_field(name="Zaproszenia:", value=f"{invite_count}", inline=True)
+
+        # Add mute information if user has any mutes
+        if active_mutes:
+            mutes_text = ", ".join(active_mutes)
+            embed.add_field(name="Aktywne muty:", value=mutes_text, inline=True)
 
         if active_premium_roles:  # Użyj przefiltrowanych aktywnych ról
             # Jeśli są aktywne role premium, usuń je z ogólnej listy ról, aby uniknąć duplikacji
@@ -259,6 +293,18 @@ class InfoCog(commands.Cog):
 
         if member.banner:
             embed.set_image(url=member.banner.url)
+
+        # Add "Wybierz swój plan" info (always shown)
+        _, premium_text = MessageSender._get_premium_text(ctx)
+        if premium_text:
+            embed.add_field(name="\u200b", value=premium_text, inline=False)
+
+        # Add footer with mute removal info if user has any mutes
+        if active_mutes:
+            embed.set_footer(
+                text="💡 Zakup dowolnej rangi premium automatycznie usuwa wszystkie muty",
+                icon_url=self.bot.user.display_avatar.url,
+            )
 
         view = ProfileView(
             self.bot, member, active_premium_roles, ctx.author

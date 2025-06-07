@@ -559,12 +559,12 @@ class MuteManager:
                     # Upewnij się, że użytkownicy istnieją w bazie
                     await MemberQueries.get_or_add_member(session, user.id)
                     await MemberQueries.get_or_add_member(session, ctx.author.id)
-                    
+
                     # Oblicz czas trwania w sekundach
                     duration_seconds = None
                     if duration is not None:
                         duration_seconds = int(duration.total_seconds())
-                    
+
                     # Zapisz log akcji
                     await ModerationLogQueries.log_mute_action(
                         session=session,
@@ -577,7 +577,7 @@ class MuteManager:
                         channel_id=ctx.channel.id,
                     )
                     await session.commit()
-                    
+
                     logger.info(
                         f"Saved {'unmute' if unmute else 'mute'} action to database: "
                         f"user {user.id}, moderator {ctx.author.id}, type {mute_type.type_name}"
