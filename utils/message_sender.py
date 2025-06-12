@@ -806,6 +806,66 @@ class MessageSender:
         await MessageSender._send_embed(ctx, embed, reply=True, view=view)
 
     @staticmethod
+    async def send_tier_t_bypass_required(ctx):
+        """Send message when user needs T>0 for TIER_T commands (like limit)."""
+        services = ["disboard", "dzik", "discadia", "discordservers", "dsme"]
+        available_services = []
+
+        for service in services:
+            status = await BumpChecker(ctx.bot).get_service_status(service, ctx.author.id)
+            if status["available"]:
+                available_services.append((service, status))
+
+        # Create more specific description for TIER_T
+        embed = MessageSender._create_embed(
+            description="**Masz 0T!** Zbumpuj serwer żeby móc użyć tej komendy (wystarczy minimum 1T).",
+            ctx=ctx,
+        )
+
+        # Add available services
+        if available_services:
+            available_text = []
+            for service, status in available_services:
+                emoji = BumpChecker.get_service_emoji(service)
+                details = BumpChecker.get_service_details(service)
+                service_text = f"{emoji} **{details['name']}** • {details['cooldown']} {details['cooldown_type']} • {details['reward']} • "
+                if "command" in details:
+                    service_text += f"`{details['command']}`"
+                elif "url" in details:
+                    service_text += f"[Zagłosuj]({details['url']})"
+                available_text.append(service_text)
+
+            if available_text:
+                embed.add_field(
+                    name="💰 Zbumpuj i odbierz T:", value="\n".join(available_text), inline=False
+                )
+
+        # Create view with buttons for voting services
+        view = None
+        if available_services:
+            view = discord.ui.View()
+            for service, status in available_services:
+                details = BumpChecker.get_service_details(service)
+                if "url" in details:
+                    emoji = BumpChecker.get_service_emoji(service)
+                    button = discord.ui.Button(
+                        style=discord.ButtonStyle.link,
+                        label=details["name"],
+                        emoji=emoji,
+                        url=details["url"],
+                    )
+                    view.add_item(button)
+
+        # Add channel info as the last field
+        channel = ctx.author.voice.channel if ctx.author.voice else None
+        if channel:
+            _, channel_text = MessageSender._get_premium_text(ctx, channel)
+            if channel_text:
+                embed.add_field(name="\u200b", value=channel_text, inline=False)
+
+        await MessageSender._send_embed(ctx, embed, reply=True, view=view)
+
+    @staticmethod
     async def send_premium_required(ctx):
         """Send message when premium role is required."""
         base_text = "Aby użyć tej komendy, wybierz plan lub zaproś 4 znajomych na serwer (ranga ♵)!"

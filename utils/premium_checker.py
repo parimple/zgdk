@@ -66,9 +66,13 @@ class PremiumChecker:
 
     async def has_active_bypass(self, ctx: commands.Context) -> bool:
         """Check if user has active T (bypass)."""
-        async with self.bot.get_db() as session:
-            bypass_until = await MemberQueries.get_voice_bypass_status(session, ctx.author.id)
-            return bypass_until is not None and bypass_until > datetime.now(timezone.utc)
+        try:
+            async with self.bot.get_db() as session:
+                bypass_until = await MemberQueries.get_voice_bypass_status(session, ctx.author.id)
+                return bypass_until is not None and bypass_until > datetime.now(timezone.utc)
+        except Exception as e:
+            logger.error(f"Error in has_active_bypass for user {ctx.author.id}: {e}")
+            return False
 
     def has_booster_roles(self, ctx: commands.Context) -> bool:
         """Check if user has booster or invite role."""
@@ -145,18 +149,27 @@ class PremiumChecker:
         Check if user qualifies for alternative bypass access.
         Requirements: booster role + 4+ invites + discord.gg/zagadka in status
         """
-        if not self.has_booster_roles(ctx):
-            return False
+        try:
+            logger.debug(f"Checking alternative bypass access for user {ctx.author.id}")
 
-        if not self.has_discord_invite_in_status(ctx):
-            return False
+            if not self.has_booster_roles(ctx):
+                logger.debug(f"User {ctx.author.id} does not have booster roles")
+                return False
 
-        # Check invite count (with validation like legacy system)
-        async with self.bot.get_db() as session:
-            invite_count = await InviteQueries.get_member_valid_invite_count(
-                session, ctx.author.id, ctx.guild, min_days=7
-            )
-            return invite_count >= 4
+            if not self.has_discord_invite_in_status(ctx):
+                logger.debug(f"User {ctx.author.id} does not have discord invite in status")
+                return False
+
+            # Check invite count (with validation like legacy system)
+            async with self.bot.get_db() as session:
+                invite_count = await InviteQueries.get_member_valid_invite_count(
+                    session, ctx.author.id, ctx.guild, min_days=7
+                )
+                logger.debug(f"User {ctx.author.id} has {invite_count} valid invites")
+                return invite_count >= 4
+        except Exception as e:
+            logger.error(f"Error in has_alternative_bypass_access for user {ctx.author.id}: {e}")
+            return False
 
     async def debug_alternative_access(self, ctx: commands.Context) -> str:
         """Debug function to check alternative access requirements."""
@@ -281,7 +294,7 @@ class PremiumChecker:
             # TIER_T - Requires only T>0 OR alternative access (booster + 4 invites + status)
             if command_tier == CommandTier.TIER_T:
                 if not has_bypass and not has_premium and not has_alternative_access:
-                    await checker.message_sender.send_bypass_expired(ctx)
+                    await checker.message_sender.send_tier_t_bypass_required(ctx)
                     return False
                 return True
 
@@ -360,7 +373,7 @@ class PremiumChecker:
             if voice_channel:
                 perms = voice_channel.overwrites_for(ctx.author)
                 is_channel_mod = (
-                    perms and perms.manage_messages is True and not perms.priority_speaker
+                    perms and perms.manage_messages is True and perms.priority_speaker is not True
                 )
 
             # TIER_0 - Available to everyone without any requirements
@@ -370,7 +383,7 @@ class PremiumChecker:
             # TIER_T - Requires only T>0 OR alternative access (booster + 4 invites + status)
             if command_tier == CommandTier.TIER_T:
                 if not has_bypass and not has_premium and not has_alternative_access:
-                    await checker.message_sender.send_bypass_expired(ctx)
+                    await checker.message_sender.send_tier_t_bypass_required(ctx)
                     return False
                 return True
 

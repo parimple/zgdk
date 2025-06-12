@@ -214,6 +214,154 @@ class OnPaymentEvent(commands.Cog):
                     f"Processing payment for {member.display_name} - original: {original_amount}, final: {final_amount}"
                 )
 
+                # Get user's current highest premium role before processing
+                highest_role_name = self.role_manager.get_user_highest_role_name(member)
+                highest_role_priority = (
+                    self.role_manager.PREMIUM_PRIORITY.get(highest_role_name, 0)
+                    if highest_role_name
+                    else 0
+                )
+
+                # Check if the original amount (before legacy conversion) would result in a higher role
+                # than what the user currently has - if so, add to wallet instead
+                if highest_role_priority > 0:  # User has a premium role
+                    target_role_for_original = None
+
+                    # First check direct price match
+                    for role_config in self.bot.config["premium_roles"]:
+                        role_price = role_config["price"]
+                        rounded_price = role_price + 1
+                        if original_amount in [role_price, rounded_price]:
+                            target_role_for_original = role_config["name"]
+                            break
+
+                    # If no direct match, check legacy mapping
+                    if not target_role_for_original and self.bot.config.get(
+                        "legacy_system", {}
+                    ).get("enabled", False):
+                        legacy_amounts = self.bot.config.get("legacy_system", {}).get("amounts", {})
+                        if original_amount in legacy_amounts:
+                            converted_amount = legacy_amounts[original_amount]
+                            # Find role that matches the converted amount
+                            for role_config in self.bot.config["premium_roles"]:
+                                role_price = role_config["price"]
+                                rounded_price = role_price + 1
+                                if converted_amount in [role_price, rounded_price]:
+                                    target_role_for_original = role_config["name"]
+                                    break
+
+                    if target_role_for_original:
+                        target_role_priority = self.role_manager.PREMIUM_PRIORITY.get(
+                            target_role_for_original, 0
+                        )
+
+                        # If user has higher role, add to wallet
+                        if highest_role_priority > target_role_priority:
+                            # User has higher role than what they're trying to buy with original amount
+                            # Add original amount to wallet and don't process legacy conversion
+                            await MemberQueries.add_to_wallet_balance(
+                                session, member.id, original_amount
+                            )
+                            await session.flush()
+
+                            # Remove mute roles regardless
+                            await self.role_manager.remove_mute_roles(member)
+
+                            embed = discord.Embed(
+                                title="Doładowanie konta",
+                                description=f"Posiadasz już wyższą rolę ({highest_role_name}). "
+                                f"Kwota {original_amount}{CURRENCY_UNIT} została dodana do Twojego portfela.",
+                                color=discord.Color.blue(),
+                            )
+                            embed.set_image(url=self.bot.config["gifs"]["donation"])
+
+                            view = discord.ui.View()
+                            view.add_item(
+                                BuyRoleButton(
+                                    bot=self.bot,
+                                    member=member,
+                                    role_name=highest_role_name,
+                                    style=discord.ButtonStyle.success,
+                                    label="Kup rangę",
+                                    emoji=self.bot.config.get("emojis", {}).get("mastercard", "💳"),
+                                )
+                            )
+                            view.add_item(
+                                discord.ui.Button(
+                                    label="Doładuj konto",
+                                    style=discord.ButtonStyle.link,
+                                    url=self.bot.config["donate_url"],
+                                )
+                            )
+
+                            message = await channel.send(
+                                content=f"{member.mention}", embed=embed, view=view
+                            )
+                            if owner:
+                                await message.reply(f"{owner.mention}")
+                            return
+
+                        # If user has equal role, allow normal processing (role extension)
+                        # This will handle cases like user with zG100 paying 25 -> legacy -> zG100 (should extend)
+                        elif highest_role_priority == target_role_priority:
+                            # Allow normal processing for same role extension
+                            pass
+
+                        # If user has lower role, check if this is a legacy conversion that shouldn't happen
+                        elif highest_role_priority < target_role_priority:
+                            # This is a potential upgrade, but check if it's through legacy conversion
+                            # If original amount was converted by legacy system, it's not a real upgrade
+                            if self.bot.config.get("legacy_system", {}).get("enabled", False):
+                                legacy_amounts = self.bot.config.get("legacy_system", {}).get(
+                                    "amounts", {}
+                                )
+                                if original_amount in legacy_amounts:
+                                    # This is a legacy conversion - user didn't pay enough for real upgrade
+                                    # Add original amount to wallet instead
+                                    await MemberQueries.add_to_wallet_balance(
+                                        session, member.id, original_amount
+                                    )
+                                    await session.flush()
+
+                                    # Remove mute roles regardless
+                                    await self.role_manager.remove_mute_roles(member)
+
+                                    embed = discord.Embed(
+                                        title="Doładowanie konta",
+                                        description=f"Kwota {original_amount}{CURRENCY_UNIT} została dodana do Twojego portfela. "
+                                        f"Aby kupić rolę {target_role_for_original}, potrzebujesz więcej środków.",
+                                        color=discord.Color.blue(),
+                                    )
+                                    embed.set_image(url=self.bot.config["gifs"]["donation"])
+
+                                    view = discord.ui.View()
+                                    view.add_item(
+                                        BuyRoleButton(
+                                            bot=self.bot,
+                                            member=member,
+                                            role_name=target_role_for_original,
+                                            style=discord.ButtonStyle.success,
+                                            label="Kup rangę",
+                                            emoji=self.bot.config.get("emojis", {}).get(
+                                                "mastercard", "💳"
+                                            ),
+                                        )
+                                    )
+                                    view.add_item(
+                                        discord.ui.Button(
+                                            label="Doładuj konto",
+                                            style=discord.ButtonStyle.link,
+                                            url=self.bot.config["donate_url"],
+                                        )
+                                    )
+
+                                    message = await channel.send(
+                                        content=f"{member.mention}", embed=embed, view=view
+                                    )
+                                    if owner:
+                                        await message.reply(f"{owner.mention}")
+                                    return
+
                 # Initialize owner and embed variables
                 owner_id = self.bot.config.get("owner_id")
                 owner = self.guild.get_member(owner_id)
