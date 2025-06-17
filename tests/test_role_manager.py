@@ -70,12 +70,17 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         expired_role.role_id = 789
         expired_role.expiration_date = datetime.now() - timedelta(days=1)
 
-        mock_role_queries.get_expired_roles.return_value = [expired_role]
+        mock_role_queries.get_expired_roles = AsyncMock(return_value=[expired_role])
         mock_role_queries.delete_member_role = AsyncMock()
         mock_notif_queries.add_or_update_notification_log = AsyncMock()
 
+        # Mock notification handler
+        notification_handler = AsyncMock()
+
         # Call the method
-        removed_count = await self.role_manager.check_expired_roles()
+        removed_count = await self.role_manager.check_expired_roles(
+            notification_handler=notification_handler
+        )
 
         # Verify only role1 was removed
         member.remove_roles.assert_called_once()
@@ -85,7 +90,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         mock_role_queries.delete_member_role.assert_called_with(self.session, member.id, role1.id)
 
         # Verify notification was sent
-        self.role_manager.send_default_notification.assert_called_once()
+        notification_handler.assert_called_once()
 
         # Verify correct count was returned
         self.assertEqual(removed_count, 1)
@@ -146,23 +151,33 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         expired_role3.role_id = 791
         expired_role3.expiration_date = datetime.now() - timedelta(days=1)
 
-        mock_role_queries.get_expired_roles.return_value = [
-            expired_role1,
-            expired_role2,
-            expired_role3,
-        ]
+        mock_role_queries.get_expired_roles = AsyncMock(
+            return_value=[
+                expired_role1,
+                expired_role2,
+                expired_role3,
+            ]
+        )
 
         mock_role_queries.delete_member_role = AsyncMock()
         mock_notif_queries.add_or_update_notification_log = AsyncMock()
 
+        # Mock notification handler
+        notification_handler = AsyncMock()
+
         # Call the method
-        removed_count = await self.role_manager.check_expired_roles()
+        removed_count = await self.role_manager.check_expired_roles(
+            notification_handler=notification_handler
+        )
 
         # Verify roles were removed
         self.assertEqual(member.remove_roles.call_count, 1)
 
         # Verify database operations
         self.assertEqual(mock_role_queries.delete_member_role.call_count, 3)
+
+        # Verify notifications were sent for all 3 roles
+        self.assertEqual(notification_handler.call_count, 3)
 
         # Verify the correct count was returned
         self.assertEqual(removed_count, 3)
@@ -198,7 +213,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         expired_role.role_id = 789
         expired_role.expiration_date = datetime.now() - timedelta(days=1)
 
-        mock_role_queries.get_expired_roles.return_value = [expired_role]
+        mock_role_queries.get_expired_roles = AsyncMock(return_value=[expired_role])
         mock_role_queries.delete_member_role = AsyncMock()
         mock_notif_queries.add_or_update_notification_log = AsyncMock()
 
@@ -269,7 +284,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         expired_role.role_id = 789
         expired_role.expiration_date = datetime.now() - timedelta(days=1)
 
-        mock_role_queries.get_expired_roles.return_value = [expired_role]
+        mock_role_queries.get_expired_roles = AsyncMock(return_value=[expired_role])
         mock_role_queries.delete_member_role = AsyncMock()
         mock_notif_queries.add_or_update_notification_log = AsyncMock()
 
@@ -324,7 +339,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         print(
             f"Debug: Setting up expired_role with member_id={expired_role.member_id}, role_id={expired_role.role_id}"
         )
-        mock_role_queries.get_expired_roles.return_value = [expired_role]
+        mock_role_queries.get_expired_roles = AsyncMock(return_value=[expired_role])
         mock_role_queries.delete_member_role = AsyncMock()
         mock_notif_queries.add_or_update_notification_log = AsyncMock()
 
@@ -380,7 +395,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         expired_role.role_id = 789
         expired_role.expiration_date = datetime.now() - timedelta(days=1)
 
-        mock_role_queries.get_expired_roles.return_value = [expired_role]
+        mock_role_queries.get_expired_roles = AsyncMock(return_value=[expired_role])
         mock_role_queries.delete_member_role = AsyncMock()
         mock_notif_queries.add_or_update_notification_log = AsyncMock()
 

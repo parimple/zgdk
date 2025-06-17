@@ -94,22 +94,30 @@ class OnActivityTracking(commands.Cog):
     @tasks.loop(minutes=1)
     async def voice_point_tracker(self):
         """Award points every minute for voice activity."""
-        if not self.voice_members:
+        if not self.voice_members or not self.bot.guild:
             return
 
         try:
             async with self.bot.get_db() as session:
-                for channel_id, member_ids in self.voice_members.items():
+                # Create a copy of the dictionary to avoid "dictionary changed size during iteration"
+                voice_members_copy = dict(self.voice_members)
+
+                for channel_id, member_ids in voice_members_copy.items():
                     channel = self.bot.guild.get_channel(channel_id)
                     if not channel:
                         continue
 
+                    # Create a copy of member_ids set to avoid modification during iteration
+                    member_ids_copy = set(member_ids)
+
                     # Filter out muted/deafened members
                     active_members = []
-                    for member_id in member_ids.copy():
+                    members_to_remove = set()
+
+                    for member_id in member_ids_copy:
                         member = self.bot.guild.get_member(member_id)
                         if not member:
-                            member_ids.discard(member_id)
+                            members_to_remove.add(member_id)
                             continue
 
                         # Skip if member has "points_off" role
@@ -121,6 +129,13 @@ class OnActivityTracking(commands.Cog):
                             continue
 
                         active_members.append(member_id)
+
+                    # Remove non-existent members from the original set after iteration
+                    if members_to_remove:
+                        self.voice_members[channel_id].difference_update(members_to_remove)
+                        # Remove empty channel entries
+                        if not self.voice_members[channel_id]:
+                            del self.voice_members[channel_id]
 
                     # Award points based on whether they're alone or with others
                     is_with_others = len(active_members) > 1
