@@ -99,6 +99,9 @@ class RoleManager:
         # Zmiana poziomu logowania z INFO na DEBUG
         logger.debug(f"Checking expired roles: type={role_type}, specific_ids={role_ids}")
 
+        # Lista powiadomień do wysłania po commit
+        notifications_to_send = []
+
         try:
             # Zapamiętaj poprzedni stan pominiętych członków dla tego klucza
             previous_skipped_ids = RoleManager._last_check_results.get(check_key, {}).get(
@@ -166,6 +169,26 @@ class RoleManager:
                             )
                             removed_count += 1  # Count DB removal as an action
                             stats["removed_count"] += 1
+
+                            # Jeśli to była rola premium, wyczyść również teamy i uprawnienia
+                            # nawet gdy użytkownik opuścił serwer (zombie teams cleanup)
+                            if role_type == "premium":
+                                try:
+                                    from cogs.commands.info import (
+                                        remove_premium_role_mod_permissions,
+                                    )
+
+                                    await remove_premium_role_mod_permissions(
+                                        session, self.bot, member_role.member_id
+                                    )
+                                    logger.info(
+                                        f"Removed premium privileges (teams, mod permissions) for departed member {member_role.member_id} to prevent zombie teams"
+                                    )
+                                except Exception as e_premium_cleanup:
+                                    logger.error(
+                                        f"Error removing premium privileges for departed member {member_role.member_id}: {e_premium_cleanup}",
+                                        exc_info=True,
+                                    )
                             continue
                         except Exception as e:
                             logger.error(f"Error fetching member {member_role.member_id}: {e}")
@@ -201,7 +224,7 @@ class RoleManager:
 
                     if role not in member.roles:
                         logger.info(
-                            f"Role {role.name} (ID: {role.id}) was in DB for member {member.display_name} (ID: {member.id}) but not assigned on Discord. Cleaning DB."
+                            f"Role {role.name} (ID: {role.id}) was in DB for member {member.display_name} (ID: {member.id}) but not assigned on Discord. Cleaning DB and notifying user."
                         )
                         stats["roles_not_assigned"] += 1
                         await RoleQueries.delete_member_role(
@@ -209,6 +232,40 @@ class RoleManager:
                         )
                         removed_count += 1  # Count DB removal
                         stats["removed_count"] += 1
+
+                        # Dodaj powiadomienie do wysłania po commit (tak jak w normalnym przypadku wygaśnięcia)
+                        notification_tag = f"{role_type or 'role'}_expired"
+                        await NotificationLogQueries.add_or_update_notification_log(
+                            session, member_role.member_id, notification_tag
+                        )
+
+                        # Przygotuj powiadomienie do wysłania PO commit
+                        if notification_handler:
+                            notifications_to_send.append(
+                                {
+                                    "handler": notification_handler,
+                                    "member": member,
+                                    "member_role_db_entry": member_role,
+                                    "role_obj": role,
+                                }
+                            )
+
+                        # Jeśli to była rola premium, wyczyść również uprawnienia i teamy
+                        if role_type == "premium":
+                            try:
+                                from cogs.commands.info import remove_premium_role_mod_permissions
+
+                                await remove_premium_role_mod_permissions(
+                                    session, self.bot, member.id
+                                )
+                                logger.info(
+                                    f"Removed premium privileges (teams, mod permissions) for {member.display_name} ({member.id}) due to DB/Discord inconsistency"
+                                )
+                            except Exception as e_premium_cleanup:
+                                logger.error(
+                                    f"Error removing premium privileges for {member.display_name} ({member.id}): {e_premium_cleanup}",
+                                    exc_info=True,
+                                )
                         continue
 
                     # Dodaj parę (member_role, role) do listy ról użytkownika
@@ -251,7 +308,7 @@ class RoleManager:
                             f"Successfully removed {len(discord_roles_to_remove_on_discord)} roles from {member.display_name} ({member.id}) on Discord."
                         )
 
-                        # Krok 2: Jeśli usunięcie na Discordzie się powiodło, usuń z bazy danych i wyślij powiadomienia
+                        # Krok 2: Jeśli usunięcie na Discordzie się powiodło, usuń z bazy danych i przygotuj powiadomienia
                         for member_role_db_entry, role_obj in role_pairs:
                             try:
                                 await RoleQueries.delete_member_role(
@@ -270,19 +327,20 @@ class RoleManager:
                                     session, member_role_db_entry.member_id, notification_tag
                                 )
 
+                                # Przygotuj powiadomienie do wysłania PO commit
                                 if notification_handler:
-                                    await notification_handler(
-                                        member, member_role_db_entry, role_obj
+                                    notifications_to_send.append(
+                                        {
+                                            "handler": notification_handler,
+                                            "member": member,
+                                            "member_role_db_entry": member_role_db_entry,
+                                            "role_obj": role_obj,
+                                        }
                                     )
-                                else:
-                                    # Logika dla domyślnego powiadomienia, jeśli jest potrzebna i nie ma handlera
-                                    # (zakładając, że wysyłamy powiadomienie o każdym pomyślnym usunięciu)
-                                    # await self.send_default_notification(member, role_obj) # Odkomentuj/dostosuj w razie potrzeby
-                                    pass  # Obecnie handler jest przekazywany z OnTaskEvent
 
                             except Exception as e_db_notify:
                                 logger.error(
-                                    f"Error during DB delete or notification for role {role_obj.name} (member {member.id}): {e_db_notify}",
+                                    f"Error during DB delete or notification preparation for role {role_obj.name} (member {member.id}): {e_db_notify}",
                                     exc_info=True,
                                 )
                                 # Kontynuuj z następną rolą, ale zaloguj błąd.
@@ -380,6 +438,20 @@ class RoleManager:
                         # WAŻNE: Nie usuwamy z DB przy innych błędach.
 
                 await session.commit()
+
+                # Wyślij powiadomienia DOPIERO PO commit
+                for notification_data in notifications_to_send:
+                    try:
+                        await notification_data["handler"](
+                            notification_data["member"],
+                            notification_data["member_role_db_entry"],
+                            notification_data["role_obj"],
+                        )
+                    except Exception as e_notification:
+                        logger.error(
+                            f"Error sending notification for role {notification_data['role_obj'].name} (member {notification_data['member'].id}): {e_notification}",
+                            exc_info=True,
+                        )
 
                 # Pobierz poprzednie statystyki i porównaj
                 last_stats = RoleManager._last_check_results.get(check_key, {})
