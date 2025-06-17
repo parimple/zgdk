@@ -319,11 +319,29 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             existing_channel = empty_channels[0]
             logger.info(f"Wykorzystuję istniejący pusty kanał: {existing_channel.name}")
 
-            # Dodaj uprawnienia właściciela
+            # Dodaj wszystkie uprawnienia do istniejącego kanału
+            # Najpierw ustaw uprawnienia właściciela
             owner_permissions = permission_overwrites.get(member, None)
             if owner_permissions:
                 await existing_channel.set_permissions(member, overwrite=owner_permissions)
                 logger.info(f"Dodano uprawnienia właściciela dla {member.display_name}")
+
+            # Następnie dodaj wszystkie inne uprawnienia z bazy danych
+            for target, overwrite in permission_overwrites.items():
+                if target != member and target != self.guild.default_role:
+                    # Pomiń role wyciszające (już są na kanale) i @everyone (już jest ustawiony)
+                    mute_role_ids = [role["id"] for role in self.bot.config["mute_roles"]]
+                    if isinstance(target, discord.Role) and target.id in mute_role_ids:
+                        continue
+
+                    await existing_channel.set_permissions(target, overwrite=overwrite)
+                    logger.info(f"Dodano uprawnienia z bazy danych dla {target}")
+
+            # Dodaj uprawnienia z db_overwrites jeśli istnieją
+            if db_overwrites:
+                for target, overwrite in db_overwrites.items():
+                    await existing_channel.set_permissions(target, overwrite=overwrite)
+                    logger.info(f"Dodano dodatkowe uprawnienia z bazy danych dla {target}")
 
             # Przenieś członka do kanału
             await member.move_to(existing_channel)
