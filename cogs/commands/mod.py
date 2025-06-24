@@ -27,6 +27,10 @@ class ModCog(commands.Cog):
         self.message_cleaner = MessageCleaner(bot)
         self.gender_manager = GenderManager(bot)
 
+        # Ułatwia testowanie komend bez dodawania cogu do bota
+        for command in self.get_commands():
+            command.cog = self
+
     # Nowa metoda pomocnicza do wyświetlania pomocy dla komend
     async def send_subcommand_help(self, ctx, command_name):
         """Wyświetla pomoc dla komend grupowych z informacją o premium.
@@ -629,9 +633,7 @@ class ModCog(commands.Cog):
                 color = (
                     discord.Color.green()
                     if mute_count == 0
-                    else discord.Color.orange()
-                    if mute_count < 5
-                    else discord.Color.red()
+                    else discord.Color.orange() if mute_count < 5 else discord.Color.red()
                 )
 
                 embed = discord.Embed(
