@@ -598,7 +598,7 @@ class ModCog(commands.Cog):
                         mods_text += f"{i}. <@{mod_id}> - {count} akcji\n"
 
                     embed.add_field(
-                        name="👮 Najaktywniejszi moderatorzy",
+                        name="👮 Najaktywniejsi moderatorzy",
                         value=mods_text or "Brak danych",
                         inline=True,
                     )
