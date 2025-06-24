@@ -8,7 +8,7 @@ echo "checks are running..."
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 
 echo "running black..."
-black --check .
+black --check --line-length=88 .
 
 echo "running isort..."
 isort --check-only --skip .venv .
