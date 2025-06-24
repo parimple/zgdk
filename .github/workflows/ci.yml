@@ -101,45 +101,45 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=testdb
       - POSTGRES_PORT=5432
-    command: >
+    command: |
       python -c "
-      import sys, os;
-      print('🔍 Testing bot initialization in test mode...');
+      import sys, os
+      print('🔍 Testing bot initialization in test mode...')
       try:
-          print('📦 Testing imports...');
-          from main import Zagadka, load_config, setup_logging;
-          print('✅ Core modules imported successfully');
+          print('📦 Testing imports...')
+          from main import Zagadka, load_config, setup_logging
+          print('✅ Core modules imported successfully')
           
-          print('🤖 Testing bot initialization...');
-          config = load_config();
-          bot = Zagadka(config=config, test=True);
-          print('✅ Bot initialized in test mode');
+          print('🤖 Testing bot initialization...')
+          config = load_config()
+          bot = Zagadka(config=config, test=True)
+          print('✅ Bot initialized in test mode')
           
-          print('🗄️ Testing database setup...');
-          assert bot.engine is not None;
-          assert bot.SessionLocal is not None;
-          print('✅ Database components initialized');
+          print('🗄️ Testing database setup...')
+          assert bot.engine is not None
+          assert bot.SessionLocal is not None
+          print('✅ Database components initialized')
           
-          print('🔌 Testing cog discovery...');
-          import os;
-          cog_count = 0;
+          print('🔌 Testing cog discovery...')
+          import os
+          cog_count = 0
           for folder in ['cogs/commands', 'cogs/events']:
               if os.path.exists(folder):
-                  cog_count += len([f for f in os.listdir(folder) if f.endswith('.py') and f != '__init__.py']);
-          print(f'✅ Found {cog_count} cogs ready to load');
+                  cog_count += len([f for f in os.listdir(folder) if f.endswith('.py') and f != '__init__.py'])
+          print(f'✅ Found {cog_count} cogs ready to load')
           
-          print('🎉 All Docker integration tests passed!');
-          print('🚀 Bot is ready for production deployment');
-          sys.exit(0);
+          print('🎉 All Docker integration tests passed!')
+          print('🚀 Bot is ready for production deployment')
+          sys.exit(0)
           
       except ImportError as e:
-          print(f'❌ Import error: {e}');
-          sys.exit(1);
+          print(f'❌ Import error: {e}')
+          sys.exit(1)
       except Exception as e:
-          print(f'❌ Initialization error: {e}');
-          import traceback;
-          traceback.print_exc();
-          sys.exit(1);
+          print(f'❌ Initialization error: {e}')
+          import traceback
+          traceback.print_exc()
+          sys.exit(1)
       "
 EOF
     
