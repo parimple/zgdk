@@ -14,7 +14,7 @@ from utils.services import BaseService, ServiceResult
 class ShopService(BaseService):
     """Service for handling shop operations."""
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         """Initialize the shop service with a bot instance."""
         super().__init__(bot)
         self.shop_manager = ShopManager(bot)

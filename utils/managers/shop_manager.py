@@ -3,6 +3,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from pydantic import BaseModel, NonNegativeInt, PositiveInt
+
 import discord
 from discord.ext.commands import Context
 
@@ -15,9 +17,32 @@ from utils.premium import PaymentData
 class ShopManager(BaseManager):
     """Manager for shop business logic."""
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         """Initialize the shop manager with a bot instance."""
         super().__init__(bot)
+
+
+class AssignPaymentInput(BaseModel):
+    """Input schema for payment assignment."""
+
+    payment_id: PositiveInt
+    user_id: PositiveInt
+
+
+class AddBalanceInput(BaseModel):
+    """Input schema for adding balance."""
+
+    admin_name: str
+    user_id: PositiveInt
+    amount: PositiveInt
+
+
+class RoleExpiryInput(BaseModel):
+    """Input schema for setting role expiry."""
+
+    member_id: PositiveInt
+    role_id: Optional[PositiveInt] = None
+    hours: NonNegativeInt
 
     async def assign_payment_to_user(
         self, payment_id: int, user_id: int
@@ -32,21 +57,22 @@ class ShopManager(BaseManager):
             Tuple of (success, message)
         """
         try:
+            data = AssignPaymentInput(payment_id=payment_id, user_id=user_id)
             async with self.bot.get_db() as session:
                 payment = await HandledPaymentQueries.get_payment_by_id(
-                    session, payment_id
+                    session, data.payment_id
                 )
 
                 if not payment:
                     return False, f"Payment with ID {payment_id} not found"
 
-                payment.member_id = user_id
+                payment.member_id = data.user_id
                 await MemberQueries.add_to_wallet_balance(
-                    session, user_id, payment.amount
+                    session, data.user_id, payment.amount
                 )
                 await session.commit()
 
-                return True, f"Payment assigned to user {user_id}"
+                return True, f"Payment assigned to user {data.user_id}"
 
         except Exception as e:
             return False, str(e)
@@ -65,9 +91,12 @@ class ShopManager(BaseManager):
             Tuple of (success, message)
         """
         try:
+            data = AddBalanceInput(
+                admin_name=admin_name, user_id=user_id, amount=amount
+            )
             payment_data = PaymentData(
-                name=admin_name,
-                amount=amount,
+                name=data.admin_name,
+                amount=data.amount,
                 paid_at=datetime.now(timezone.utc),
                 payment_type="command",
             )
@@ -75,19 +104,19 @@ class ShopManager(BaseManager):
             async with self.bot.get_db() as session:
                 await HandledPaymentQueries.add_payment(
                     session,
-                    user_id,
+                    data.user_id,
                     payment_data.name,
                     payment_data.amount,
                     payment_data.paid_at,
                     payment_data.payment_type,
                 )
-                await MemberQueries.get_or_add_member(session, user_id)
+                await MemberQueries.get_or_add_member(session, data.user_id)
                 await MemberQueries.add_to_wallet_balance(
-                    session, user_id, payment_data.amount
+                    session, data.user_id, payment_data.amount
                 )
                 await session.commit()
 
-            return True, f"Added {amount} to user's wallet"
+            return True, f"Added {data.amount} to user's wallet"
 
         except Exception as e:
             return False, str(e)
@@ -147,37 +176,38 @@ class ShopManager(BaseManager):
             Tuple of (success, message, new_expiry_date)
         """
         try:
+            data = RoleExpiryInput(member_id=member_id, role_id=role_id, hours=hours)
             async with self.bot.get_db() as session:
                 premium_roles = await RoleQueries.get_member_premium_roles(
-                    session, member_id
+                    session, data.member_id
                 )
 
                 if not premium_roles:
                     return False, "User has no premium roles", None
 
                 # Get the first role if role_id is not specified
-                if not role_id:
+                if not data.role_id:
                     member_role, role = premium_roles[0]
                     role_id = role.id
                 else:
                     # Verify the specified role exists for this member
                     role_found = False
                     for mr, r in premium_roles:
-                        if r.id == role_id:
+                        if r.id == data.role_id:
                             role_found = True
                             break
 
                     if not role_found:
                         return (
                             False,
-                            f"Role ID {role_id} not found for this member",
+                            f"Role ID {data.role_id} not found for this member",
                             None,
                         )
 
-                new_expiry = datetime.now(timezone.utc) + timedelta(hours=hours)
+                new_expiry = datetime.now(timezone.utc) + timedelta(hours=data.hours)
 
                 await RoleQueries.update_role_expiration_date_direct(
-                    session, member_id, role_id, new_expiry
+                    session, data.member_id, role_id, new_expiry
                 )
                 await session.commit()
 

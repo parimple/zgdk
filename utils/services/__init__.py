@@ -20,7 +20,7 @@ class ServiceResult(Generic[T]):
         data: Optional[T] = None,
         message: str = "",
         error_code: Optional[str] = None,
-    ):
+    ) -> None:
         """Initialize a service result.
 
         Args:
@@ -35,14 +35,16 @@ class ServiceResult(Generic[T]):
         self.error_code = error_code
 
     @classmethod
-    def success(cls, data: Optional[T] = None, message: str = "Operation successful"):
+    def success(
+        cls, data: Optional[T] = None, message: str = "Operation successful"
+    ) -> "ServiceResult[T]":
         """Create a successful result."""
         return cls(success=True, data=data, message=message)
 
     @classmethod
     def failure(
         cls, message: str, error_code: Optional[str] = None, data: Optional[T] = None
-    ):
+    ) -> "ServiceResult[T]":
         """Create a failed result."""
         return cls(success=False, message=message, error_code=error_code, data=data)
 
@@ -50,6 +52,6 @@ class ServiceResult(Generic[T]):
 class BaseService:
     """Base class for all services."""
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         """Initialize the service with a bot instance."""
         self.bot = bot

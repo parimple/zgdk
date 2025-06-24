@@ -38,12 +38,12 @@ class VoiceManager(BaseManager):
         None: None,  # Special case - handled separately
     }
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         """Initialize the voice manager with a bot instance."""
         super().__init__(bot)
         self.message_sender = MessageSender()
         # Cache for autokick functionality
-        self._autokick_cache = {}
+        self._autokick_cache: dict[int, set[int]] = {}
         self._cache_initialized = False
 
     async def is_channel_owner(self, channel: VoiceChannel, member: Member) -> bool:
@@ -440,7 +440,7 @@ class VoiceManager(BaseManager):
 
     # AutoKick functionality
 
-    async def _initialize_autokick_cache(self):
+    async def _initialize_autokick_cache(self) -> None:
         """Initialize the autokick cache with data from database."""
         if self._cache_initialized:
             return

@@ -13,7 +13,7 @@ from utils.services import BaseService
 class RoleService(BaseService):
     """Service for handling role operations."""
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         """Initialize the role service with a bot instance."""
         super().__init__(bot)
         self.role_manager = RoleManager(bot)

@@ -5,12 +5,30 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from pydantic import BaseModel, PositiveInt
+
 import discord
 from discord import AllowedMentions
 
 from datasources.queries import MemberQueries, NotificationLogQueries, RoleQueries
 from utils.errors import ResourceNotFoundError, ZGDKError
 from utils.managers import BaseManager
+
+
+class AddRoleInput(BaseModel):
+    """Input schema for adding a role with expiry."""
+
+    member_id: PositiveInt
+    role_id: PositiveInt
+    expiry_hours: PositiveInt
+
+
+class RemoveRoleInput(BaseModel):
+    """Input schema for removing a role."""
+
+    member_id: PositiveInt
+    role_id: PositiveInt
+
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +37,10 @@ class RoleManager(BaseManager):
     """Manages temporary roles on the Discord server."""
 
     # Static variables to store last check results
-    _last_check_results = {}
-    _last_check_timestamp = None
+    _last_check_results: Dict[str, Dict[str, Any]] = {}
+    _last_check_timestamp: Optional[datetime] = None
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         """Initialize the role manager with a bot instance."""
         super().__init__(bot)
         self.notification_channel_id = self.bot.config.get("channels", {}).get(
@@ -535,30 +553,39 @@ class RoleManager(BaseManager):
             True if successful, False otherwise
         """
         try:
+            data = AddRoleInput(
+                member_id=member_id, role_id=role_id, expiry_hours=expiry_hours
+            )
+
             # Get Discord objects
-            member = self.bot.guild.get_member(member_id)
+            member = self.bot.guild.get_member(data.member_id)
             if not member:
                 try:
-                    member = await self.bot.guild.fetch_member(member_id)
+                    member = await self.bot.guild.fetch_member(data.member_id)
                 except discord.NotFound:
-                    logger.error(f"Member with ID {member_id} not found")
-                    raise ResourceNotFoundError(f"Member with ID {member_id} not found")
+                    logger.error(f"Member with ID {data.member_id} not found")
+                    raise ResourceNotFoundError(
+                        f"Member with ID {data.member_id} not found"
+                    )
 
-            role = self.bot.guild.get_role(role_id)
+            role = self.bot.guild.get_role(data.role_id)
             if not role:
-                logger.error(f"Role with ID {role_id} not found")
-                raise ResourceNotFoundError(f"Role with ID {role_id} not found")
+                logger.error(f"Role with ID {data.role_id} not found")
+                raise ResourceNotFoundError(f"Role with ID {data.role_id} not found")
 
             # Add role to member on Discord
             await member.add_roles(
-                role, reason=f"Role added with {expiry_hours}h expiry"
+                role, reason=f"Role added with {data.expiry_hours}h expiry"
             )
 
             # Update database
             async with self.bot.get_db() as session:
                 # Add or update the role in the database
                 await RoleQueries.add_or_update_role_to_member(
-                    session, member_id, role_id, duration=timedelta(hours=expiry_hours)
+                    session,
+                    data.member_id,
+                    data.role_id,
+                    duration=timedelta(hours=data.expiry_hours),
                 )
                 await session.commit()
 
@@ -584,19 +611,20 @@ class RoleManager(BaseManager):
             True if successful, False otherwise
         """
         try:
+            data = RemoveRoleInput(member_id=member_id, role_id=role_id)
             # Get Discord objects
-            member = self.bot.guild.get_member(member_id)
+            member = self.bot.guild.get_member(data.member_id)
             if not member:
                 try:
-                    member = await self.bot.guild.fetch_member(member_id)
+                    member = await self.bot.guild.fetch_member(data.member_id)
                 except discord.NotFound:
-                    logger.error(f"Member with ID {member_id} not found")
+                    logger.error(f"Member with ID {data.member_id} not found")
                     # Still try to remove from DB even if member is not found
                     pass
 
-            role = self.bot.guild.get_role(role_id)
+            role = self.bot.guild.get_role(data.role_id)
             if not role:
-                logger.error(f"Role with ID {role_id} not found")
+                logger.error(f"Role with ID {data.role_id} not found")
                 # Still try to remove from DB even if role is not found
                 pass
 
@@ -608,7 +636,9 @@ class RoleManager(BaseManager):
             # Update database
             async with self.bot.get_db() as session:
                 # Remove the role from the database
-                await RoleQueries.delete_member_role(session, member_id, role_id)
+                await RoleQueries.delete_member_role(
+                    session, data.member_id, data.role_id
+                )
                 await session.commit()
 
             return True
@@ -651,10 +681,11 @@ class RoleManager(BaseManager):
                         "name": role_name,
                         "type": role.role_type,
                         "expiry_date": member_role.expiration_date,
-                        "has_role_on_discord": discord_role
-                        in self.bot.guild.get_member(member_id).roles
-                        if discord_role and self.bot.guild.get_member(member_id)
-                        else False,
+                        "has_role_on_discord": (
+                            discord_role in self.bot.guild.get_member(member_id).roles
+                            if discord_role and self.bot.guild.get_member(member_id)
+                            else False
+                        ),
                     }
                 else:
                     # Get all roles
@@ -683,10 +714,13 @@ class RoleManager(BaseManager):
                                 "name": role_name,
                                 "type": role.role_type,
                                 "expiry_date": member_role.expiration_date,
-                                "has_role_on_discord": discord_role
-                                in self.bot.guild.get_member(member_id).roles
-                                if discord_role and self.bot.guild.get_member(member_id)
-                                else False,
+                                "has_role_on_discord": (
+                                    discord_role
+                                    in self.bot.guild.get_member(member_id).roles
+                                    if discord_role
+                                    and self.bot.guild.get_member(member_id)
+                                    else False
+                                ),
                             }
                         )
 

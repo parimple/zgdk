@@ -53,11 +53,11 @@ class ActivityManager:
     NIGHT_OWL_BONUS = 1  # Dodatkowy punkt za aktywność 22:00-06:00
     EARLY_BIRD_BONUS = 1  # Dodatkowy punkt za aktywność 06:00-10:00
 
-    def __init__(self, guild: discord.Guild = None):
+    def __init__(self, guild: discord.Guild | None = None) -> None:
         self.guild = guild
         self.promotion_keywords = ["zagadka", ".gg/zagadka", "discord.gg/zagadka"]
 
-    def set_guild(self, guild: discord.Guild):
+    def set_guild(self, guild: discord.Guild) -> None:
         """Set the guild for the activity manager."""
         self.guild = guild
 

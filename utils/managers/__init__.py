@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 class BaseManager:
     """Base class for all manager classes."""
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         """Initialize the manager with a bot instance."""
         self.bot = bot
         self.config = bot.config

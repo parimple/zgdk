@@ -14,7 +14,7 @@ from utils.services import BaseService
 class VoiceService(BaseService):
     """Service for handling voice channel operations."""
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         """Initialize the voice service with a bot instance."""
         super().__init__(bot)
         self.voice_manager = VoiceManager(bot)
@@ -117,9 +117,7 @@ class VoiceService(BaseService):
                 value_desc = (
                     "enabled"
                     if value == "+"
-                    else "disabled"
-                    if value == "-"
-                    else "toggled"
+                    else "disabled" if value == "-" else "toggled"
                 )
                 target_desc = (
                     target.name
