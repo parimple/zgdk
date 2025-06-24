@@ -1,13 +1,11 @@
-#!/usr/bin/env python
-"""
-Performance test for RoleManager.check_expired_roles
-"""
+"""Performance test for RoleManager.check_expired_roles."""
 
-import asyncio
 import logging
 import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from datasources.queries import NotificationLogQueries, RoleQueries
 from utils.role_manager import RoleManager
@@ -24,6 +22,8 @@ TEST_USER_COUNT = 10
 ROLES_PER_USER = 3
 
 
+@pytest.mark.asyncio
+@pytest.mark.skip(reason="Performance heavy test")
 async def test_role_manager_performance():
     """Test the performance of the role_manager's check_expired_roles method"""
     start_time = time.time()
@@ -158,5 +158,3 @@ async def test_role_manager_performance():
         )
 
 
-if __name__ == "__main__":
-    asyncio.run(test_role_manager_performance())

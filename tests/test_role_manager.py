@@ -432,5 +432,3 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         guild.fetch_member.assert_called_once_with(456)
 
 
-if __name__ == "__main__":
-    unittest.main()

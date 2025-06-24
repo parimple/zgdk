@@ -150,3 +150,50 @@ async def test_delete_user_teams_with_exceptions():
     assert deleted_count == 0  # No successful deletions due to exceptions
     assert mock_logger.error.called
     assert session.delete.call_count == 0  # Database entry not deleted due to exception
+
+
+@pytest.mark.asyncio
+async def test_delete_user_teams_by_sql():
+    """Ensure SQL-based deletion removes roles and channels."""
+    session = AsyncMock()
+    bot = MagicMock()
+    bot.guild = MagicMock()
+
+    team_db1 = MagicMock(spec=DBRole)
+    team_db1.id = 11
+    team_db1.name = "42"
+
+    team_db2 = MagicMock(spec=DBRole)
+    team_db2.id = 12
+    team_db2.name = "42"
+
+    session.execute.side_effect = [
+        [(team_db1,), (team_db2,)],
+        AsyncMock(rowcount=2),
+        AsyncMock(rowcount=2),
+    ]
+
+    role1 = MagicMock(spec=discord.Role)
+    role1.id = 11
+    role1.delete = AsyncMock()
+    role2 = MagicMock(spec=discord.Role)
+    role2.id = 12
+    role2.delete = AsyncMock()
+    bot.guild.get_role.side_effect = lambda rid: {11: role1, 12: role2}.get(rid)
+
+    chan1 = MagicMock(spec=discord.TextChannel)
+    chan1.topic = "42 11"
+    chan1.delete = AsyncMock()
+    chan2 = MagicMock(spec=discord.TextChannel)
+    chan2.topic = "42 12"
+    chan2.delete = AsyncMock()
+    bot.guild.channels = [chan1, chan2]
+
+    removed = await TeamManager.delete_user_teams_by_sql(session, bot, 42)
+
+    assert removed == 2
+    chan1.delete.assert_called_once()
+    chan2.delete.assert_called_once()
+    role1.delete.assert_called_once()
+    role2.delete.assert_called_once()
+    assert session.execute.call_count == 3
