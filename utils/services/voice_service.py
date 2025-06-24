@@ -84,14 +84,20 @@ class VoiceService(BaseService):
                 voice_channel, ctx.author, target
             )
             if not can_modify:
-                return False, "You don't have permission to modify this target's permissions"
+                return (
+                    False,
+                    "You don't have permission to modify this target's permissions",
+                )
 
             # Block priority_speaker modification
             if permission_name == "priority_speaker":
                 return False, "You cannot modify the priority_speaker permission"
 
             # Block setting manage_messages for @everyone
-            if permission_name == "manage_messages" and target == ctx.guild.default_role:
+            if (
+                permission_name == "manage_messages"
+                and target == ctx.guild.default_role
+            ):
                 return False, "You cannot set moderator permissions for @everyone"
 
             # Modify the permission
@@ -109,10 +115,16 @@ class VoiceService(BaseService):
             if success:
                 # Build a user-friendly message
                 value_desc = (
-                    "enabled" if value == "+" else "disabled" if value == "-" else "toggled"
+                    "enabled"
+                    if value == "+"
+                    else "disabled"
+                    if value == "-"
+                    else "toggled"
                 )
                 target_desc = (
-                    target.name if isinstance(target, discord.Role) else f"{target.display_name}"
+                    target.name
+                    if isinstance(target, discord.Role)
+                    else f"{target.display_name}"
                 )
 
                 return (
@@ -158,7 +170,9 @@ class VoiceService(BaseService):
                 max_members = 0
 
             # Set the limit
-            success = await self.voice_manager.set_channel_limit(voice_channel, max_members)
+            success = await self.voice_manager.set_channel_limit(
+                voice_channel, max_members
+            )
 
             if success:
                 limit_text = "unlimited" if max_members == 0 else str(max_members)
@@ -186,7 +200,9 @@ class VoiceService(BaseService):
             voice_channel = ctx.author.voice.channel
 
             # Reset the permissions
-            success = await self.voice_manager.reset_channel_permissions(voice_channel, ctx.author)
+            success = await self.voice_manager.reset_channel_permissions(
+                voice_channel, ctx.author
+            )
 
             if success:
                 return True, "Channel permissions reset successfully"
@@ -254,7 +270,10 @@ class VoiceService(BaseService):
                 voice_channel, ctx.author
             )
             if permission_level not in ["owner", "mod"]:
-                return False, "You don't have permission to add users to the autokick list"
+                return (
+                    False,
+                    "You don't have permission to add users to the autokick list",
+                )
 
             # Add to autokick list
             success = await self.voice_manager.add_autokick(ctx.author, target)
@@ -262,7 +281,10 @@ class VoiceService(BaseService):
             if success:
                 return True, f"Added {target.display_name} to your autokick list"
             else:
-                return False, f"Failed to add {target.display_name} to your autokick list"
+                return (
+                    False,
+                    f"Failed to add {target.display_name} to your autokick list",
+                )
 
         except Exception as e:
             return False, f"Error adding autokick: {str(e)}"
@@ -284,7 +306,10 @@ class VoiceService(BaseService):
             if success:
                 return True, f"Removed {target.display_name} from your autokick list"
             else:
-                return False, f"Failed to remove {target.display_name} from your autokick list"
+                return (
+                    False,
+                    f"Failed to remove {target.display_name} from your autokick list",
+                )
 
         except Exception as e:
             return False, f"Error removing autokick: {str(e)}"
@@ -303,7 +328,11 @@ class VoiceService(BaseService):
             target_ids = await self.voice_manager.get_autokicks(ctx.author)
 
             if target_ids:
-                return True, f"Found {len(target_ids)} users in your autokick list", target_ids
+                return (
+                    True,
+                    f"Found {len(target_ids)} users in your autokick list",
+                    target_ids,
+                )
             else:
                 return True, "Your autokick list is empty", []
 

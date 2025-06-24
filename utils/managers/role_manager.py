@@ -25,7 +25,9 @@ class RoleManager(BaseManager):
     def __init__(self, bot):
         """Initialize the role manager with a bot instance."""
         super().__init__(bot)
-        self.notification_channel_id = self.bot.config.get("channels", {}).get("mute_notifications")
+        self.notification_channel_id = self.bot.config.get("channels", {}).get(
+            "mute_notifications"
+        )
 
     @property
     def force_channel_notifications(self):
@@ -80,13 +82,15 @@ class RoleManager(BaseManager):
             return 0
 
         # Change logging level from INFO to DEBUG
-        logger.debug(f"Checking expired roles: type={role_type}, specific_ids={role_ids}")
+        logger.debug(
+            f"Checking expired roles: type={role_type}, specific_ids={role_ids}"
+        )
 
         try:
             # Remember the previous state of skipped members for this key
-            previous_skipped_ids = RoleManager._last_check_results.get(check_key, {}).get(
-                "skipped_member_ids", set()
-            )
+            previous_skipped_ids = RoleManager._last_check_results.get(
+                check_key, {}
+            ).get("skipped_member_ids", set())
 
             async with self.bot.get_db() as session:
                 # Get expired roles from the database
@@ -98,7 +102,9 @@ class RoleManager(BaseManager):
                     # Check if there was something to do previously
                     last_stats = RoleManager._last_check_results.get(check_key, {})
                     if last_stats.get("expired_roles_count", 0) > 0:
-                        logger.info("No expired roles found (changed from previous check)")
+                        logger.info(
+                            "No expired roles found (changed from previous check)"
+                        )
                         RoleManager._last_check_results[check_key] = stats.copy()
                     return 0
 
@@ -106,9 +112,9 @@ class RoleManager(BaseManager):
                 stats["expired_roles_count"] = len(expired_roles)
 
                 # Check if the number of expired roles has changed
-                last_expired_count = RoleManager._last_check_results.get(check_key, {}).get(
-                    "expired_roles_count", -1
-                )
+                last_expired_count = RoleManager._last_check_results.get(
+                    check_key, {}
+                ).get("expired_roles_count", -1)
                 if last_expired_count != stats["expired_roles_count"]:
                     logger.info(
                         f"Found {stats['expired_roles_count']} expired roles to process (changed from {last_expired_count})"
@@ -135,9 +141,14 @@ class RoleManager(BaseManager):
                         member = member_data_map[member_role.member_id]["member"]
                     else:
                         try:
-                            member = await self.bot.guild.fetch_member(member_role.member_id)
+                            member = await self.bot.guild.fetch_member(
+                                member_role.member_id
+                            )
                             # Save the fetched user to avoid multiple fetches
-                            member_data_map[member_role.member_id] = {"member": member, "roles": []}
+                            member_data_map[member_role.member_id] = {
+                                "member": member,
+                                "roles": [],
+                            }
                         except discord.NotFound:
                             logger.info(
                                 f"Member with ID {member_role.member_id} not found (left server?), skipping role {member_role.role_id} and cleaning DB."
@@ -151,7 +162,9 @@ class RoleManager(BaseManager):
                             stats["removed_count"] += 1
                             continue
                         except Exception as e:
-                            logger.error(f"Error fetching member {member_role.member_id}: {e}")
+                            logger.error(
+                                f"Error fetching member {member_role.member_id}: {e}"
+                            )
                             stats["non_existent_members"] += 1
                             stats["skipped_member_ids"].add(member_role.member_id)
                             # Don't delete from DB on unknown error, might be temporary
@@ -196,7 +209,9 @@ class RoleManager(BaseManager):
 
                     # Add the (member_role, role) pair to the user's role list
                     # This part is reached only if member exists, role exists, and member has the role.
-                    member_data_map[member_role.member_id]["roles"].append((member_role, role))
+                    member_data_map[member_role.member_id]["roles"].append(
+                        (member_role, role)
+                    )
 
                 # Process roles grouped by users
                 for member_id, data in member_data_map.items():
@@ -217,7 +232,9 @@ class RoleManager(BaseManager):
                     # Check if the user has mutenick and if they have a default nick before removing roles
                     default_nick = self.config.get("default_mute_nickname", "random")
 
-                    if not discord_roles_to_remove_on_discord:  # If the list is empty, continue
+                    if (
+                        not discord_roles_to_remove_on_discord
+                    ):  # If the list is empty, continue
                         logger.debug(
                             f"No Discord roles to remove for member {member.display_name} ({member.id}), skipping Discord interaction."
                         )
@@ -248,7 +265,9 @@ class RoleManager(BaseManager):
 
                                 notification_tag = f"{role_type or 'role'}_expired"
                                 await NotificationLogQueries.add_or_update_notification_log(
-                                    session, member_role_db_entry.member_id, notification_tag
+                                    session,
+                                    member_role_db_entry.member_id,
+                                    notification_tag,
                                 )
 
                                 if notification_handler:
@@ -276,8 +295,12 @@ class RoleManager(BaseManager):
                             )  # Give Discord a moment to process the role removal
                             # Get a fresh member object to be sure about current roles and nick
                             try:
-                                updated_member = await self.bot.guild.fetch_member(member.id)
-                                if not updated_member:  # In case fetch_member returns None
+                                updated_member = await self.bot.guild.fetch_member(
+                                    member.id
+                                )
+                                if (
+                                    not updated_member
+                                ):  # In case fetch_member returns None
                                     logger.warning(
                                         f"Could not fetch updated member {member.id} after role removal, skipping nick logic."
                                     )
@@ -297,7 +320,9 @@ class RoleManager(BaseManager):
                             member_roles_after_removal = updated_member.roles
 
                             has_nick_mute_role_after_removal = (
-                                discord.utils.get(member_roles_after_removal, id=nick_mute_role_id)
+                                discord.utils.get(
+                                    member_roles_after_removal, id=nick_mute_role_id
+                                )
                                 is not None
                             )
                             was_nick_mute_role_removed = any(
@@ -323,7 +348,10 @@ class RoleManager(BaseManager):
                                 # If the nick wasn't the default mute nick, we don't do anything - the user might have changed it.
 
                             # Scenario 2: Another role expired, but the user still has mutenick and had the default nick
-                            elif has_nick_mute_role_after_removal and current_nick == default_nick:
+                            elif (
+                                has_nick_mute_role_after_removal
+                                and current_nick == default_nick
+                            ):
                                 # This condition is more precise - we check if they *still* have mutenick
                                 # and if they *still* have the default nick. If so, we make sure the nick is preserved.
                                 try:
@@ -365,7 +393,9 @@ class RoleManager(BaseManager):
                 stats_changed = False
 
                 # Check if the number of skipped roles for non-existent users changed
-                if stats["non_existent_members"] != last_stats.get("non_existent_members", -1):
+                if stats["non_existent_members"] != last_stats.get(
+                    "non_existent_members", -1
+                ):
                     stats_changed = True
                     if stats["non_existent_members"] > 0:
                         logger.info(
@@ -373,7 +403,9 @@ class RoleManager(BaseManager):
                         )
 
                 # Check if the number of skipped non-existent roles changed
-                if stats["non_existent_roles"] != last_stats.get("non_existent_roles", -1):
+                if stats["non_existent_roles"] != last_stats.get(
+                    "non_existent_roles", -1
+                ):
                     stats_changed = True
                     if stats["non_existent_roles"] > 0:
                         logger.info(
@@ -381,7 +413,9 @@ class RoleManager(BaseManager):
                         )
 
                 # Check if the number of skipped unassigned roles changed
-                if stats["roles_not_assigned"] != last_stats.get("roles_not_assigned", -1):
+                if stats["roles_not_assigned"] != last_stats.get(
+                    "roles_not_assigned", -1
+                ):
                     stats_changed = True
                     if stats["roles_not_assigned"] > 0:
                         logger.info(
@@ -419,7 +453,9 @@ class RoleManager(BaseManager):
             logger.error(f"Error in check_expired_roles: {e}", exc_info=True)
             return 0
 
-    async def send_default_notification(self, member: discord.Member, role: discord.Role):
+    async def send_default_notification(
+        self, member: discord.Member, role: discord.Role
+    ):
         """Send a default notification about role expiry.
 
         Args:
@@ -429,7 +465,8 @@ class RoleManager(BaseManager):
         try:
             # Check if it's a mute role
             is_mute_role = any(
-                role.id == mute_role["id"] for mute_role in self.config.get("mute_roles", [])
+                role.id == mute_role["id"]
+                for mute_role in self.config.get("mute_roles", [])
             )
 
             if is_mute_role:
@@ -453,7 +490,9 @@ class RoleManager(BaseManager):
             if not self.force_channel_notifications:
                 # Send DM
                 await member.send(message)
-                logger.info(f"Sent DM notification to {member.display_name} ({member.id})")
+                logger.info(
+                    f"Sent DM notification to {member.display_name} ({member.id})"
+                )
             else:
                 # Send to channel
                 channel = self.bot.get_channel(self.notification_channel_id)
@@ -462,9 +501,13 @@ class RoleManager(BaseManager):
                         f"[Channel] {member.mention}, {message}",
                         allowed_mentions=AllowedMentions(users=False),
                     )
-                    logger.info(f"Sent channel notification to {member.display_name} ({member.id})")
+                    logger.info(
+                        f"Sent channel notification to {member.display_name} ({member.id})"
+                    )
                 else:
-                    logger.error(f"Notification channel {self.notification_channel_id} not found")
+                    logger.error(
+                        f"Notification channel {self.notification_channel_id} not found"
+                    )
         except discord.Forbidden:
             logger.warning(f"Could not send DM to {member.display_name} ({member.id})")
             # Fallback to channel notification
@@ -478,7 +521,9 @@ class RoleManager(BaseManager):
         except Exception as e:
             logger.error(f"Error sending notification: {e}")
 
-    async def add_role_with_expiry(self, member_id: int, role_id: int, expiry_hours: int) -> bool:
+    async def add_role_with_expiry(
+        self, member_id: int, role_id: int, expiry_hours: int
+    ) -> bool:
         """Add a role with an expiration time to a member.
 
         Args:
@@ -505,7 +550,9 @@ class RoleManager(BaseManager):
                 raise ResourceNotFoundError(f"Role with ID {role_id} not found")
 
             # Add role to member on Discord
-            await member.add_roles(role, reason=f"Role added with {expiry_hours}h expiry")
+            await member.add_roles(
+                role, reason=f"Role added with {expiry_hours}h expiry"
+            )
 
             # Update database
             async with self.bot.get_db() as session:
@@ -586,7 +633,9 @@ class RoleManager(BaseManager):
             async with self.bot.get_db() as session:
                 if role_id:
                     # Get specific role
-                    member_role = await RoleQueries.get_member_role(session, member_id, role_id)
+                    member_role = await RoleQueries.get_member_role(
+                        session, member_id, role_id
+                    )
                     if not member_role:
                         return False, {"error": "Role not found for this member"}
 
@@ -609,18 +658,24 @@ class RoleManager(BaseManager):
                     }
                 else:
                     # Get all roles
-                    member_roles = await RoleQueries.get_member_roles(session, member_id)
+                    member_roles = await RoleQueries.get_member_roles(
+                        session, member_id
+                    )
                     if not member_roles:
                         return False, {"error": "No roles found for this member"}
 
                     roles_info = []
                     for member_role in member_roles:
-                        role = await RoleQueries.get_role_by_id(session, member_role.role_id)
+                        role = await RoleQueries.get_role_by_id(
+                            session, member_role.role_id
+                        )
                         if not role:
                             continue
 
                         discord_role = self.bot.guild.get_role(role.id)
-                        role_name = discord_role.name if discord_role else "Unknown Role"
+                        role_name = (
+                            discord_role.name if discord_role else "Unknown Role"
+                        )
 
                         roles_info.append(
                             {

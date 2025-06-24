@@ -19,7 +19,9 @@ class ShopService(BaseService):
         super().__init__(bot)
         self.shop_manager = ShopManager(bot)
 
-    async def get_shop_data(self, viewer_id: int, target_member_id: int) -> Dict[str, Any]:
+    async def get_shop_data(
+        self, viewer_id: int, target_member_id: int
+    ) -> Dict[str, Any]:
         """Get shop data including balance and premium roles.
 
         Args:
@@ -46,7 +48,9 @@ class ShopService(BaseService):
         """
         return await self.shop_manager.add_balance(admin.display_name, user.id, amount)
 
-    async def assign_payment(self, payment_id: int, user: discord.User) -> Tuple[bool, str]:
+    async def assign_payment(
+        self, payment_id: int, user: discord.User
+    ) -> Tuple[bool, str]:
         """Assign a payment to a user.
 
         Args:
@@ -56,7 +60,9 @@ class ShopService(BaseService):
         Returns:
             Tuple of (success, message)
         """
-        success, message = await self.shop_manager.assign_payment_to_user(payment_id, user.id)
+        success, message = await self.shop_manager.assign_payment_to_user(
+            payment_id, user.id
+        )
 
         if success:
             # Try to send DM to the user
@@ -107,7 +113,9 @@ class ShopService(BaseService):
         """
         return await self.shop_manager.set_role_expiry(member.id, role_id, hours)
 
-    async def check_expired_premium_roles(self, guild: discord.Guild) -> Tuple[bool, str, int]:
+    async def check_expired_premium_roles(
+        self, guild: discord.Guild
+    ) -> Tuple[bool, str, int]:
         """Check and remove expired premium roles.
 
         Args:

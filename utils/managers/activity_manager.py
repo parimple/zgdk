@@ -86,11 +86,17 @@ class ActivityManager:
         if points > 0:
             await self._add_points(session, member_id, ActivityType.TEXT, points)
 
-    async def add_promotion_activity(self, session: AsyncSession, member_id: int) -> None:
+    async def add_promotion_activity(
+        self, session: AsyncSession, member_id: int
+    ) -> None:
         """Add promotion activity points for a member."""
-        await self._add_points(session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS)
+        await self._add_points(
+            session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS
+        )
 
-    async def add_bonus_activity(self, session: AsyncSession, member_id: int, points: int) -> None:
+    async def add_bonus_activity(
+        self, session: AsyncSession, member_id: int, points: int
+    ) -> None:
         """Add bonus activity points for a member."""
         await self._add_points(session, member_id, ActivityType.BONUS, points)
 
@@ -104,10 +110,14 @@ class ActivityManager:
             await add_activity_points(session, member_id, activity_type, points)
             await session.commit()
 
-            logger.debug(f"Added {points} {activity_type} points for member {member_id}")
+            logger.debug(
+                f"Added {points} {activity_type} points for member {member_id}"
+            )
         except Exception as e:
             await session.rollback()
-            logger.error(f"Error adding {activity_type} points for member {member_id}: {e}")
+            logger.error(
+                f"Error adding {activity_type} points for member {member_id}: {e}"
+            )
             raise
 
     def get_time_bonus(self) -> int:
@@ -124,7 +134,9 @@ class ActivityManager:
 
         return 0
 
-    async def get_member_stats(self, session: AsyncSession, member_id: int) -> Dict[str, any]:
+    async def get_member_stats(
+        self, session: AsyncSession, member_id: int
+    ) -> Dict[str, any]:
         """Get comprehensive stats for a member."""
         total_points = await get_member_total_points(session, member_id)
         breakdown = await get_member_activity_breakdown(session, member_id)

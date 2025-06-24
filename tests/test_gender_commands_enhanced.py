@@ -105,7 +105,9 @@ def test_database_integration_concepts():
     # Test that we have the expected role tracking structure
     class MockRoleQueries:
         @staticmethod
-        async def add_or_update_role_to_member(session, user_id, role_id, duration=None):
+        async def add_or_update_role_to_member(
+            session, user_id, role_id, duration=None
+        ):
             # Gender roles should not have duration (unlike mutes)
             assert duration is None, "Gender roles should not have expiration"
             return True

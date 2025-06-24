@@ -40,7 +40,9 @@ class ServiceResult(Generic[T]):
         return cls(success=True, data=data, message=message)
 
     @classmethod
-    def failure(cls, message: str, error_code: Optional[str] = None, data: Optional[T] = None):
+    def failure(
+        cls, message: str, error_code: Optional[str] = None, data: Optional[T] = None
+    ):
         """Create a failed result."""
         return cls(success=False, message=message, error_code=error_code, data=data)
 

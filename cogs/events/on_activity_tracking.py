@@ -130,14 +130,18 @@ class OnActivityTracking(commands.Cog):
                             continue
 
                         # Skip if muted or deafened
-                        if member.voice and (member.voice.self_mute or member.voice.self_deaf):
+                        if member.voice and (
+                            member.voice.self_mute or member.voice.self_deaf
+                        ):
                             continue
 
                         active_members.append(member_id)
 
                     # Remove non-existent members from the original set after iteration
                     if members_to_remove:
-                        self.voice_members[channel_id].difference_update(members_to_remove)
+                        self.voice_members[channel_id].difference_update(
+                            members_to_remove
+                        )
                         # Remove empty channel entries
                         if not self.voice_members[channel_id]:
                             del self.voice_members[channel_id]
@@ -182,14 +186,20 @@ class OnActivityTracking(commands.Cog):
                         continue
 
                     # Check for promotion
-                    if await self.activity_manager.check_member_promotion_status(member):
+                    if await self.activity_manager.check_member_promotion_status(
+                        member
+                    ):
                         current_promoters.add(member.id)
                         # Only award points every 3 minutes
                         if should_award_points:
-                            await self.activity_manager.add_promotion_activity(session, member.id)
+                            await self.activity_manager.add_promotion_activity(
+                                session, member.id
+                            )
 
                     # Check for anti-promotion (promoting other servers)
-                    if await self.activity_manager.check_member_antipromo_status(member):
+                    if await self.activity_manager.check_member_antipromo_status(
+                        member
+                    ):
                         # Log but don't reset points automatically (as per user request)
                         logger.debug(
                             f"Member {member.display_name} ({member.id}) is promoting other servers"
@@ -241,7 +251,9 @@ class OnActivityTracking(commands.Cog):
                 f"{channel.name if channel else channel_id}: {len(member_ids)} members"
             )
 
-        embed = discord.Embed(title="🔧 Activity Tracking Debug", color=discord.Color.orange())
+        embed = discord.Embed(
+            title="🔧 Activity Tracking Debug", color=discord.Color.orange()
+        )
 
         embed.add_field(
             name="🎤 Voice Channels",
@@ -266,11 +278,15 @@ class OnActivityTracking(commands.Cog):
 
     @commands.hybrid_command(name="add_bonus_points")
     @is_zagadka_owner()
-    async def add_bonus_points(self, ctx: commands.Context, member: discord.Member, points: int):
+    async def add_bonus_points(
+        self, ctx: commands.Context, member: discord.Member, points: int
+    ):
         """Add bonus points to a member."""
         try:
             async with self.bot.get_db() as session:
-                await self.activity_manager.add_bonus_activity(session, member.id, points)
+                await self.activity_manager.add_bonus_activity(
+                    session, member.id, points
+                )
 
             embed = discord.Embed(
                 title="✅ Bonus Points Added",

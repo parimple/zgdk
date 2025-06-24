@@ -88,12 +88,16 @@ class ShopCog(commands.Cog):
         else:
             await ctx.reply(f"Błąd: {message}")
 
-    @commands.hybrid_command(name="payments", description="Wyświetla wszystkie płatności")
+    @commands.hybrid_command(
+        name="payments", description="Wyświetla wszystkie płatności"
+    )
     @is_admin()
     async def all_payments(self, ctx: Context):
         """Fetch and display the initial set of payments."""
         # Use the service to get payments
-        success, message, payments = await self.shop_service.get_recent_payments(limit=10)
+        success, message, payments = await self.shop_service.get_recent_payments(
+            limit=10
+        )
 
         if not success:
             await ctx.reply(f"Błąd: {message}")
@@ -115,7 +119,9 @@ class ShopCog(commands.Cog):
         await ctx.send(embed=embed, view=view)
 
     @commands.command(
-        name="set_role_expiry", description="Ustawia czas wygaśnięcia roli", aliases=["sr"]
+        name="set_role_expiry",
+        description="Ustawia czas wygaśnięcia roli",
+        aliases=["sr"],
     )
     @is_admin()
     async def set_role_expiry(self, ctx: Context, member: discord.Member, hours: int):
@@ -127,7 +133,9 @@ class ShopCog(commands.Cog):
             hours: The number of hours until the role expires
         """
         # Use the service for this operation
-        success, message, new_expiry = await self.shop_service.set_role_expiry(member, hours)
+        success, message, new_expiry = await self.shop_service.set_role_expiry(
+            member, hours
+        )
 
         if success:
             await ctx.reply(
@@ -146,9 +154,13 @@ class ShopCog(commands.Cog):
         For voluntary role selling by users, use the "Sell role" button in the profile.
         """
         # Use the service for this operation
-        success, message, count = await self.shop_service.check_expired_premium_roles(ctx.guild)
+        success, message, count = await self.shop_service.check_expired_premium_roles(
+            ctx.guild
+        )
 
-        await ctx.reply(f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne.")
+        await ctx.reply(
+            f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne."
+        )
 
         if not success:
             await ctx.send(f"Uwaga: Wystąpiły błędy podczas sprawdzania: {message}")

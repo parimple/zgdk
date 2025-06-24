@@ -121,7 +121,9 @@ class VoiceManager(BaseManager):
         elif permission_level == "mod" and target:
             target_perms = channel.overwrites_for(target)
             # Mods cannot modify owner or other mod permissions
-            if target_perms and (target_perms.priority_speaker or target_perms.manage_messages):
+            if target_perms and (
+                target_perms.priority_speaker or target_perms.manage_messages
+            ):
                 return False
             return True
 
@@ -158,7 +160,9 @@ class VoiceManager(BaseManager):
                 return True if value == "+" else False
             else:
                 # Otherwise toggle based on current value
-                return self.TOGGLE_MAP.get(current_value, lambda _: True)(permission_flag)
+                return self.TOGGLE_MAP.get(current_value, lambda _: True)(
+                    permission_flag
+                )
 
         # Handle direct mode
         if value is None:
@@ -352,7 +356,9 @@ class VoiceManager(BaseManager):
             logger.error(f"Error setting channel limit: {e}", exc_info=True)
             return False
 
-    async def reset_channel_permissions(self, channel: VoiceChannel, member: Member) -> bool:
+    async def reset_channel_permissions(
+        self, channel: VoiceChannel, member: Member
+    ) -> bool:
         """Reset all permissions for a channel.
 
         Args:
@@ -370,7 +376,9 @@ class VoiceManager(BaseManager):
             # Get all overwrites except for the owner
             overwrites_to_remove = []
             for target, _ in channel.overwrites.items():
-                if isinstance(target, Member) and await self.is_channel_owner(channel, target):
+                if isinstance(target, Member) and await self.is_channel_owner(
+                    channel, target
+                ):
                     continue  # Skip owner
                 overwrites_to_remove.append(target)
 
@@ -409,7 +417,9 @@ class VoiceManager(BaseManager):
         try:
             # Check if member can modify target's permissions
             if not await self.can_modify_permissions(channel, member, target):
-                raise PermissionError("You don't have permission to reset this user's permissions")
+                raise PermissionError(
+                    "You don't have permission to reset this user's permissions"
+                )
 
             # Remove the target's overwrites
             await channel.set_permissions(target, overwrite=None)
@@ -505,7 +515,10 @@ class VoiceManager(BaseManager):
                 await session.commit()
 
             # Update cache
-            if target.id in self._autokick_cache and member.id in self._autokick_cache[target.id]:
+            if (
+                target.id in self._autokick_cache
+                and member.id in self._autokick_cache[target.id]
+            ):
                 self._autokick_cache[target.id].remove(member.id)
 
                 # Clean up empty sets
@@ -566,7 +579,9 @@ class VoiceManager(BaseManager):
                 # If any channel member has this person in their autokick list
                 if channel_member.id in self._autokick_cache.get(member.id, set()):
                     # Get permission level
-                    perm_level = await self.get_permission_level(channel, channel_member)
+                    perm_level = await self.get_permission_level(
+                        channel, channel_member
+                    )
 
                     # Owner/Mod can autokick
                     if perm_level in ["owner", "mod"]:

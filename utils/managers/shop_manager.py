@@ -19,7 +19,9 @@ class ShopManager(BaseManager):
         """Initialize the shop manager with a bot instance."""
         super().__init__(bot)
 
-    async def assign_payment_to_user(self, payment_id: int, user_id: int) -> Tuple[bool, str]:
+    async def assign_payment_to_user(
+        self, payment_id: int, user_id: int
+    ) -> Tuple[bool, str]:
         """Assign a payment to a user and update their wallet balance.
 
         Args:
@@ -31,13 +33,17 @@ class ShopManager(BaseManager):
         """
         try:
             async with self.bot.get_db() as session:
-                payment = await HandledPaymentQueries.get_payment_by_id(session, payment_id)
+                payment = await HandledPaymentQueries.get_payment_by_id(
+                    session, payment_id
+                )
 
                 if not payment:
                     return False, f"Payment with ID {payment_id} not found"
 
                 payment.member_id = user_id
-                await MemberQueries.add_to_wallet_balance(session, user_id, payment.amount)
+                await MemberQueries.add_to_wallet_balance(
+                    session, user_id, payment.amount
+                )
                 await session.commit()
 
                 return True, f"Payment assigned to user {user_id}"
@@ -45,7 +51,9 @@ class ShopManager(BaseManager):
         except Exception as e:
             return False, str(e)
 
-    async def add_balance(self, admin_name: str, user_id: int, amount: int) -> Tuple[bool, str]:
+    async def add_balance(
+        self, admin_name: str, user_id: int, amount: int
+    ) -> Tuple[bool, str]:
         """Add balance to a user's wallet.
 
         Args:
@@ -74,7 +82,9 @@ class ShopManager(BaseManager):
                     payment_data.payment_type,
                 )
                 await MemberQueries.get_or_add_member(session, user_id)
-                await MemberQueries.add_to_wallet_balance(session, user_id, payment_data.amount)
+                await MemberQueries.add_to_wallet_balance(
+                    session, user_id, payment_data.amount
+                )
                 await session.commit()
 
             return True, f"Added {amount} to user's wallet"
@@ -82,7 +92,9 @@ class ShopManager(BaseManager):
         except Exception as e:
             return False, str(e)
 
-    async def get_shop_data(self, viewer_id: int, target_member_id: int) -> Dict[str, Any]:
+    async def get_shop_data(
+        self, viewer_id: int, target_member_id: int
+    ) -> Dict[str, Any]:
         """Get shop data including balance and premium roles.
 
         Args:
@@ -95,7 +107,9 @@ class ShopManager(BaseManager):
         async with self.bot.get_db() as session:
             db_viewer = await MemberQueries.get_or_add_member(session, viewer_id)
             balance = db_viewer.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(session, target_member_id)
+            premium_roles = await RoleQueries.get_member_premium_roles(
+                session, target_member_id
+            )
             await session.commit()
 
         return {
@@ -134,7 +148,9 @@ class ShopManager(BaseManager):
         """
         try:
             async with self.bot.get_db() as session:
-                premium_roles = await RoleQueries.get_member_premium_roles(session, member_id)
+                premium_roles = await RoleQueries.get_member_premium_roles(
+                    session, member_id
+                )
 
                 if not premium_roles:
                     return False, "User has no premium roles", None
@@ -152,7 +168,11 @@ class ShopManager(BaseManager):
                             break
 
                     if not role_found:
-                        return False, f"Role ID {role_id} not found for this member", None
+                        return (
+                            False,
+                            f"Role ID {role_id} not found for this member",
+                            None,
+                        )
 
                 new_expiry = datetime.now(timezone.utc) + timedelta(hours=hours)
 
@@ -166,7 +186,9 @@ class ShopManager(BaseManager):
         except Exception as e:
             return False, str(e), None
 
-    async def check_expired_premium_roles(self, guild: discord.Guild) -> Tuple[int, List[str]]:
+    async def check_expired_premium_roles(
+        self, guild: discord.Guild
+    ) -> Tuple[int, List[str]]:
         """Check and remove expired premium roles.
 
         Args:
@@ -180,17 +202,23 @@ class ShopManager(BaseManager):
         errors = []
 
         # Get premium role configuration
-        premium_role_names = {role["name"]: role for role in self.bot.config["premium_roles"]}
+        premium_role_names = {
+            role["name"]: role for role in self.bot.config["premium_roles"]
+        }
 
         # Find premium roles on the server
-        premium_roles = [role for role in guild.roles if role.name in premium_role_names]
+        premium_roles = [
+            role for role in guild.roles if role.name in premium_role_names
+        ]
 
         # For each premium role
         for role in premium_roles:
             # Check members with this role
             for member in role.members:
                 async with self.bot.get_db() as session:
-                    db_role = await RoleQueries.get_member_role(session, member.id, role.id)
+                    db_role = await RoleQueries.get_member_role(
+                        session, member.id, role.id
+                    )
 
                     if not db_role or db_role.expiration_date <= now:
                         try:
@@ -199,7 +227,9 @@ class ShopManager(BaseManager):
 
                             # If there was a DB entry, remove it
                             if db_role:
-                                await RoleQueries.delete_member_role(session, member.id, role.id)
+                                await RoleQueries.delete_member_role(
+                                    session, member.id, role.id
+                                )
 
                         except Exception as e:
                             error_msg = f"Error removing role {role.name} from {member.display_name}: {str(e)}"

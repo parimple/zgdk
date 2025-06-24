@@ -26,7 +26,9 @@ class RankingCommands(commands.Cog):
         if self.bot.guild:
             self.activity_manager.set_guild(self.bot.guild)
 
-    @commands.hybrid_command(name="ranking", description="Pokaż ranking aktywności serwera")
+    @commands.hybrid_command(
+        name="ranking", description="Pokaż ranking aktywności serwera"
+    )
     @app_commands.describe(
         days="Liczba dni wstecz (domyślnie 7)",
         limit="Liczba użytkowników do pokazania (domyślnie 10)",
@@ -46,7 +48,9 @@ class RankingCommands(commands.Cog):
 
         try:
             async with self.bot.get_db() as session:
-                leaderboard = await self.activity_manager.get_leaderboard(session, limit, days)
+                leaderboard = await self.activity_manager.get_leaderboard(
+                    session, limit, days
+                )
 
             if not leaderboard:
                 embed = discord.Embed(
@@ -64,14 +68,20 @@ class RankingCommands(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error in ranking command: {e}")
-            await ctx.send("❌ Wystąpił błąd podczas pobierania rankingu.", ephemeral=True)
+            await ctx.send(
+                "❌ Wystąpił błąd podczas pobierania rankingu.", ephemeral=True
+            )
 
-    @commands.hybrid_command(name="stats", description="Pokaż swoje statystyki aktywności")
+    @commands.hybrid_command(
+        name="stats", description="Pokaż swoje statystyki aktywności"
+    )
     @app_commands.describe(
         member="Użytkownik do sprawdzenia (domyślnie Ty)",
         days="Liczba dni wstecz (domyślnie 7)",
     )
-    async def stats(self, ctx: commands.Context, member: discord.Member = None, days: int = 7):
+    async def stats(
+        self, ctx: commands.Context, member: discord.Member = None, days: int = 7
+    ):
         """Show activity stats for a member."""
         await ctx.defer()
 
@@ -88,14 +98,20 @@ class RankingCommands(commands.Cog):
                     session, target_member.id, days
                 )
 
-            embed = self.activity_manager.format_member_stats_embed(stats, target_member)
+            embed = self.activity_manager.format_member_stats_embed(
+                stats, target_member
+            )
             await ctx.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Error in stats command: {e}")
-            await ctx.send("❌ Wystąpił błąd podczas pobierania statystyk.", ephemeral=True)
+            await ctx.send(
+                "❌ Wystąpił błąd podczas pobierania statystyk.", ephemeral=True
+            )
 
-    @commands.hybrid_command(name="my_rank", description="Pokaż swoją pozycję w rankingu")
+    @commands.hybrid_command(
+        name="my_rank", description="Pokaż swoją pozycję w rankingu"
+    )
     @app_commands.describe(days="Liczba dni wstecz (domyślnie 7)")
     async def my_rank(self, ctx: commands.Context, days: int = 7):
         """Show your current ranking position."""
@@ -108,16 +124,28 @@ class RankingCommands(commands.Cog):
 
         try:
             async with self.bot.get_db() as session:
-                stats = await self.activity_manager.get_member_stats(session, ctx.author.id, days)
+                stats = await self.activity_manager.get_member_stats(
+                    session, ctx.author.id, days
+                )
 
             # Use member's color if available, otherwise blue
-            color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
+            color = (
+                ctx.author.color
+                if ctx.author.color.value != 0
+                else discord.Color.blue()
+            )
 
-            embed = discord.Embed(title=f"📊 Twoja pozycja w rankingu zaGadki", color=color)
+            embed = discord.Embed(
+                title=f"📊 Twoja pozycja w rankingu zaGadki", color=color
+            )
 
             if stats["position"] > 0:
-                embed.add_field(name="🏆 Pozycja", value=f"**#{stats['position']}**", inline=True)
-                embed.add_field(name="🏅 Ranga", value=f"**{stats['tier']}**", inline=True)
+                embed.add_field(
+                    name="🏆 Pozycja", value=f"**#{stats['position']}**", inline=True
+                )
+                embed.add_field(
+                    name="🏅 Ranga", value=f"**{stats['tier']}**", inline=True
+                )
                 embed.add_field(
                     name="⭐ Punkty",
                     value=f"**{stats['total_points']}** pkt",
@@ -135,10 +163,16 @@ class RankingCommands(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error in my_rank command: {e}")
-            await ctx.send("❌ Wystąpił błąd podczas pobierania pozycji.", ephemeral=True)
+            await ctx.send(
+                "❌ Wystąpił błąd podczas pobierania pozycji.", ephemeral=True
+            )
 
-    @commands.hybrid_command(name="top", description="Pokaż TOP użytkowników w różnych kategoriach")
-    @app_commands.describe(category="Kategoria rankingu", days="Liczba dni wstecz (domyślnie 7)")
+    @commands.hybrid_command(
+        name="top", description="Pokaż TOP użytkowników w różnych kategoriach"
+    )
+    @app_commands.describe(
+        category="Kategoria rankingu", days="Liczba dni wstecz (domyślnie 7)"
+    )
     @app_commands.choices(
         category=[
             app_commands.Choice(name="TOP 100", value="100"),
@@ -162,7 +196,9 @@ class RankingCommands(commands.Cog):
 
         try:
             async with self.bot.get_db() as session:
-                leaderboard = await self.activity_manager.get_leaderboard(session, limit, days)
+                leaderboard = await self.activity_manager.get_leaderboard(
+                    session, limit, days
+                )
 
             if not leaderboard:
                 embed = discord.Embed(
@@ -179,7 +215,11 @@ class RankingCommands(commands.Cog):
             tier_300 = [x for x in leaderboard if 201 <= x[2] <= 300]
 
             # Use author's color if available, otherwise blue
-            color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
+            color = (
+                ctx.author.color
+                if ctx.author.color.value != 0
+                else discord.Color.blue()
+            )
 
             embed = discord.Embed(
                 title=f"🏆 TOP {category} zaGadki",
@@ -207,7 +247,9 @@ class RankingCommands(commands.Cog):
                             for mid, pts, pos in sample
                         ]
                     )
-                    embed.add_field(name="🥈 Ranga 200 (101-200)", value=text, inline=False)
+                    embed.add_field(
+                        name="🥈 Ranga 200 (101-200)", value=text, inline=False
+                    )
 
             if category == "300" or category == "all":
                 if tier_300:
@@ -218,7 +260,9 @@ class RankingCommands(commands.Cog):
                             for mid, pts, pos in sample
                         ]
                     )
-                    embed.add_field(name="🥉 Ranga 300 (201-300)", value=text, inline=False)
+                    embed.add_field(
+                        name="🥉 Ranga 300 (201-300)", value=text, inline=False
+                    )
 
             # Summary
             embed.add_field(
@@ -238,12 +282,16 @@ class RankingCommands(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error in top command: {e}")
-            await ctx.send("❌ Wystąpił błąd podczas pobierania rankingu.", ephemeral=True)
+            await ctx.send(
+                "❌ Wystąpił błąd podczas pobierania rankingu.", ephemeral=True
+            )
 
     # Admin commands
     @commands.hybrid_command(name="reset_daily_points")
     @is_zagadka_owner()
-    async def reset_daily_points(self, ctx: commands.Context, activity_type: str = None):
+    async def reset_daily_points(
+        self, ctx: commands.Context, activity_type: str = None
+    ):
         """Reset daily points for specific activity type or all."""
         await ctx.defer(ephemeral=True)
 
@@ -278,7 +326,9 @@ class RankingCommands(commands.Cog):
                 deleted_count = await cleanup_old_activity_data(session, days_to_keep)
                 await session.commit()
 
-            await ctx.send(f"✅ Deleted {deleted_count} old activity records.", ephemeral=True)
+            await ctx.send(
+                f"✅ Deleted {deleted_count} old activity records.", ephemeral=True
+            )
 
         except Exception as e:
             logger.error(f"Error cleaning up activity data: {e}")

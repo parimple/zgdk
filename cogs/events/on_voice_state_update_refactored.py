@@ -120,7 +120,9 @@ class OnVoiceStateUpdateEventRefactored(commands.Cog):
                 # Check if the member is still in the channel
                 if channel in member.guild.voice_channels and member in channel.members:
                     # Check if the member should be autokicked
-                    should_kick = await self.voice_service.should_autokick(member, channel)
+                    should_kick = await self.voice_service.should_autokick(
+                        member, channel
+                    )
 
                     if should_kick:
                         try:
@@ -134,9 +136,13 @@ class OnVoiceStateUpdateEventRefactored(commands.Cog):
                                 f"Failed to autokick {member.display_name} - missing permissions"
                             )
                         except discord.HTTPException as e:
-                            self.logger.error(f"HTTP error autokicking {member.display_name}: {e}")
+                            self.logger.error(
+                                f"HTTP error autokicking {member.display_name}: {e}"
+                            )
                         except Exception as e:
-                            self.logger.error(f"Error autokicking {member.display_name}: {e}")
+                            self.logger.error(
+                                f"Error autokicking {member.display_name}: {e}"
+                            )
 
                 # Mark the task as done
                 self.autokick_queue.task_done()
@@ -195,14 +201,18 @@ class OnVoiceStateUpdateEventRefactored(commands.Cog):
 
             # Update metrics
             self.metrics["channels_created"] += 1
-            self.logger.info(f"Created new channel {new_channel.name} for {member.display_name}")
+            self.logger.info(
+                f"Created new channel {new_channel.name} for {member.display_name}"
+            )
 
         except discord.Forbidden:
             self.logger.warning(
                 f"Failed to create channel for {member.display_name} - missing permissions"
             )
         except discord.HTTPException as e:
-            self.logger.error(f"HTTP error creating channel for {member.display_name}: {e}")
+            self.logger.error(
+                f"HTTP error creating channel for {member.display_name}: {e}"
+            )
         except Exception as e:
             self.logger.error(f"Error creating channel for {member.display_name}: {e}")
 

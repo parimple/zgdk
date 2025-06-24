@@ -36,10 +36,16 @@ class RoleService(BaseService):
         """
         try:
             removed_count = await self.role_manager.check_expired_roles(
-                role_type=role_type, role_ids=role_ids, notification_handler=notification_handler
+                role_type=role_type,
+                role_ids=role_ids,
+                notification_handler=notification_handler,
             )
 
-            return True, f"Checked expired roles, removed {removed_count}", removed_count
+            return (
+                True,
+                f"Checked expired roles, removed {removed_count}",
+                removed_count,
+            )
         except Exception as e:
             return False, f"Error checking expired roles: {str(e)}", 0
 
@@ -57,7 +63,9 @@ class RoleService(BaseService):
             Tuple of (success, message, expiry_date)
         """
         try:
-            success = await self.role_manager.add_role_with_expiry(member.id, role_id, expiry_hours)
+            success = await self.role_manager.add_role_with_expiry(
+                member.id, role_id, expiry_hours
+            )
 
             if success:
                 expiry_date = datetime.now(timezone.utc) + timedelta(hours=expiry_hours)
@@ -70,7 +78,9 @@ class RoleService(BaseService):
         except Exception as e:
             return False, f"Error adding role: {str(e)}", None
 
-    async def remove_role(self, member: discord.Member, role_id: int) -> Tuple[bool, str]:
+    async def remove_role(
+        self, member: discord.Member, role_id: int
+    ) -> Tuple[bool, str]:
         """Remove a role from a member and from the database.
 
         Args:
@@ -177,7 +187,9 @@ class RoleService(BaseService):
             await self.role_manager.remove_role(member.id, role_id)
 
             # Add the role with the new expiry
-            success = await self.role_manager.add_role_with_expiry(member.id, role_id, new_hours)
+            success = await self.role_manager.add_role_with_expiry(
+                member.id, role_id, new_hours
+            )
 
             if success:
                 new_expiry = datetime.now(timezone.utc) + timedelta(hours=new_hours)
