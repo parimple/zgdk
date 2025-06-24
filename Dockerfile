@@ -1,5 +1,6 @@
 FROM python:3.10-slim-buster
 
+# Install system dependencies (rarely change)
 RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libnss3 \
@@ -22,7 +23,8 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     libasound2 \
     libatk-bridge2.0-0 \
-    libgtk-3-0
+    libgtk-3-0 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Check the architecture
 RUN uname -a
@@ -30,22 +32,27 @@ RUN uname -a
 # Create app directory
 WORKDIR /app
 
-# Install app dependencies
+# Install Python dependencies (change less often than code)
 COPY requirements.txt ./
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
 
-# Download the browser
+# Download playwright browser (heavy operation, cache it)
 RUN python -m playwright install chromium
 
 # Check the executable permission of python binary
 RUN ls -la $(which python)
 
-# Copy the source code
-COPY . .
+# Copy only necessary files (exclude logs, cache, etc.)
+COPY main.py ./
+COPY cogs/ ./cogs/
+COPY utils/ ./utils/
+COPY datasources/ ./datasources/
+COPY config.yml ./
+COPY __init__.py ./
 
 # Check the executable permission of main.py
 RUN ls -la main.py
 
 # Run the bot
-CMD ["python", "main.py", "&"]
+CMD ["python", "main.py"]

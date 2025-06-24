@@ -1,14 +1,52 @@
+# Python
 .venv
-.vscode
-.env
-.gitignore
-.gitlab-ci.yml
-.pytest_cache
-pg_log/
-.git/
-*.log
 __pycache__/
-.pytest_cache/
-tests/
 *.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
 .coverage
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.gitlab-ci.yml
+.github/
+
+# Project specific
+.env
+*.log
+pg_log/
+models/
+docker-compose*.yml
+Dockerfile*
+README.md
+*.md
+ARCHITECTURE.md
+OPTIMAL_POINT_SYSTEM.md
+SHOP_REFACTOR_*.md
+MODERATION_LOG_IMPLEMENTATION.md
+
+# Tests
+tests/
+conftest.py
+pytest.ini
+
+# Scripts
+run_*.sh
+bin/
+
+# Other
+.DS_Store
+Thumbs.db
