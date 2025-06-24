@@ -18,7 +18,7 @@ gi
 
 1. Clone the repository:
 
-`git clone https://gitlab.com/patrykpyzel/zgdk.git`
+`git clone https://github.com/TWOJ_USERNAME/zgdk.git`
 
 2. Create a `.env` file in the root directory of the project and set the following environment variable:
 
