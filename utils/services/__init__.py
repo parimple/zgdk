@@ -6,14 +6,14 @@ and the business logic layer (managers). It coordinates operations and handles
 error management.
 """
 
-from typing import Any, Dict, List, Optional, Tuple, TypeVar, Generic
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class ServiceResult(Generic[T]):
     """Standard result object for service operations."""
-    
+
     def __init__(
         self,
         success: bool = True,
@@ -22,7 +22,7 @@ class ServiceResult(Generic[T]):
         error_code: Optional[str] = None,
     ):
         """Initialize a service result.
-        
+
         Args:
             success: Whether the operation was successful
             data: The operation result data (if any)
@@ -33,12 +33,12 @@ class ServiceResult(Generic[T]):
         self.data = data
         self.message = message
         self.error_code = error_code
-    
+
     @classmethod
     def success(cls, data: Optional[T] = None, message: str = "Operation successful"):
         """Create a successful result."""
         return cls(success=True, data=data, message=message)
-    
+
     @classmethod
     def failure(cls, message: str, error_code: Optional[str] = None, data: Optional[T] = None):
         """Create a failed result."""

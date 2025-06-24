@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 class BaseManager:
     """Base class for all manager classes."""
-    
+
     def __init__(self, bot):
         """Initialize the manager with a bot instance."""
         self.bot = bot

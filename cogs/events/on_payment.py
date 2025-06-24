@@ -37,6 +37,7 @@ class OnPaymentEvent(commands.Cog):
         self.role_manager = None
         # Add role_service
         from utils.services.role_service import RoleService
+
         self.role_service = RoleService(bot)
         self.check_payments.start()  # pylint: disable=no-member
         self.processing_locks = {}  # Lock per user ID

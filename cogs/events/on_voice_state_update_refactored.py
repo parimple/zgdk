@@ -86,7 +86,11 @@ class OnVoiceStateUpdateEventRefactored(commands.Cog):
         # Check for joins and leaves
         is_join = before_channel is None and after_channel is not None
         is_leave = before_channel is not None and after_channel is None
-        is_move = before_channel is not None and after_channel is not None and before_channel != after_channel
+        is_move = (
+            before_channel is not None
+            and after_channel is not None
+            and before_channel != after_channel
+        )
 
         # Update metrics
         if is_join:
@@ -117,14 +121,18 @@ class OnVoiceStateUpdateEventRefactored(commands.Cog):
                 if channel in member.guild.voice_channels and member in channel.members:
                     # Check if the member should be autokicked
                     should_kick = await self.voice_service.should_autokick(member, channel)
-                    
+
                     if should_kick:
                         try:
                             await member.move_to(None)
                             self.metrics["autokicks"] += 1
-                            self.logger.info(f"Autokicked {member.display_name} from {channel.name}")
+                            self.logger.info(
+                                f"Autokicked {member.display_name} from {channel.name}"
+                            )
                         except discord.Forbidden:
-                            self.logger.warning(f"Failed to autokick {member.display_name} - missing permissions")
+                            self.logger.warning(
+                                f"Failed to autokick {member.display_name} - missing permissions"
+                            )
                         except discord.HTTPException as e:
                             self.logger.error(f"HTTP error autokicking {member.display_name}: {e}")
                         except Exception as e:
@@ -132,10 +140,10 @@ class OnVoiceStateUpdateEventRefactored(commands.Cog):
 
                 # Mark the task as done
                 self.autokick_queue.task_done()
-                
+
                 # Small delay to avoid rate limiting
                 await asyncio.sleep(0.5)
-                
+
             except asyncio.CancelledError:
                 # Task was cancelled, exit the loop
                 break
@@ -172,25 +180,27 @@ class OnVoiceStateUpdateEventRefactored(commands.Cog):
                 user_limit=0,  # No limit by default
                 reason=f"Created by {member.display_name}",
             )
-            
+
             # Get default permission overwrites
             overwrites = await self.voice_service.voice_manager.get_default_permission_overwrites(
                 self.guild, member
             )
-            
+
             # Apply the overwrites
             for target, overwrite in overwrites.items():
                 await new_channel.set_permissions(target, overwrite=overwrite)
-            
+
             # Move the member to the new channel
             await member.move_to(new_channel)
-            
+
             # Update metrics
             self.metrics["channels_created"] += 1
             self.logger.info(f"Created new channel {new_channel.name} for {member.display_name}")
-            
+
         except discord.Forbidden:
-            self.logger.warning(f"Failed to create channel for {member.display_name} - missing permissions")
+            self.logger.warning(
+                f"Failed to create channel for {member.display_name} - missing permissions"
+            )
         except discord.HTTPException as e:
             self.logger.error(f"HTTP error creating channel for {member.display_name}: {e}")
         except Exception as e:
@@ -214,21 +224,23 @@ class OnVoiceStateUpdateEventRefactored(commands.Cog):
             try:
                 # Delay the deletion to avoid deleting channels that are being joined
                 await asyncio.sleep(5)
-                
+
                 # Check again if the channel is still empty
                 fetched_channel = self.guild.get_channel(channel.id)
                 if not fetched_channel or len(fetched_channel.members) > 0:
                     return
-                
+
                 # Delete the channel
                 await fetched_channel.delete(reason="Empty voice channel")
-                
+
                 # Update metrics
                 self.metrics["channels_deleted"] += 1
                 self.logger.info(f"Deleted empty channel {channel.name}")
-                
+
             except discord.Forbidden:
-                self.logger.warning(f"Failed to delete channel {channel.name} - missing permissions")
+                self.logger.warning(
+                    f"Failed to delete channel {channel.name} - missing permissions"
+                )
             except discord.HTTPException as e:
                 self.logger.error(f"HTTP error deleting channel {channel.name}: {e}")
             except Exception as e:

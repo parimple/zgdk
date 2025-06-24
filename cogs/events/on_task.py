@@ -47,7 +47,7 @@ class OnTaskEvent(commands.Cog):
 
         # 1. Sprawdź wygasłe role wyciszenia (częściej sprawdzane, co minutę)
         mute_role_ids = [role["id"] for role in self.bot.config["mute_roles"]]
-        
+
         # Use the new role_service
         success, message, mutes_removed = await self.role_service.check_expired_roles(
             role_ids=mute_role_ids, notification_handler=self.notify_mute_removal

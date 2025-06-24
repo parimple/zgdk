@@ -30,10 +30,10 @@ class ShopCog(commands.Cog):
         """Display the role shop."""
         viewer = ctx.author
         target_member = member or viewer
-        
+
         # Use the service to get shop data
         shop_data = await self.shop_service.get_shop_data(viewer.id, target_member.id)
-        
+
         # Create view and embed
         view = RoleShopView(
             ctx,
@@ -44,7 +44,7 @@ class ShopCog(commands.Cog):
             viewer=viewer,
             member=target_member,
         )
-        
+
         embed = await create_shop_embed(
             ctx,
             shop_data["balance"],
@@ -54,7 +54,7 @@ class ShopCog(commands.Cog):
             viewer=viewer,
             member=target_member,
         )
-        
+
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
     @commands.command(name="add", description="Dodaje środki G.")
@@ -63,7 +63,7 @@ class ShopCog(commands.Cog):
         """Add balance to a user's wallet."""
         # Use the service for this operation
         success, message = await self.shop_service.add_balance(ctx.author, user, amount)
-        
+
         if success:
             await ctx.reply(f"Dodano {amount} do portfela {user.mention}.")
         else:
@@ -75,10 +75,10 @@ class ShopCog(commands.Cog):
         """Assign a payment ID to a user."""
         # Use the service for this operation
         success, message = await self.shop_service.assign_payment(payment_id, user)
-        
+
         if success:
             await ctx.reply(f"Płatność została przypisana do {user.mention}.")
-            
+
             # Check if DM was sent
             if "Could not send DM" in message:
                 await ctx.send(
@@ -94,11 +94,11 @@ class ShopCog(commands.Cog):
         """Fetch and display the initial set of payments."""
         # Use the service to get payments
         success, message, payments = await self.shop_service.get_recent_payments(limit=10)
-        
+
         if not success:
             await ctx.reply(f"Błąd: {message}")
             return
-        
+
         embed = discord.Embed(title="Wszystkie płatności")
         for payment in payments:
             name = f"ID płatności: {payment.id}"
@@ -110,7 +110,7 @@ class ShopCog(commands.Cog):
                 f"Typ płatności: {payment.payment_type}"
             )
             embed.add_field(name=name, value=value, inline=False)
-        
+
         view = PaymentsView(ctx, self.bot)
         await ctx.send(embed=embed, view=view)
 
@@ -120,7 +120,7 @@ class ShopCog(commands.Cog):
     @is_admin()
     async def set_role_expiry(self, ctx: Context, member: discord.Member, hours: int):
         """Set the expiration time for a role.
-        
+
         Args:
             ctx: The command context
             member: The member whose role to set the expiry for
@@ -128,7 +128,7 @@ class ShopCog(commands.Cog):
         """
         # Use the service for this operation
         success, message, new_expiry = await self.shop_service.set_role_expiry(member, hours)
-        
+
         if success:
             await ctx.reply(
                 f"Zaktualizowano czas wygaśnięcia roli dla {member.display_name}.\n"
@@ -141,15 +141,15 @@ class ShopCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def force_check_roles(self, ctx: Context):
         """Force check and remove expired premium roles.
-        
+
         WARNING: This command only removes expired roles without refunding money.
         For voluntary role selling by users, use the "Sell role" button in the profile.
         """
         # Use the service for this operation
         success, message, count = await self.shop_service.check_expired_premium_roles(ctx.guild)
-        
+
         await ctx.reply(f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne.")
-        
+
         if not success:
             await ctx.send(f"Uwaga: Wystąpiły błędy podczas sprawdzania: {message}")
 

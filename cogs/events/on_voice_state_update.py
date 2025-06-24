@@ -72,8 +72,6 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             self.autokick_worker_task = asyncio.create_task(self._autokick_worker())
             logger.info("Started autokick worker task")
 
-
-
     async def _autokick_worker(self):
         """Worker task dla przetwarzania operacji autokick"""
         while True:
@@ -147,8 +145,6 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             if member.id != self.bot.config["owner_id"]:
                 await self.handle_autokicks(member, after.channel)
 
-
-
             if after.channel and after.channel.id in self.channels_create:
                 await self.handle_create_channel(member, after)
             elif after.channel and after.channel.id == self.bot.config["channels_voice"]["afk"]:
@@ -161,8 +157,6 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             and len(before.channel.members) == 0
         ):
             await self.handle_channel_leave(before)
-
-
 
     async def handle_autokicks(self, member, channel):
         """Handle autokicks for a member joining a voice channel"""

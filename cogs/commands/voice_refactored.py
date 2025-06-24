@@ -33,6 +33,7 @@ class VoiceCogRefactored(commands.Cog):
             requires_owner (bool): If True, only channel owner (priority_speaker) can use the command.
                                 If False, both owner and mod can use the command.
         """
+
         async def predicate(ctx):
             # Skip checks for help command and help context
             if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
@@ -113,7 +114,9 @@ class VoiceCogRefactored(commands.Cog):
 
     @commands.command(name="speak", aliases=["s"])
     @voice_command(requires_owner=False)
-    async def speak(self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None):
+    async def speak(
+        self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None
+    ):
         """
         Manage speak permission for users in your voice channel.
 
@@ -125,15 +128,15 @@ class VoiceCogRefactored(commands.Cog):
         - speak - (deny permission to @everyone)
         """
         target, value = await self._parse_target_and_value(ctx, target, value)
-        
+
         if not target:
             await self.message_sender.send_invalid_target(ctx)
             return
-        
+
         success, message = await self.voice_service.modify_permission(
             ctx, target, "speak", value, toggle=True
         )
-        
+
         if success:
             await self.message_sender.send_success(ctx, description=message)
         else:
@@ -141,7 +144,9 @@ class VoiceCogRefactored(commands.Cog):
 
     @commands.command(name="view", aliases=["v"])
     @voice_command(requires_owner=False)
-    async def view(self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None):
+    async def view(
+        self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None
+    ):
         """
         Manage view permission for users in your voice channel.
 
@@ -153,15 +158,15 @@ class VoiceCogRefactored(commands.Cog):
         - view - (deny permission to @everyone)
         """
         target, value = await self._parse_target_and_value(ctx, target, value)
-        
+
         if not target:
             await self.message_sender.send_invalid_target(ctx)
             return
-        
+
         success, message = await self.voice_service.modify_permission(
             ctx, target, "view_channel", value, toggle=True
         )
-        
+
         if success:
             await self.message_sender.send_success(ctx, description=message)
         else:
@@ -169,7 +174,9 @@ class VoiceCogRefactored(commands.Cog):
 
     @commands.command(name="connect", aliases=["c"])
     @voice_command(requires_owner=False)
-    async def connect(self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None):
+    async def connect(
+        self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None
+    ):
         """
         Manage connect permission for users in your voice channel.
 
@@ -181,15 +188,15 @@ class VoiceCogRefactored(commands.Cog):
         - connect - (deny permission to @everyone)
         """
         target, value = await self._parse_target_and_value(ctx, target, value)
-        
+
         if not target:
             await self.message_sender.send_invalid_target(ctx)
             return
-        
+
         success, message = await self.voice_service.modify_permission(
             ctx, target, "connect", value, toggle=True
         )
-        
+
         if success:
             await self.message_sender.send_success(ctx, description=message)
         else:
@@ -197,7 +204,9 @@ class VoiceCogRefactored(commands.Cog):
 
     @commands.command(name="text", aliases=["t"])
     @voice_command(requires_owner=False)
-    async def text(self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None):
+    async def text(
+        self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None
+    ):
         """
         Manage text permission for users in your voice channel.
 
@@ -209,15 +218,15 @@ class VoiceCogRefactored(commands.Cog):
         - text - (deny permission to @everyone)
         """
         target, value = await self._parse_target_and_value(ctx, target, value)
-        
+
         if not target:
             await self.message_sender.send_invalid_target(ctx)
             return
-        
+
         success, message = await self.voice_service.modify_permission(
             ctx, target, "send_messages", value, toggle=True
         )
-        
+
         if success:
             await self.message_sender.send_success(ctx, description=message)
         else:
@@ -225,7 +234,9 @@ class VoiceCogRefactored(commands.Cog):
 
     @commands.command(name="live", aliases=["lv"])
     @voice_command(requires_owner=False)
-    async def live(self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None):
+    async def live(
+        self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None
+    ):
         """
         Manage stream permission for users in your voice channel.
 
@@ -237,15 +248,15 @@ class VoiceCogRefactored(commands.Cog):
         - live - (deny permission to @everyone)
         """
         target, value = await self._parse_target_and_value(ctx, target, value)
-        
+
         if not target:
             await self.message_sender.send_invalid_target(ctx)
             return
-        
+
         success, message = await self.voice_service.modify_permission(
             ctx, target, "stream", value, toggle=True
         )
-        
+
         if success:
             await self.message_sender.send_success(ctx, description=message)
         else:
@@ -253,7 +264,9 @@ class VoiceCogRefactored(commands.Cog):
 
     @commands.command(name="mod", aliases=["m"])
     @voice_command(requires_owner=True)
-    async def mod(self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None):
+    async def mod(
+        self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None
+    ):
         """
         Manage moderator permission for users in your voice channel.
         Only the channel owner can use this command.
@@ -264,20 +277,22 @@ class VoiceCogRefactored(commands.Cog):
         - mod @user (toggle permission)
         """
         target, value = await self._parse_target_and_value(ctx, target, value)
-        
+
         if not target:
             await self.message_sender.send_invalid_target(ctx)
             return
-        
+
         # Check if target is a Member (not a Role)
         if not isinstance(target, Member):
-            await self.message_sender.send_error(ctx, description="You can only make members moderators, not roles.")
+            await self.message_sender.send_error(
+                ctx, description="You can only make members moderators, not roles."
+            )
             return
-        
+
         success, message = await self.voice_service.modify_permission(
             ctx, target, "manage_messages", value, toggle=True, default_to_true=True
         )
-        
+
         if success:
             await self.message_sender.send_success(ctx, description=message)
         else:
@@ -288,15 +303,17 @@ class VoiceCogRefactored(commands.Cog):
     async def limit(self, ctx, max_members: int = 0):
         """
         Set the member limit for your voice channel.
-        
+
         Args:
             max_members: The maximum number of members (0 for unlimited)
         """
         success, message = await self.voice_service.set_channel_limit(ctx, max_members)
-        
+
         if success:
             limit_text = "unlimited" if max_members == 0 else str(max_members)
-            await self.message_sender.send_member_limit_set(ctx, ctx.author.voice.channel, limit_text)
+            await self.message_sender.send_member_limit_set(
+                ctx, ctx.author.voice.channel, limit_text
+            )
         else:
             await self.message_sender.send_error(ctx, description=message)
 
@@ -306,13 +323,13 @@ class VoiceCogRefactored(commands.Cog):
         """
         Reset permissions for your voice channel or a specific user.
         Only the channel owner can use this command.
-        
+
         Args:
             target: The target member to reset permissions for
         """
         if target:
             success, message = await self.voice_service.reset_user_permissions(ctx, target)
-            
+
             if success:
                 await self.message_sender.send_success(
                     ctx, description=f"Reset permissions for {target.display_name}"
@@ -321,7 +338,7 @@ class VoiceCogRefactored(commands.Cog):
                 await self.message_sender.send_error(ctx, description=message)
         else:
             success, message = await self.voice_service.reset_channel_permissions(ctx)
-            
+
             if success:
                 await self.message_sender.send_success(
                     ctx, description="Reset all permissions for this channel"
@@ -331,10 +348,12 @@ class VoiceCogRefactored(commands.Cog):
 
     @commands.command(name="autokick", aliases=["ak"])
     @voice_command(requires_owner=False)
-    async def autokick(self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None):
+    async def autokick(
+        self, ctx, target: Optional[Member] = None, value: Optional[Literal["+", "-"]] = None
+    ):
         """
         Manage autokick list for your voice channel.
-        
+
         Args:
             target: The target member to add/remove from autokick list
             value: "+" to add, "-" to remove
@@ -342,19 +361,20 @@ class VoiceCogRefactored(commands.Cog):
         # List autokicks if no target is specified
         if not target:
             success, message, target_ids = await self.voice_service.get_autokicks(ctx)
-            
+
             if success and target_ids:
                 members = []
                 for target_id in target_ids:
                     member = ctx.guild.get_member(target_id)
                     if member:
                         members.append(member.mention)
-                
+
                 if members:
                     await self.message_sender.send_info(
                         ctx,
                         title="Autokick List",
-                        description=f"You have {len(members)} users in your autokick list:\n" + "\n".join(members),
+                        description=f"You have {len(members)} users in your autokick list:\n"
+                        + "\n".join(members),
                     )
                 else:
                     await self.message_sender.send_info(
@@ -368,15 +388,15 @@ class VoiceCogRefactored(commands.Cog):
                     title="Autokick List",
                     description="Your autokick list is empty",
                 )
-            
+
             return
-        
+
         # Default to adding if no value is specified
         value = value or "+"
-        
+
         if value == "+":
             success, message = await self.voice_service.add_autokick(ctx, target)
-            
+
             if success:
                 await self.message_sender.send_success(
                     ctx, description=f"Added {target.display_name} to your autokick list"
@@ -385,7 +405,7 @@ class VoiceCogRefactored(commands.Cog):
                 await self.message_sender.send_error(ctx, description=message)
         else:
             success, message = await self.voice_service.remove_autokick(ctx, target)
-            
+
             if success:
                 await self.message_sender.send_success(
                     ctx, description=f"Removed {target.display_name} from your autokick list"
