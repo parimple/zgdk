@@ -90,7 +90,7 @@ class OnMemberJoinEvent(commands.Cog):
         if not self.welcome_channel:
             logger.error(f"Failed to get welcome channel with ID {welcome_channel_id}")
 
-    async def restore_mute_roles_OLD_UNUSED(self, member):
+    async def restore_mute_roles(self, member):
         """
         Przywraca role wyciszenia użytkownikowi, który wrócił na serwer.
 
@@ -100,9 +100,7 @@ class OnMemberJoinEvent(commands.Cog):
         :param member: Członek serwera, któremu trzeba przywrócić role
         :type member: discord.Member
         """
-        logger.info(
-            f"Sprawdzanie i przywracanie ról wyciszenia dla {member} ({member.id})"
-        )
+        logger.info(f"Sprawdzanie i przywracanie ról wyciszenia dla {member} ({member.id})")
 
         try:
             # Pobierz konfigurację ról wyciszenia
@@ -121,9 +119,7 @@ class OnMemberJoinEvent(commands.Cog):
                 member_roles = await RoleQueries.get_member_roles(session, member.id)
 
                 # Filtruj tylko role wyciszenia
-                mute_member_roles = [
-                    role for role in member_roles if role.role_id in mute_role_ids
-                ]
+                mute_member_roles = [role for role in member_roles if role.role_id in mute_role_ids]
 
                 if not mute_member_roles:
                     logger.info(
@@ -159,24 +155,20 @@ class OnMemberJoinEvent(commands.Cog):
                         has_nick_mute = True
 
                     # Sprawdź, czy rola jest nadal ważna (jeśli ma datę wygaśnięcia)
-                    if (
-                        member_role.expiration_date
-                        and member_role.expiration_date < datetime.now(timezone.utc)
+                    if member_role.expiration_date and member_role.expiration_date < datetime.now(
+                        timezone.utc
                     ):
                         logger.info(
                             f"Rola wyciszenia {role_id} ({role_desc}) dla {member.id} wygasła, nie przywracam"
                         )
                         # Usuń wygasłą rolę z bazy danych
-                        await RoleQueries.delete_member_role(
-                            session, member.id, role_id
-                        )
+                        await RoleQueries.delete_member_role(session, member.id, role_id)
                         continue
 
                     # Przywróć rolę
                     try:
                         await member.add_roles(
-                            mute_role,
-                            reason="Przywrócenie wyciszenia po powrocie na serwer",
+                            mute_role, reason="Przywrócenie wyciszenia po powrocie na serwer"
                         )
                         roles_restored += 1
                         logger.info(
@@ -185,11 +177,7 @@ class OnMemberJoinEvent(commands.Cog):
 
                         # Znajdź właściwą nazwę roli
                         role_name = next(
-                            (
-                                role["name"]
-                                for role in mute_roles_config
-                                if role["id"] == role_id
-                            ),
+                            (role["name"] for role in mute_roles_config if role["id"] == role_id),
                             "⚠️",
                         )
 
@@ -229,9 +217,7 @@ class OnMemberJoinEvent(commands.Cog):
                                         allowed_mentions=AllowedMentions(users=False),
                                     )
                             except discord.HTTPException as e:
-                                logger.error(
-                                    f"Błąd podczas wysyłania DM do {member.id}: {e}"
-                                )
+                                logger.error(f"Błąd podczas wysyłania DM do {member.id}: {e}")
                     except discord.Forbidden:
                         logger.error(
                             f"Brak uprawnień do przywrócenia roli {role_id} dla {member.id}"
@@ -247,12 +233,9 @@ class OnMemberJoinEvent(commands.Cog):
                 if roles_restored > 0 and has_nick_mute:
                     try:
                         # Pobierz domyślny nickname z konfiguracji
-                        default_nick = self.bot.config.get(
-                            "default_mute_nickname", "random"
-                        )
+                        default_nick = self.bot.config.get("default_mute_nickname", "random")
                         await member.edit(
-                            nick=default_nick,
-                            reason="Przywrócenie mutenick po powrocie na serwer",
+                            nick=default_nick, reason="Przywrócenie mutenick po powrocie na serwer"
                         )
                         logger.info(
                             f"Zmieniono nick użytkownika {member.id} na {default_nick} po przywróceniu mutenick"
@@ -267,14 +250,11 @@ class OnMemberJoinEvent(commands.Cog):
                         )
 
                 if roles_restored > 0:
-                    logger.info(
-                        f"Przywrócono {roles_restored} ról wyciszenia dla {member.id}"
-                    )
+                    logger.info(f"Przywrócono {roles_restored} ról wyciszenia dla {member.id}")
 
         except Exception as e:
             logger.error(
-                f"Błąd podczas przywracania ról wyciszenia dla {member.id}: {e}",
-                exc_info=True,
+                f"Błąd podczas przywracania ról wyciszenia dla {member.id}: {e}", exc_info=True
             )
 
     @commands.command()
@@ -294,15 +274,11 @@ class OnMemberJoinEvent(commands.Cog):
                 self.bot.force_channel_notifications = False
                 status = "DM"
             else:
-                await ctx.send(
-                    "Nieprawidłowy tryb. Dostępne opcje: 'channel' lub 'dm'."
-                )
+                await ctx.send("Nieprawidłowy tryb. Dostępne opcje: 'channel' lub 'dm'.")
                 return
         else:
             # Przełącz między trybami
-            self.bot.force_channel_notifications = (
-                not self.bot.force_channel_notifications
-            )
+            self.bot.force_channel_notifications = not self.bot.force_channel_notifications
             status = "kanał" if self.bot.force_channel_notifications else "DM"
 
         await ctx.send(
@@ -335,18 +311,16 @@ class OnMemberJoinEvent(commands.Cog):
             )
             return
 
-        # Przywróć wszystkie role jednocześnie (muty, gender)
-        await self.restore_all_roles(member)
+        # Przywróć role wyciszenia, jeśli były przypisane wcześniej
+        await self.restore_mute_roles(member)
 
-        # Przywróć uprawnienia głosowe osobno (to nie są role)
+        # Przywróć uprawnienia głosowe, jeśli były przypisane wcześniej
         await self.restore_voice_permissions(member)
 
         # Check if we have invites dictionary initialized
         if not self.invites:
             logger.warning("Invites dictionary is empty, initializing...")
-            self.invites = {
-                invite.id: invite for invite in await member.guild.invites()
-            }
+            self.invites = {invite.id: invite for invite in await member.guild.invites()}
 
         # Log current state
         logger.info(f"Current invites count: {len(self.invites)}")
@@ -375,24 +349,18 @@ class OnMemberJoinEvent(commands.Cog):
                         await self.process_invite(member, new_invite)
                         break
                 else:
-                    logger.debug(
-                        f"New invite found: {invite_id} (uses: {new_invite.uses})"
-                    )
+                    logger.debug(f"New invite found: {invite_id} (uses: {new_invite.uses})")
 
             # Handle the case when no invite was identified
             if used_invite is None:
-                logger.info(
-                    f"No invite identified for member {member}, processing as unknown"
-                )
+                logger.info(f"No invite identified for member {member}, processing as unknown")
                 await self.process_unknown_invite(member)
 
             # Update the invites dictionary
             self.invites = new_invites_dict
 
         except Exception as e:
-            logger.error(
-                f"Error processing member join for {member}: {str(e)}", exc_info=True
-            )
+            logger.error(f"Error processing member join for {member}: {str(e)}", exc_info=True)
             # Still try to process as unknown invite if something went wrong
             await self.process_unknown_invite(member)
 
@@ -431,16 +399,12 @@ class OnMemberJoinEvent(commands.Cog):
 
                 await session.commit()
             except Exception as e:
-                logger.error(
-                    f"Error processing invite for member {member.id}: {str(e)}"
-                )
+                logger.error(f"Error processing invite for member {member.id}: {str(e)}")
                 await session.rollback()
 
         # Check if welcome_channel is None and try to get it again
         if self.welcome_channel is None:
-            self.welcome_channel = self.bot.get_channel(
-                self.bot.channels.get("on_join")
-            )
+            self.welcome_channel = self.bot.get_channel(self.bot.channels.get("on_join"))
             logger.info(f"Re-fetched welcome channel: {self.welcome_channel}")
 
         if self.welcome_channel:
@@ -456,26 +420,16 @@ class OnMemberJoinEvent(commands.Cog):
 
     async def process_unknown_invite(self, member: discord.Member):
         """Process member join when invite is unknown"""
-        logger.info(
-            f"No invite identified for member {member.display_name}, processing as unknown"
-        )
+        logger.info(f"No invite identified for member {member.display_name}, processing as unknown")
 
         # Bezpieczne sprawdzenie self.guild i self.guild.vanity_url_code
         vanity_code = "nieznany"
-        if (
-            self.guild
-            and hasattr(self.guild, "vanity_url_code")
-            and self.guild.vanity_url_code
-        ):
+        if self.guild and hasattr(self.guild, "vanity_url_code") and self.guild.vanity_url_code:
             vanity_code = self.guild.vanity_url_code
         elif not self.guild:
-            logger.warning(
-                "process_unknown_invite: self.guild is None, cannot get vanity URL."
-            )
+            logger.warning("process_unknown_invite: self.guild is None, cannot get vanity URL.")
         elif not hasattr(self.guild, "vanity_url_code"):
-            logger.warning(
-                "process_unknown_invite: self.guild has no attribute 'vanity_url_code'."
-            )
+            logger.warning("process_unknown_invite: self.guild has no attribute 'vanity_url_code'.")
 
         embed_data = {
             "title": "Dołączenie bez zaproszenia (lub nieznane)",
@@ -487,11 +441,7 @@ class OnMemberJoinEvent(commands.Cog):
                     discord.utils.format_dt(datetime.now(timezone.utc), "F"),
                     False,
                 ),
-                (
-                    "Prawdopodobny powód",
-                    "Użyto linku vanity lub bezpośredniego dołączenia",
-                    False,
-                ),
+                ("Prawdopodobny powód", "Użyto linku vanity lub bezpośredniego dołączenia", False),
                 ("Vanity URL", f"Kod: {vanity_code}", False),
             ],
             "thumbnail_url": member.display_avatar.url,
@@ -515,9 +465,7 @@ class OnMemberJoinEvent(commands.Cog):
 
                 # Check if welcome_channel is None and try to get it again
                 if self.welcome_channel is None:
-                    self.welcome_channel = self.bot.get_channel(
-                        self.bot.channels.get("on_join")
-                    )
+                    self.welcome_channel = self.bot.get_channel(self.bot.channels.get("on_join"))
                     logger.info(f"Re-fetched welcome channel: {self.welcome_channel}")
 
                 if self.welcome_channel:
@@ -532,11 +480,7 @@ class OnMemberJoinEvent(commands.Cog):
                     )
 
             except Exception as e:
-                logger.error(
-                    "Error processing member join for %s: %s",
-                    member.display_name,
-                    str(e),
-                )
+                logger.error("Error processing member join for %s: %s", member.display_name, str(e))
                 await session.rollback()
                 raise
 
@@ -588,9 +532,7 @@ class OnMemberJoinEvent(commands.Cog):
                 #     f"Invite {invite.code} (ID: {invite.id}) deleted from Discord and database."
                 # )
             except Exception as e:
-                logger.error(
-                    f"Error deleting invite {invite.id} from database: {str(e)}"
-                )
+                logger.error(f"Error deleting invite {invite.id} from database: {str(e)}")
                 await session.rollback()
 
     async def sync_invites(self):
@@ -637,9 +579,7 @@ class OnMemberJoinEvent(commands.Cog):
             return
 
         if not guild_invites:
-            logger.warning(
-                "Received empty list of guild invites. Skipping cleanup process."
-            )
+            logger.warning("Received empty list of guild invites. Skipping cleanup process.")
             return
 
         now = datetime.now(timezone.utc)
@@ -655,9 +595,7 @@ class OnMemberJoinEvent(commands.Cog):
                 abs(len(guild_invites) - db_invite_count) > 10
                 or len(guild_invites) < db_invite_count
             ):
-                logger.warning(
-                    "Significant discrepancy in invite counts. Syncing invites..."
-                )
+                logger.warning("Significant discrepancy in invite counts. Syncing invites...")
                 await self.sync_invites()
                 db_invite_count = await InviteQueries.get_invite_count(session)
                 logger.info(
@@ -674,9 +612,7 @@ class OnMemberJoinEvent(commands.Cog):
             max_deletions = min(100, max(0, len(guild_invites) - 900))
 
             if len(guild_invites) > 900:
-                logger.info(
-                    f"Number of invites ({len(guild_invites)}) exceeds 900. Cleaning up..."
-                )
+                logger.info(f"Number of invites ({len(guild_invites)}) exceeds 900. Cleaning up...")
 
                 inactive_threshold = timedelta(days=1)  # Konfigurowalny próg czasowy
 
@@ -701,9 +637,7 @@ class OnMemberJoinEvent(commands.Cog):
                             guild_invites.remove(discord_invite)
                             # logger.info(f"Deleted expired invite: {db_invite.id}")
                         except Exception as e:
-                            logger.error(
-                                f"Error deleting invite {db_invite.id}: {str(e)}"
-                            )
+                            logger.error(f"Error deleting invite {db_invite.id}: {str(e)}")
                     else:
                         await InviteQueries.delete_invite(session, db_invite.id)
                         deleted_count += 1
@@ -715,9 +649,7 @@ class OnMemberJoinEvent(commands.Cog):
             await session.commit()
 
             remaining_invites = len(guild_invites)
-            donation_channel = self.bot.get_channel(
-                self.bot.config["channels"]["donation"]
-            )
+            donation_channel = self.bot.get_channel(self.bot.config["channels"]["donation"])
             if donation_channel:
                 message = (
                     f"Podsumowanie czyszczenia zaproszeń:\n"
@@ -728,9 +660,7 @@ class OnMemberJoinEvent(commands.Cog):
                 )
                 # await donation_channel.send(message)
             else:
-                logger.warning(
-                    "Donation channel not found. Could not send invite cleanup summary."
-                )
+                logger.warning("Donation channel not found. Could not send invite cleanup summary.")
 
             logger.info(
                 f"Invite cleanup completed. Deleted {deleted_count} invites (Expired: {expired_count}, Not found: {not_found_count}). Remaining: {remaining_invites}"
@@ -756,9 +686,7 @@ class OnMemberJoinEvent(commands.Cog):
             # Get the member
             member = self.guild.get_member(user_id)
             if not member:
-                logger.warning(
-                    f"Member {user_id} not found, cannot notify about deleted invite"
-                )
+                logger.warning(f"Member {user_id} not found, cannot notify about deleted invite")
                 return
 
             # Send notification
@@ -768,85 +696,7 @@ class OnMemberJoinEvent(commands.Cog):
             logger.info(f"Notified {member} about deleted invite {invite_id}")
 
         except Exception as e:
-            logger.error(
-                f"Error notifying user {user_id} about deleted invite {invite_id}: {e}"
-            )
-
-    async def restore_all_roles(self, member):
-        """
-        Przywraca wszystkie role jednocześnie (muty, gender) dla użytkownika.
-
-        Zbiera wszystkie role z bazy danych i nadaje je jednym wywołaniem Discord API.
-        Bardziej wydajne niż osobne wywołania dla każdego typu roli.
-        """
-        logger.info(
-            f"Sprawdzanie i przywracanie wszystkich ról dla {member.display_name} ({member.id})"
-        )
-
-        roles_to_add = []
-
-        try:
-            async with self.bot.get_db() as session:
-                # Pobierz wszystkie role użytkownika z bazy danych
-                all_role_records = await RoleQueries.get_member_roles(
-                    session, member.id
-                )
-
-                if all_role_records:
-                    for role_record in all_role_records:
-                        # Sprawdź czy rola istnieje na serwerze
-                        discord_role = self.guild.get_role(role_record.role_id)
-                        if not discord_role:
-                            logger.warning(
-                                f"Rola {role_record.role_id} nie istnieje na serwerze"
-                            )
-                            continue
-
-                        # Sprawdź czy użytkownik już ma tę rolę
-                        if discord_role in member.roles:
-                            logger.info(f"Użytkownik już ma rolę {discord_role.name}")
-                            continue
-
-                        # Dodaj role wyciszenia (mute types)
-                        if role_record.role.role_type in ["text", "voice", "full"]:
-                            # Sprawdź czy role wyciszenia nie wygasły
-                            if (
-                                role_record.expiration_date
-                                and role_record.expiration_date
-                                < datetime.now(timezone.utc)
-                            ):
-                                logger.info(
-                                    f"Rola wyciszenia {discord_role.name} wygasła, pomijam"
-                                )
-                                continue
-                            roles_to_add.append(discord_role)
-                            logger.info(
-                                f"Zaplanowano przywrócenie roli wyciszenia {role_record.role.role_type}: {discord_role.name}"
-                            )
-
-                        # Dodaj role gender
-                        elif role_record.role.role_type == "gender":
-                            roles_to_add.append(discord_role)
-                            logger.info(
-                                f"Zaplanowano przywrócenie roli gender: {discord_role.name}"
-                            )
-
-                # Nadaj wszystkie role jednocześnie
-                if roles_to_add:
-                    await member.add_roles(
-                        *roles_to_add, reason="Przywracanie ról po powrocie na serwer"
-                    )
-                    role_names = [role.name for role in roles_to_add]
-                    logger.info(
-                        f"Przywrócono {len(roles_to_add)} ról dla {member.display_name}: {', '.join(role_names)}"
-                    )
-                else:
-                    logger.info(
-                        f"Użytkownik {member.id} nie ma żadnych ról do przywrócenia"
-                    )
-
-        except Exception as e:
-            logger.error(f"Błąd podczas przywracania ról dla {member.id}: {str(e)}")
+            logger.error(f"Error notifying user {user_id} about deleted invite {invite_id}: {e}")
 
     async def restore_voice_permissions(self, member):
         """
@@ -855,23 +705,17 @@ class OnMemberJoinEvent(commands.Cog):
         Sprawdza w bazie danych wszystkie uprawnienia gdzie użytkownik jest targetem,
         a następnie aplikuje je na kanałach gdzie właściciele są aktualnie obecni.
         """
-        logger.info(
-            f"Sprawdzanie uprawnień głosowych dla {member.display_name} ({member.id})"
-        )
+        logger.info(f"Sprawdzanie uprawnień głosowych dla {member.display_name} ({member.id})")
 
         try:
             async with self.bot.get_db() as session:
                 # Pobierz wszystkie uprawnienia gdzie ten użytkownik jest targetem
-                target_permissions = (
-                    await ChannelPermissionQueries.get_permissions_for_target(
-                        session, member.id
-                    )
+                target_permissions = await ChannelPermissionQueries.get_permissions_for_target(
+                    session, member.id
                 )
 
                 if not target_permissions:
-                    logger.info(
-                        f"Brak zapisanych uprawnień głosowych dla {member.display_name}"
-                    )
+                    logger.info(f"Brak zapisanych uprawnień głosowych dla {member.display_name}")
                     return
 
                 logger.info(
@@ -898,13 +742,9 @@ class OnMemberJoinEvent(commands.Cog):
                         continue  # Właściciel nie jest właścicielem tego kanału
 
                     # Konwertuj uprawnienia z bazy na Discord PermissionOverwrite
-                    allow_perms = discord.Permissions(
-                        permission.allow_permissions_value
-                    )
+                    allow_perms = discord.Permissions(permission.allow_permissions_value)
                     deny_perms = discord.Permissions(permission.deny_permissions_value)
-                    overwrite = discord.PermissionOverwrite.from_pair(
-                        allow_perms, deny_perms
-                    )
+                    overwrite = discord.PermissionOverwrite.from_pair(allow_perms, deny_perms)
 
                     # Pobierz aktualne uprawnienia użytkownika w kanale
                     current_member_perms = channel.overwrites_for(member)
@@ -913,9 +753,7 @@ class OnMemberJoinEvent(commands.Cog):
                         for perm_name, value in overwrite._values.items():
                             if value is not None:
                                 setattr(current_member_perms, perm_name, value)
-                        await channel.set_permissions(
-                            member, overwrite=current_member_perms
-                        )
+                        await channel.set_permissions(member, overwrite=current_member_perms)
                     else:
                         # Ustaw nowe uprawnienia
                         await channel.set_permissions(member, overwrite=overwrite)
@@ -934,9 +772,7 @@ class OnMemberJoinEvent(commands.Cog):
                     )
 
         except Exception as e:
-            logger.error(
-                f"Błąd podczas przywracania uprawnień głosowych dla {member.id}: {str(e)}"
-            )
+            logger.error(f"Błąd podczas przywracania uprawnień głosowych dla {member.id}: {str(e)}")
 
 
 async def setup(bot: commands.Bot):

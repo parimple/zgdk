@@ -39,12 +39,41 @@ To use the bot, invite it to a Discord server and use the following commands:
 - `!help`: Display a list of available commands.
 - `!ping`: Display bot latency.
 
+## Architecture & Refactoring
+
+We are in the process of improving the architecture of the project to make it more maintainable and extensible. The planned architecture follows a layered approach:
+
+```
+┌─ Presentation Layer ─┐
+│  Commands, Events,   │
+│  Views, Embeds       │
+├─────────┬────────────┤
+          │
+┌─────────▼────────────┐
+│    Service Layer     │
+│  Service classes     │
+├─────────┬────────────┤
+          │
+┌─────────▼────────────┐
+│    Domain Layer      │
+│  Business logic      │
+├─────────┬────────────┤
+          │
+┌─────────▼────────────┐
+│  Data Access Layer   │
+│  Database operations │
+└──────────────────────┘
+```
+
+For more details, see [ARCHITECTURE.md](ARCHITECTURE.md) and [SHOP_REFACTOR_PLAN.md](SHOP_REFACTOR_PLAN.md).
+
 ## Contributing
 
 We welcome contributions to this project. If you are interested in contributing, please follow these guidelines:
 
 - Fork the repository and make your changes in a feature branch.
 - Run the tests to ensure that they pass.
+- Follow the architectural guidelines described in ARCHITECTURE.md.
 - Submit a pull request.
 
 ## License

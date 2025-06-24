@@ -1,5 +1,17 @@
-"""Managers package for zgdk bot."""
+"""
+Manager classes for the ZGDK application.
 
-from .activity_manager import ActivityManager, ActivityType
+This layer contains the core business logic of the application,
+independent of the presentation and data access layers.
+"""
 
-__all__ = ["ActivityManager", "ActivityType"]
+from typing import Any, Dict, List, Optional, Tuple
+
+
+class BaseManager:
+    """Base class for all manager classes."""
+
+    def __init__(self, bot):
+        """Initialize the manager with a bot instance."""
+        self.bot = bot
+        self.config = bot.config

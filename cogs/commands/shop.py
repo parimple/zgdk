@@ -1,6 +1,6 @@
 """Shop cog for the Zagadka bot."""
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands
@@ -11,6 +11,7 @@ from cogs.views.shop_views import PaymentsView, RoleShopView
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
 from utils.permissions import is_admin, is_zagadka_owner
 from utils.premium import PaymentData
+from utils.services.shop_service import ShopService
 
 logger = logging.getLogger(__name__)
 
@@ -19,109 +20,84 @@ class ShopCog(commands.Cog):
     """Shop cog for managing the purchase and assignment of roles."""
 
     def __init__(self, bot):
+        """Initialize the shop cog."""
         self.bot = bot
+        self.shop_service = ShopService(bot)
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
     @is_admin()
     async def shop(self, ctx: Context, member: discord.Member = None):
+        """Display the role shop."""
         viewer = ctx.author
         target_member = member or viewer
 
-        async with self.bot.get_db() as session:
-            db_viewer = await MemberQueries.get_or_add_member(session, viewer.id)
-            balance = db_viewer.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(
-                session, target_member.id
-            )
-            await session.commit()
+        # Use the service to get shop data
+        shop_data = await self.shop_service.get_shop_data(viewer.id, target_member.id)
 
+        # Create view and embed
         view = RoleShopView(
             ctx,
             self.bot,
             self.bot.config["premium_roles"],
-            balance,
+            shop_data["balance"],
             page=1,
             viewer=viewer,
             member=target_member,
         )
+
         embed = await create_shop_embed(
             ctx,
-            balance,
+            shop_data["balance"],
             view.role_price_map,
-            premium_roles,
+            shop_data["premium_roles"],
             page=1,
             viewer=viewer,
             member=target_member,
         )
+
         await ctx.reply(embed=embed, view=view, mention_author=False)
 
-    @commands.hybrid_command(name="addbalance", description="Dodaje środki G.")
+    @commands.command(name="add", description="Dodaje środki G.")
     @is_zagadka_owner()
     async def add_balance(self, ctx: Context, user: discord.User, amount: int):
         """Add balance to a user's wallet."""
-        payment_data = PaymentData(
-            name=ctx.author.display_name,
-            amount=amount,
-            paid_at=datetime.now(timezone.utc),
-            payment_type="command",
-        )
+        # Use the service for this operation
+        success, message = await self.shop_service.add_balance(ctx.author, user, amount)
 
-        async with self.bot.get_db() as session:
-            await HandledPaymentQueries.add_payment(
-                session,
-                user.id,
-                payment_data.name,
-                payment_data.amount,
-                payment_data.paid_at,
-                payment_data.payment_type,
-            )
-            await MemberQueries.get_or_add_member(session, user.id)
-            await MemberQueries.add_to_wallet_balance(
-                session, user.id, payment_data.amount
-            )
-            await session.commit()
+        if success:
+            await ctx.reply(f"Dodano {amount} do portfela {user.mention}.")
+        else:
+            await ctx.reply(f"Błąd: {message}")
 
-        await ctx.reply(f"Dodano {amount} do portfela {user.mention}.")
-
-    @commands.hybrid_command(name="assign_payment")
+    @commands.command(name="assign_payment")
     @is_admin()
     async def assign_payment(self, ctx: Context, payment_id: int, user: discord.Member):
         """Assign a payment ID to a user."""
-        async with self.bot.get_db() as session:
-            payment = await HandledPaymentQueries.get_payment_by_id(session, payment_id)
+        # Use the service for this operation
+        success, message = await self.shop_service.assign_payment(payment_id, user)
 
-            if payment:
-                payment.member_id = user.id
-                await MemberQueries.add_to_wallet_balance(
-                    session, user.id, payment.amount
-                )
-                await session.commit()
+        if success:
+            await ctx.reply(f"Płatność została przypisana do {user.mention}.")
 
-                msg1 = (
-                    "Proszę pamiętać o podawaniu swojego ID "
-                    "podczas dokonywania wpłat w przyszłości. Twoje ID to:"
-                )
-                msg2 = (
+            # Check if DM was sent
+            if "Could not send DM" in message:
+                await ctx.send(
                     f"Nie mogłem wysłać DM do {user.mention}. "
                     f"Proszę przekazać mu te informacje ręcznie."
                 )
+        else:
+            await ctx.reply(f"Błąd: {message}")
 
-                try:
-                    await user.send(msg1)
-                    await user.send(f"```{user.id}```")
-                except discord.Forbidden:
-                    await ctx.send(msg2)
-            else:
-                await ctx.send(f"Nie znaleziono płatności o ID: {payment_id}")
-
-    @commands.hybrid_command(
-        name="payments", description="Wyświetla wszystkie płatności"
-    )
+    @commands.hybrid_command(name="payments", description="Wyświetla wszystkie płatności")
     @is_admin()
     async def all_payments(self, ctx: Context):
         """Fetch and display the initial set of payments."""
-        async with self.bot.get_db() as session:
-            payments = await HandledPaymentQueries.get_last_payments(session, limit=10)
+        # Use the service to get payments
+        success, message, payments = await self.shop_service.get_recent_payments(limit=10)
+
+        if not success:
+            await ctx.reply(f"Błąd: {message}")
+            return
 
         embed = discord.Embed(title="Wszystkie płatności")
         for payment in payments:
@@ -139,88 +115,43 @@ class ShopCog(commands.Cog):
         await ctx.send(embed=embed, view=view)
 
     @commands.command(
-        name="set_role_expiry",
-        description="Ustawia czas wygaśnięcia roli",
-        aliases=["sr"],
+        name="set_role_expiry", description="Ustawia czas wygaśnięcia roli", aliases=["sr"]
     )
     @is_admin()
     async def set_role_expiry(self, ctx: Context, member: discord.Member, hours: int):
-        """
-        Ustawia czas wygaśnięcia roli dla użytkownika.
+        """Set the expiration time for a role.
 
         Args:
-            ctx: Kontekst komendy
-            member: Użytkownik, którego rola ma być zmodyfikowana
-            hours: Liczba godzin do wygaśnięcia roli
+            ctx: The command context
+            member: The member whose role to set the expiry for
+            hours: The number of hours until the role expires
         """
-        async with self.bot.get_db() as session:
-            premium_roles = await RoleQueries.get_member_premium_roles(
-                session, member.id
-            )
+        # Use the service for this operation
+        success, message, new_expiry = await self.shop_service.set_role_expiry(member, hours)
 
-            if not premium_roles:
-                await ctx.reply("Ten użytkownik nie ma żadnej roli premium.")
-                return
-
-            member_role, role = premium_roles[0]
-            new_expiry = datetime.now(timezone.utc) + timedelta(hours=hours)
-
-            await RoleQueries.update_role_expiration_date_direct(
-                session, member.id, role.id, new_expiry
-            )
-            await session.commit()
-
+        if success:
             await ctx.reply(
-                f"Zaktualizowano czas wygaśnięcia roli {role.name} dla {member.display_name}.\n"
+                f"Zaktualizowano czas wygaśnięcia roli dla {member.display_name}.\n"
                 f"Nowy czas wygaśnięcia: {discord.utils.format_dt(new_expiry, 'R')}"
             )
+        else:
+            await ctx.reply(f"Błąd: {message}")
 
     @commands.command(name="shop_force_check_roles")
     @commands.has_permissions(administrator=True)
     async def force_check_roles(self, ctx: Context):
+        """Force check and remove expired premium roles.
+
+        WARNING: This command only removes expired roles without refunding money.
+        For voluntary role selling by users, use the "Sell role" button in the profile.
         """
-        Wymusza sprawdzenie i ewentualne usunięcie ról premium.
+        # Use the service for this operation
+        success, message, count = await self.shop_service.check_expired_premium_roles(ctx.guild)
 
-        UWAGA: Ta komenda tylko usuwa wygasłe role bez zwrotu pieniędzy.
-        Do dobrowolnej sprzedaży ról przez użytkowników służy przycisk "Sprzedaj rangę" w profilu.
-        """
-        now = datetime.now(timezone.utc)
-        count = 0
+        await ctx.reply(f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne.")
 
-        # Pobierz konfigurację ról premium
-        premium_role_names = {
-            role["name"]: role for role in self.bot.config["premium_roles"]
-        }
-
-        # Znajdź role premium na serwerze
-        premium_roles = [
-            role for role in ctx.guild.roles if role.name in premium_role_names
-        ]
-
-        # Dla każdej roli premium
-        for role in premium_roles:
-            # Sprawdź członków z tą rolą
-            for member in role.members:
-                async with self.bot.get_db() as session:
-                    db_role = await RoleQueries.get_member_role(
-                        session, member.id, role.id
-                    )
-
-                    if not db_role or db_role.expiration_date <= now:
-                        try:
-                            await member.remove_roles(role)
-                            count += 1
-                            logger.info(
-                                f"Removed role {role.name} from {member.display_name} - no DB entry or expired"
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f"Error removing role {role.name} from {member.display_name}: {str(e)}"
-                            )
-
-        await ctx.reply(
-            f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne."
-        )
+        if not success:
+            await ctx.send(f"Uwaga: Wystąpiły błędy podczas sprawdzania: {message}")
 
 
 async def setup(bot: commands.Bot):

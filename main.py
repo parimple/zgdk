@@ -36,7 +36,7 @@ class Zagadka(commands.Bot):
     """Bot class."""
 
     def __init__(self, config, **kwargs):
-        load_dotenv()
+        load_dotenv(override=True)
 
         self.test: bool = kwargs.get("test", False)
         self.config: dict[str, Any] = config
