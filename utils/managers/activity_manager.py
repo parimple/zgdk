@@ -33,11 +33,25 @@ class ActivityType:
 class ActivityManager:
     """Manages user activity points and ranking system."""
 
-    # Point values (similar to zagadka)
-    VOICE_WITH_OTHERS = 12  # Points per minute in voice with others
-    VOICE_ALONE = 2  # Points per minute in voice alone
-    TEXT_MESSAGE = 1  # Points per message (can be adjusted)
-    PROMOTION_STATUS = 4  # Points per minute for promoting server in status
+    # NOWY OPTYMALNY SYSTEM PUNKTÓW
+    # Zaprojektowany dla maksymalnej sprawiedliwości i motywacji społecznej
+
+    # 🎤 VOICE ACTIVITY (co minutę)
+    VOICE_WITH_OTHERS = 2  # Wyższa nagroda za społeczne interakcje
+    VOICE_ALONE = 1  # Podstawowa nagroda za obecność
+
+    # 💬 TEXT ACTIVITY
+    TEXT_MESSAGE = 1  # Punkty za słowo (max 15 za wiadomość - mniej spamu)
+    MAX_MESSAGE_POINTS = 15  # Zmniejszone z 32 żeby ograniczyć spam
+
+    # 📢 PROMOTION (co 5 minut zamiast co 3)
+    PROMOTION_STATUS = 2  # Wyższa nagroda za promocję serwera
+
+    # 🎁 NOWE BONUSY (opcjonalne - można włączyć w przyszłości)
+    DAILY_LOGIN_BONUS = 10  # Bonus za pierwsze logowanie dziennie
+    WEEKEND_MULTIPLIER = 1.5  # Mnożnik weekendowy (sobota-niedziela)
+    NIGHT_OWL_BONUS = 1  # Dodatkowy punkt za aktywność 22:00-06:00
+    EARLY_BIRD_BONUS = 1  # Dodatkowy punkt za aktywność 06:00-10:00
 
     def __init__(self, guild: discord.Guild = None):
         self.guild = guild
@@ -51,15 +65,26 @@ class ActivityManager:
         self, session: AsyncSession, member_id: int, is_with_others: bool = True
     ) -> None:
         """Add voice activity points for a member."""
-        points = self.VOICE_WITH_OTHERS if is_with_others else self.VOICE_ALONE
-        await self._add_points(session, member_id, ActivityType.VOICE, points)
+        base_points = self.VOICE_WITH_OTHERS if is_with_others else self.VOICE_ALONE
+        time_bonus = self.get_time_bonus()
+        total_points = base_points + time_bonus
+        await self._add_points(session, member_id, ActivityType.VOICE, total_points)
 
     async def add_text_activity(
-        self, session: AsyncSession, member_id: int, message_count: int = 1
+        self, session: AsyncSession, member_id: int, message_content: str = ""
     ) -> None:
-        """Add text activity points for a member."""
-        points = self.TEXT_MESSAGE * message_count
-        await self._add_points(session, member_id, ActivityType.TEXT, points)
+        """Add text activity points for a member based on word count (like original zagadka)."""
+        if not message_content:
+            return
+
+        # Count words in message
+        word_count = len(message_content.split())
+
+        # Apply maximum points limit (like original zagadka)
+        points = min(word_count * self.TEXT_MESSAGE, self.MAX_MESSAGE_POINTS)
+
+        if points > 0:
+            await self._add_points(session, member_id, ActivityType.TEXT, points)
 
     async def add_promotion_activity(self, session: AsyncSession, member_id: int) -> None:
         """Add promotion activity points for a member."""
@@ -296,3 +321,50 @@ class ActivityManager:
         )
 
         return embed
+
+    async def has_daily_activity_today(
+        self, session: AsyncSession, member_id: int, activity_type: str
+    ) -> bool:
+        """Check if member already got points for this activity type today."""
+        today_breakdown = await get_member_activity_breakdown(session, member_id, days_back=1)
+        return activity_type in today_breakdown and today_breakdown[activity_type] > 0
+
+    async def add_voice_activity_daily(
+        self, session: AsyncSession, member_id: int, is_with_others: bool = True
+    ) -> None:
+        """Add voice activity points once per day (like original zagadka)."""
+        # Check if user already got voice points today
+        if await self.has_daily_activity_today(session, member_id, ActivityType.VOICE):
+            return
+
+        points = self.VOICE_WITH_OTHERS if is_with_others else self.VOICE_ALONE
+        await self._add_points(session, member_id, ActivityType.VOICE, points)
+
+    async def add_promotion_activity_daily(self, session: AsyncSession, member_id: int) -> None:
+        """Add promotion activity points once per day (like original zagadka)."""
+        # Check if user already got promotion points today
+        if await self.has_daily_activity_today(session, member_id, ActivityType.PROMOTION):
+            return
+
+        await self._add_points(session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS)
+
+    def get_time_bonus(self) -> int:
+        """Calculate time-based bonus points based on current hour."""
+        current_time = datetime.now(timezone.utc)
+        hour = current_time.hour
+
+        bonus = 0
+
+        # Night owl bonus (22:00-06:00 UTC)
+        if hour >= 22 or hour < 6:
+            bonus += self.NIGHT_OWL_BONUS
+
+        # Early bird bonus (06:00-10:00 UTC)
+        elif 6 <= hour < 10:
+            bonus += self.EARLY_BIRD_BONUS
+
+        # Weekend multiplier (currently not applied, but calculated)
+        # if current_time.weekday() >= 5:  # Saturday = 5, Sunday = 6
+        #     bonus = int(bonus * self.WEEKEND_MULTIPLIER)
+
+        return bonus

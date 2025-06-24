@@ -87,7 +87,9 @@ class OnActivityTracking(commands.Cog):
 
         try:
             async with self.bot.get_db() as session:
-                await self.activity_manager.add_text_activity(session, message.author.id)
+                await self.activity_manager.add_text_activity(
+                    session, message.author.id, message.content
+                )
         except Exception as e:
             logger.error(f"Failed to track text activity for {message.author.id}: {e}")
 
@@ -160,6 +162,10 @@ class OnActivityTracking(commands.Cog):
         if not self.bot.guild:
             return
 
+        # Only award promotion points every 5 minutes (optimal balance)
+        current_time = datetime.now(timezone.utc)
+        should_award_points = current_time.minute % 5 == 0
+
         try:
             async with self.bot.get_db() as session:
                 current_promoters = set()
@@ -175,7 +181,9 @@ class OnActivityTracking(commands.Cog):
                     # Check for promotion
                     if await self.activity_manager.check_member_promotion_status(member):
                         current_promoters.add(member.id)
-                        await self.activity_manager.add_promotion_activity(session, member.id)
+                        # Only award points every 3 minutes
+                        if should_award_points:
+                            await self.activity_manager.add_promotion_activity(session, member.id)
 
                     # Check for anti-promotion (promoting other servers)
                     if await self.activity_manager.check_member_antipromo_status(member):

@@ -16,7 +16,7 @@ from cogs.views.shop_views import BuyRoleButton, RoleShopView
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
 from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager, TipplyDataProvider
-from utils.premium_logic import PremiumRoleManager
+from utils.premium_logic import PREMIUM_PRIORITY, PremiumRoleManager
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +203,10 @@ class OnPaymentEvent(commands.Cog):
                     logger.error("Donation channel not found: %s", channel_id)
                     return
 
+                # Initialize owner variable at the start
+                owner_id = self.bot.config.get("owner_id")
+                owner = self.guild.get_member(owner_id)
+
                 # Initialize variables
                 original_amount = payment_data.amount
                 final_amount = (
@@ -217,9 +221,7 @@ class OnPaymentEvent(commands.Cog):
                 # Get user's current highest premium role before processing
                 highest_role_name = self.role_manager.get_user_highest_role_name(member)
                 highest_role_priority = (
-                    self.role_manager.PREMIUM_PRIORITY.get(highest_role_name, 0)
-                    if highest_role_name
-                    else 0
+                    PREMIUM_PRIORITY.get(highest_role_name, 0) if highest_role_name else 0
                 )
 
                 # Check if the original amount (before legacy conversion) would result in a higher role
@@ -251,9 +253,7 @@ class OnPaymentEvent(commands.Cog):
                                     break
 
                     if target_role_for_original:
-                        target_role_priority = self.role_manager.PREMIUM_PRIORITY.get(
-                            target_role_for_original, 0
-                        )
+                        target_role_priority = PREMIUM_PRIORITY.get(target_role_for_original, 0)
 
                         # If user has higher role, add to wallet
                         if highest_role_priority > target_role_priority:
@@ -362,9 +362,7 @@ class OnPaymentEvent(commands.Cog):
                                         await message.reply(f"{owner.mention}")
                                     return
 
-                # Initialize owner and embed variables
-                owner_id = self.bot.config.get("owner_id")
-                owner = self.guild.get_member(owner_id)
+                # Initialize embed variables
                 embed = None
                 role_name = None
                 amount_to_add = final_amount  # Default to adding full amount if no role is found

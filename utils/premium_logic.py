@@ -430,6 +430,10 @@ class PremiumRoleManager:
 
     async def assign_temporary_roles(self, session, member: discord.Member, amount: int):
         """Assign temporary roles based on donation amount."""
+        logger.info(
+            f"[TEMP_ROLES] Starting assign_temporary_roles for {member.display_name} with amount {amount}"
+        )
+
         roles_tiers = [
             (15, "$2"),
             (25, "$4"),
@@ -441,8 +445,12 @@ class PremiumRoleManager:
         ]
 
         for amount_required, role_name in roles_tiers:
+            logger.info(
+                f"[TEMP_ROLES] Checking tier: {amount_required} -> {role_name}, amount >= required: {amount >= amount_required}"
+            )
             if amount >= amount_required:
                 role = discord.utils.get(self.guild.roles, name=role_name)
+                logger.info(f"[TEMP_ROLES] Looking for role {role_name}, found: {role is not None}")
                 if role:
                     try:
                         current_role = await RoleQueries.get_member_role(
@@ -463,6 +471,13 @@ class PremiumRoleManager:
 
                         if role not in member.roles:
                             await member.add_roles(role)
+                            logger.info(
+                                f"[TEMP_ROLES] Added role {role_name} to {member.display_name}"
+                            )
+                        else:
+                            logger.info(
+                                f"[TEMP_ROLES] Updated role {role_name} for {member.display_name}"
+                            )
 
                         # After $4 and $8 roles, wait 5 seconds
                         if role_name in ["$4", "$8"]:
@@ -470,5 +485,7 @@ class PremiumRoleManager:
 
                     except Exception as e:
                         logger.error(
-                            f"Error assigning/updating role {role_name} to {member.display_name}: {str(e)}"
+                            f"[TEMP_ROLES] Error assigning/updating role {role_name} to {member.display_name}: {str(e)}"
                         )
+                else:
+                    logger.warning(f"[TEMP_ROLES] Role {role_name} not found on server")
