@@ -22,7 +22,7 @@ gi
 
 2. Create a `.env` file in the root directory of the project and set the following environment variable:
 
-`DISCORD_TOKEN=<your Discord API token>`
+`ZAGADKA_TOKEN=<your Discord API token>`
 
 3. Build the Docker image:
 
