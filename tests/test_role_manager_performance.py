@@ -118,6 +118,8 @@ async def test_role_manager_performance():
 
     # Verify expected behavior
     expected_roles = TEST_USER_COUNT * ROLES_PER_USER
+    assert removed_count == expected_roles
+    assert RoleQueries.delete_member_role.call_count == expected_roles
 
     # Verify the remove_roles calls
     for user_id, member in members.items():
