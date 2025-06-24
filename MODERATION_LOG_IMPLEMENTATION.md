@@ -97,7 +97,7 @@ Pokaże statystyki mute'ów z ostatnich 30 dni:
 - Całkowita liczba mute'ów
 - Podział według typu mute'a
 - Najczęściej mutowani użytkownicy
-- Najaktywniejszi moderatorzy
+- Najaktywniejsi moderatorzy
 
 ### Liczba mute'ów użytkownika
 ```

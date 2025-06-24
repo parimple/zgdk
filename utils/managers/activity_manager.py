@@ -224,7 +224,7 @@ class ActivityManager:
 
         embed = discord.Embed(
             title=f"🏆 Ranking Aktywności zaGadki",
-            description=f"📌 **Najaktywniejszi członkowie serwera z ostatnich {days_back} dni**",
+            description=f"📌 **Najaktywniejsi członkowie serwera z ostatnich {days_back} dni**",
             color=color,
         )
 
