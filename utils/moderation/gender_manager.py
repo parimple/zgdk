@@ -218,9 +218,7 @@ class GenderManager:
                 color=discord.Color.blue(),
                 timestamp=ctx.message.created_at,
             )
-            embed.add_field(
-                name="👤 Użytkownik", value=f"{user.mention} (`{user.id}`)", inline=True
-            )
+            embed.add_field(name="👤 Użytkownik", value=f"{user.mention} (`{user.id}`)", inline=True)
             embed.add_field(
                 name="👮 Moderator", value=f"{ctx.author.mention} (`{ctx.author.id}`)", inline=True
             )

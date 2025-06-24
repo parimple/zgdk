@@ -633,7 +633,9 @@ class ModCog(commands.Cog):
                 color = (
                     discord.Color.green()
                     if mute_count == 0
-                    else discord.Color.orange() if mute_count < 5 else discord.Color.red()
+                    else discord.Color.orange()
+                    if mute_count < 5
+                    else discord.Color.red()
                 )
 
                 embed = discord.Embed(
