@@ -90,13 +90,13 @@ class PremiumCog(commands.Cog):
         # Konfiguracja kolorów
         color_config = self.bot.config.get("color", {})
         self.color_role_name = color_config.get("role_name", "✎")
-        self.base_role_id = color_config.get("base_role_id", 960665311772803184)
+        self.base_role_id = color_config.get("base_role_id")
 
         # Konfiguracja teamów
         team_config = self.bot.config.get("team", {})
         self.team_symbol = team_config.get("symbol", "☫")
-        self.team_base_role_id = team_config.get("base_role_id", 960665311730868240)
-        self.team_category_id = team_config.get("category_id", 1344105013357842522)
+        self.team_base_role_id = team_config.get("base_role_id")
+        self.team_category_id = team_config.get("category_id")
 
         self.message_sender = MessageSender()
 
@@ -525,9 +525,9 @@ class PremiumCog(commands.Cog):
         team_info_embed = discord.Embed(
             title=f"Team **{self.team_symbol} {name}**",
             description="Witaj w twoim nowym teamie! Oto informacje o nim:",
-            color=team_role.color
-            if team_role.color.value != 0
-            else discord.Color.blue(),
+            color=(
+                team_role.color if team_role.color.value != 0 else discord.Color.blue()
+            ),
         )
         team_info_embed.add_field(
             name="Właściciel", value=ctx.author.mention, inline=True

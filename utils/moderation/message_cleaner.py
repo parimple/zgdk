@@ -35,7 +35,7 @@ class MessageCleaner:
         self.config = bot.config
         self.message_sender = MessageSender()
         # ID bota, który obsługuje komendy avatara
-        self.avatar_bot_id = 489377322042916885
+        self.avatar_bot_id = bot.config.roles.avatar_bot if bot.config.roles else 0
 
     async def get_target_user(
         self, ctx: commands.Context, user
@@ -322,9 +322,11 @@ class MessageCleaner:
         if target_id is None and not ctx.author.guild_permissions.administrator:
             embed = discord.Embed(
                 description="Musisz podać użytkownika, którego wiadomości chcesz usunąć.",
-                color=ctx.author.color
-                if ctx.author.color.value != 0
-                else discord.Color.red(),
+                color=(
+                    ctx.author.color
+                    if ctx.author.color.value != 0
+                    else discord.Color.red()
+                ),
             )
             await ctx.send(embed=embed)
             return
@@ -340,9 +342,11 @@ class MessageCleaner:
             if not confirm:
                 embed = discord.Embed(
                     description="Anulowano usuwanie wiadomości.",
-                    color=ctx.author.color
-                    if ctx.author.color.value != 0
-                    else discord.Color.blue(),
+                    color=(
+                        ctx.author.color
+                        if ctx.author.color.value != 0
+                        else discord.Color.blue()
+                    ),
                 )
                 await ctx.send(embed=embed)
                 return
@@ -364,16 +368,16 @@ class MessageCleaner:
         # Pobierz emoji mastercard z konfiguracji
         mastercard = self.config.get("emojis", {}).get("mastercard", "💳")
         # Pobierz ID kanału premium_info
-        premium_info_id = self.config.get("channels", {}).get(
-            "premium_info", 960665316109713421
-        )
+        premium_info_id = self.config.get("channels", {}).get("premium_info")
 
         message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}.\nWybierz swój <#{premium_info_id}> {mastercard}"
         embed = discord.Embed(
             description=message,
-            color=ctx.author.color
-            if ctx.author.color.value != 0
-            else discord.Color.green(),
+            color=(
+                ctx.author.color
+                if ctx.author.color.value != 0
+                else discord.Color.green()
+            ),
         )
         await ctx.send(embed=embed)
 
@@ -459,9 +463,11 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description="Nie mam uprawnień do usuwania wiadomości na tym kanale.",
-                    color=ctx.author.color
-                    if ctx.author.color.value != 0
-                    else discord.Color.red(),
+                    color=(
+                        ctx.author.color
+                        if ctx.author.color.value != 0
+                        else discord.Color.red()
+                    ),
                 )
             )
             return total_deleted
@@ -470,9 +476,11 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description=f"Wystąpił błąd podczas usuwania wiadomości: {e}",
-                    color=ctx.author.color
-                    if ctx.author.color.value != 0
-                    else discord.Color.red(),
+                    color=(
+                        ctx.author.color
+                        if ctx.author.color.value != 0
+                        else discord.Color.red()
+                    ),
                 )
             )
             return total_deleted
@@ -481,9 +489,11 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description=f"Wystąpił nieoczekiwany błąd: {e}",
-                    color=ctx.author.color
-                    if ctx.author.color.value != 0
-                    else discord.Color.red(),
+                    color=(
+                        ctx.author.color
+                        if ctx.author.color.value != 0
+                        else discord.Color.red()
+                    ),
                 )
             )
             return total_deleted
@@ -510,16 +520,7 @@ class MessageCleaner:
         )
 
         # Pobierz listę ID kategorii do pominięcia
-        excluded_categories = self.config.get(
-            "excluded_categories",
-            [
-                1127590722015604766,  # Dodane domyślne ID kategorii do pominięcia
-                960665312200626199,
-                960665312376807530,
-                960665315895836698,
-                960665316109713423,
-            ],
-        )
+        excluded_categories = self.config.get("excluded_categories", [])
 
         logger.info(
             f"Starting message deletion across channels, excluding categories: {excluded_categories}"
@@ -620,9 +621,11 @@ class MessageCleaner:
         embed = discord.Embed(
             title="Potwierdzenie",
             description=message,
-            color=ctx.author.color
-            if ctx.author.color.value != 0
-            else discord.Color.orange(),
+            color=(
+                ctx.author.color
+                if ctx.author.color.value != 0
+                else discord.Color.orange()
+            ),
         )
 
         view = discord.ui.View()

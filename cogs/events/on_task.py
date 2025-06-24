@@ -35,7 +35,7 @@ class OnTaskEvent(commands.Cog):
         self.role_manager = RoleManager(bot)
         self.role_service = RoleService(bot)
         self.check_roles_expiry.start()  # pylint: disable=no-member
-        self.notification_channel_id = 1336368306940018739
+        self.notification_channel_id = bot.config.channels.get("mute_notifications")
         # Set default channel notifications to True
         self.bot.force_channel_notifications = True
 

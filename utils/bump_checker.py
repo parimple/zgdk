@@ -26,8 +26,7 @@ class BumpChecker:
         }
         return emojis.get(service, "")
 
-    @staticmethod
-    def get_service_details(service: str) -> dict:
+    def get_service_details(self, service: str) -> dict:
         """Get details for a service"""
         return {
             "disboard": {
@@ -56,14 +55,18 @@ class BumpChecker:
                 "cooldown": "12h",
                 "cooldown_type": "👤",
                 "reward": "6T",
-                "url": "https://discordservers.com/server/960665311701528596/bump",
+                "url": "https://discordservers.com/server/{guild}/bump".format(
+                    guild=self.bot.guild_id
+                ),
             },
             "dsme": {
                 "name": "DSME",
                 "cooldown": "6h",
                 "cooldown_type": "👤",
                 "reward": "3T",
-                "url": "https://discords.com/servers/960665311701528596/upvote",
+                "url": "https://discords.com/servers/{guild}/upvote".format(
+                    guild=self.bot.guild_id
+                ),
             },
         }[service]
 

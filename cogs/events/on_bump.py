@@ -9,6 +9,14 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from sqlalchemy import select
 
+from constants import (
+    DCSERVERS_WEBHOOK_CHANNEL_ID,
+    DISBOARD_BOT_ID,
+    DISBOARD_PING_ID,
+    DISCADIA_BOT_ID,
+    DISCADIA_WEBHOOK_CHANNEL_ID,
+    DZIK_BOT_ID,
+)
 from datasources.models import Member, NotificationLog
 from datasources.queries import MemberQueries, NotificationLogQueries
 from utils.message_sender import MessageSender
@@ -17,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Bot IDs and configurations
 DISBOARD = {
-    "id": 302050872383242240,
+    "id": DISBOARD_BOT_ID,
     "description": [
         "!",
         ":thumbsup:",
@@ -32,18 +40,18 @@ DISBOARD = {
         "Podbito serwer",
         "Server bumped",
     ],
-    "ping_id": 764443772108013578,
+    "ping_id": DISBOARD_PING_ID,
     "message_bot": "Można już zbumpować kanał ❤️ Wpisz /bump ",
     "message_bump": "Można już zbumpować kanał ❤️ Wpisz /bump ",
     "command": "!d bump",
 }
 
 DZIK = {
-    "id": 1270093920256393248,
+    "id": DZIK_BOT_ID,
 }
 
 DISCADIA = {
-    "id": 1222548162741538938,
+    "id": DISCADIA_BOT_ID,
     "cooldown_messages": [
         "already bumped recently",
         "try again in",
@@ -55,20 +63,20 @@ DISCADIA = {
 }
 
 DCSERVERS = {
-    "id": 1336297961402929195,  # Webhook channel ID
+    "id": DCSERVERS_WEBHOOK_CHANNEL_ID,  # Webhook channel ID
     "success_messages": [
         "has bumped your server on DiscordServers",
         "More Gems!",
     ],
 }
 
-DISCADIA_WEBHOOK_CHANNEL = 1326322441383051385
-DCSERVERS_WEBHOOK_CHANNEL = 1336297961402929195
+DISCADIA_WEBHOOK_CHANNEL = DISCADIA_WEBHOOK_CHANNEL_ID
+DCSERVERS_WEBHOOK_CHANNEL = DCSERVERS_WEBHOOK_CHANNEL_ID
 
 # Global services that use guild_id for cooldown
 GLOBAL_SERVICES = ["disboard"]  # tylko Disboard jest globalny
 
-DSME_ROLE_ID = 960665311743447108
+DSME_ROLE_ID = 0
 
 
 class OnBumpEvent(commands.Cog):
@@ -76,24 +84,19 @@ class OnBumpEvent(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.notification_channel_id = 1336368306940018739
+        self.notification_channel_id = bot.config.channels.get("mute_notifications")
         self.system_user_id = bot.guild_id
+        global DSME_ROLE_ID
+        if bot.config.roles:
+            DSME_ROLE_ID = bot.config.roles.dsme
         self.test_mode = True  # Flaga do kontrolowania trybu testowego
 
     def get_service_duration(self, service: str) -> int:
         """Get duration for a service"""
-        if service == "discordservers":
-            return 6  # 6h za DCServers
-        elif service == "dsme":
-            return 3  # 3h za DSME
         return self.bot.config["bypass"]["duration"]["services"].get(service, 3)
 
     def get_service_cooldown(self, service: str) -> int:
         """Get cooldown for a service"""
-        if service == "discordservers":
-            return 12  # 12h cooldown dla DCServers
-        elif service == "dsme":
-            return 6  # 6h cooldown dla DSME
         return self.bot.config["bypass"]["cooldown"].get(service, 24)
 
     def extract_message_text(self, message: discord.Message) -> str:
@@ -991,14 +994,14 @@ class OnBumpEvent(commands.Cog):
                 "cooldown": "12h",
                 "cooldown_type": "👤",
                 "reward": "6T",
-                "url": "https://discordservers.com/server/960665311701528596/bump",
+                "url": f"https://discordservers.com/server/{self.bot.guild_id}/bump",
             },
             "dsme": {
                 "name": "DSME",
                 "cooldown": "6h",
                 "cooldown_type": "👤",
                 "reward": "3T",
-                "url": "https://discords.com/servers/960665311701528596/upvote",
+                "url": f"https://discords.com/servers/{self.bot.guild_id}/upvote",
             },
         }[service]
 

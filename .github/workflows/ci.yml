@@ -76,7 +76,8 @@ jobs:
         docker run --rm zgdk:test python -c "
         import sys
         try:
-            from main import Zagadka, load_config
+            from main import Zagadka
+            from utils.config import load_config
             print('✅ Core modules imported successfully')
             sys.exit(0)
         except Exception as e:

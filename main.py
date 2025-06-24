@@ -10,7 +10,6 @@ from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 import discord
-import yaml
 from discord.ext import commands
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import (
@@ -22,28 +21,24 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import sessionmaker
 
 from datasources.models import Base
+from utils.config import Config, load_config
 from utils.premium import PaymentData
 
 intents = discord.Intents.all()
 
 
-def load_config():
-    with open("config.yml", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
 class Zagadka(commands.Bot):
     """Bot class."""
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, config: Config, **kwargs):
         load_dotenv(override=True)
 
         self.test: bool = kwargs.get("test", False)
-        self.config: dict[str, Any] = config
+        self.config: Config = config
 
-        self.guild_id: int = config.get("guild_id")
-        self.donate_url: str = config.get("donate_url", "")
-        self.channels: dict[str, int] = config.get("channels", {})
+        self.guild_id: int = config.guild_id
+        self.donate_url: str = config.donate_url
+        self.channels: dict[str, int] = config.channels
 
         self.guild: Optional[discord.Guild] = None
         self.invites: dict[str, discord.Invite] = {}
@@ -65,7 +60,7 @@ class Zagadka(commands.Bot):
         self.payment_data_class = PaymentData
 
         super().__init__(
-            command_prefix=config.get("prefix"),
+            command_prefix=config.prefix,
             intents=intents,
             status=discord.Status.do_not_disturb,
             allowed_mentions=discord.AllowedMentions.all(),

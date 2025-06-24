@@ -16,12 +16,17 @@ async def check_roles():
             print(f"  ID: {role.id}, Name: {role.name}, Type: {role.role_type}")
 
         # Check specific gender roles
-        male_role = await RoleQueries.get_role_by_id(session, 960665311701528599)
-        female_role = await RoleQueries.get_role_by_id(session, 960665311701528600)
+        from utils.config import load_config
+
+        cfg = load_config()
+        male_role_id = cfg["gender_roles"]["male"]
+        female_role_id = cfg["gender_roles"]["female"]
+        male_role = await RoleQueries.get_role_by_id(session, male_role_id)
+        female_role = await RoleQueries.get_role_by_id(session, female_role_id)
 
         print("\nGender roles:")
-        print(f"  Male role (960665311701528599): {male_role}")
-        print(f"  Female role (960665311701528600): {female_role}")
+        print(f"  Male role ({male_role_id}): {male_role}")
+        print(f"  Female role ({female_role_id}): {female_role}")
 
 
 if __name__ == "__main__":

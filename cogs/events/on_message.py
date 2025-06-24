@@ -16,7 +16,7 @@ class OnMessageEvent(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.allowed_channels = [960665312200626196]
+        self.allowed_channels = bot.config.allowed_channels
 
     @commands.Cog.listener()
     async def on_message(self, message: Message):

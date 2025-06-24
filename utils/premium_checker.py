@@ -46,8 +46,8 @@ class PremiumChecker:
     }
 
     # Role IDs
-    BOOSTER_ROLE_ID = 1052692705718829117  # ♼
-    INVITE_ROLE_ID = 960665311760248879  # ♵
+    BOOSTER_ROLE_ID = 0  # ♼
+    INVITE_ROLE_ID = 0  # ♵
 
     # Premium role levels
     PREMIUM_ROLE_LEVELS = {"zG50": 1, "zG100": 2, "zG500": 3, "zG1000": 4}
@@ -56,6 +56,9 @@ class PremiumChecker:
         self.bot = bot
         self.config = bot.config.get("voice_permission_levels", {})
         self.message_sender = MessageSender()
+        if bot.config.roles:
+            self.BOOSTER_ROLE_ID = bot.config.roles.booster
+            self.INVITE_ROLE_ID = bot.config.roles.invite
 
     def get_command_tier(self, command_name: str) -> Optional[CommandTier]:
         """Get the tier level for a given command."""
