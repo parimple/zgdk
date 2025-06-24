@@ -311,31 +311,61 @@ class OnTaskEvent(commands.Cog):
         audit_reason_key: str = "niespójności systemowej",
     ):
         """Powiadamia użytkownika o usunięciu roli w wyniku audytu."""
-        role_name = discord_role.name
-        main_message_body = ""
-        include_renewal = False
-        local_renewal_payment_action_prefix = ""  # Domyślnie pusty
+        # Sprawdź czy powiadomienie zostało już wysłane
+        async with self.bot.get_db() as session:
+            # Sprawdź różne typy powiadomień - zarówno z normalnego systemu jak i audytu
+            recent_notifications = []
+            notification_tags_to_check = [
+                "premium_role_expiry",  # Powiadomienie o wygasaniu
+                f"premium_expired",     # Powiadomienie o usunięciu wygasłej roli
+                f"audit_removal_{discord_role.name}",  # Powiadomienie z audytu dla tej konkretnej roli
+            ]
+            
+            for tag in notification_tags_to_check:
+                notification_log = await NotificationLogQueries.get_notification_log(
+                    session, member.id, tag
+                )
+                if notification_log:
+                    # Sprawdź czy powiadomienie zostało wysłane w ciągu ostatnich 24 godzin
+                    time_since_notification = datetime.now(timezone.utc) - notification_log.sent_at
+                    if time_since_notification < timedelta(hours=24):
+                        logger.info(
+                            f"AuditRemoval: Skipping notification for {member.display_name} ({member.id}) "
+                            f"- recent notification found: {tag} sent {time_since_notification} ago"
+                        )
+                        return
 
-        if db_expiration_date:
-            expiration_str = discord.utils.format_dt(db_expiration_date, "R")
-            main_message_body = f"Twoja rola premium {role_name} wygasła {expiration_str} i została usunięta w ramach korekty systemowej."
-            include_renewal = True
-            local_renewal_payment_action_prefix = ", aby ją odnowić"  # Ustawiamy dla spójności
-        else:
-            main_message_body = (
-                f"Twoja rola premium {role_name} została usunięta z powodu {audit_reason_key}."
+            role_name = discord_role.name
+            main_message_body = ""
+            include_renewal = False
+            local_renewal_payment_action_prefix = ""  # Domyślnie pusty
+
+            if db_expiration_date:
+                expiration_str = discord.utils.format_dt(db_expiration_date, "R")
+                main_message_body = f"Twoja rola premium {role_name} wygasła {expiration_str} i została usunięta w ramach korekty systemowej."
+                include_renewal = True
+                local_renewal_payment_action_prefix = ", aby ją odnowić"  # Ustawiamy dla spójności
+            else:
+                main_message_body = (
+                    f"Twoja rola premium {role_name} została usunięta z powodu {audit_reason_key}."
+                )
+
+            await self._send_notification_template(
+                member,
+                role_name,  # Nadal potrzebne dla wyszukania ceny w _send_notification_template
+                title_prefix="",  # Kluczowa zmiana: używamy main_message_body jako głównej treści
+                reason_details=main_message_body,
+                include_renewal_info=include_renewal,
+                log_prefix="AuditRemoval",
+                # renewal_action_verb domyślnie jest "odnowić", co jest tutaj odpowiednie
+                renewal_payment_action_prefix=local_renewal_payment_action_prefix,
             )
 
-        await self._send_notification_template(
-            member,
-            role_name,  # Nadal potrzebne dla wyszukania ceny w _send_notification_template
-            title_prefix="",  # Kluczowa zmiana: używamy main_message_body jako głównej treści
-            reason_details=main_message_body,
-            include_renewal_info=include_renewal,
-            log_prefix="AuditRemoval",
-            # renewal_action_verb domyślnie jest "odnowić", co jest tutaj odpowiednie
-            renewal_payment_action_prefix=local_renewal_payment_action_prefix,
-        )
+            # Zapisz że powiadomienie zostało wysłane, aby uniknąć duplikatów w przyszłości
+            await NotificationLogQueries.add_or_update_notification_log(
+                session, member.id, f"audit_removal_{role_name}"
+            )
+            await session.commit()
 
     @check_roles_expiry.before_loop
     async def before_tasks(self):
