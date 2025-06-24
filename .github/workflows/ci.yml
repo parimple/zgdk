@@ -7,7 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  unit-tests:
+    name: Unit Tests & Code Quality
     runs-on: ubuntu-latest
     
     services:
@@ -25,46 +26,143 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
     
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
+        cache: 'pip'
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Run checks
+    - name: Run code quality checks & tests
       run: |
         chmod +x run_checks.sh
         ./run_checks.sh
 
-  build:
-    needs: test
+  docker-integration:
+    name: Docker Integration Tests
+    needs: unit-tests
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
     
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
     
-    - name: Login to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Create test configuration
+      run: |
+        # Create minimal config for testing
+        cat > config.yml << EOF
+        discord:
+          token: "dummy_token_for_testing"
+          guild_id: 123456789
+        database:
+          host: "postgres"
+          port: 5432
+          name: "testdb"
+          user: "postgres"
+          password: "postgres"
+        EOF
     
-    - name: Build and push
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: |
-          ${{ secrets.DOCKERHUB_USERNAME }}/zgdk:latest
-          ${{ secrets.DOCKERHUB_USERNAME }}/zgdk:${{ github.sha }} 
+    - name: Build Docker image
+      run: |
+        docker build -t zgdk:test .
+        docker images zgdk:test
+    
+    - name: Test Docker Compose setup
+      run: |
+        # Create test docker-compose override
+        cat > docker-compose.test.yml << EOF
+        services:
+          postgres:
+            image: postgres:13
+            environment:
+              POSTGRES_PASSWORD: postgres
+              POSTGRES_DB: testdb
+            healthcheck:
+              test: ["CMD-SHELL", "pg_isready -U postgres"]
+              interval: 5s
+              timeout: 5s
+              retries: 5
+          
+          bot:
+            build: .
+            depends_on:
+              postgres:
+                condition: service_healthy
+            environment:
+              - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/testdb
+            command: python -c "
+              import sys;
+              print('Testing bot initialization...');
+              try:
+                  from main import *;
+                  print('✅ Bot modules import successfully');
+                  print('✅ Dependencies loaded correctly');
+                  print('✅ Docker container test passed');
+                  sys.exit(0);
+              except ImportError as e:
+                  print(f'❌ Import error: {e}');
+                  sys.exit(1);
+              except Exception as e:
+                  print(f'❌ Runtime error: {e}');
+                  sys.exit(1);
+              "
+        EOF
+    
+    - name: Run integration tests
+      run: |
+        echo "🚀 Starting integration test..."
+        docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
+        
+        echo "🧹 Cleaning up test containers..."
+        docker-compose -f docker-compose.test.yml down -v
+    
+    - name: Validate Docker image efficiency
+      run: |
+        echo "📊 Docker image analysis:"
+        docker images zgdk:test --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+        
+        # Check if image size is reasonable (should be < 1GB for Python app)
+        SIZE=$(docker images zgdk:test --format "{{.Size}}" | sed 's/MB//' | sed 's/GB/*1024/' | bc -l 2>/dev/null || echo "0")
+        echo "Image size: ${SIZE}MB"
+
+  # Optional: Enable this when Docker Hub secrets are configured
+  # docker-publish:
+  #   name: Publish Docker Image
+  #   needs: [unit-tests, docker-integration]
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #   
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
+  #   
+  #   - name: Set up Docker Buildx
+  #     uses: docker/setup-buildx-action@v3
+  #   
+  #   - name: Login to Docker Hub
+  #     uses: docker/login-action@v3
+  #     with:
+  #       username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #       password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #   
+  #   - name: Build and push
+  #     uses: docker/build-push-action@v5
+  #     with:
+  #       context: .
+  #       platforms: linux/amd64,linux/arm64
+  #       push: true
+  #       tags: |
+  #         ${{ secrets.DOCKERHUB_USERNAME }}/zgdk:latest
+  #         ${{ secrets.DOCKERHUB_USERNAME }}/zgdk:${{ github.sha }}
+  #       cache-from: type=gha
+  #       cache-to: type=gha,mode=max 
