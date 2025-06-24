@@ -165,7 +165,8 @@ class OnBumpEvent(commands.Cog):
                         username = field.value.strip("*")
                         # Find member by username
                         member = discord.utils.find(
-                            lambda m: m.name.lower() == username.lower(), self.bot.guild.members
+                            lambda m: m.name.lower() == username.lower(),
+                            self.bot.guild.members,
                         )
                         if member:
                             return member.id
@@ -174,7 +175,9 @@ class OnBumpEvent(commands.Cog):
             if embed.description:
                 # First try to get user from mentions in the embed description
                 if message.mentions:
-                    logger.info(f"Found mentions in message: {[m.name for m in message.mentions]}")
+                    logger.info(
+                        f"Found mentions in message: {[m.name for m in message.mentions]}"
+                    )
                     return message.mentions[0].id
 
                 # Try to extract user ID from mention in description
@@ -190,16 +193,21 @@ class OnBumpEvent(commands.Cog):
                     username = match.group(1)
                     logger.info(f"Found username in description: {username}")
                     member = discord.utils.find(
-                        lambda m: m.name.lower() == username.lower(), self.bot.guild.members
+                        lambda m: m.name.lower() == username.lower(),
+                        self.bot.guild.members,
                     )
                     if member:
-                        logger.info(f"Found member by username: {member.name} ({member.id})")
+                        logger.info(
+                            f"Found member by username: {member.name} ({member.id})"
+                        )
                         return member.id
                     logger.warning(
                         f"Could not find member with username {username} in guild members"
                     )
                 else:
-                    logger.warning(f"No username match found in description: {embed.description}")
+                    logger.warning(
+                        f"No username match found in description: {embed.description}"
+                    )
 
         # Check message mentions
         if message.mentions:
@@ -256,7 +264,9 @@ class OnBumpEvent(commands.Cog):
             if message.interaction
             else "no interaction"
         )
-        command_user = getattr(message.interaction, "user", None) if message.interaction else None
+        command_user = (
+            getattr(message.interaction, "user", None) if message.interaction else None
+        )
 
         # Log initial state
         logger.info(
@@ -419,14 +429,21 @@ class OnBumpEvent(commands.Cog):
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
         """Handle message edits from bump bots (especially Dzik slash responses)."""
         # Skip if not in bump channel or not from relevant bots
-        if not after.guild or after.author.id not in [DISBOARD["id"], DZIK["id"], DISCADIA["id"]]:
+        if not after.guild or after.author.id not in [
+            DISBOARD["id"],
+            DZIK["id"],
+            DISCADIA["id"],
+        ]:
             return
 
         # Only process if the message changed significantly (content or embeds)
         if (
             before.content == after.content
             and len(before.embeds) == len(after.embeds)
-            and all(e1.description == e2.description for e1, e2 in zip(before.embeds, after.embeds))
+            and all(
+                e1.description == e2.description
+                for e1, e2 in zip(before.embeds, after.embeds)
+            )
         ):
             return
 
@@ -460,9 +477,11 @@ class OnBumpEvent(commands.Cog):
             return
 
         # Log messages from bump bots or webhook channel
-        should_log = message.author.id in [DISBOARD["id"], DZIK["id"], DISCADIA["id"]] or (
-            message.webhook_id and message.channel.id == DISCADIA_WEBHOOK_CHANNEL
-        )
+        should_log = message.author.id in [
+            DISBOARD["id"],
+            DZIK["id"],
+            DISCADIA["id"],
+        ] or (message.webhook_id and message.channel.id == DISCADIA_WEBHOOK_CHANNEL)
 
         if should_log:
             log_message = (
@@ -511,13 +530,17 @@ class OnBumpEvent(commands.Cog):
             return
 
         # Check if this is a successful bump message
-        if not any(d in message.embeds[0].description.lower() for d in DISBOARD["description"]):
+        if not any(
+            d in message.embeds[0].description.lower() for d in DISBOARD["description"]
+        ):
             return
 
         # For slash commands, use the interaction user
         if message.type == discord.MessageType.chat_input_command:
             if not message.interaction or not message.interaction.user:
-                logger.warning("No interaction user found in Disboard slash command. Aborting.")
+                logger.warning(
+                    "No interaction user found in Disboard slash command. Aborting."
+                )
                 return
 
             user = message.interaction.user
@@ -548,7 +571,9 @@ class OnBumpEvent(commands.Cog):
                 # Add T time to the user who executed the command
                 duration = self.get_service_duration("disboard")
                 if await MemberQueries.add_bypass_time(session, user.id, duration):
-                    logger.info(f"Added {duration}h T to user {user.id} for Disboard bump")
+                    logger.info(
+                        f"Added {duration}h T to user {user.id} for Disboard bump"
+                    )
                     await session.commit()
 
                     # Send marketing message in the channel where command was used
@@ -556,7 +581,9 @@ class OnBumpEvent(commands.Cog):
             return
 
         # For non-slash messages (fallback)
-        logger.warning("Received non-slash command Disboard message - this should not happen")
+        logger.warning(
+            "Received non-slash command Disboard message - this should not happen"
+        )
         logger.info(
             f"Message details:\n"
             f"Type: {message.type}\n"
@@ -569,7 +596,9 @@ class OnBumpEvent(commands.Cog):
         # For slash commands, use the interaction user directly
         if message.type == discord.MessageType.chat_input_command:
             if not message.interaction or not message.interaction.user:
-                logger.warning("No interaction user found in Dzik slash command. Aborting.")
+                logger.warning(
+                    "No interaction user found in Dzik slash command. Aborting."
+                )
                 return
 
             user = message.interaction.user
@@ -600,7 +629,9 @@ class OnBumpEvent(commands.Cog):
             )
 
             if not can_use:
-                logger.info(f"User {user.id} attempted Dzik bump but cooldown not finished")
+                logger.info(
+                    f"User {user.id} attempted Dzik bump but cooldown not finished"
+                )
                 await self.send_bump_marketing(message.channel, "dzik", user)
                 return
 
@@ -625,7 +656,9 @@ class OnBumpEvent(commands.Cog):
         # For slash commands, use the interaction user
         if message.type == discord.MessageType.chat_input_command:
             if not message.interaction or not message.interaction.user:
-                logger.warning("No interaction user found in Discadia slash command. Aborting.")
+                logger.warning(
+                    "No interaction user found in Discadia slash command. Aborting."
+                )
                 return
 
             user = message.interaction.user
@@ -656,7 +689,9 @@ class OnBumpEvent(commands.Cog):
                 # Add T time to the user who executed the command
                 duration = self.get_service_duration("dsme")
                 if await MemberQueries.add_bypass_time(session, user.id, duration):
-                    logger.info(f"Added {duration}h T to user {user.id} for Discadia bump")
+                    logger.info(
+                        f"Added {duration}h T to user {user.id} for Discadia bump"
+                    )
                     await session.commit()
 
                     # Send marketing message
@@ -664,7 +699,9 @@ class OnBumpEvent(commands.Cog):
             return
 
         # For non-slash messages (fallback)
-        logger.warning("Received non-slash command Discadia message - this should not happen")
+        logger.warning(
+            "Received non-slash command Discadia message - this should not happen"
+        )
         logger.info(
             f"Message details:\n"
             f"Type: {message.type}\n"
@@ -714,7 +751,9 @@ class OnBumpEvent(commands.Cog):
             )
 
             if not can_use:
-                logger.info(f"User {user_id} attempted Discadia vote but cooldown not finished")
+                logger.info(
+                    f"User {user_id} attempted Discadia vote but cooldown not finished"
+                )
                 return
 
             # Add T time
@@ -725,9 +764,13 @@ class OnBumpEvent(commands.Cog):
 
                 # Send marketing message to user's voice channel if they're in one
                 if member.voice and member.voice.channel:
-                    await self.send_bump_marketing(member.voice.channel, "discadia", member)
+                    await self.send_bump_marketing(
+                        member.voice.channel, "discadia", member
+                    )
                 else:
-                    logger.info(f"User {user_id} not in voice channel, skipping marketing message")
+                    logger.info(
+                        f"User {user_id} not in voice channel, skipping marketing message"
+                    )
 
     async def handle_discordservers_bump(self, message: discord.Message):
         """Handle bump confirmation from DCServers."""
@@ -758,7 +801,9 @@ class OnBumpEvent(commands.Cog):
             )
 
             if not can_use:
-                logger.info(f"User {user_id} attempted DCServers bump but cooldown not finished")
+                logger.info(
+                    f"User {user_id} attempted DCServers bump but cooldown not finished"
+                )
                 return
 
             # Add T time
@@ -768,7 +813,9 @@ class OnBumpEvent(commands.Cog):
                 await session.commit()
 
                 # Send marketing message in the channel where command was used
-                await self.send_bump_marketing(message.channel, "discordservers", member)
+                await self.send_bump_marketing(
+                    message.channel, "discordservers", member
+                )
 
     @property
     def force_channel_notifications(self):
@@ -848,11 +895,15 @@ class OnBumpEvent(commands.Cog):
                 if "command" in details:
                     service_text += f"\nDostępne: {next_time} • `{details['command']}`"
                 elif "url" in details:
-                    service_text += f"\nDostępne: {next_time} • [Zagłosuj]({details['url']})"
+                    service_text += (
+                        f"\nDostępne: {next_time} • [Zagłosuj]({details['url']})"
+                    )
                 waiting_text.append(service_text)
 
             if waiting_text:
-                embed.add_field(name="⏳ Oczekujące", value="\n".join(waiting_text), inline=False)
+                embed.add_field(
+                    name="⏳ Oczekujące", value="\n".join(waiting_text), inline=False
+                )
 
         # Add available services
         if available_services:
@@ -869,7 +920,9 @@ class OnBumpEvent(commands.Cog):
 
             if available_text:
                 embed.add_field(
-                    name="✅ Dostępne teraz", value="\n".join(available_text), inline=False
+                    name="✅ Dostępne teraz",
+                    value="\n".join(available_text),
+                    inline=False,
                 )
 
         # Create view with buttons for voting services
@@ -953,8 +1006,12 @@ class OnBumpEvent(commands.Cog):
         name="bump", description="Pokazuje status wszystkich dostępnych bumpów"
     )
     @commands.cooldown(1, 5, commands.BucketType.user)  # Prevent spam
-    @app_commands.describe(member="Użytkownik, którego status chcesz sprawdzić (opcjonalne)")
-    async def show_bump_status(self, ctx: commands.Context, member: discord.Member = None):
+    @app_commands.describe(
+        member="Użytkownik, którego status chcesz sprawdzić (opcjonalne)"
+    )
+    async def show_bump_status(
+        self, ctx: commands.Context, member: discord.Member = None
+    ):
         """Show status of all available bump services."""
         # Defer the response since we'll be making database queries
         await ctx.defer()
@@ -1005,11 +1062,15 @@ class OnBumpEvent(commands.Cog):
                 if "command" in details:
                     service_text += f"\nDostępne: {next_time} • `{details['command']}`"
                 elif "url" in details:
-                    service_text += f"\nDostępne: {next_time} • [Zagłosuj]({details['url']})"
+                    service_text += (
+                        f"\nDostępne: {next_time} • [Zagłosuj]({details['url']})"
+                    )
                 waiting_text.append(service_text)
 
             if waiting_text:
-                embed.add_field(name="⏳ Oczekujące", value="\n".join(waiting_text), inline=False)
+                embed.add_field(
+                    name="⏳ Oczekujące", value="\n".join(waiting_text), inline=False
+                )
 
         # Add available services
         if available_services:
@@ -1026,7 +1087,9 @@ class OnBumpEvent(commands.Cog):
 
             if available_text:
                 embed.add_field(
-                    name="✅ Dostępne teraz", value="\n".join(available_text), inline=False
+                    name="✅ Dostępne teraz",
+                    value="\n".join(available_text),
+                    inline=False,
                 )
 
         # Create view with buttons for voting services
@@ -1075,11 +1138,15 @@ class OnBumpEvent(commands.Cog):
                 )
 
                 if not can_use:
-                    logger.info(f"User {after.id} attempted DSME vote but cooldown not finished")
+                    logger.info(
+                        f"User {after.id} attempted DSME vote but cooldown not finished"
+                    )
                     # Remove the role since they can't use it yet
                     try:
                         await after.remove_roles(dsme_role)
-                        logger.info(f"Removed DSME role from {after.id} due to cooldown")
+                        logger.info(
+                            f"Removed DSME role from {after.id} due to cooldown"
+                        )
                     except discord.HTTPException as e:
                         logger.error(f"Failed to remove DSME role from {after.id}: {e}")
                     return
@@ -1098,7 +1165,9 @@ class OnBumpEvent(commands.Cog):
                     # Remove the role after processing
                     try:
                         await after.remove_roles(dsme_role)
-                        logger.info(f"Removed DSME role from {after.id} after processing")
+                        logger.info(
+                            f"Removed DSME role from {after.id} after processing"
+                        )
                     except discord.HTTPException as e:
                         logger.error(f"Failed to remove DSME role from {after.id}: {e}")
 
@@ -1111,7 +1180,9 @@ class OnBumpEvent(commands.Cog):
         async with self.bot.get_db() as session:
             # For global services, use guild_id instead of user ID
             check_id = self.bot.guild_id if service in GLOBAL_SERVICES else user_id
-            log = await NotificationLogQueries.get_notification_log(session, check_id, service)
+            log = await NotificationLogQueries.get_notification_log(
+                session, check_id, service
+            )
 
             if not log or now - log.sent_at > timedelta(hours=cooldown):
                 return {
@@ -1140,7 +1211,9 @@ class OnBumpEvent(commands.Cog):
             if channel:
                 try:
                     await channel.send(formatted_message)
-                    logger.info(f"[TEST MODE] Sent notification to test channel {channel.id}")
+                    logger.info(
+                        f"[TEST MODE] Sent notification to test channel {channel.id}"
+                    )
                     return True
                 except discord.HTTPException as e:
                     logger.error(f"Failed to send to test channel: {e}")
@@ -1153,7 +1226,9 @@ class OnBumpEvent(commands.Cog):
         if member.voice and member.voice.channel:
             try:
                 await member.voice.channel.send(formatted_message)
-                logger.info(f"Sent notification to voice channel {member.voice.channel.id}")
+                logger.info(
+                    f"Sent notification to voice channel {member.voice.channel.id}"
+                )
                 return True
             except discord.HTTPException as e:
                 logger.error(f"Failed to send notification to voice channel: {e}")
@@ -1173,7 +1248,9 @@ class OnBumpEvent(commands.Cog):
         if channel:
             try:
                 await channel.send(f"[DM nie działa] {formatted_message}")
-                logger.info(f"Sent notification to test channel as fallback {channel.id}")
+                logger.info(
+                    f"Sent notification to test channel as fallback {channel.id}"
+                )
                 return True
             except discord.HTTPException as e:
                 logger.error(f"Failed to send to test channel: {e}")

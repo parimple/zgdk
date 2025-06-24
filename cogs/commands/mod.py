@@ -10,7 +10,13 @@ from discord.ext import commands
 
 from datasources.queries import MemberQueries, ModerationLogQueries, RoleQueries
 from utils.message_sender import MessageSender
-from utils.moderation import GenderManager, GenderType, MessageCleaner, MuteManager, MuteType
+from utils.moderation import (
+    GenderManager,
+    GenderType,
+    MessageCleaner,
+    MuteManager,
+    MuteType,
+)
 from utils.permissions import is_admin, is_mod_or_admin, is_owner_or_admin
 
 logger = logging.getLogger(__name__)
@@ -26,6 +32,10 @@ class ModCog(commands.Cog):
         self.mute_manager = MuteManager(bot)
         self.message_cleaner = MessageCleaner(bot)
         self.gender_manager = GenderManager(bot)
+
+        # Ułatwia testowanie komend bez dodawania cogu do bota
+        for command in self.get_commands():
+            command.cog = self
 
     # Nowa metoda pomocnicza do wyświetlania pomocy dla komend
     async def send_subcommand_help(self, ctx, command_name):
@@ -73,7 +83,8 @@ class ModCog(commands.Cog):
         await self.message_cleaner.clear_messages(ctx, hours, user, all_channels=True)
 
     @commands.hybrid_command(
-        name="clearimg", description="Usuwa linki i obrazki użytkownika z ostatnich X godzin."
+        name="clearimg",
+        description="Usuwa linki i obrazki użytkownika z ostatnich X godzin.",
     )
     @is_mod_or_admin()
     @discord.app_commands.describe(
@@ -99,14 +110,19 @@ class ModCog(commands.Cog):
             logger.error(f"Error during command synchronization: {e}", exc_info=True)
             await ctx.send(f"Wystąpił błąd podczas synchronizacji ModCog: {e}")
 
-    @commands.hybrid_group(name="mute", description="Komendy związane z wyciszaniem użytkowników.")
+    @commands.hybrid_group(
+        name="mute", description="Komendy związane z wyciszaniem użytkowników."
+    )
     @is_mod_or_admin()
     @discord.app_commands.describe(
         user="Użytkownik do wyciszenia (opcjonalnie, działa jak mute txt)",
         duration="Czas trwania blokady, np. 1h, 30m, 1d (puste = blokada stała)",
     )
     async def mute(
-        self, ctx: commands.Context, user: Optional[discord.Member] = None, duration: str = ""
+        self,
+        ctx: commands.Context,
+        user: Optional[discord.Member] = None,
+        duration: str = "",
     ):
         """Komendy związane z wyciszaniem użytkowników.
 
@@ -117,25 +133,33 @@ class ModCog(commands.Cog):
         if ctx.invoked_subcommand is None:
             if user is not None:
                 # Jeśli podano użytkownika, ale nie podkomendę, działa jak 'mute txt'
-                await self.mute_txt(ctx, user, duration)  # Przekazujemy parametr duration
+                await self.mute_txt(
+                    ctx, user, duration
+                )  # Przekazujemy parametr duration
             else:
                 # Użyj wspólnej metody do wyświetlania pomocy
                 await self.send_subcommand_help(ctx, "mute")
 
-    @mute.command(name="nick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę.")
+    @mute.command(
+        name="nick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę."
+    )
     @is_mod_or_admin()
     @discord.app_commands.describe(user="Użytkownik z niewłaściwym nickiem")
     async def mute_nick(self, ctx: commands.Context, user: discord.Member):
         """Usuwa niewłaściwy nick użytkownika i nadaje karę."""
         await self.mute_manager.mute_user(ctx, user, MuteType.NICK)
 
-    @mute.command(name="img", description="Blokuje możliwość wysyłania obrazków i linków.")
+    @mute.command(
+        name="img", description="Blokuje możliwość wysyłania obrazków i linków."
+    )
     @is_mod_or_admin()
     @discord.app_commands.describe(
         user="Użytkownik, któremu chcesz zablokować możliwość wysyłania obrazków",
         duration="Czas trwania blokady, np. 1h, 30m, 1d (puste = blokada stała)",
     )
-    async def mute_img(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
+    async def mute_img(
+        self, ctx: commands.Context, user: discord.Member, duration: str = ""
+    ):
         """Blokuje możliwość wysyłania obrazków i linków.
 
         :param ctx: Kontekst komendy
@@ -151,7 +175,9 @@ class ModCog(commands.Cog):
         user="Użytkownik, któremu chcesz zablokować możliwość wysyłania wiadomości",
         duration="Czas trwania blokady, np. 1h, 30m, 1d (puste = blokada stała)",
     )
-    async def mute_txt(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
+    async def mute_txt(
+        self, ctx: commands.Context, user: discord.Member, duration: str = ""
+    ):
         """Blokuje możliwość wysyłania wiadomości.
 
         :param ctx: Kontekst komendy
@@ -174,7 +200,9 @@ class ModCog(commands.Cog):
         """
         await self.mute_manager.mute_user(ctx, user, MuteType.LIVE)
 
-    @mute.command(name="rank", description="Blokuje możliwość zdobywania punktów rankingowych.")
+    @mute.command(
+        name="rank", description="Blokuje możliwość zdobywania punktów rankingowych."
+    )
     @is_mod_or_admin()
     @discord.app_commands.describe(
         user="Użytkownik, któremu chcesz zablokować możliwość zdobywania punktów"
@@ -194,7 +222,9 @@ class ModCog(commands.Cog):
     @discord.app_commands.describe(
         user="Użytkownik do odwyciszenia (opcjonalnie, działa jak unmute txt)"
     )
-    async def unmute(self, ctx: commands.Context, user: Optional[discord.Member] = None):
+    async def unmute(
+        self, ctx: commands.Context, user: Optional[discord.Member] = None
+    ):
         """Komendy związane z odwyciszaniem użytkowników.
 
         :param ctx: Kontekst komendy
@@ -208,7 +238,9 @@ class ModCog(commands.Cog):
                 # Użyj wspólnej metody do wyświetlania pomocy
                 await self.send_subcommand_help(ctx, "unmute")
 
-    @unmute.command(name="nick", description="Przywraca możliwość zmiany nicku użytkownikowi.")
+    @unmute.command(
+        name="nick", description="Przywraca możliwość zmiany nicku użytkownikowi."
+    )
     @is_mod_or_admin()
     @discord.app_commands.describe(user="Użytkownik do odmutowania nicku")
     async def unmute_nick(self, ctx: commands.Context, user: discord.Member):
@@ -219,7 +251,9 @@ class ModCog(commands.Cog):
         """
         await self.mute_manager.unmute_user(ctx, user, MuteType.NICK)
 
-    @unmute.command(name="img", description="Przywraca możliwość wysyłania obrazków i linków.")
+    @unmute.command(
+        name="img", description="Przywraca możliwość wysyłania obrazków i linków."
+    )
     @is_mod_or_admin()
     @discord.app_commands.describe(user="Użytkownik do odblokowania wysyłania obrazków")
     async def unmute_img(self, ctx: commands.Context, user: discord.Member):
@@ -232,7 +266,9 @@ class ModCog(commands.Cog):
 
     @unmute.command(name="txt", description="Przywraca możliwość wysyłania wiadomości.")
     @is_mod_or_admin()
-    @discord.app_commands.describe(user="Użytkownik do odblokowania wysyłania wiadomości")
+    @discord.app_commands.describe(
+        user="Użytkownik do odblokowania wysyłania wiadomości"
+    )
     async def unmute_txt(self, ctx: commands.Context, user: discord.Member):
         """Przywraca możliwość wysyłania wiadomości.
 
@@ -252,7 +288,9 @@ class ModCog(commands.Cog):
         """
         await self.mute_manager.unmute_user(ctx, user, MuteType.LIVE)
 
-    @unmute.command(name="rank", description="Przywraca możliwość zdobywania punktów rankingowych.")
+    @unmute.command(
+        name="rank", description="Przywraca możliwość zdobywania punktów rankingowych."
+    )
     @is_mod_or_admin()
     @discord.app_commands.describe(user="Użytkownik do odblokowania zdobywania punktów")
     async def unmute_rank(self, ctx: commands.Context, user: discord.Member):
@@ -323,7 +361,9 @@ class ModCog(commands.Cog):
                         )
 
                     except Exception as nick_error:
-                        logger.error(f"Failed to enforce nick for user {user.id}: {nick_error}")
+                        logger.error(
+                            f"Failed to enforce nick for user {user.id}: {nick_error}"
+                        )
                         await ctx.send(
                             f"❌ **Ostrzeżenie**: Błąd podczas wymuszania nicku dla {updated_user.mention}: {nick_error}"
                         )
@@ -332,12 +372,16 @@ class ModCog(commands.Cog):
                         f"Nick verification successful for user {user.id}: '{current_nick}'"
                     )
             else:
-                logger.warning(f"Could not fetch updated user {user.id} for nick verification")
+                logger.warning(
+                    f"Could not fetch updated user {user.id} for nick verification"
+                )
 
             logger.info(f"mutenick command completed successfully for user {user.id}")
 
         except Exception as e:
-            logger.error(f"Error in mutenick command for user {user.id}: {e}", exc_info=True)
+            logger.error(
+                f"Error in mutenick command for user {user.id}: {e}", exc_info=True
+            )
             await ctx.send(f"Wystąpił błąd podczas wykonywania komendy mutenick: {e}")
 
     @commands.command(
@@ -348,9 +392,13 @@ class ModCog(commands.Cog):
         """Przywraca możliwość zmiany nicku użytkownikowi (wersja prefiksowa)."""
         await self.mute_manager.unmute_user(ctx, user, MuteType.NICK)
 
-    @commands.command(name="muteimg", description="Blokuje możliwość wysyłania obrazków i linków.")
+    @commands.command(
+        name="muteimg", description="Blokuje możliwość wysyłania obrazków i linków."
+    )
     @is_mod_or_admin()
-    async def muteimg_prefix(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
+    async def muteimg_prefix(
+        self, ctx: commands.Context, user: discord.Member, duration: str = ""
+    ):
         """Blokuje możliwość wysyłania obrazków i linków (wersja prefiksowa)."""
         parsed_duration = self.mute_manager.parse_duration(duration)
         await self.mute_manager.mute_user(ctx, user, MuteType.IMG, parsed_duration)
@@ -363,14 +411,20 @@ class ModCog(commands.Cog):
         """Przywraca możliwość wysyłania obrazków i linków (wersja prefiksowa)."""
         await self.mute_manager.unmute_user(ctx, user, MuteType.IMG)
 
-    @commands.command(name="mutetxt", description="Blokuje możliwość wysyłania wiadomości.")
+    @commands.command(
+        name="mutetxt", description="Blokuje możliwość wysyłania wiadomości."
+    )
     @is_mod_or_admin()
-    async def mutetxt_prefix(self, ctx: commands.Context, user: discord.Member, duration: str = ""):
+    async def mutetxt_prefix(
+        self, ctx: commands.Context, user: discord.Member, duration: str = ""
+    ):
         """Blokuje możliwość wysyłania wiadomości (wersja prefiksowa)."""
         parsed_duration = self.mute_manager.parse_duration(duration)
         await self.mute_manager.mute_user(ctx, user, MuteType.TXT, parsed_duration)
 
-    @commands.command(name="unmutetxt", description="Przywraca możliwość wysyłania wiadomości.")
+    @commands.command(
+        name="unmutetxt", description="Przywraca możliwość wysyłania wiadomości."
+    )
     @is_mod_or_admin()
     async def unmutetxt_prefix(self, ctx: commands.Context, user: discord.Member):
         """Przywraca możliwość wysyłania wiadomości (wersja prefiksowa)."""
@@ -382,14 +436,17 @@ class ModCog(commands.Cog):
         """Blokuje możliwość streamowania (wersja prefiksowa)."""
         await self.mute_manager.mute_user(ctx, user, MuteType.LIVE)
 
-    @commands.command(name="unmutelive", description="Przywraca możliwość streamowania.")
+    @commands.command(
+        name="unmutelive", description="Przywraca możliwość streamowania."
+    )
     @is_mod_or_admin()
     async def unmutelive_prefix(self, ctx: commands.Context, user: discord.Member):
         """Przywraca możliwość streamowania (wersja prefiksowa)."""
         await self.mute_manager.unmute_user(ctx, user, MuteType.LIVE)
 
     @commands.command(
-        name="muterank", description="Blokuje możliwość zdobywania punktów rankingowych."
+        name="muterank",
+        description="Blokuje możliwość zdobywania punktów rankingowych.",
     )
     @is_mod_or_admin()
     async def muterank_prefix(self, ctx: commands.Context, user: discord.Member):
@@ -397,7 +454,8 @@ class ModCog(commands.Cog):
         await self.mute_manager.mute_user(ctx, user, MuteType.RANK)
 
     @commands.command(
-        name="unmuterank", description="Przywraca możliwość zdobywania punktów rankingowych."
+        name="unmuterank",
+        description="Przywraca możliwość zdobywania punktów rankingowych.",
     )
     @is_mod_or_admin()
     async def unmuterank_prefix(self, ctx: commands.Context, user: discord.Member):
@@ -424,7 +482,9 @@ class ModCog(commands.Cog):
         """
         await self.gender_manager.assign_gender_role(ctx, user, GenderType.FEMALE)
 
-    @commands.command(name="userid", description="Wyświetla ID użytkownika o podanej nazwie")
+    @commands.command(
+        name="userid", description="Wyświetla ID użytkownika o podanej nazwie"
+    )
     @is_mod_or_admin()
     async def user_id(self, ctx: commands.Context, *, name: str):
         """Wyświetla ID użytkownika o podanej nazwie.
@@ -451,13 +511,19 @@ class ModCog(commands.Cog):
             result += f"- **{member.name}** (ID: `{member.id}`)\n"
 
         if len(matching_members) > 10:
-            result += f"\nPokazano 10 z {len(matching_members)} pasujących użytkowników."
+            result += (
+                f"\nPokazano 10 z {len(matching_members)} pasujących użytkowników."
+            )
 
         await ctx.send(result)
 
-    @commands.command(name="mutehistory", description="Wyświetla historię mute'ów użytkownika")
+    @commands.command(
+        name="mutehistory", description="Wyświetla historię mute'ów użytkownika"
+    )
     @is_mod_or_admin()
-    async def mute_history(self, ctx: commands.Context, user: discord.Member, limit: int = 10):
+    async def mute_history(
+        self, ctx: commands.Context, user: discord.Member, limit: int = 10
+    ):
         """Wyświetla historię mute'ów użytkownika.
 
         :param ctx: Kontekst komendy
@@ -470,7 +536,9 @@ class ModCog(commands.Cog):
         try:
             async with self.bot.get_db() as session:
                 # Pobierz historię mute'ów
-                history = await ModerationLogQueries.get_user_mute_history(session, user.id, limit)
+                history = await ModerationLogQueries.get_user_mute_history(
+                    session, user.id, limit
+                )
 
                 if not history:
                     embed = discord.Embed(
@@ -536,10 +604,14 @@ class ModCog(commands.Cog):
                 await ctx.reply(embed=embed)
 
         except Exception as e:
-            logger.error(f"Error retrieving mute history for user {user.id}: {e}", exc_info=True)
+            logger.error(
+                f"Error retrieving mute history for user {user.id}: {e}", exc_info=True
+            )
             await ctx.send("Wystąpił błąd podczas pobierania historii mute'ów.")
 
-    @commands.command(name="mutestats", description="Wyświetla statystyki mute'ów z serwera")
+    @commands.command(
+        name="mutestats", description="Wyświetla statystyki mute'ów z serwera"
+    )
     @is_mod_or_admin()
     async def mute_stats(self, ctx: commands.Context, days: int = 30):
         """Wyświetla statystyki mute'ów z ostatnich X dni.
@@ -576,13 +648,17 @@ class ModCog(commands.Cog):
                         types_text += f"**{mute_type.upper()}:** {count}\n"
 
                     embed.add_field(
-                        name="🏷️ Według typu", value=types_text or "Brak danych", inline=True
+                        name="🏷️ Według typu",
+                        value=types_text or "Brak danych",
+                        inline=True,
                     )
 
                 # Top mutowani użytkownicy
                 if stats["top_muted_users"]:
                     users_text = ""
-                    for i, (user_id, count) in enumerate(stats["top_muted_users"][:5], 1):
+                    for i, (user_id, count) in enumerate(
+                        stats["top_muted_users"][:5], 1
+                    ):
                         users_text += f"{i}. <@{user_id}> - {count} mute'ów\n"
 
                     embed.add_field(
@@ -609,9 +685,13 @@ class ModCog(commands.Cog):
             logger.error(f"Error retrieving mute statistics: {e}", exc_info=True)
             await ctx.send("Wystąpił błąd podczas pobierania statystyk mute'ów.")
 
-    @commands.command(name="mutecount", description="Sprawdza ile razy użytkownik był mutowany")
+    @commands.command(
+        name="mutecount", description="Sprawdza ile razy użytkownik był mutowany"
+    )
     @is_mod_or_admin()
-    async def mute_count(self, ctx: commands.Context, user: discord.Member, days: int = 30):
+    async def mute_count(
+        self, ctx: commands.Context, user: discord.Member, days: int = 30
+    ):
         """Sprawdza ile razy użytkownik był mutowany w ostatnich X dniach.
 
         :param ctx: Kontekst komendy
@@ -623,7 +703,9 @@ class ModCog(commands.Cog):
 
         try:
             async with self.bot.get_db() as session:
-                mute_count = await ModerationLogQueries.get_user_mute_count(session, user.id, days)
+                mute_count = await ModerationLogQueries.get_user_mute_count(
+                    session, user.id, days
+                )
 
                 # Stwórz embed z wynikiem
                 color = (
@@ -644,25 +726,35 @@ class ModCog(commands.Cog):
                 # Dodaj ocenę
                 if mute_count == 0:
                     embed.add_field(
-                        name="✅ Ocena", value="Użytkownik nie ma żadnych mute'ów!", inline=False
+                        name="✅ Ocena",
+                        value="Użytkownik nie ma żadnych mute'ów!",
+                        inline=False,
                     )
                 elif mute_count < 3:
                     embed.add_field(
-                        name="⚠️ Ocena", value="Niewiele mute'ów - dobry użytkownik", inline=False
+                        name="⚠️ Ocena",
+                        value="Niewiele mute'ów - dobry użytkownik",
+                        inline=False,
                     )
                 elif mute_count < 10:
                     embed.add_field(
-                        name="⚠️ Ocena", value="Średnio problematyczny użytkownik", inline=False
+                        name="⚠️ Ocena",
+                        value="Średnio problematyczny użytkownik",
+                        inline=False,
                     )
                 else:
                     embed.add_field(
-                        name="🚫 Ocena", value="Bardzo problematyczny użytkownik!", inline=False
+                        name="🚫 Ocena",
+                        value="Bardzo problematyczny użytkownik!",
+                        inline=False,
                     )
 
                 await ctx.reply(embed=embed)
 
         except Exception as e:
-            logger.error(f"Error retrieving mute count for user {user.id}: {e}", exc_info=True)
+            logger.error(
+                f"Error retrieving mute count for user {user.id}: {e}", exc_info=True
+            )
             await ctx.send("Wystąpił błąd podczas sprawdzania liczby mute'ów.")
 
 

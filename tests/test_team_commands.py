@@ -30,7 +30,9 @@ async def test_team_create_when_user_is_team_member_only():
     # Mock database session
     session = AsyncMock()
     session_result = AsyncMock()
-    session_result.scalar_one_or_none.return_value = None  # User is not an owner of any team
+    session_result.scalar_one_or_none.return_value = (
+        None  # User is not an owner of any team
+    )
     session.execute.return_value = session_result
 
     # Setup bot.get_db context manager
@@ -42,13 +44,17 @@ async def test_team_create_when_user_is_team_member_only():
     ctx.guild.edit_role_positions = AsyncMock()
     ctx.guild.get_role = MagicMock(return_value=MagicMock(spec=discord.Role))
     ctx.author.add_roles = AsyncMock()
-    ctx.guild.create_text_channel = AsyncMock(return_value=MagicMock(spec=discord.TextChannel))
+    ctx.guild.create_text_channel = AsyncMock(
+        return_value=MagicMock(spec=discord.TextChannel)
+    )
 
     # Create premium cog instance and patch _send_premium_embed and _get_user_team_role
     cog = PremiumCog(bot)
     cog._send_premium_embed = AsyncMock()
     cog._save_team_to_database = AsyncMock()
-    cog._get_user_team_role = AsyncMock(return_value=team_role)  # User is a member of another team
+    cog._get_user_team_role = AsyncMock(
+        return_value=team_role
+    )  # User is a member of another team
 
     # Call the method under test
     await cog.team_create(ctx, "NewTeam")
@@ -93,7 +99,9 @@ async def test_team_create_when_user_is_already_team_owner():
     # Mock database session to return existing team
     session = AsyncMock()
     session_result = AsyncMock()
-    session_result.scalar_one_or_none.return_value = existing_team_db  # User is already an owner
+    session_result.scalar_one_or_none.return_value = (
+        existing_team_db  # User is already an owner
+    )
     session.execute.return_value = session_result
 
     # Setup bot.get_db context manager
@@ -135,7 +143,9 @@ async def test_team_create_with_new_topic_format_and_pinned_message():
     # Mock database session
     session = AsyncMock()
     session_result = AsyncMock()
-    session_result.scalar_one_or_none.return_value = None  # User is not an owner of any team
+    session_result.scalar_one_or_none.return_value = (
+        None  # User is not an owner of any team
+    )
     session.execute.return_value = session_result
 
     # Setup bot.get_db context manager

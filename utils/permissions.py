@@ -98,7 +98,9 @@ def has_permission_level(
             return True
         else:
             for permission_level in levels:
-                if check_permission_level(interaction.client, interaction.user, permission_level):
+                if check_permission_level(
+                    interaction.client, interaction.user, permission_level
+                ):
                     return True
             await interaction.response.send_message(
                 "Nie masz uprawnień do użycia tej komendy!", ephemeral=True

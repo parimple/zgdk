@@ -49,7 +49,9 @@ class MessageCleaner:
         if isinstance(user, (discord.User, discord.Member)):
             target_id = user.id
             target_member = ctx.guild.get_member(user.id)
-            logger.info(f"User is discord.User/Member with ID: {target_id} and name: {user.name}")
+            logger.info(
+                f"User is discord.User/Member with ID: {target_id} and name: {user.name}"
+            )
         else:
             try:
                 # Próbuj najpierw przekonwertować na int (jeśli to ID)
@@ -61,14 +63,18 @@ class MessageCleaner:
                     target_member = ctx.guild.get_member(target_id)
 
                     if target_member is None:
-                        logger.info(f"Member not found in cache, trying to fetch from API")
+                        logger.info(
+                            f"Member not found in cache, trying to fetch from API"
+                        )
                         try:
                             target_member = await ctx.guild.fetch_member(target_id)
                             logger.info(
                                 f"Found member from API: {target_member.name} (ID: {target_member.id})"
                             )
                         except discord.NotFound:
-                            logger.warning(f"Member with ID {target_id} not found in API")
+                            logger.warning(
+                                f"Member with ID {target_id} not found in API"
+                            )
                     else:
                         logger.info(
                             f"Found member in cache: {target_member.name} (ID: {target_member.id})"
@@ -76,7 +82,9 @@ class MessageCleaner:
 
                 except ValueError:
                     # Jeśli to nie ID, spróbuj znaleźć użytkownika po nazwie lub części nazwy
-                    logger.info(f"Input '{user}' is not a valid ID, trying to find by name")
+                    logger.info(
+                        f"Input '{user}' is not a valid ID, trying to find by name"
+                    )
 
                     user_str = str(user).lower()
                     found_members = []
@@ -86,7 +94,9 @@ class MessageCleaner:
                             member.nick and user_str in member.nick.lower()
                         ):
                             found_members.append(member)
-                            logger.info(f"Found member by name: {member.name} (ID: {member.id})")
+                            logger.info(
+                                f"Found member by name: {member.name} (ID: {member.id})"
+                            )
 
                     if found_members:
                         target_member = found_members[0]  # Weź pierwszego znalezionego
@@ -101,7 +111,9 @@ class MessageCleaner:
                             )
                     else:
                         logger.warning(f"No members found matching '{user}'")
-                        await ctx.send(f"Nie znaleziono użytkownika pasującego do '{user}'.")
+                        await ctx.send(
+                            f"Nie znaleziono użytkownika pasującego do '{user}'."
+                        )
                         return None, None
             except Exception as e:
                 logger.error(f"Error finding user: {e}", exc_info=True)
@@ -127,7 +139,9 @@ class MessageCleaner:
             or target_member.guild_permissions.administrator
         ):
             if not ctx.author.guild_permissions.administrator:
-                await ctx.send("Nie możesz usuwać wiadomości moderatorów lub administratorów.")
+                await ctx.send(
+                    "Nie możesz usuwać wiadomości moderatorów lub administratorów."
+                )
                 return False
         return True
 
@@ -186,7 +200,10 @@ class MessageCleaner:
                 return True
 
             # Check if message mentions target user
-            if f"<@{target_id}>" in message.content or f"<@!{target_id}>" in message.content:
+            if (
+                f"<@{target_id}>" in message.content
+                or f"<@!{target_id}>" in message.content
+            ):
                 # Jeśli images_only, weryfikujemy czy wiadomość ma media
                 if images_only:
                     has_media = (
@@ -201,7 +218,9 @@ class MessageCleaner:
             if message.author.id == self.avatar_bot_id:
                 # Sprawdź czy wiadomość zawiera nazwę użytkownika (jeśli dostępna)
                 avatar_message_match = False
-                if target_name and message.content.lower().startswith(target_name.lower()):
+                if target_name and message.content.lower().startswith(
+                    target_name.lower()
+                ):
                     avatar_message_match = True
 
                 # Sprawdź czy w wiadomości jest ID użytkownika (w URL lub tekście)
@@ -221,7 +240,10 @@ class MessageCleaner:
                 if message.embeds:
                     for embed in message.embeds:
                         if embed.title:
-                            if target_name and target_name.lower() in embed.title.lower():
+                            if (
+                                target_name
+                                and target_name.lower() in embed.title.lower()
+                            ):
                                 avatar_message_match = True
                             if target_id_str in embed.title:
                                 avatar_message_match = True
@@ -240,12 +262,15 @@ class MessageCleaner:
             if message.webhook_id:
                 found_in_content = target_id_str in message.content
                 found_in_attachments = any(
-                    target_id_str in attachment.url or target_id_str in attachment.filename
+                    target_id_str in attachment.url
+                    or target_id_str in attachment.filename
                     for attachment in message.attachments
                 )
                 found_in_webhook = target_id_str in str(message.author)
 
-                webhook_match = found_in_content or found_in_attachments or found_in_webhook
+                webhook_match = (
+                    found_in_content or found_in_attachments or found_in_webhook
+                )
 
                 if webhook_match:
                     return True
@@ -297,7 +322,9 @@ class MessageCleaner:
         if target_id is None and not ctx.author.guild_permissions.administrator:
             embed = discord.Embed(
                 description="Musisz podać użytkownika, którego wiadomości chcesz usunąć.",
-                color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.red(),
+                color=ctx.author.color
+                if ctx.author.color.value != 0
+                else discord.Color.red(),
             )
             await ctx.send(embed=embed)
             return
@@ -313,7 +340,9 @@ class MessageCleaner:
             if not confirm:
                 embed = discord.Embed(
                     description="Anulowano usuwanie wiadomości.",
-                    color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue(),
+                    color=ctx.author.color
+                    if ctx.author.color.value != 0
+                    else discord.Color.blue(),
                 )
                 await ctx.send(embed=embed)
                 return
@@ -335,12 +364,16 @@ class MessageCleaner:
         # Pobierz emoji mastercard z konfiguracji
         mastercard = self.config.get("emojis", {}).get("mastercard", "💳")
         # Pobierz ID kanału premium_info
-        premium_info_id = self.config.get("channels", {}).get("premium_info", 960665316109713421)
+        premium_info_id = self.config.get("channels", {}).get(
+            "premium_info", 960665316109713421
+        )
 
         message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}.\nWybierz swój <#{premium_info_id}> {mastercard}"
         embed = discord.Embed(
             description=message,
-            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.green(),
+            color=ctx.author.color
+            if ctx.author.color.value != 0
+            else discord.Color.green(),
         )
         await ctx.send(embed=embed)
 
@@ -353,13 +386,19 @@ class MessageCleaner:
     ) -> int:
         """Usuwa wiadomości na jednym kanale."""
         time_threshold = ctx.message.created_at - timedelta(hours=hours)
-        logger.info(f"Deleting messages before {ctx.message.created_at} and after {time_threshold}")
+        logger.info(
+            f"Deleting messages before {ctx.message.created_at} and after {time_threshold}"
+        )
         logger.info(f"images_only={images_only}, target_id={target_id}")
 
         total_deleted = 0
-        user_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
+        user_color = (
+            ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
+        )
         status_message = await ctx.send(
-            embed=discord.Embed(description="Rozpoczynam usuwanie wiadomości...", color=user_color)
+            embed=discord.Embed(
+                description="Rozpoczynam usuwanie wiadomości...", color=user_color
+            )
         )
 
         try:
@@ -386,7 +425,12 @@ class MessageCleaner:
                 limit=None, before=ctx.message, after=time_threshold, oldest_first=False
             ):
                 if self._is_message_to_delete_filter(
-                    message, ctx, target_id, images_only, time_threshold, is_bulk_delete=False
+                    message,
+                    ctx,
+                    target_id,
+                    images_only,
+                    time_threshold,
+                    is_bulk_delete=False,
                 ):
                     try:
                         await message.delete()
@@ -399,7 +443,9 @@ class MessageCleaner:
                                 )
                             )
                     except discord.NotFound:
-                        logger.warning(f"Message {message.id} not found, probably already deleted")
+                        logger.warning(
+                            f"Message {message.id} not found, probably already deleted"
+                        )
                     except discord.Forbidden:
                         logger.error(f"No permission to delete message {message.id}")
                     except Exception as e:
@@ -413,7 +459,9 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description="Nie mam uprawnień do usuwania wiadomości na tym kanale.",
-                    color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.red(),
+                    color=ctx.author.color
+                    if ctx.author.color.value != 0
+                    else discord.Color.red(),
                 )
             )
             return total_deleted
@@ -422,7 +470,9 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description=f"Wystąpił błąd podczas usuwania wiadomości: {e}",
-                    color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.red(),
+                    color=ctx.author.color
+                    if ctx.author.color.value != 0
+                    else discord.Color.red(),
                 )
             )
             return total_deleted
@@ -431,7 +481,9 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description=f"Wystąpił nieoczekiwany błąd: {e}",
-                    color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.red(),
+                    color=ctx.author.color
+                    if ctx.author.color.value != 0
+                    else discord.Color.red(),
                 )
             )
             return total_deleted
@@ -447,7 +499,9 @@ class MessageCleaner:
         """Usuwa wiadomości na wszystkich kanałach."""
         time_threshold = ctx.message.created_at - timedelta(hours=hours)
         total_deleted = 0
-        user_color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
+        user_color = (
+            ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
+        )
         status_message = await ctx.send(
             embed=discord.Embed(
                 description="Rozpoczynam usuwanie wiadomości na pozostałych kanałach...",
@@ -489,7 +543,12 @@ class MessageCleaner:
                 deleted = await channel.purge(
                     limit=100,
                     check=lambda m: self._is_message_to_delete_filter(
-                        m, ctx, target_id, images_only, time_threshold, is_bulk_delete=True
+                        m,
+                        ctx,
+                        target_id,
+                        images_only,
+                        time_threshold,
+                        is_bulk_delete=True,
                     ),
                 )
                 total_deleted += len(deleted)
@@ -503,7 +562,12 @@ class MessageCleaner:
                     limit=None, after=time_threshold, oldest_first=False
                 ):
                     if self._is_message_to_delete_filter(
-                        message, ctx, target_id, images_only, time_threshold, is_bulk_delete=False
+                        message,
+                        ctx,
+                        target_id,
+                        images_only,
+                        time_threshold,
+                        is_bulk_delete=False,
                     ):
                         try:
                             await message.delete()
@@ -517,7 +581,9 @@ class MessageCleaner:
                             pass
 
                 if channel_deleted > 0:
-                    logger.info(f"Deleted {channel_deleted} older messages from {channel.name}")
+                    logger.info(
+                        f"Deleted {channel_deleted} older messages from {channel.name}"
+                    )
 
                 await status_message.edit(
                     embed=discord.Embed(
@@ -533,7 +599,9 @@ class MessageCleaner:
                 logger.error(f"Error in channel {channel.name}: {e}", exc_info=True)
                 continue
 
-        logger.info(f"Finished deleting messages across channels, total deleted: {total_deleted}")
+        logger.info(
+            f"Finished deleting messages across channels, total deleted: {total_deleted}"
+        )
         await status_message.delete()
         return total_deleted
 
@@ -552,15 +620,21 @@ class MessageCleaner:
         embed = discord.Embed(
             title="Potwierdzenie",
             description=message,
-            color=ctx.author.color if ctx.author.color.value != 0 else discord.Color.orange(),
+            color=ctx.author.color
+            if ctx.author.color.value != 0
+            else discord.Color.orange(),
         )
 
         view = discord.ui.View()
         view.add_item(
-            discord.ui.Button(label="Tak", style=discord.ButtonStyle.danger, custom_id="confirm")
+            discord.ui.Button(
+                label="Tak", style=discord.ButtonStyle.danger, custom_id="confirm"
+            )
         )
         view.add_item(
-            discord.ui.Button(label="Nie", style=discord.ButtonStyle.secondary, custom_id="cancel")
+            discord.ui.Button(
+                label="Nie", style=discord.ButtonStyle.secondary, custom_id="cancel"
+            )
         )
 
         msg = await ctx.send(embed=embed, view=view)

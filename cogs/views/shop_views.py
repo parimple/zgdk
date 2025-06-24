@@ -37,7 +37,9 @@ class PaymentsView(discord.ui.View):
                 session, offset=self.current_offset, limit=10
             )
 
-        embed = MessageSender._create_embed(title="Wszystkie płatności", ctx=self.ctx.author)
+        embed = MessageSender._create_embed(
+            title="Wszystkie płatności", ctx=self.ctx.author
+        )
         for payment in payments:
             name = f"ID płatności: {payment.id}"
             value = (
@@ -51,13 +53,17 @@ class PaymentsView(discord.ui.View):
         await interaction.response.edit_message(embed=embed)
 
     @discord.ui.button(label="Nowsze", style=discord.ButtonStyle.primary)
-    async def newer_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def newer_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         """Go to the newer payments."""
         self.current_offset -= 10
         await self.display_payments(interaction)
 
     @discord.ui.button(label="Starsze", style=discord.ButtonStyle.primary)
-    async def older_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def older_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         """Go to the older payments."""
         self.current_offset += 10
         await self.display_payments(interaction)
@@ -125,7 +131,9 @@ class RoleShopView(discord.ui.View):
             self.add_item(previous_button)
 
         # Przycisk opisu ról
-        description_button = discord.ui.Button(label="Opis ról", style=discord.ButtonStyle.primary)
+        description_button = discord.ui.Button(
+            label="Opis ról", style=discord.ButtonStyle.primary
+        )
         description_button.callback = self.show_role_description
         self.add_item(description_button)
 
@@ -151,9 +159,13 @@ class RoleShopView(discord.ui.View):
     ) -> tuple[discord.Embed, "RoleShopView"]:
         """Create a new view instance for a different user."""
         async with self.bot.get_db() as session:
-            db_viewer = await MemberQueries.get_or_add_member(session, interaction.user.id)
+            db_viewer = await MemberQueries.get_or_add_member(
+                session, interaction.user.id
+            )
             balance = db_viewer.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(session, interaction.user.id)
+            premium_roles = await RoleQueries.get_member_premium_roles(
+                session, interaction.user.id
+            )
             await session.commit()
 
         new_view = RoleShopView(
@@ -181,7 +193,9 @@ class RoleShopView(discord.ui.View):
         price_map = {}
         for role_name, base_price in self.base_price_map.items():
             if self.page == 2:  # Ceny roczne
-                price_map[role_name] = base_price * YEARLY_MONTHS  # Płacisz za 10 miesięcy
+                price_map[role_name] = (
+                    base_price * YEARLY_MONTHS
+                )  # Płacisz za 10 miesięcy
             else:  # Ceny miesięczne
                 price_map[role_name] = base_price
         return price_map
@@ -200,13 +214,18 @@ class RoleShopView(discord.ui.View):
             if interaction.user.id != self.viewer.id:
                 embed, view = await self.create_view_for_user(interaction)
                 await interaction.response.send_message(
-                    "Oto twój własny widok sklepu:", embed=embed, view=view, ephemeral=True
+                    "Oto twój własny widok sklepu:",
+                    embed=embed,
+                    view=view,
+                    ephemeral=True,
                 )
                 return
 
             duration_days = YEARLY_DURATION if self.page == 2 else MONTHLY_DURATION
             price = self.role_price_map[role_name]
-            await self.handle_buy_role(interaction, role_name, self.member, duration_days, price)
+            await self.handle_buy_role(
+                interaction, role_name, self.member, duration_days, price
+            )
 
         return button_callback
 
@@ -232,7 +251,9 @@ class RoleShopView(discord.ui.View):
                 )
 
                 # Check if member has enough balance
-                db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
+                db_member = await MemberQueries.get_or_add_member(
+                    session, self.viewer.id
+                )
                 if db_member.wallet_balance < price:
                     # Get premium text
                     _, premium_text = self.message_sender._get_premium_text(self.ctx)
@@ -272,7 +293,11 @@ class RoleShopView(discord.ui.View):
                         None,
                     )
                     new_role_config = next(
-                        (r for r in self.bot.config["premium_roles"] if r["name"] == role_name),
+                        (
+                            r
+                            for r in self.bot.config["premium_roles"]
+                            if r["name"] == role_name
+                        ),
                         None,
                     )
 
@@ -295,8 +320,8 @@ class RoleShopView(discord.ui.View):
                             )
 
                             # Update expiration date
-                            current_member_role.expiration_date = old_expiry + timedelta(
-                                days=extend_days
+                            current_member_role.expiration_date = (
+                                old_expiry + timedelta(days=extend_days)
                             )
 
                             # Remove mute roles and update balance
@@ -320,7 +345,9 @@ class RoleShopView(discord.ui.View):
                                 description=success_description, ctx=member
                             )
 
-                            await interaction.followup.send(embed=embed, ephemeral=False)
+                            await interaction.followup.send(
+                                embed=embed, ephemeral=False
+                            )
 
                             # Update the original shop embed with new expiration date
                             premium_roles = await RoleQueries.get_member_premium_roles(
@@ -340,7 +367,8 @@ class RoleShopView(discord.ui.View):
 
                         # Calculate refund for current role
                         refund_amount = calculate_refund(
-                            current_member_role.expiration_date, current_role_config["price"]
+                            current_member_role.expiration_date,
+                            current_role_config["price"],
                         )
 
                         if current_role_config["price"] > new_role_config["price"]:
@@ -389,11 +417,14 @@ class RoleShopView(discord.ui.View):
                             role_name,
                             price,
                             days_to_add,
-                            is_upgrade=current_role_config["price"] < new_role_config["price"],
+                            is_upgrade=current_role_config["price"]
+                            < new_role_config["price"],
                         )
 
                         # Send initial message with options as ephemeral
-                        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+                        await interaction.followup.send(
+                            embed=embed, view=view, ephemeral=True
+                        )
 
                         try:
                             await view.wait()
@@ -412,8 +443,9 @@ class RoleShopView(discord.ui.View):
 
                         elif view.value == "extend":
                             # Extend the current role and remove mutes
-                            expiration_date = current_member_role.expiration_date + timedelta(
-                                days=view.days_to_add
+                            expiration_date = (
+                                current_member_role.expiration_date
+                                + timedelta(days=view.days_to_add)
                             )
                             logger.info(
                                 f"[SHOP] Extending role {current_role.name} for {member.display_name}:"
@@ -448,7 +480,9 @@ class RoleShopView(discord.ui.View):
                                 description=success_description, ctx=member
                             )
 
-                            await interaction.followup.send(embed=embed, ephemeral=False)
+                            await interaction.followup.send(
+                                embed=embed, ephemeral=False
+                            )
 
                         elif view.value in ["buy_lower", "buy_higher"]:
                             # Calculate refund for the old role
@@ -499,7 +533,9 @@ class RoleShopView(discord.ui.View):
                             embed.description = self._add_premium_text_to_description(
                                 embed.description
                             )
-                            await interaction.followup.send(embed=embed, ephemeral=False)
+                            await interaction.followup.send(
+                                embed=embed, ephemeral=False
+                            )
 
                         # Update the original shop embed with new expiration date
                         premium_roles = await RoleQueries.get_member_premium_roles(
@@ -529,8 +565,8 @@ class RoleShopView(discord.ui.View):
                             old_expiry = current_member_role.expiration_date
 
                             # Update expiration date
-                            current_member_role.expiration_date = old_expiry + timedelta(
-                                days=extend_days
+                            current_member_role.expiration_date = (
+                                old_expiry + timedelta(days=extend_days)
                             )
 
                             # Remove mute roles and update balance
@@ -561,7 +597,9 @@ class RoleShopView(discord.ui.View):
                                 description=success_description, ctx=member
                             )
 
-                            await interaction.followup.send(embed=embed, ephemeral=False)
+                            await interaction.followup.send(
+                                embed=embed, ephemeral=False
+                            )
 
                             # Update the original shop embed with new expiration date
                             premium_roles = await RoleQueries.get_member_premium_roles(
@@ -588,7 +626,9 @@ class RoleShopView(discord.ui.View):
                 # Normal purchase flow
                 if role in member.roles:
                     # Get current role expiration
-                    member_role = await RoleQueries.get_member_role(session, member.id, role.id)
+                    member_role = await RoleQueries.get_member_role(
+                        session, member.id, role.id
+                    )
                     now = datetime.now(timezone.utc)
 
                     logger.info(
@@ -617,14 +657,18 @@ class RoleShopView(discord.ui.View):
                                 f"\n - New base: {now}"
                                 f"\n - Days to add: {extend_days}"
                             )
-                            member_role.expiration_date = now + timedelta(days=extend_days)
+                            member_role.expiration_date = now + timedelta(
+                                days=extend_days
+                            )
                         else:
                             logger.info(
                                 f"[SHOP] Extending active role {role_name}:"
                                 f"\n - Current expiry: {old_expiry}"
                                 f"\n - Days to add: {extend_days}"
                             )
-                            member_role.expiration_date = old_expiry + timedelta(days=extend_days)
+                            member_role.expiration_date = old_expiry + timedelta(
+                                days=extend_days
+                            )
 
                         # Verify the update
                         await session.flush()
@@ -640,7 +684,9 @@ class RoleShopView(discord.ui.View):
                         await self.premium_manager.remove_mute_roles(member)
 
                         # Update wallet balance
-                        await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -price)
+                        await MemberQueries.add_to_wallet_balance(
+                            session, self.viewer.id, -price
+                        )
                         await session.commit()
 
                         # Send confirmation message using MessageSender
@@ -684,7 +730,9 @@ class RoleShopView(discord.ui.View):
                 )
 
                 duration = timedelta(days=duration_days)
-                await RoleQueries.add_role_to_member(session, member.id, role.id, duration)
+                await RoleQueries.add_role_to_member(
+                    session, member.id, role.id, duration
+                )
 
                 if role not in member.roles:
                     await member.add_roles(role)
@@ -692,11 +740,15 @@ class RoleShopView(discord.ui.View):
                 # Remove mute roles before updating balance
                 await self.premium_manager.remove_mute_roles(member)
 
-                await MemberQueries.add_to_wallet_balance(session, self.viewer.id, -price)
+                await MemberQueries.add_to_wallet_balance(
+                    session, self.viewer.id, -price
+                )
                 await session.commit()
 
                 # Verify the role assignment
-                member_role = await RoleQueries.get_member_role(session, member.id, role.id)
+                member_role = await RoleQueries.get_member_role(
+                    session, member.id, role.id
+                )
                 if member_role:
                     logger.info(
                         f"[SHOP] Purchase verification for {member.display_name}:"
@@ -713,9 +765,13 @@ class RoleShopView(discord.ui.View):
                 # Send confirmation message using MessageSender
                 success_description = f"✅ Gratulacje! Zakupiłeś rangę **{role_name}** na 30 dni. Wszystkie blokady zostały usunięte – miłego korzystania!\nBóg zapłać!"
                 # Add premium text directly to description like MessageSender does
-                success_description = self._add_premium_text_to_description(success_description)
+                success_description = self._add_premium_text_to_description(
+                    success_description
+                )
 
-                embed = MessageSender._create_embed(description=success_description, ctx=member)
+                embed = MessageSender._create_embed(
+                    description=success_description, ctx=member
+                )
 
                 await interaction.followup.send(embed=embed, ephemeral=False)
 
@@ -732,7 +788,9 @@ class RoleShopView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description("Oto twój własny widok sklepu:")
+            base_text = self._add_premium_text_to_description(
+                "Oto twój własny widok sklepu:"
+            )
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -744,7 +802,9 @@ class RoleShopView(discord.ui.View):
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
             balance = db_member.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
+            premium_roles = await RoleQueries.get_member_premium_roles(
+                session, self.member.id
+            )
             await session.commit()
 
         view = RoleShopView(
@@ -772,7 +832,9 @@ class RoleShopView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description("Oto twój własny widok sklepu:")
+            base_text = self._add_premium_text_to_description(
+                "Oto twój własny widok sklepu:"
+            )
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -784,7 +846,9 @@ class RoleShopView(discord.ui.View):
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
             balance = db_member.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
+            premium_roles = await RoleQueries.get_member_premium_roles(
+                session, self.member.id
+            )
             await session.commit()
 
         view = RoleShopView(
@@ -812,7 +876,9 @@ class RoleShopView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description("Oto twój własny widok sklepu:")
+            base_text = self._add_premium_text_to_description(
+                "Oto twój własny widok sklepu:"
+            )
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -841,7 +907,9 @@ class RoleShopView(discord.ui.View):
         """Generate the embed for the role shop."""
         db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
+        premium_roles = await RoleQueries.get_member_premium_roles(
+            session, self.member.id
+        )
         return await create_shop_embed(
             self.ctx,
             balance,
@@ -896,7 +964,9 @@ class BuyRoleButton(discord.ui.Button):
         # Otherwise use the standard shop command (from shop view)
         else:
             if self.role_name:
-                await interaction.client.get_command("shop")(interaction, role_name=self.role_name)
+                await interaction.client.get_command("shop")(
+                    interaction, role_name=self.role_name
+                )
             else:
                 await interaction.client.get_command("shop")(interaction)
 
@@ -926,7 +996,9 @@ class RoleDescriptionView(discord.ui.View):
         self.message_sender = MessageSender(bot)
 
         # Add buttons
-        previous_button = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary)
+        previous_button = discord.ui.Button(
+            label="⬅️", style=discord.ButtonStyle.secondary
+        )
         previous_button.callback = self.previous_page
         self.add_item(previous_button)
 
@@ -939,7 +1011,9 @@ class RoleDescriptionView(discord.ui.View):
         buy_button.callback = self.buy_role
         self.add_item(buy_button)
 
-        go_to_shop_button = discord.ui.Button(label="Do sklepu", style=discord.ButtonStyle.primary)
+        go_to_shop_button = discord.ui.Button(
+            label="Do sklepu", style=discord.ButtonStyle.primary
+        )
         go_to_shop_button.callback = self.go_to_shop
         self.add_item(go_to_shop_button)
 
@@ -967,7 +1041,9 @@ class RoleDescriptionView(discord.ui.View):
     ) -> tuple[discord.Embed, "RoleDescriptionView"]:
         """Create a new view instance for a different user."""
         async with self.bot.get_db() as session:
-            db_viewer = await MemberQueries.get_or_add_member(session, interaction.user.id)
+            db_viewer = await MemberQueries.get_or_add_member(
+                session, interaction.user.id
+            )
             balance = db_viewer.wallet_balance
             await session.commit()
 
@@ -995,7 +1071,9 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
+            base_text = self._add_premium_text_to_description(
+                "Oto twój własny widok opisu ról:"
+            )
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -1003,7 +1081,12 @@ class RoleDescriptionView(discord.ui.View):
 
         self.page = (self.page % len(self.premium_roles)) + 1
         embed = await create_role_description_embed(
-            self.ctx, self.page, self.premium_roles, self.balance, self.viewer, self.member
+            self.ctx,
+            self.page,
+            self.premium_roles,
+            self.balance,
+            self.viewer,
+            self.member,
         )
         view = RoleDescriptionView(
             self.ctx,
@@ -1021,7 +1104,9 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
+            base_text = self._add_premium_text_to_description(
+                "Oto twój własny widok opisu ról:"
+            )
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -1029,7 +1114,12 @@ class RoleDescriptionView(discord.ui.View):
 
         self.page = (self.page - 2) % len(self.premium_roles) + 1
         embed = await create_role_description_embed(
-            self.ctx, self.page, self.premium_roles, self.balance, self.viewer, self.member
+            self.ctx,
+            self.page,
+            self.premium_roles,
+            self.balance,
+            self.viewer,
+            self.member,
         )
         view = RoleDescriptionView(
             self.ctx,
@@ -1047,7 +1137,9 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
+            base_text = self._add_premium_text_to_description(
+                "Oto twój własny widok opisu ról:"
+            )
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
@@ -1073,14 +1165,18 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
+            base_text = self._add_premium_text_to_description(
+                "Oto twój własny widok opisu ról:"
+            )
             await interaction.response.send_message(
                 base_text, embed=embed, view=view, ephemeral=True
             )
             return
 
         async with self.bot.get_db() as session:
-            premium_roles = await RoleQueries.get_member_premium_roles(session, self.member.id)
+            premium_roles = await RoleQueries.get_member_premium_roles(
+                session, self.member.id
+            )
 
         view = RoleShopView(
             self.ctx,
@@ -1109,7 +1205,9 @@ class ConfirmView(discord.ui.View):
         self.value = None
 
     @discord.ui.button(label="Potwierdź", style=discord.ButtonStyle.green)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def confirm(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         self.value = True
         await interaction.response.send_message("Potwierdzono zakup.", ephemeral=True)
         self.stop()
@@ -1152,20 +1250,27 @@ class LowerRoleChoiceView(discord.ui.View):
         # Add buttons based on whether this is an upgrade or not
         if not is_upgrade:
             extend_button = discord.ui.Button(
-                label="Przedłuż obecną rangę (usuwa muty)", style=discord.ButtonStyle.primary, row=0
+                label="Przedłuż obecną rangę (usuwa muty)",
+                style=discord.ButtonStyle.primary,
+                row=0,
             )
             extend_button.callback = self.extend_button_callback
             self.add_item(extend_button)
 
         buy_button = discord.ui.Button(
-            label=f"Kup nową rangę {new_role_name}" + (" (usuwa muty)" if is_upgrade else ""),
-            style=discord.ButtonStyle.primary if is_upgrade else discord.ButtonStyle.secondary,
+            label=f"Kup nową rangę {new_role_name}"
+            + (" (usuwa muty)" if is_upgrade else ""),
+            style=discord.ButtonStyle.primary
+            if is_upgrade
+            else discord.ButtonStyle.secondary,
             row=0,
         )
         buy_button.callback = self.buy_button_callback
         self.add_item(buy_button)
 
-        cancel_button = discord.ui.Button(label="Anuluj", style=discord.ButtonStyle.danger, row=1)
+        cancel_button = discord.ui.Button(
+            label="Anuluj", style=discord.ButtonStyle.danger, row=1
+        )
         cancel_button.callback = self.cancel_button_callback
         self.add_item(cancel_button)
 
@@ -1204,7 +1309,11 @@ class LowerRoleChoiceView(discord.ui.View):
     async def get_refund_info(self, session) -> int:
         """Calculate refund amount for current role."""
         role_config = next(
-            (r for r in self.bot.config["premium_roles"] if r["name"] == self.current_role_name),
+            (
+                r
+                for r in self.bot.config["premium_roles"]
+                if r["name"] == self.current_role_name
+            ),
             None,
         )
         if not role_config:

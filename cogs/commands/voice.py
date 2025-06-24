@@ -12,7 +12,11 @@ from utils.message_sender import MessageSender
 from utils.premium_checker import PremiumChecker
 from utils.voice.autokick import AutoKickManager
 from utils.voice.channel import ChannelModManager, VoiceChannelManager
-from utils.voice.permissions import BasePermissionCommand, PermissionChecker, VoicePermissionManager
+from utils.voice.permissions import (
+    BasePermissionCommand,
+    PermissionChecker,
+    VoicePermissionManager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +106,9 @@ class VoiceCog(commands.Cog):
         can_connect: Optional[Literal["+", "-"]] = None,
     ):
         """Set the connect permission for the target."""
-        await self.permission_commands["connect"].execute(self, ctx, target, can_connect)
+        await self.permission_commands["connect"].execute(
+            self, ctx, target, can_connect
+        )
 
     @commands.hybrid_command(aliases=["t"])
     @PermissionChecker.voice_command()
@@ -170,7 +176,10 @@ class VoiceCog(commands.Cog):
             ]
             # Convert Member objects to mentions string with display names
             current_mods_mentions = (
-                ", ".join(f"{member.mention} ({member.display_name})" for member in current_mods)
+                ", ".join(
+                    f"{member.mention} ({member.display_name})"
+                    for member in current_mods
+                )
                 or "brak"
             )
             remaining_slots = max(0, mod_limit - len(current_mods))
@@ -200,7 +209,9 @@ class VoiceCog(commands.Cog):
 
         # Check if adding would exceed limit
         if can_manage == "+" and len(current_mods) >= mod_limit:
-            await self.message_sender.send_mod_limit_exceeded(ctx, mod_limit, current_mods)
+            await self.message_sender.send_mod_limit_exceeded(
+                ctx, mod_limit, current_mods
+            )
             return
 
         await self.permission_commands["mod"].execute(self, ctx, target, can_manage)
@@ -242,7 +253,11 @@ class VoiceCog(commands.Cog):
             channel = ctx.author.voice.channel
             info = await self.channel_manager.get_channel_info(channel, ctx.author)
             await self.message_sender.send_voice_channel_info(
-                ctx, info["channel"], info["owner"], info["mods"], info["disabled_perms"]
+                ctx,
+                info["channel"],
+                info["owner"],
+                info["mods"],
+                info["disabled_perms"],
             )
             return
 
@@ -256,7 +271,12 @@ class VoiceCog(commands.Cog):
         channel = target.voice.channel
         info = await self.channel_manager.get_channel_info(channel, target)
         await self.message_sender.send_voice_channel_info(
-            ctx, info["channel"], info["owner"], info["mods"], info["disabled_perms"], target
+            ctx,
+            info["channel"],
+            info["owner"],
+            info["mods"],
+            info["disabled_perms"],
+            target,
         )
 
     @commands.hybrid_command(aliases=["ak"])
@@ -342,9 +362,13 @@ class VoiceCog(commands.Cog):
 
         # Cache statistics
         cache_total = metrics["cache_hits"] + metrics["cache_misses"]
-        cache_hit_rate = (metrics["cache_hits"] / cache_total * 100) if cache_total > 0 else 0
+        cache_hit_rate = (
+            (metrics["cache_hits"] / cache_total * 100) if cache_total > 0 else 0
+        )
 
-        embed = discord.Embed(title="📊 Statystyki systemu Voice", color=discord.Color.blue())
+        embed = discord.Embed(
+            title="📊 Statystyki systemu Voice", color=discord.Color.blue()
+        )
 
         embed.add_field(
             name="🏗️ Kanały",
@@ -380,7 +404,8 @@ class VoiceCog(commands.Cog):
         # Worker status
         worker_status = (
             "🟢 Aktywny"
-            if voice_event.autokick_worker_task and not voice_event.autokick_worker_task.done()
+            if voice_event.autokick_worker_task
+            and not voice_event.autokick_worker_task.done()
             else "🔴 Nieaktywny"
         )
         embed.add_field(name="⚙️ Worker", value=worker_status, inline=True)
@@ -392,7 +417,8 @@ class VoiceCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
-        name="debug_permissions", description="Sprawdza uprawnienia użytkownika w bazie danych"
+        name="debug_permissions",
+        description="Sprawdza uprawnienia użytkownika w bazie danych",
     )
     @commands.has_permissions(administrator=True)
     @discord.app_commands.describe(
@@ -407,17 +433,22 @@ class VoiceCog(commands.Cog):
         try:
             async with self.bot.get_db() as session:
                 # Get permissions where user is the target
-                target_permissions = await ChannelPermissionQueries.get_permissions_for_target(
-                    session, target_user.id
+                target_permissions = (
+                    await ChannelPermissionQueries.get_permissions_for_target(
+                        session, target_user.id
+                    )
                 )
 
                 # Get permissions where user is the owner
-                owner_permissions = await ChannelPermissionQueries.get_permissions_for_member(
-                    session, target_user.id
+                owner_permissions = (
+                    await ChannelPermissionQueries.get_permissions_for_member(
+                        session, target_user.id
+                    )
                 )
 
             embed = discord.Embed(
-                title=f"🔐 Uprawnienia dla {target_user.display_name}", color=discord.Color.blue()
+                title=f"🔐 Uprawnienia dla {target_user.display_name}",
+                color=discord.Color.blue(),
             )
 
             # Permissions where user is the target (restrictions applied to them)
@@ -446,7 +477,9 @@ class VoiceCog(commands.Cog):
                     inline=False,
                 )
             else:
-                embed.add_field(name="🎯 Ograniczenia na użytkowniku", value="Brak", inline=False)
+                embed.add_field(
+                    name="🎯 Ograniczenia na użytkowniku", value="Brak", inline=False
+                )
 
             # Permissions where user is the owner (permissions they granted)
             if owner_permissions:
@@ -479,7 +512,9 @@ class VoiceCog(commands.Cog):
                 )
             else:
                 embed.add_field(
-                    name="👑 Uprawnienia przyznane przez użytkownika", value="Brak", inline=False
+                    name="👑 Uprawnienia przyznane przez użytkownika",
+                    value="Brak",
+                    inline=False,
                 )
 
             await ctx.send(embed=embed)

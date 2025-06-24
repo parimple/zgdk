@@ -23,7 +23,9 @@ def g_to_pln(amount_g: int) -> int:
 
     # Get integer and decimal parts
     int_part = int(amount_pln)
-    decimal_part = round((amount_pln - int_part) * 100) / 100  # Round to 2 decimal places
+    decimal_part = (
+        round((amount_pln - int_part) * 100) / 100
+    )  # Round to 2 decimal places
 
     # Check if decimal part is exactly .99
     if decimal_part == 0.99:

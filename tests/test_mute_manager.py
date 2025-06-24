@@ -46,7 +46,8 @@ class TestMuteManager(unittest.TestCase):
 
         # Test combination
         self.assertEqual(
-            self.mute_manager.parse_duration("1d12h30m"), timedelta(days=1, hours=12, minutes=30)
+            self.mute_manager.parse_duration("1d12h30m"),
+            timedelta(days=1, hours=12, minutes=30),
         )
 
     @patch("discord.utils.format_dt")
@@ -82,13 +83,19 @@ class TestMuteManager(unittest.TestCase):
 
         # Extract duration text from what would be sent
         # This is a bit hacky but allows us to test the internal formatting without exposing it
-        with patch.object(self.mute_manager, "_handle_mute_logic", new=self._extract_duration_text):
+        with patch.object(
+            self.mute_manager, "_handle_mute_logic", new=self._extract_duration_text
+        ):
             result = asyncio.run(
-                self.mute_manager._handle_mute_logic(ctx, user, mute_type, duration, unmute=False)
+                self.mute_manager._handle_mute_logic(
+                    ctx, user, mute_type, duration, unmute=False
+                )
             )
             self.assertEqual(result, expected)
 
-    async def _extract_duration_text(self, ctx, user, mute_type, duration, unmute=False):
+    async def _extract_duration_text(
+        self, ctx, user, mute_type, duration, unmute=False
+    ):
         """Mock implementation to extract formatted duration text"""
         if duration is None:
             return "stałe"
@@ -106,7 +113,9 @@ class TestMuteManager(unittest.TestCase):
             if minutes > 0:
                 parts.append(f"{minutes}m")
 
-            if seconds > 0 and not parts:  # Pokazuj sekundy tylko jeśli nie ma innych jednostek
+            if (
+                seconds > 0 and not parts
+            ):  # Pokazuj sekundy tylko jeśli nie ma innych jednostek
                 parts.append(f"{seconds}s")
 
             return " ".join(parts) if parts else "mniej niż 1m"

@@ -61,7 +61,9 @@ class MemberQueries:
                 await session.rollback()
                 member = await session.get(Member, member_id)
                 if member is None:
-                    logger.error(f"Failed to add or retrieve member with ID {member_id}")
+                    logger.error(
+                        f"Failed to add or retrieve member with ID {member_id}"
+                    )
                     raise
 
         # Update fields for existing members
@@ -73,7 +75,9 @@ class MemberQueries:
         return member
 
     @staticmethod
-    async def add_to_wallet_balance(session: AsyncSession, member_id: int, amount: int) -> None:
+    async def add_to_wallet_balance(
+        session: AsyncSession, member_id: int, amount: int
+    ) -> None:
         """Add to the wallet balance of a Member"""
         await session.execute(
             update(Member)
@@ -103,11 +107,15 @@ class MemberQueries:
             await session.flush()
             return member.voice_bypass_until
         except Exception as e:
-            logger.error(f"Failed to extend voice bypass for member {member_id}: {str(e)}")
+            logger.error(
+                f"Failed to extend voice bypass for member {member_id}: {str(e)}"
+            )
             return None
 
     @staticmethod
-    async def get_voice_bypass_status(session: AsyncSession, member_id: int) -> Optional[datetime]:
+    async def get_voice_bypass_status(
+        session: AsyncSession, member_id: int
+    ) -> Optional[datetime]:
         """
         Get the current voice bypass expiration datetime for a member.
         Returns None if member has no bypass or if it's expired.
@@ -133,11 +141,15 @@ class MemberQueries:
                 return True
             return False
         except Exception as e:
-            logger.error(f"Failed to clear voice bypass for member {member_id}: {str(e)}")
+            logger.error(
+                f"Failed to clear voice bypass for member {member_id}: {str(e)}"
+            )
             return False
 
     @staticmethod
-    async def add_bypass_time(session: AsyncSession, user_id: int, hours: int) -> Optional[Member]:
+    async def add_bypass_time(
+        session: AsyncSession, user_id: int, hours: int
+    ) -> Optional[Member]:
         """Add bypass time to a member"""
         member = await session.get(Member, user_id)
         if not member:
@@ -170,7 +182,9 @@ class MemberQueries:
             await session.flush()
             return member
         except Exception as e:
-            logger.error(f"Failed to set voice bypass status for member {member_id}: {str(e)}")
+            logger.error(
+                f"Failed to set voice bypass status for member {member_id}: {str(e)}"
+            )
             return None
 
 
@@ -189,14 +203,20 @@ class RoleQueries:
             member_role = await session.get(MemberRole, (member_id, role_id))
 
             # Calculate expiration date (if duration is None, set it to None for permanent)
-            expiration_date = None if duration is None else datetime.now(timezone.utc) + duration
+            expiration_date = (
+                None if duration is None else datetime.now(timezone.utc) + duration
+            )
 
             if member_role:
                 member_role.expiration_date = expiration_date
-                logger.info(f"Updated expiration date for role {role_id} of member {member_id}")
+                logger.info(
+                    f"Updated expiration date for role {role_id} of member {member_id}"
+                )
             else:
                 member_role = MemberRole(
-                    member_id=member_id, role_id=role_id, expiration_date=expiration_date
+                    member_id=member_id,
+                    role_id=role_id,
+                    expiration_date=expiration_date,
                 )
                 session.add(member_role)
                 logger.info(f"Added new role {role_id} to member {member_id}")
@@ -252,7 +272,9 @@ class RoleQueries:
         return await session.get(Role, role_id)
 
     @staticmethod
-    async def get_member_roles(session: AsyncSession, member_id: int) -> list[MemberRole]:
+    async def get_member_roles(
+        session: AsyncSession, member_id: int
+    ) -> list[MemberRole]:
         """Get all roles of a member"""
         result = await session.execute(
             select(MemberRole)
@@ -271,7 +293,9 @@ class RoleQueries:
             query = (
                 select(MemberRole, Role)
                 .join(Role, MemberRole.role_id == Role.id)
-                .where((MemberRole.member_id == member_id) & (Role.role_type == "premium"))
+                .where(
+                    (MemberRole.member_id == member_id) & (Role.role_type == "premium")
+                )
             )
             logger.info(
                 f"Executing query for member_id {member_id} in get_member_premium_roles: {query}"
@@ -295,7 +319,8 @@ class RoleQueries:
             return fetched_roles
         except Exception as e:
             logger.error(
-                f"Błąd podczas pobierania ról premium użytkownika {member_id}: {e}", exc_info=True
+                f"Błąd podczas pobierania ról premium użytkownika {member_id}: {e}",
+                exc_info=True,
             )
             return []
 
@@ -362,11 +387,15 @@ class RoleQueries:
             await session.execute(sql, {"member_id": member_id, "role_id": role_id})
             logger.info(f"Deleted role {role_id} for member {member_id} using raw SQL")
         except Exception as e:
-            logger.error(f"Error deleting role {role_id} for member {member_id}: {str(e)}")
+            logger.error(
+                f"Error deleting role {role_id} for member {member_id}: {str(e)}"
+            )
             raise
 
     @staticmethod
-    async def get_premium_role(session: AsyncSession, member_id: int) -> Optional[MemberRole]:
+    async def get_premium_role(
+        session: AsyncSession, member_id: int
+    ) -> Optional[MemberRole]:
         """Get the active premium role of a member"""
         result = await session.execute(
             select(MemberRole)
@@ -452,7 +481,9 @@ class RoleQueries:
         return result.scalars().first()
 
     @staticmethod
-    async def safe_delete_member_role(session: AsyncSession, member_id: int, role_id: int):
+    async def safe_delete_member_role(
+        session: AsyncSession, member_id: int, role_id: int
+    ):
         """
         Bezpieczna metoda usuwania roli użytkownika, która unika problemów z ORM.
         W przeciwieństwie do delete_member_role, ta metoda:
@@ -481,14 +512,18 @@ class RoleQueries:
                 logger.info(f"Safely deleted role {role_id} for member {member_id}")
                 return True
             else:
-                logger.warning(f"No role {role_id} found for member {member_id} to delete (safe)")
+                logger.warning(
+                    f"No role {role_id} found for member {member_id} to delete (safe)"
+                )
                 return False
         except Exception as e:
             logger.error(f"Error in safe_delete_member_role: {str(e)}")
             raise
 
     @staticmethod
-    async def raw_delete_member_role(session: AsyncSession, member_id: int, role_id: int) -> bool:
+    async def raw_delete_member_role(
+        session: AsyncSession, member_id: int, role_id: int
+    ) -> bool:
         """
         Najprostsza i najbezpieczniejsza metoda usuwania roli członka, używająca wyłącznie surowego SQL.
         Ta metoda jest stworzona specjalnie do rozwiązania problemu z usuwaniem ról podczas sprzedaży.
@@ -499,14 +534,20 @@ class RoleQueries:
                 f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
             )
             await session.execute(sql, {"member_id": member_id, "role_id": role_id})
-            logger.info(f"Raw SQL deletion of role {role_id} for member {member_id} succeeded")
+            logger.info(
+                f"Raw SQL deletion of role {role_id} for member {member_id} succeeded"
+            )
             return True
         except Exception as e:
-            logger.error(f"Raw SQL deletion failed for role {role_id}, member {member_id}: {e}")
+            logger.error(
+                f"Raw SQL deletion failed for role {role_id}, member {member_id}: {e}"
+            )
             return False
 
     @staticmethod
-    async def orm_delete_member_role(session: AsyncSession, member_id: int, role_id: int) -> bool:
+    async def orm_delete_member_role(
+        session: AsyncSession, member_id: int, role_id: int
+    ) -> bool:
         """
         Metoda usuwania roli członka używająca ORM SQLAlchemy, ale w bezpieczny sposób.
         Ta metoda używa funkcji delete() zamiast surowego SQL.
@@ -518,10 +559,14 @@ class RoleQueries:
             )
             result = await session.execute(stmt)
             await session.flush()
-            logger.info(f"ORM deletion of role {role_id} for member {member_id} succeeded")
+            logger.info(
+                f"ORM deletion of role {role_id} for member {member_id} succeeded"
+            )
             return True
         except Exception as e:
-            logger.error(f"ORM deletion failed for role {role_id}, member {member_id}: {e}")
+            logger.error(
+                f"ORM deletion failed for role {role_id}, member {member_id}: {e}"
+            )
             return False
 
     @staticmethod
@@ -583,11 +628,17 @@ class HandledPaymentQueries:
 
     @staticmethod
     async def get_last_payments(
-        session: AsyncSession, offset: int = 0, limit: int = 10, payment_type: Optional[str] = None
+        session: AsyncSession,
+        offset: int = 0,
+        limit: int = 10,
+        payment_type: Optional[str] = None,
     ) -> List[HandledPayment]:
         """Get last 'limit' payments of specific type. If payment_type is None, return all types"""
         query = (
-            select(HandledPayment).order_by(HandledPayment.id.desc()).offset(offset).limit(limit)
+            select(HandledPayment)
+            .order_by(HandledPayment.id.desc())
+            .offset(offset)
+            .limit(limit)
         )
         if payment_type is not None:
             query = query.where(HandledPayment.payment_type == payment_type)
@@ -606,7 +657,9 @@ class HandledPaymentQueries:
             logger.error("Payment with id %s not found", payment_id)
 
     @staticmethod
-    async def get_payment_by_id(session: AsyncSession, payment_id: int) -> Optional[HandledPayment]:
+    async def get_payment_by_id(
+        session: AsyncSession, payment_id: int
+    ) -> Optional[HandledPayment]:
         """Get a payment by its ID"""
         return await session.get(HandledPayment, payment_id)
 
@@ -673,7 +726,10 @@ class ChannelPermissionQueries:
                 .where(
                     (ChannelPermission.member_id == member_id)
                     & (
-                        ChannelPermission.allow_permissions_value.bitwise_and(0x00002000) == 0
+                        ChannelPermission.allow_permissions_value.bitwise_and(
+                            0x00002000
+                        )
+                        == 0
                     )  # not manage_messages
                     & (ChannelPermission.target_id != guild_id)  # not @everyone
                 )
@@ -693,9 +749,13 @@ class ChannelPermissionQueries:
         permission = await session.get(ChannelPermission, (member_id, target_id))
         if permission:
             await session.delete(permission)
-            logger.info(f"Removed permission for member {member_id} and target {target_id}")
+            logger.info(
+                f"Removed permission for member {member_id} and target {target_id}"
+            )
         else:
-            logger.warning(f"No permission found for member {member_id} and target {target_id}")
+            logger.warning(
+                f"No permission found for member {member_id} and target {target_id}"
+            )
 
     @staticmethod
     async def get_permission(
@@ -725,10 +785,16 @@ class ChannelPermissionQueries:
             .order_by(
                 case(
                     (
-                        ChannelPermission.allow_permissions_value.bitwise_and(0x00002000) != 0,
+                        ChannelPermission.allow_permissions_value.bitwise_and(
+                            0x00002000
+                        )
+                        != 0,
                         0,
                     ),  # manage_messages
-                    (ChannelPermission.target_id == member_id, 0),  # everyone permissions
+                    (
+                        ChannelPermission.target_id == member_id,
+                        0,
+                    ),  # everyone permissions
                     else_=1,
                 ),
                 ChannelPermission.last_updated_at.desc(),
@@ -751,7 +817,9 @@ class ChannelPermissionQueries:
         logger.info(f"Removed all {len(permissions)} permissions for owner {owner_id}")
 
     @staticmethod
-    async def remove_mod_permissions_granted_by_member(session: AsyncSession, owner_id: int):
+    async def remove_mod_permissions_granted_by_member(
+        session: AsyncSession, owner_id: int
+    ):
         """
         Remove only moderator permissions granted by a specific member.
 
@@ -834,7 +902,9 @@ class NotificationLogQueries:
         For global services (bumps), member_id should be guild_id.
         For user-specific services, member_id should be user_id.
         """
-        notification_log = await session.get(NotificationLog, (member_id, notification_tag))
+        notification_log = await session.get(
+            NotificationLog, (member_id, notification_tag)
+        )
 
         if notification_log is None:
             notification_log = NotificationLog(
@@ -860,13 +930,16 @@ class NotificationLogQueries:
         Increment notification count and return if max count reached.
         Returns (notification_log, should_opt_out)
         """
-        notification_log = await session.get(NotificationLog, (member_id, notification_tag))
+        notification_log = await session.get(
+            NotificationLog, (member_id, notification_tag)
+        )
         if not notification_log:
             return None, False
 
         notification_log.notification_count += 1
         should_opt_out = (
-            notification_log.notification_count >= NotificationLogQueries.MAX_NOTIFICATION_COUNT
+            notification_log.notification_count
+            >= NotificationLogQueries.MAX_NOTIFICATION_COUNT
         )
         if should_opt_out:
             notification_log.opted_out = True
@@ -882,11 +955,16 @@ class NotificationLogQueries:
 
     @staticmethod
     async def get_service_notification_log(
-        session: AsyncSession, service: str, guild_id: int, user_id: Optional[int] = None
+        session: AsyncSession,
+        service: str,
+        guild_id: int,
+        user_id: Optional[int] = None,
     ) -> Optional[NotificationLog]:
         """Get notification log for a service, handling both global and user-specific services"""
         # For global services (bumps), use guild_id as member_id
-        member_id = guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
+        member_id = (
+            guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
+        )
         if member_id is None:
             return None
 
@@ -919,7 +997,9 @@ class NotificationLogQueries:
     ) -> bool:
         """Check if service can be used based on cooldown"""
         # For global services (bumps), use guild_id as member_id
-        member_id = guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
+        member_id = (
+            guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
+        )
         if member_id is None:
             return False
 
@@ -1052,10 +1132,14 @@ class InviteQueries:
         )
 
         if sort_by == "uses":
-            query = query.order_by(Invite.uses.asc() if order == "asc" else Invite.uses.desc())
+            query = query.order_by(
+                Invite.uses.asc() if order == "asc" else Invite.uses.desc()
+            )
         elif sort_by == "last_used_at":
             query = query.order_by(
-                Invite.last_used_at.asc() if order == "asc" else Invite.last_used_at.desc()
+                Invite.last_used_at.asc()
+                if order == "asc"
+                else Invite.last_used_at.desc()
             )
         else:
             query = query.order_by(Invite.uses.asc(), Invite.last_used_at.asc())
@@ -1083,7 +1167,9 @@ class InviteQueries:
     ) -> List[Invite]:
         query = select(Invite)
         if sort_by == "uses":
-            query = query.order_by(desc(Invite.uses) if order == "desc" else asc(Invite.uses))
+            query = query.order_by(
+                desc(Invite.uses) if order == "desc" else asc(Invite.uses)
+            )
         elif sort_by == "created_at":
             query = query.order_by(
                 desc(Invite.created_at) if order == "desc" else asc(Invite.created_at)
@@ -1099,7 +1185,9 @@ class InviteQueries:
 
     @staticmethod
     async def get_invites_for_cleanup(
-        session: AsyncSession, limit: int = 100, inactive_threshold: timedelta = timedelta(days=1)
+        session: AsyncSession,
+        limit: int = 100,
+        inactive_threshold: timedelta = timedelta(days=1),
     ) -> List[Invite]:
         now = datetime.now(timezone.utc)
         threshold_date = now - inactive_threshold
@@ -1108,13 +1196,22 @@ class InviteQueries:
             select(Invite)
             .where(
                 or_(
-                    and_(Invite.last_used_at.is_(None), Invite.created_at < threshold_date),
+                    and_(
+                        Invite.last_used_at.is_(None),
+                        Invite.created_at < threshold_date,
+                    ),
                     Invite.last_used_at.isnot(None),
                 )
             )
             .order_by(
                 case(
-                    (and_(Invite.last_used_at.is_(None), Invite.created_at < threshold_date), 0),
+                    (
+                        and_(
+                            Invite.last_used_at.is_(None),
+                            Invite.created_at < threshold_date,
+                        ),
+                        0,
+                    ),
                     else_=1,
                 ),
                 Invite.last_used_at.asc().nulls_first(),
@@ -1194,7 +1291,9 @@ class InviteQueries:
             return valid_count
 
         except Exception as e:
-            logger.error(f"Error getting valid invite count for member {member_id}: {e}")
+            logger.error(
+                f"Error getting valid invite count for member {member_id}: {e}"
+            )
             return 0
 
 
@@ -1202,35 +1301,47 @@ class AutoKickQueries:
     """Class for AutoKick Queries"""
 
     @staticmethod
-    async def ensure_members_exist(session: AsyncSession, owner_id: int, target_id: int) -> None:
+    async def ensure_members_exist(
+        session: AsyncSession, owner_id: int, target_id: int
+    ) -> None:
         """Ensure both owner and target exist in members table"""
         # Check if owner exists
-        owner_exists = await session.scalar(select(Member.id).where(Member.id == owner_id))
+        owner_exists = await session.scalar(
+            select(Member.id).where(Member.id == owner_id)
+        )
         if not owner_exists:
             await session.merge(Member(id=owner_id))
 
         # Check if target exists
-        target_exists = await session.scalar(select(Member.id).where(Member.id == target_id))
+        target_exists = await session.scalar(
+            select(Member.id).where(Member.id == target_id)
+        )
         if not target_exists:
             await session.merge(Member(id=target_id))
 
         await session.commit()
 
     @staticmethod
-    async def add_autokick(session: AsyncSession, owner_id: int, target_id: int) -> None:
+    async def add_autokick(
+        session: AsyncSession, owner_id: int, target_id: int
+    ) -> None:
         """Add an autokick entry"""
         # Ensure both members exist
         await AutoKickQueries.ensure_members_exist(session, owner_id, target_id)
 
         # Add autokick entry
         autokick = AutoKick(
-            owner_id=owner_id, target_id=target_id, created_at=datetime.now(timezone.utc)
+            owner_id=owner_id,
+            target_id=target_id,
+            created_at=datetime.now(timezone.utc),
         )
         session.add(autokick)
         await session.commit()
 
     @staticmethod
-    async def remove_autokick(session: AsyncSession, owner_id: int, target_id: int) -> None:
+    async def remove_autokick(
+        session: AsyncSession, owner_id: int, target_id: int
+    ) -> None:
         """Remove an autokick entry"""
         await session.execute(
             delete(AutoKick).where(
@@ -1246,15 +1357,23 @@ class AutoKickQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def get_owner_autokicks(session: AsyncSession, owner_id: int) -> List[AutoKick]:
+    async def get_owner_autokicks(
+        session: AsyncSession, owner_id: int
+    ) -> List[AutoKick]:
         """Get all autokicks for a specific owner"""
-        result = await session.execute(select(AutoKick).where(AutoKick.owner_id == owner_id))
+        result = await session.execute(
+            select(AutoKick).where(AutoKick.owner_id == owner_id)
+        )
         return result.scalars().all()
 
     @staticmethod
-    async def get_target_autokicks(session: AsyncSession, target_id: int) -> List[AutoKick]:
+    async def get_target_autokicks(
+        session: AsyncSession, target_id: int
+    ) -> List[AutoKick]:
         """Get all autokicks targeting a specific member"""
-        result = await session.execute(select(AutoKick).where(AutoKick.target_id == target_id))
+        result = await session.execute(
+            select(AutoKick).where(AutoKick.target_id == target_id)
+        )
         return result.scalars().all()
 
 
@@ -1272,11 +1391,17 @@ async def ensure_member_exists(session: AsyncSession, member_id: int) -> None:
 
 
 async def add_activity_points(
-    session: AsyncSession, member_id: int, activity_type: str, points: int, date: datetime = None
+    session: AsyncSession,
+    member_id: int,
+    activity_type: str,
+    points: int,
+    date: datetime = None,
 ) -> None:
     """Add points to member's activity for specific date and type."""
     if date is None:
-        date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        date = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
 
     # Check if activity record exists for this member, date and type
     activity = await session.get(Activity, (member_id, date, activity_type))
@@ -1290,7 +1415,9 @@ async def add_activity_points(
         session.add(activity)
 
 
-async def get_member_total_points(session: AsyncSession, member_id: int, days_back: int = 7) -> int:
+async def get_member_total_points(
+    session: AsyncSession, member_id: int, days_back: int = 7
+) -> int:
     """Get total points for a member from last N days."""
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
@@ -1340,9 +1467,13 @@ async def get_member_ranking_position(
     return 0  # Not found in ranking
 
 
-async def reset_daily_activity_points(session: AsyncSession, activity_type: str = None) -> None:
+async def reset_daily_activity_points(
+    session: AsyncSession, activity_type: str = None
+) -> None:
     """Reset activity points for today. If activity_type is None, reset all types."""
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
 
     if activity_type:
         await session.execute(
@@ -1352,7 +1483,9 @@ async def reset_daily_activity_points(session: AsyncSession, activity_type: str 
             .values(points=0)
         )
     else:
-        await session.execute(update(Activity).where(Activity.date == today).values(points=0))
+        await session.execute(
+            update(Activity).where(Activity.date == today).values(points=0)
+        )
 
 
 async def get_member_activity_breakdown(
@@ -1371,7 +1504,9 @@ async def get_member_activity_breakdown(
     return {activity_type: total_points for activity_type, total_points in result.all()}
 
 
-async def cleanup_old_activity_data(session: AsyncSession, days_to_keep: int = 30) -> int:
+async def cleanup_old_activity_data(
+    session: AsyncSession, days_to_keep: int = 30
+) -> int:
     """Remove activity data older than specified days. Returns number of deleted records."""
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
 
@@ -1389,7 +1524,9 @@ async def get_activity_leaderboard_with_names(
         select(
             Activity.member_id,
             func.sum(Activity.points).label("total_points"),
-            func.row_number().over(order_by=func.sum(Activity.points).desc()).label("position"),
+            func.row_number()
+            .over(order_by=func.sum(Activity.points).desc())
+            .label("position"),
         )
         .where(Activity.date >= cutoff_date)
         .group_by(Activity.member_id)
@@ -1399,7 +1536,9 @@ async def get_activity_leaderboard_with_names(
     return result.all()
 
 
-async def get_ranking_tier(session: AsyncSession, member_id: int, days_back: int = 7) -> str:
+async def get_ranking_tier(
+    session: AsyncSession, member_id: int, days_back: int = 7
+) -> str:
     """Get ranking tier for member (100, 200, 300, or None)."""
     position = await get_member_ranking_position(session, member_id, days_back)
 
@@ -1433,7 +1572,9 @@ class ModerationLogQueries:
         # Oblicz datę wygaśnięcia jeśli podano czas trwania
         expires_at = None
         if duration_seconds is not None:
-            expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
+            expires_at = datetime.now(timezone.utc) + timedelta(
+                seconds=duration_seconds
+            )
 
         # Stwórz wpis w logu
         moderation_log = ModerationLog(
@@ -1467,7 +1608,9 @@ class ModerationLogQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def get_user_mute_count(session: AsyncSession, user_id: int, days_back: int = 30) -> int:
+    async def get_user_mute_count(
+        session: AsyncSession, user_id: int, days_back: int = 30
+    ) -> int:
         """Zlicza ile razy użytkownik był mutowany w ostatnich X dniach"""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
@@ -1506,7 +1649,9 @@ class ModerationLogQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def get_mute_statistics(session: AsyncSession, days_back: int = 30) -> Dict[str, any]:
+    async def get_mute_statistics(
+        session: AsyncSession, days_back: int = 30
+    ) -> Dict[str, any]:
         """Pobiera statystyki mute'ów z ostatnich X dni"""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
@@ -1560,11 +1705,16 @@ class ModerationLogQueries:
         }
 
     @staticmethod
-    async def get_recent_actions(session: AsyncSession, limit: int = 20) -> List[ModerationLog]:
+    async def get_recent_actions(
+        session: AsyncSession, limit: int = 20
+    ) -> List[ModerationLog]:
         """Pobiera ostatnie akcje moderatorskie"""
         result = await session.execute(
             select(ModerationLog)
-            .options(joinedload(ModerationLog.target_user), joinedload(ModerationLog.moderator))
+            .options(
+                joinedload(ModerationLog.target_user),
+                joinedload(ModerationLog.moderator),
+            )
             .order_by(ModerationLog.created_at.desc())
             .limit(limit)
         )

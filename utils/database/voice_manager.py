@@ -34,7 +34,8 @@ class DatabaseManager:
             for role in self.bot.config["premium_roles"]
         )
         is_in_specific_category = (
-            voice_channel and voice_channel.category_id in self.bot.config.get("vc_categories", [])
+            voice_channel
+            and voice_channel.category_id in self.bot.config.get("vc_categories", [])
         )
         self.logger.info(
             f"Checking database update conditions for {member}: has_premium={has_premium}, is_in_specific_category={is_in_specific_category}"
@@ -76,10 +77,14 @@ class DatabaseManager:
                 self.logger.info(
                     f"Removing permission: member_id={member_id}, target_id={target_id}"
                 )
-                await ChannelPermissionQueries.remove_permission(session, member_id, target_id)
+                await ChannelPermissionQueries.remove_permission(
+                    session, member_id, target_id
+                )
                 self.logger.info("Permission successfully removed from database")
         except Exception as e:
-            self.logger.error(f"Error updating permission in database: {str(e)}", exc_info=True)
+            self.logger.error(
+                f"Error updating permission in database: {str(e)}", exc_info=True
+            )
             raise
 
     async def get_member_permissions(self, session: AsyncSession, member_id: int):

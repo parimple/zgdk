@@ -35,7 +35,9 @@ class OnMessageEvent(commands.Cog):
         if message.channel.id not in self.allowed_channels:
             return
 
-        reply_to_message_id = message.reference.message_id if message.reference else None
+        reply_to_message_id = (
+            message.reference.message_id if message.reference else None
+        )
 
         async with self.bot.get_db() as session:
             await MessageQueries.save_message(
@@ -49,7 +51,9 @@ class OnMessageEvent(commands.Cog):
             )
             await session.commit()
 
-        logger.info("Message from %s saved to database: %s", message.author.id, message.content)
+        logger.info(
+            "Message from %s saved to database: %s", message.author.id, message.content
+        )
 
 
 async def setup(bot: commands.Bot):

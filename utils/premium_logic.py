@@ -114,7 +114,9 @@ class PremiumRoleManager:
     def has_mute_roles(self, member: discord.Member) -> bool:
         """Check if member has any mute roles."""
         return any(
-            role for role in self.mute_roles.values() if role["id"] in [r.id for r in member.roles]
+            role
+            for role in self.mute_roles.values()
+            if role["id"] in [r.id for r in member.roles]
         )
 
     async def remove_mute_roles(self, member: discord.Member):
@@ -128,7 +130,9 @@ class PremiumRoleManager:
             await member.remove_roles(*roles_to_remove)
             roles_removed = [role.name for role in roles_to_remove]
             try:
-                message = f"Usunięto następujące role mutujące: {', '.join(roles_removed)}"
+                message = (
+                    f"Usunięto następujące role mutujące: {', '.join(roles_removed)}"
+                )
                 await member.send(message)
             except discord.Forbidden:
                 logger.warning(
@@ -158,7 +162,12 @@ class PremiumRoleManager:
         return highest_role_name
 
     async def check_partial_extension(
-        self, session, member: discord.Member, role_name: str, amount: int, current_role=None
+        self,
+        session,
+        member: discord.Member,
+        role_name: str,
+        amount: int,
+        current_role=None,
     ) -> Optional[Tuple[discord.Embed, int]]:
         """
         Check if a partial extension is possible.
@@ -220,7 +229,12 @@ class PremiumRoleManager:
         return None
 
     async def get_extension_type(
-        self, session, member: discord.Member, role_name: str, amount: int, current_role=None
+        self,
+        session,
+        member: discord.Member,
+        role_name: str,
+        amount: int,
+        current_role=None,
     ) -> Tuple[str, Optional[int], Optional[str]]:
         """
         Determine the type of extension/purchase.
@@ -291,7 +305,9 @@ class PremiumRoleManager:
 
             # If user already has a premium role, extend it based on their highest role
             if highest_role_name:
-                role_to_extend = discord.utils.get(self.guild.roles, name=highest_role_name)
+                role_to_extend = discord.utils.get(
+                    self.guild.roles, name=highest_role_name
+                )
                 if role_to_extend:
                     # Get the role database entry
                     db_role = await RoleQueries.get_member_role(
@@ -312,7 +328,10 @@ class PremiumRoleManager:
 
                     # Update expiration date
                     updated_role = await RoleQueries.update_role_expiration_date(
-                        session, member.id, role_to_extend.id, timedelta(days=days_to_add)
+                        session,
+                        member.id,
+                        role_to_extend.id,
+                        timedelta(days=days_to_add),
                     )
 
                     if updated_role:
@@ -387,7 +406,9 @@ class PremiumRoleManager:
             if current_role and role in member.roles:
                 # Extend existing role
                 extend_days = (
-                    MONTHLY_DURATION if duration_days == MONTHLY_DURATION else YEARLY_DURATION
+                    MONTHLY_DURATION
+                    if duration_days == MONTHLY_DURATION
+                    else YEARLY_DURATION
                 )
                 logger.info(
                     f"[PREMIUM] Extending role {role_name} for {member.display_name}:"
@@ -403,16 +424,24 @@ class PremiumRoleManager:
                 if updated_role:
                     await session.flush()
                     if duration_days == MONTHLY_DURATION:
-                        description = f"Przedłużyłeś rolę {role_name} o {MONTHLY_DURATION} dni!"
+                        description = (
+                            f"Przedłużyłeś rolę {role_name} o {MONTHLY_DURATION} dni!"
+                        )
                     else:
-                        description = f"Przedłużyłeś rolę {role_name} o {YEARLY_DURATION} dni!"
+                        description = (
+                            f"Przedłużyłeś rolę {role_name} o {YEARLY_DURATION} dni!"
+                        )
 
                     embed = discord.Embed(
-                        title="Gratulacje!", description=description, color=discord.Color.green()
+                        title="Gratulacje!",
+                        description=description,
+                        color=discord.Color.green(),
                     )
                     return embed, None, None
                 else:
-                    raise ValueError(f"Failed to update role expiration for {role_name}")
+                    raise ValueError(
+                        f"Failed to update role expiration for {role_name}"
+                    )
             else:
                 # New purchase
                 await RoleQueries.add_role_to_member(
@@ -428,7 +457,9 @@ class PremiumRoleManager:
                 )
                 return embed, None, None
 
-    async def assign_temporary_roles(self, session, member: discord.Member, amount: int):
+    async def assign_temporary_roles(
+        self, session, member: discord.Member, amount: int
+    ):
         """Assign temporary roles based on donation amount."""
         logger.info(
             f"[TEMP_ROLES] Starting assign_temporary_roles for {member.display_name} with amount {amount}"
@@ -450,7 +481,9 @@ class PremiumRoleManager:
             )
             if amount >= amount_required:
                 role = discord.utils.get(self.guild.roles, name=role_name)
-                logger.info(f"[TEMP_ROLES] Looking for role {role_name}, found: {role is not None}")
+                logger.info(
+                    f"[TEMP_ROLES] Looking for role {role_name}, found: {role is not None}"
+                )
                 if role:
                     try:
                         current_role = await RoleQueries.get_member_role(
@@ -460,7 +493,8 @@ class PremiumRoleManager:
 
                         if current_role and role in member.roles:
                             days_left = (
-                                current_role.expiration_date - datetime.now(timezone.utc)
+                                current_role.expiration_date
+                                - datetime.now(timezone.utc)
                             ).days
                             if days_left < 1 or days_left >= 29:
                                 days_to_add = 33

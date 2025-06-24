@@ -37,7 +37,9 @@ class RoleManager:
         """
         self.bot = bot
         self.config = bot.config
-        self.notification_channel_id = self.bot.config.get("channels", {}).get("mute_notifications")
+        self.notification_channel_id = self.bot.config.get("channels", {}).get(
+            "mute_notifications"
+        )
 
     @property
     def force_channel_notifications(self):
@@ -97,16 +99,18 @@ class RoleManager:
             return 0
 
         # Zmiana poziomu logowania z INFO na DEBUG
-        logger.debug(f"Checking expired roles: type={role_type}, specific_ids={role_ids}")
+        logger.debug(
+            f"Checking expired roles: type={role_type}, specific_ids={role_ids}"
+        )
 
         # Lista powiadomień do wysłania po commit
         notifications_to_send = []
 
         try:
             # Zapamiętaj poprzedni stan pominiętych członków dla tego klucza
-            previous_skipped_ids = RoleManager._last_check_results.get(check_key, {}).get(
-                "skipped_member_ids", set()
-            )
+            previous_skipped_ids = RoleManager._last_check_results.get(
+                check_key, {}
+            ).get("skipped_member_ids", set())
 
             async with self.bot.get_db() as session:
                 # Pobierz wygasłe role z bazy danych
@@ -118,7 +122,9 @@ class RoleManager:
                     # Sprawdź czy poprzednio było coś do zrobienia
                     last_stats = RoleManager._last_check_results.get(check_key, {})
                     if last_stats.get("expired_roles_count", 0) > 0:
-                        logger.info("No expired roles found (changed from previous check)")
+                        logger.info(
+                            "No expired roles found (changed from previous check)"
+                        )
                         RoleManager._last_check_results[check_key] = stats.copy()
                     return 0
 
@@ -126,9 +132,9 @@ class RoleManager:
                 stats["expired_roles_count"] = len(expired_roles)
 
                 # Sprawdź czy zmieniła się liczba wygasłych ról
-                last_expired_count = RoleManager._last_check_results.get(check_key, {}).get(
-                    "expired_roles_count", -1
-                )
+                last_expired_count = RoleManager._last_check_results.get(
+                    check_key, {}
+                ).get("expired_roles_count", -1)
                 if last_expired_count != stats["expired_roles_count"]:
                     logger.info(
                         f"Found {stats['expired_roles_count']} expired roles to process (changed from {last_expired_count})"
@@ -155,9 +161,14 @@ class RoleManager:
                         member = member_data_map[member_role.member_id]["member"]
                     else:
                         try:
-                            member = await self.bot.guild.fetch_member(member_role.member_id)
+                            member = await self.bot.guild.fetch_member(
+                                member_role.member_id
+                            )
                             # Zapisz pobranego użytkownika, aby uniknąć wielokrotnego fetchowania
-                            member_data_map[member_role.member_id] = {"member": member, "roles": []}
+                            member_data_map[member_role.member_id] = {
+                                "member": member,
+                                "roles": [],
+                            }
                         except discord.NotFound:
                             logger.info(
                                 f"Member with ID {member_role.member_id} not found (left server?), skipping role {member_role.role_id} and cleaning DB."
@@ -191,7 +202,9 @@ class RoleManager:
                                     )
                             continue
                         except Exception as e:
-                            logger.error(f"Error fetching member {member_role.member_id}: {e}")
+                            logger.error(
+                                f"Error fetching member {member_role.member_id}: {e}"
+                            )
                             stats["non_existent_members"] += 1
                             stats["skipped_member_ids"].add(member_role.member_id)
                             # Don't delete from DB on unknown error, might be temporary
@@ -253,7 +266,9 @@ class RoleManager:
                         # Jeśli to była rola premium, wyczyść również uprawnienia i teamy
                         if role_type == "premium":
                             try:
-                                from cogs.commands.info import remove_premium_role_mod_permissions
+                                from cogs.commands.info import (
+                                    remove_premium_role_mod_permissions,
+                                )
 
                                 await remove_premium_role_mod_permissions(
                                     session, self.bot, member.id
@@ -270,7 +285,9 @@ class RoleManager:
 
                     # Dodaj parę (member_role, role) do listy ról użytkownika
                     # This part is reached only if member exists, role exists, and member has the role.
-                    member_data_map[member_role.member_id]["roles"].append((member_role, role))
+                    member_data_map[member_role.member_id]["roles"].append(
+                        (member_role, role)
+                    )
 
                 # Przetwarzaj role pogrupowane według użytkowników
                 for member_id, data in member_data_map.items():
@@ -324,7 +341,9 @@ class RoleManager:
 
                                 notification_tag = f"{role_type or 'role'}_expired"
                                 await NotificationLogQueries.add_or_update_notification_log(
-                                    session, member_role_db_entry.member_id, notification_tag
+                                    session,
+                                    member_role_db_entry.member_id,
+                                    notification_tag,
                                 )
 
                                 # Przygotuj powiadomienie do wysłania PO commit
@@ -347,14 +366,20 @@ class RoleManager:
                                 # Nie chcemy, aby błąd przy jednej roli zatrzymał przetwarzanie innych.
 
                         # Logika związana z mutenick po pomyślnym usunięciu ról
-                        if nick_mute_role_id:  # Sprawdź tylko jeśli mutenick jest skonfigurowany
+                        if (
+                            nick_mute_role_id
+                        ):  # Sprawdź tylko jeśli mutenick jest skonfigurowany
                             await asyncio.sleep(
                                 0.5
                             )  # Daj Discordowi chwilę na przetworzenie usunięcia ról
                             # Pobierz świeży obiekt członka, aby mieć pewność co do aktualnych ról i nicku
                             try:
-                                updated_member = await self.bot.guild.fetch_member(member.id)
-                                if not updated_member:  # Na wypadek gdyby fetch_member zwrócił None
+                                updated_member = await self.bot.guild.fetch_member(
+                                    member.id
+                                )
+                                if (
+                                    not updated_member
+                                ):  # Na wypadek gdyby fetch_member zwrócił None
                                     logger.warning(
                                         f"Could not fetch updated member {member.id} after role removal, skipping nick logic."
                                     )
@@ -374,7 +399,9 @@ class RoleManager:
                             member_roles_after_removal = updated_member.roles
 
                             has_nick_mute_role_after_removal = (
-                                discord.utils.get(member_roles_after_removal, id=nick_mute_role_id)
+                                discord.utils.get(
+                                    member_roles_after_removal, id=nick_mute_role_id
+                                )
                                 is not None
                             )
                             was_nick_mute_role_removed = any(
@@ -400,7 +427,10 @@ class RoleManager:
                                 # Jeśli nick nie był domyślnym nickiem wyciszenia, nie robimy nic - użytkownik mógł go zmienić.
 
                             # Scenariusz 2: Inna rola wygasła, ale użytkownik nadal ma mutenick i miał domyślny nick
-                            elif has_nick_mute_role_after_removal and current_nick == default_nick:
+                            elif (
+                                has_nick_mute_role_after_removal
+                                and current_nick == default_nick
+                            ):
                                 # Ten warunek jest bardziej precyzyjny - sprawdzamy czy *nadal* ma mutenick
                                 # i czy *nadal* ma domyślny nick. Jeśli tak, upewniamy się, że nick jest zachowany.
                                 # Teoretycznie, jeśli nic się nie zmieniło z nickiem, ponowne edit nie jest konieczne,
@@ -460,7 +490,9 @@ class RoleManager:
                 stats_changed = False
 
                 # Sprawdź czy zmieniła się liczba pominiętych ról dla nieistniejących użytkowników
-                if stats["non_existent_members"] != last_stats.get("non_existent_members", -1):
+                if stats["non_existent_members"] != last_stats.get(
+                    "non_existent_members", -1
+                ):
                     stats_changed = True
                     if stats["non_existent_members"] > 0:
                         logger.info(
@@ -468,7 +500,9 @@ class RoleManager:
                         )
 
                 # Sprawdź czy zmieniła się liczba pominiętych nieistniejących ról
-                if stats["non_existent_roles"] != last_stats.get("non_existent_roles", -1):
+                if stats["non_existent_roles"] != last_stats.get(
+                    "non_existent_roles", -1
+                ):
                     stats_changed = True
                     if stats["non_existent_roles"] > 0:
                         logger.info(
@@ -476,7 +510,9 @@ class RoleManager:
                         )
 
                 # Sprawdź czy zmieniła się liczba pominiętych nieprzypisanych ról
-                if stats["roles_not_assigned"] != last_stats.get("roles_not_assigned", -1):
+                if stats["roles_not_assigned"] != last_stats.get(
+                    "roles_not_assigned", -1
+                ):
                     stats_changed = True
                     if stats["roles_not_assigned"] > 0:
                         logger.info(
@@ -514,7 +550,9 @@ class RoleManager:
             logger.error(f"Error in check_expired_roles: {e}", exc_info=True)
             return 0
 
-    async def send_default_notification(self, member: discord.Member, role: discord.Role):
+    async def send_default_notification(
+        self, member: discord.Member, role: discord.Role
+    ):
         """Wysyła domyślne powiadomienie o wygaśnięciu roli.
 
         :param member: Użytkownik, któremu wygasła rola
@@ -525,15 +563,16 @@ class RoleManager:
         try:
             # Sprawdź, czy to rola wyciszenia
             is_mute_role = any(
-                role.id == mute_role["id"] for mute_role in self.config.get("mute_roles", [])
+                role.id == mute_role["id"]
+                for mute_role in self.config.get("mute_roles", [])
             )
 
             if is_mute_role:
-                message = (
-                    f"Twoje wyciszenie ({role.name}) wygasło i zostało automatycznie usunięte."
-                )
+                message = f"Twoje wyciszenie ({role.name}) wygasło i zostało automatycznie usunięte."
             else:
-                message = f"Twoja rola {role.name} wygasła i została automatycznie usunięta."
+                message = (
+                    f"Twoja rola {role.name} wygasła i została automatycznie usunięta."
+                )
 
             await self.send_notification(member, message)
 
@@ -552,7 +591,9 @@ class RoleManager:
             if not self.force_channel_notifications:
                 # Wysyłanie DM
                 await member.send(message)
-                logger.info(f"Sent DM notification to {member.display_name} ({member.id})")
+                logger.info(
+                    f"Sent DM notification to {member.display_name} ({member.id})"
+                )
             else:
                 # Wysyłanie na kanał
                 channel = self.bot.get_channel(self.notification_channel_id)
@@ -561,9 +602,13 @@ class RoleManager:
                         f"[Kanał] {member.mention}, {message}",
                         allowed_mentions=AllowedMentions(users=False),
                     )
-                    logger.info(f"Sent channel notification to {member.display_name} ({member.id})")
+                    logger.info(
+                        f"Sent channel notification to {member.display_name} ({member.id})"
+                    )
                 else:
-                    logger.error(f"Notification channel {self.notification_channel_id} not found")
+                    logger.error(
+                        f"Notification channel {self.notification_channel_id} not found"
+                    )
         except discord.Forbidden:
             logger.warning(f"Could not send DM to {member.display_name} ({member.id})")
             # Fallback do powiadomienia na kanał

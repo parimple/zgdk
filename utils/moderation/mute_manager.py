@@ -55,11 +55,15 @@ class MuteManager:
         # This is important to handle users with changed nicknames correctly
         user = ctx.guild.get_member(user.id)
         if not user:
-            logger.error(f"Could not find user with ID {user.id} in guild. Aborting mute.")
+            logger.error(
+                f"Could not find user with ID {user.id} in guild. Aborting mute."
+            )
             await ctx.send("Nie można znaleźć tego użytkownika na serwerze.")
             return
 
-        logger.info(f"Muting user {user.id} ({user.display_name}) with type {mute_type_name}")
+        logger.info(
+            f"Muting user {user.id} ({user.display_name}) with type {mute_type_name}"
+        )
         await self._handle_mute_logic(ctx, user, mute_type, duration, unmute=False)
 
     async def unmute_user(self, ctx, user, mute_type_name):
@@ -78,11 +82,15 @@ class MuteManager:
         # This is important to handle users with changed nicknames correctly
         user = ctx.guild.get_member(user.id)
         if not user:
-            logger.error(f"Could not find user with ID {user.id} in guild. Aborting unmute.")
+            logger.error(
+                f"Could not find user with ID {user.id} in guild. Aborting unmute."
+            )
             await ctx.send("Nie można znaleźć tego użytkownika na serwerze.")
             return
 
-        logger.info(f"Unmuting user {user.id} ({user.display_name}) with type {mute_type_name}")
+        logger.info(
+            f"Unmuting user {user.id} ({user.display_name}) with type {mute_type_name}"
+        )
         await self._handle_mute_logic(ctx, user, mute_type, unmute=True)
 
     async def _handle_mute_logic(
@@ -108,8 +116,12 @@ class MuteManager:
         """
         try:
             # Check if target is a moderator or admin
-            has_mod_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["mod"])
-            has_admin_role = discord.utils.get(user.roles, id=self.config["admin_roles"]["admin"])
+            has_mod_role = discord.utils.get(
+                user.roles, id=self.config["admin_roles"]["mod"]
+            )
+            has_admin_role = discord.utils.get(
+                user.roles, id=self.config["admin_roles"]["admin"]
+            )
 
             # Only admins can mute mods, and nobody can mute admins
             if has_admin_role:
@@ -121,7 +133,9 @@ class MuteManager:
                 ctx.author.roles, id=self.config["admin_roles"]["admin"]
             ):
                 action = "zarządzać" if unmute else "zablokować"
-                await ctx.send(f"Tylko administrator może {action} uprawnienia moderatora.")
+                await ctx.send(
+                    f"Tylko administrator może {action} uprawnienia moderatora."
+                )
                 return
 
             # Get role ID based on config
@@ -192,8 +206,12 @@ class MuteManager:
                 # Apply mute - Optymalizacja operacji na rolach
 
                 # Sprawdź czy użytkownik ma już rolę mutenick (rola o indeksie 2 w konfiguracji)
-                nick_mute_role_id = self.config["mute_roles"][2]["id"]  # ID roli mutenick (☢︎)
-                has_nick_mute = discord.utils.get(user.roles, id=nick_mute_role_id) is not None
+                nick_mute_role_id = self.config["mute_roles"][2][
+                    "id"
+                ]  # ID roli mutenick (☢︎)
+                has_nick_mute = (
+                    discord.utils.get(user.roles, id=nick_mute_role_id) is not None
+                )
                 default_nick = self.config.get("default_mute_nickname", "random")
 
                 # Sprawdź aktualny nick użytkownika
@@ -210,7 +228,9 @@ class MuteManager:
 
                 if roles_to_remove:
                     # Jeśli są role do usunięcia, usuń je
-                    await user.remove_roles(*roles_to_remove, reason=mute_type.reason_add)
+                    await user.remove_roles(
+                        *roles_to_remove, reason=mute_type.reason_add
+                    )
 
                 # Dodaj rolę wyciszenia jako osobną operację (by uniknąć błędów API)
                 await user.add_roles(mute_role, reason=mute_type.reason_add)
@@ -255,9 +275,7 @@ class MuteManager:
                             logger.info(
                                 f"Nadpisuję wygasłą blokadę dla {user.id} (wygasła {now - existing_role.expiration_date} temu)"
                             )
-                            override_info = (
-                                "\nNadpisano wygasłą blokadę, która już powinna zostać usunięta."
-                            )
+                            override_info = "\nNadpisano wygasłą blokadę, która już powinna zostać usunięta."
                         else:
                             # Role still active, format with Discord timestamp
                             discord_timestamp = discord.utils.format_dt(
@@ -324,7 +342,9 @@ class MuteManager:
                         self._execute_special_actions(ctx, user, mute_type)
                     )
                     # Dodaj identyfikator użytkownika do nazwy zadania dla lepszego debugowania
-                    special_task.set_name(f"special_actions_{user.id}_{mute_type.type_name}")
+                    special_task.set_name(
+                        f"special_actions_{user.id}_{mute_type.type_name}"
+                    )
 
             # Add premium info to message
             _, premium_text = MessageSender._get_premium_text(ctx)
@@ -412,7 +432,11 @@ class MuteManager:
                     logger.error(f"Error changing nickname for user {user.id}: {e}")
 
             # Check if user needs to be moved to AFK and back to force stream permission update
-            if "move_to_afk_and_back" in special_actions and user.voice and user.voice.channel:
+            if (
+                "move_to_afk_and_back" in special_actions
+                and user.voice
+                and user.voice.channel
+            ):
                 # Get the AFK channel ID from config
                 afk_channel_id = self.config["channels_voice"]["afk"]
                 afk_channel = self.bot.get_channel(afk_channel_id)
@@ -454,7 +478,9 @@ class MuteManager:
                             f"Error moving user {user.id} for stream permission update: {e}"
                         )
         except Exception as e:
-            logger.error(f"Error during special actions for user {user.id}: {e}", exc_info=True)
+            logger.error(
+                f"Error during special actions for user {user.id}: {e}", exc_info=True
+            )
 
     def parse_duration(self, duration_str: str) -> Optional[timedelta]:
         """Parsuje ciąg znakowy reprezentujący czas trwania do obiektu timedelta.
@@ -484,7 +510,9 @@ class MuteManager:
 
         if not matches:
             # If no valid format found, default to 1 hour
-            logger.warning(f"Invalid duration format: {duration_str}, using default 1 hour")
+            logger.warning(
+                f"Invalid duration format: {duration_str}, using default 1 hour"
+            )
             return timedelta(hours=1)
 
         for value, unit in matches:
@@ -525,7 +553,9 @@ class MuteManager:
                     f"Przywrócono domyślny nick {default_nick} dla użytkownika {user.id} (aktualny był: {current_nick})"
                 )
         except discord.Forbidden:
-            logger.warning(f"Nie mogę przywrócić domyślnego nicku dla użytkownika {user.id}")
+            logger.warning(
+                f"Nie mogę przywrócić domyślnego nicku dla użytkownika {user.id}"
+            )
         except Exception as e:
             logger.error(
                 f"Błąd podczas przywracania domyślnego nicku dla użytkownika {user.id}: {e}"
@@ -583,7 +613,9 @@ class MuteManager:
                         f"user {user.id}, moderator {ctx.author.id}, type {mute_type.type_name}"
                     )
             except Exception as db_error:
-                logger.error(f"Error saving mute action to database: {db_error}", exc_info=True)
+                logger.error(
+                    f"Error saving mute action to database: {db_error}", exc_info=True
+                )
                 # Kontynuuj z logowaniem na kanale nawet jeśli baza danych zawiedzie
 
             # Pobierz odpowiedni kanał logów z konfiguracji w zależności od typu akcji
@@ -649,7 +681,9 @@ class MuteManager:
             )
 
             embed.add_field(
-                name="📍 Kanał", value=f"{ctx.channel.mention} (`{ctx.channel.name}`)", inline=False
+                name="📍 Kanał",
+                value=f"{ctx.channel.mention} (`{ctx.channel.name}`)",
+                inline=False,
             )
 
             # Dodaj thumbnail z avatarem użytkownika

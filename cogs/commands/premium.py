@@ -207,7 +207,9 @@ class PremiumCog(commands.Cog):
                 f"Nieznany kolor: `{color_string}`. Użyj nazwy angielskiej, polskiej lub kodu HEX (np. `#FF5733`)."
             )
 
-    async def update_user_color_role(self, member: discord.Member, color: discord.Color):
+    async def update_user_color_role(
+        self, member: discord.Member, color: discord.Color
+    ):
         """
         Creates or updates a user's color role.
 
@@ -235,7 +237,9 @@ class PremiumCog(commands.Cog):
 
             # Create the role
             new_role = await member.guild.create_role(
-                name=role_name, color=color, reason=f"Color role for {member.display_name}"
+                name=role_name,
+                color=color,
+                reason=f"Color role for {member.display_name}",
             )
 
             # Move the role above the base role
@@ -287,7 +291,9 @@ class PremiumCog(commands.Cog):
         team_role = await self._get_user_team_role(ctx.author)
 
         # Lista dostępnych komend
-        available_commands = f"**Dostępne komendy:**\n" f"{self._get_team_commands_description()}"
+        available_commands = (
+            f"**Dostępne komendy:**\n" f"{self._get_team_commands_description()}"
+        )
 
         if not team_role:
             # Create description
@@ -368,15 +374,21 @@ class PremiumCog(commands.Cog):
                 # 4. Ustawienie pozycji roli
                 base_role = ctx.guild.get_role(self.team_base_role_id)
                 if base_role:
-                    await ctx.guild.edit_role_positions({team_role: base_role.position + 1})
+                    await ctx.guild.edit_role_positions(
+                        {team_role: base_role.position + 1}
+                    )
                 else:
                     # Fallback: ustaw pod najwyższą rolą, którą bot może zarządzać
                     assignable_roles = [
-                        r for r in ctx.guild.roles if r.position < ctx.guild.me.top_role.position
+                        r
+                        for r in ctx.guild.roles
+                        if r.position < ctx.guild.me.top_role.position
                     ]
                     if assignable_roles:
                         highest_role = max(assignable_roles, key=lambda r: r.position)
-                        await ctx.guild.edit_role_positions({team_role: highest_role.position - 1})
+                        await ctx.guild.edit_role_positions(
+                            {team_role: highest_role.position - 1}
+                        )
 
                 # 5. Przypisanie roli do użytkownika
                 await ctx.author.add_roles(team_role)
@@ -418,11 +430,15 @@ class PremiumCog(commands.Cog):
                     discord_color = await self.parse_color(color)
                     await team_role.edit(color=discord_color)
                 except ValueError as e:
-                    await self._send_premium_embed(ctx, description=str(e), color=0xFF0000)
+                    await self._send_premium_embed(
+                        ctx, description=str(e), color=0xFF0000
+                    )
 
         # 8. Ustaw emoji jeśli został podany i użytkownik ma rangę zG1000
         if emoji:
-            has_emoji_permission = any(role.name == "zG1000" for role in ctx.author.roles)
+            has_emoji_permission = any(
+                role.name == "zG1000" for role in ctx.author.roles
+            )
             if not has_emoji_permission:
                 await self._send_premium_embed(
                     ctx,
@@ -443,7 +459,9 @@ class PremiumCog(commands.Cog):
         # 8. Ustaw kanał teamu
         category = ctx.guild.get_channel(self.team_category_id)
         if not category:
-            logger.error(f"Nie znaleziono kategorii teamów o ID {self.team_category_id}")
+            logger.error(
+                f"Nie znaleziono kategorii teamów o ID {self.team_category_id}"
+            )
             category = None
 
         # Create channel permissions
@@ -477,7 +495,9 @@ class PremiumCog(commands.Cog):
         # Dodaj prefix teamu dla lepszej organizacji
         channel_name = f"{self.team_symbol}-{channel_name}"
 
-        logger.info(f"Aktualizacja nazwy kanału teamu z {team_channel.name} na {channel_name}")
+        logger.info(
+            f"Aktualizacja nazwy kanału teamu z {team_channel.name} na {channel_name}"
+        )
         await team_channel.edit(name=channel_name)
 
         # Informacja o przynależności do innego teamu
@@ -505,9 +525,13 @@ class PremiumCog(commands.Cog):
         team_info_embed = discord.Embed(
             title=f"Team **{self.team_symbol} {name}**",
             description="Witaj w twoim nowym teamie! Oto informacje o nim:",
-            color=team_role.color if team_role.color.value != 0 else discord.Color.blue(),
+            color=team_role.color
+            if team_role.color.value != 0
+            else discord.Color.blue(),
         )
-        team_info_embed.add_field(name="Właściciel", value=ctx.author.mention, inline=True)
+        team_info_embed.add_field(
+            name="Właściciel", value=ctx.author.mention, inline=True
+        )
         team_info_embed.add_field(name="Rola", value=team_role.mention, inline=True)
         team_info_embed.add_field(
             name="Data utworzenia",
@@ -517,7 +541,9 @@ class PremiumCog(commands.Cog):
 
         # Dodaj sekcję z komendami
         team_info_embed.add_field(
-            name="Dostępne komendy", value=self._get_team_commands_description(), inline=False
+            name="Dostępne komendy",
+            value=self._get_team_commands_description(),
+            inline=False,
         )
 
         # Dodaj informację o twojej roli
@@ -557,7 +583,9 @@ class PremiumCog(commands.Cog):
             )
 
         # Użyj metody pomocniczej do sprawdzenia uprawnień
-        has_perm, team_role, error_msg = await self._check_team_permissions(ctx, check_owner=True)
+        has_perm, team_role, error_msg = await self._check_team_permissions(
+            ctx, check_owner=True
+        )
         if not has_perm:
             return await self.message_sender.send_error(ctx, error_msg)
 
@@ -586,7 +614,9 @@ class PremiumCog(commands.Cog):
             await team_role.edit(name=new_team_name)
 
             # Znajdź i zaktualizuj kanał
-            team_channels = [c for c in ctx.guild.channels if isinstance(c, discord.TextChannel)]
+            team_channels = [
+                c for c in ctx.guild.channels if isinstance(c, discord.TextChannel)
+            ]
             team_channel = None
 
             for channel in team_channels:
@@ -610,7 +640,9 @@ class PremiumCog(commands.Cog):
                 # Aktualizuj nazwę kanału - usuń symbole specjalne i emoji, zachowaj tylko alfanumeryczne znaki
                 # Najpierw usuń symbol teamu i emoji jeśli istnieje
                 channel_parts = new_team_name.split()
-                actual_name = channel_parts[-1] if len(channel_parts) >= 2 else new_team_name
+                actual_name = (
+                    channel_parts[-1] if len(channel_parts) >= 2 else new_team_name
+                )
 
                 # Stwórz nazwę kanału zgodną z wymaganiami Discord (małe litery, cyfry, myślniki)
                 import re
@@ -656,14 +688,17 @@ class PremiumCog(commands.Cog):
     ):
         """Dodaj lub usuń członka teamu. Bez parametru + lub - działa jak przełącznik."""
         # Użyj metody pomocniczej do sprawdzenia uprawnień
-        has_perm, team_role, error_msg = await self._check_team_permissions(ctx, check_owner=True)
+        has_perm, team_role, error_msg = await self._check_team_permissions(
+            ctx, check_owner=True
+        )
         if not has_perm:
             return await self.message_sender.send_error(ctx, error_msg)
 
         # Sprawdź czy użytkownik nie próbuje dodać/usunąć samego siebie
         if target.id == ctx.author.id:
             return await self.message_sender.send_error(
-                ctx, "Nie możesz dodać/usunąć siebie z teamu - jesteś jego właścicielem."
+                ctx,
+                "Nie możesz dodać/usunąć siebie z teamu - jesteś jego właścicielem.",
             )
 
         # Sprawdź czy osoba jest już w teamie
@@ -680,11 +715,14 @@ class PremiumCog(commands.Cog):
             member_team = await self._get_user_team_role(target)
             if member_team:
                 return await self.message_sender.send_error(
-                    ctx, f"{target.mention} jest już członkiem teamu **{member_team.name}**."
+                    ctx,
+                    f"{target.mention} jest już członkiem teamu **{member_team.name}**.",
                 )
 
             # Sprawdź limit członków na podstawie roli właściciela
-            current_members = len([m for m in ctx.guild.members if team_role in m.roles])
+            current_members = len(
+                [m for m in ctx.guild.members if team_role in m.roles]
+            )
             team_size_limit = 0
 
             # Znajdź najwyższą rangę premium użytkownika i jej limit
@@ -707,7 +745,9 @@ class PremiumCog(commands.Cog):
                 await target.add_roles(team_role)
 
                 # Wyślij informację o sukcesie
-                description = f"Dodano **{target.mention}** do teamu **{team_role.mention}**!"
+                description = (
+                    f"Dodano **{target.mention}** do teamu **{team_role.mention}**!"
+                )
                 await self._send_premium_embed(ctx, description=description)
             except Exception as e:
                 logger.error(f"Błąd podczas dodawania członka do teamu: {str(e)}")
@@ -722,7 +762,9 @@ class PremiumCog(commands.Cog):
                 await target.remove_roles(team_role)
 
                 # Wyślij informację o sukcesie
-                description = f"Usunięto **{target.mention}** z teamu **{team_role.mention}**!"
+                description = (
+                    f"Usunięto **{target.mention}** z teamu **{team_role.mention}**!"
+                )
                 await self._send_premium_embed(ctx, description=description)
             except Exception as e:
                 logger.error(f"Błąd podczas usuwania członka z teamu: {str(e)}")
@@ -746,7 +788,9 @@ class PremiumCog(commands.Cog):
             ctx, required_role="zG500", check_owner=True
         )
         if not has_perm:
-            return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
+            return await self._send_premium_embed(
+                ctx, description=error_msg, color=0xFF0000
+            )
 
         # Jeśli nie podano koloru, usuń kolor roli (ustaw domyślny)
         if color is None:
@@ -770,7 +814,9 @@ class PremiumCog(commands.Cog):
             await team_role.edit(color=discord_color)
 
             # Wyślij informację o sukcesie
-            description = f"Zmieniono kolor teamu **{team_role.mention}** na **`{color}`**."
+            description = (
+                f"Zmieniono kolor teamu **{team_role.mention}** na **`{color}`**."
+            )
 
             # Użyj nowej metody do wysłania wiadomości
             await self._send_premium_embed(ctx, description=description)
@@ -803,7 +849,9 @@ class PremiumCog(commands.Cog):
             ctx, required_role="zG1000"
         )
         if not has_perm:
-            return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
+            return await self._send_premium_embed(
+                ctx, description=error_msg, color=0xFF0000
+            )
 
         # Check if server has the required boost level for role icons (Level 2)
         if ctx.guild.premium_tier < 2:
@@ -866,7 +914,9 @@ class PremiumCog(commands.Cog):
                     emoji_id = int(emoji_id)
                     server_emoji = discord.utils.get(ctx.guild.emojis, id=emoji_id)
                     if not server_emoji:
-                        logger.warning(f"User tried to use emoji from another server: {emoji}")
+                        logger.warning(
+                            f"User tried to use emoji from another server: {emoji}"
+                        )
                         return await self._send_premium_embed(
                             ctx,
                             description=f"Możesz używać tylko emoji, które są dostępne na tym serwerze.",
@@ -902,19 +952,27 @@ class PremiumCog(commands.Cog):
                     try:
                         emoji_id = parts[-1]
                         int(emoji_id)  # Sprawdź, czy to liczba
-                        logger.info(f"Emoji seems valid despite validator failure, ID: {emoji_id}")
+                        logger.info(
+                            f"Emoji seems valid despite validator failure, ID: {emoji_id}"
+                        )
                         # Jeśli dotarliśmy tutaj, to wygląda na poprawne emoji, kontynuuj mimo błędu walidacji
                     except (ValueError, IndexError):
                         return await self._send_premium_embed(
-                            ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
+                            ctx,
+                            description=f"`{emoji}` nie jest poprawnym emoji.",
+                            color=0xFF0000,
                         )
                 else:
                     return await self._send_premium_embed(
-                        ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
+                        ctx,
+                        description=f"`{emoji}` nie jest poprawnym emoji.",
+                        color=0xFF0000,
                     )
             else:
                 return await self._send_premium_embed(
-                    ctx, description=f"`{emoji}` nie jest poprawnym emoji.", color=0xFF0000
+                    ctx,
+                    description=f"`{emoji}` nie jest poprawnym emoji.",
+                    color=0xFF0000,
                 )
 
         # Jeśli przeszliśmy walidację, pobierz ikonę i zastosuj do roli
@@ -923,7 +981,9 @@ class PremiumCog(commands.Cog):
             await team_role.edit(display_icon=icon_bytes)
 
             # Wyślij informację o sukcesie
-            description = f"Ustawiono emoji {emoji} jako ikonę teamu **{team_role.mention}**!"
+            description = (
+                f"Ustawiono emoji {emoji} jako ikonę teamu **{team_role.mention}**!"
+            )
             await self._send_premium_embed(ctx, description=description)
             logger.info(f"Successfully set emoji as team icon for role {team_role.id}")
 
@@ -1051,8 +1111,9 @@ class PremiumCog(commands.Cog):
             for role in ctx.author.roles:
                 if role.name in premium_roles_hierarchy:
                     role_index = premium_roles_hierarchy.index(role.name)
-                    if user_highest_role is None or role_index > premium_roles_hierarchy.index(
-                        user_highest_role
+                    if (
+                        user_highest_role is None
+                        or role_index > premium_roles_hierarchy.index(user_highest_role)
                     ):
                         user_highest_role = role.name
 
@@ -1074,7 +1135,9 @@ class PremiumCog(commands.Cog):
                 has_sufficient_role = user_role_index >= min_required_index
             else:
                 # Jeśli nie możemy określić pozycji w hierarchii, użyj starej metody
-                has_sufficient_role = any(role.name in required_roles for role in ctx.author.roles)
+                has_sufficient_role = any(
+                    role.name in required_roles for role in ctx.author.roles
+                )
 
             if not has_sufficient_role:
                 if len(required_roles) == 1:
@@ -1147,7 +1210,10 @@ class PremiumCog(commands.Cog):
                         break
 
                     # Dla kompatybilności ze starym formatem
-                    elif "Team Channel" in channel.topic and str(owner_id) in channel.topic:
+                    elif (
+                        "Team Channel" in channel.topic
+                        and str(owner_id) in channel.topic
+                    ):
                         team_channel = channel
                         break
 

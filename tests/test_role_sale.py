@@ -53,7 +53,9 @@ class TestRoleSaleManager:
     """Test cases for RoleSaleManager."""
 
     @pytest.mark.asyncio
-    async def test_sell_role_success(self, mock_bot, mock_member, mock_role, mock_interaction):
+    async def test_sell_role_success(
+        self, mock_bot, mock_member, mock_role, mock_interaction
+    ):
         """Test successful role sale."""
         # Setup
         sale_manager = RoleSaleManager(mock_bot)
@@ -74,7 +76,9 @@ class TestRoleSaleManager:
         # Mock all the async operations
         with patch("utils.role_sale.RoleQueries") as mock_role_queries, patch(
             "utils.role_sale.MemberQueries"
-        ) as mock_member_queries, patch("utils.role_sale.calculate_refund", return_value=50):
+        ) as mock_member_queries, patch(
+            "utils.role_sale.calculate_refund", return_value=50
+        ):
             # Setup the database mock
             mock_bot.get_db.return_value = mock_context_manager
 
@@ -207,12 +211,16 @@ class TestRoleSaleManager:
         sale_manager = RoleSaleManager(mock_bot)
 
         # Test with None member
-        success, message, refund = await sale_manager.sell_role(None, MagicMock(), mock_interaction)
+        success, message, refund = await sale_manager.sell_role(
+            None, MagicMock(), mock_interaction
+        )
         assert success is False
         assert "Nieprawidłowe dane wejściowe" in message
 
         # Test with None role
-        success, message, refund = await sale_manager.sell_role(MagicMock(), None, mock_interaction)
+        success, message, refund = await sale_manager.sell_role(
+            MagicMock(), None, mock_interaction
+        )
         assert success is False
         assert "Nieprawidłowe dane wejściowe" in message
 

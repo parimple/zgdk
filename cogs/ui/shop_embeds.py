@@ -46,7 +46,8 @@ async def create_shop_embed(
 
     # User's current balance and ID (personalized)
     user_info = (
-        f"💠 **Twoje saldo:** {balance}{CURRENCY_UNIT}\n" f"🆔 **Twoje Discord ID:** {viewer.id}"
+        f"💠 **Twoje saldo:** {balance}{CURRENCY_UNIT}\n"
+        f"🆔 **Twoje Discord ID:** {viewer.id}"
     )
 
     # Current role information
@@ -54,27 +55,35 @@ async def create_shop_embed(
     if premium_roles:
         current_role, role_obj = premium_roles[0]
         expiration_date = discord.utils.format_dt(current_role.expiration_date, "D")
-        current_role_info = f"🗓 **Aktualna rola:** {role_obj.name} (ważna do {expiration_date})"
+        current_role_info = (
+            f"🗓 **Aktualna rola:** {role_obj.name} (ważna do {expiration_date})"
+        )
     else:
-        current_role_info = "🗓 **Aktualna rola:** Brak – pomyśl, czy nie warto dołączyć?"
+        current_role_info = (
+            "🗓 **Aktualna rola:** Brak – pomyśl, czy nie warto dołączyć?"
+        )
 
     # Available roles section with Cialdini techniques
     roles_section = "🔸 **Dostępne rangi:**"
     for role_name, price in role_price_map.items():
         if role_name == "zG100":
-            roles_section += f"\n• **{role_name}** – {price}{CURRENCY_UNIT} (najczęściej wybierana)"
+            roles_section += (
+                f"\n• **{role_name}** – {price}{CURRENCY_UNIT} (najczęściej wybierana)"
+            )
         elif role_name == "zG1000":
             roles_section += f"\n• **{role_name}** – {price}{CURRENCY_UNIT} (wyjątkowe przywileje dla wymagających)"
         else:
             roles_section += f"\n• **{role_name}** – {price}{CURRENCY_UNIT}"
 
     # Benefits and instructions
-    benefits = (
-        "🎁 **Przy zakupie lub przedłużeniu rangi – automatycznie zdejmujemy wszystkie blokady.**"
+    benefits = "🎁 **Przy zakupie lub przedłużeniu rangi – automatycznie zdejmujemy wszystkie blokady.**"
+    duration_info = (
+        "⏳ **Każda ranga trwa 30 dni – możesz w każdej chwili ją przedłużyć.**"
     )
-    duration_info = "⏳ **Każda ranga trwa 30 dni – możesz w każdej chwili ją przedłużyć.**"
     payment_instructions = f"📌 **Podczas wpłaty pamiętaj:** Wpisz swoje Discord ID ({viewer.id}) w polu 'Wpisz swój nick'"
-    auto_payment_info = "💳 **Wpłata 50zł = 50G** – automatycznie nadaje odpowiednią rangę!"
+    auto_payment_info = (
+        "💳 **Wpłata 50zł = 50G** – automatycznie nadaje odpowiednią rangę!"
+    )
     thanks = "🤝 **Dziękujemy, że wspierasz rozwój społeczności zaGadki!**"
 
     # Combine all sections
@@ -144,13 +153,19 @@ async def create_role_description_embed(
     # Dodatkowe informacje o roli
     if role.get("team_size", 0) > 0:
         embed.add_field(
-            name="Drużyna", value=f"Maksymalna liczba osób: {role['team_size']}", inline=True
+            name="Drużyna",
+            value=f"Maksymalna liczba osób: {role['team_size']}",
+            inline=True,
         )
     if role.get("moderator_count", 0) > 0:
         embed.add_field(
-            name="Moderatorzy", value=f"Liczba moderatorów: {role['moderator_count']}", inline=True
+            name="Moderatorzy",
+            value=f"Liczba moderatorów: {role['moderator_count']}",
+            inline=True,
         )
     if role.get("points_multiplier", 0) > 0:
-        embed.add_field(name="Bonus punktów", value=f"+{role['points_multiplier']}%", inline=True)
+        embed.add_field(
+            name="Bonus punktów", value=f"+{role['points_multiplier']}%", inline=True
+        )
 
     return embed

@@ -49,7 +49,9 @@ class VoiceChannelManager:
         limit_text = "brak limitu" if max_members == 0 else str(max_members)
         await self.message_sender.send_member_limit_set(ctx, voice_channel, limit_text)
 
-    async def get_channel_info(self, channel: discord.VoiceChannel, member: discord.Member):
+    async def get_channel_info(
+        self, channel: discord.VoiceChannel, member: discord.Member
+    ):
         """Get voice channel information including permissions and roles."""
         # Lista uprawnień do sprawdzenia
         permissions_to_check = {
@@ -80,7 +82,12 @@ class VoiceChannelManager:
             elif overwrite.manage_messages:
                 mods.append(member)
 
-        return {"channel": channel, "owner": owner, "mods": mods, "disabled_perms": disabled_perms}
+        return {
+            "channel": channel,
+            "owner": owner,
+            "mods": mods,
+            "disabled_perms": disabled_perms,
+        }
 
 
 class ChannelModManager:
@@ -99,7 +106,8 @@ class ChannelModManager:
             t
             for t, overwrite in voice_channel.overwrites.items()
             if isinstance(t, discord.Member)
-            and overwrite.manage_messages is True  # Musi być dokładnie True (nie None ani False)
+            and overwrite.manage_messages
+            is True  # Musi być dokładnie True (nie None ani False)
             and not (
                 overwrite.priority_speaker is True and t == ctx.author
             )  # Wykluczamy tylko właściciela kanału
@@ -125,7 +133,9 @@ class ChannelModManager:
             await self.message_sender.send_not_in_voice_channel(ctx)
             return False
 
-        if not await self.permission_manager.can_assign_channel_mod(author, voice_channel):
+        if not await self.permission_manager.can_assign_channel_mod(
+            author, voice_channel
+        ):
             await self.message_sender.send_no_mod_permission(ctx)
             return False
 
@@ -135,7 +145,9 @@ class ChannelModManager:
 
         return True
 
-    async def can_add_mod(self, user: discord.Member, voice_channel: discord.VoiceChannel) -> bool:
+    async def can_add_mod(
+        self, user: discord.Member, voice_channel: discord.VoiceChannel
+    ) -> bool:
         """
         Check if user can add another moderator (limit not exceeded).
 
