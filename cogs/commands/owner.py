@@ -59,7 +59,9 @@ class OwnerCog(commands.Cog):
         # Restartuj proces Pythona
         os.execv(sys.executable, ["python"] + sys.argv)
 
-    @commands.hybrid_command(name="reload", description="Przeładuj wybrane lub wszystkie cogi.")
+    @commands.hybrid_command(
+        name="reload", description="Przeładuj wybrane lub wszystkie cogi."
+    )
     @is_zagadka_owner()
     @app_commands.describe(
         cog_name="Nazwa coga do przeładowania (opcjonalne, bez .py)",
@@ -124,7 +126,9 @@ class OwnerCog(commands.Cog):
         # Przygotuj embed z wynikami
         embed = discord.Embed(
             title="Status przeładowania cogów",
-            color=discord.Color.green() if all(r[1] for r in results) else discord.Color.red(),
+            color=discord.Color.green()
+            if all(r[1] for r in results)
+            else discord.Color.red(),
         )
 
         # Dodaj pola dla sukcesu i błędów
@@ -166,7 +170,9 @@ class OwnerCog(commands.Cog):
             payment = await HandledPaymentQueries.get_payment_by_id(session, id_wplaty)
 
             if not payment:
-                await ctx.send(f"Nie znaleziono wpłaty o ID: `{id_wplaty}`", ephemeral=True)
+                await ctx.send(
+                    f"Nie znaleziono wpłaty o ID: `{id_wplaty}`", ephemeral=True
+                )
                 return
 
             if payment.member_id is not None:
@@ -193,7 +199,9 @@ class OwnerCog(commands.Cog):
                 # Wyszukanie OnPaymentEvent coga, aby użyć jego metod
                 payment_cog = self.bot.get_cog("OnPaymentEvent")
                 if not payment_cog:
-                    await ctx.send("Błąd: Nie można znaleźć coga OnPaymentEvent.", ephemeral=True)
+                    await ctx.send(
+                        "Błąd: Nie można znaleźć coga OnPaymentEvent.", ephemeral=True
+                    )
                     return
 
                 # Użycie istniejącej logiki do obsługi płatności
@@ -211,7 +219,9 @@ class OwnerCog(commands.Cog):
                 logger.error(
                     f"Error manually assigning payment {id_wplaty} by {ctx.author.display_name}: {e}"
                 )
-                await ctx.send(f"Wystąpił błąd podczas przypisywania wpłaty: {e}", ephemeral=True)
+                await ctx.send(
+                    f"Wystąpił błąd podczas przypisywania wpłaty: {e}", ephemeral=True
+                )
 
 
 async def setup(bot: commands.Bot):

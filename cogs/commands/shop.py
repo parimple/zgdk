@@ -30,7 +30,9 @@ class ShopCog(commands.Cog):
         async with self.bot.get_db() as session:
             db_viewer = await MemberQueries.get_or_add_member(session, viewer.id)
             balance = db_viewer.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(session, target_member.id)
+            premium_roles = await RoleQueries.get_member_premium_roles(
+                session, target_member.id
+            )
             await session.commit()
 
         view = RoleShopView(
@@ -74,7 +76,9 @@ class ShopCog(commands.Cog):
                 payment_data.payment_type,
             )
             await MemberQueries.get_or_add_member(session, user.id)
-            await MemberQueries.add_to_wallet_balance(session, user.id, payment_data.amount)
+            await MemberQueries.add_to_wallet_balance(
+                session, user.id, payment_data.amount
+            )
             await session.commit()
 
         await ctx.reply(f"Dodano {amount} do portfela {user.mention}.")
@@ -88,7 +92,9 @@ class ShopCog(commands.Cog):
 
             if payment:
                 payment.member_id = user.id
-                await MemberQueries.add_to_wallet_balance(session, user.id, payment.amount)
+                await MemberQueries.add_to_wallet_balance(
+                    session, user.id, payment.amount
+                )
                 await session.commit()
 
                 msg1 = (
@@ -108,7 +114,9 @@ class ShopCog(commands.Cog):
             else:
                 await ctx.send(f"Nie znaleziono płatności o ID: {payment_id}")
 
-    @commands.hybrid_command(name="payments", description="Wyświetla wszystkie płatności")
+    @commands.hybrid_command(
+        name="payments", description="Wyświetla wszystkie płatności"
+    )
     @is_admin()
     async def all_payments(self, ctx: Context):
         """Fetch and display the initial set of payments."""
@@ -131,7 +139,9 @@ class ShopCog(commands.Cog):
         await ctx.send(embed=embed, view=view)
 
     @commands.command(
-        name="set_role_expiry", description="Ustawia czas wygaśnięcia roli", aliases=["sr"]
+        name="set_role_expiry",
+        description="Ustawia czas wygaśnięcia roli",
+        aliases=["sr"],
     )
     @is_admin()
     async def set_role_expiry(self, ctx: Context, member: discord.Member, hours: int):
@@ -144,7 +154,9 @@ class ShopCog(commands.Cog):
             hours: Liczba godzin do wygaśnięcia roli
         """
         async with self.bot.get_db() as session:
-            premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+            premium_roles = await RoleQueries.get_member_premium_roles(
+                session, member.id
+            )
 
             if not premium_roles:
                 await ctx.reply("Ten użytkownik nie ma żadnej roli premium.")
@@ -176,17 +188,23 @@ class ShopCog(commands.Cog):
         count = 0
 
         # Pobierz konfigurację ról premium
-        premium_role_names = {role["name"]: role for role in self.bot.config["premium_roles"]}
+        premium_role_names = {
+            role["name"]: role for role in self.bot.config["premium_roles"]
+        }
 
         # Znajdź role premium na serwerze
-        premium_roles = [role for role in ctx.guild.roles if role.name in premium_role_names]
+        premium_roles = [
+            role for role in ctx.guild.roles if role.name in premium_role_names
+        ]
 
         # Dla każdej roli premium
         for role in premium_roles:
             # Sprawdź członków z tą rolą
             for member in role.members:
                 async with self.bot.get_db() as session:
-                    db_role = await RoleQueries.get_member_role(session, member.id, role.id)
+                    db_role = await RoleQueries.get_member_role(
+                        session, member.id, role.id
+                    )
 
                     if not db_role or db_role.expiration_date <= now:
                         try:
@@ -200,7 +218,9 @@ class ShopCog(commands.Cog):
                                 f"Error removing role {role.name} from {member.display_name}: {str(e)}"
                             )
 
-        await ctx.reply(f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne.")
+        await ctx.reply(
+            f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne."
+        )
 
 
 async def setup(bot: commands.Bot):

@@ -20,7 +20,10 @@ class RoleSaleManager:
         self.bot = bot
 
     async def sell_role(
-        self, member: discord.Member, role: discord.Role, interaction: discord.Interaction
+        self,
+        member: discord.Member,
+        role: discord.Role,
+        interaction: discord.Interaction,
     ) -> Tuple[bool, str, Optional[int]]:
         """
         Sell a role for a member.
@@ -50,7 +53,9 @@ class RoleSaleManager:
             async with self.bot.get_db() as session:
                 try:
                     # Check if user has the role in database
-                    db_role = await RoleQueries.get_member_role(session, member.id, role.id)
+                    db_role = await RoleQueries.get_member_role(
+                        session, member.id, role.id
+                    )
                     if not db_role:
                         return False, "Nie posiadasz tej roli w bazie danych.", None
 
@@ -80,7 +85,9 @@ class RoleSaleManager:
 
                     # Add refund to wallet
                     if refund_amount > 0:
-                        await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
+                        await MemberQueries.add_to_wallet_balance(
+                            session, member.id, refund_amount
+                        )
 
                     # Remove premium role privileges
                     await self._remove_premium_privileges(session, member.id)

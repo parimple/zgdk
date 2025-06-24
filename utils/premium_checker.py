@@ -68,8 +68,12 @@ class PremiumChecker:
         """Check if user has active T (bypass)."""
         try:
             async with self.bot.get_db() as session:
-                bypass_until = await MemberQueries.get_voice_bypass_status(session, ctx.author.id)
-                return bypass_until is not None and bypass_until > datetime.now(timezone.utc)
+                bypass_until = await MemberQueries.get_voice_bypass_status(
+                    session, ctx.author.id
+                )
+                return bypass_until is not None and bypass_until > datetime.now(
+                    timezone.utc
+                )
         except Exception as e:
             logger.error(f"Error in has_active_bypass for user {ctx.author.id}: {e}")
             return False
@@ -77,7 +81,8 @@ class PremiumChecker:
     def has_booster_roles(self, ctx: commands.Context) -> bool:
         """Check if user has booster or invite role."""
         return any(
-            role.id in [self.BOOSTER_ROLE_ID, self.INVITE_ROLE_ID] for role in ctx.author.roles
+            role.id in [self.BOOSTER_ROLE_ID, self.INVITE_ROLE_ID]
+            for role in ctx.author.roles
         )
 
     def has_discord_invite_in_status(self, ctx: commands.Context) -> bool:
@@ -157,7 +162,9 @@ class PremiumChecker:
                 return False
 
             if not self.has_discord_invite_in_status(ctx):
-                logger.debug(f"User {ctx.author.id} does not have discord invite in status")
+                logger.debug(
+                    f"User {ctx.author.id} does not have discord invite in status"
+                )
                 return False
 
             # Check invite count (with validation like legacy system)
@@ -168,7 +175,9 @@ class PremiumChecker:
                 logger.debug(f"User {ctx.author.id} has {invite_count} valid invites")
                 return invite_count >= 4
         except Exception as e:
-            logger.error(f"Error in has_alternative_bypass_access for user {ctx.author.id}: {e}")
+            logger.error(
+                f"Error in has_alternative_bypass_access for user {ctx.author.id}: {e}"
+            )
             return False
 
     async def debug_alternative_access(self, ctx: commands.Context) -> str:
@@ -220,7 +229,9 @@ class PremiumChecker:
                 )
                 if guild_member.activities:
                     for i, activity in enumerate(guild_member.activities):
-                        debug_extra.append(f"Guild Activity {i}: {type(activity).__name__}")
+                        debug_extra.append(
+                            f"Guild Activity {i}: {type(activity).__name__}"
+                        )
                         if hasattr(activity, "name"):
                             debug_extra.append(f"  - name: {activity.name}")
         except Exception as e:
@@ -267,7 +278,10 @@ class PremiumChecker:
 
         async def predicate(ctx):
             # Skip checks for help/pomoc command
-            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
+            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in [
+                "help",
+                "pomoc",
+            ]:
                 return True
 
             # Skip checks for help context
@@ -342,7 +356,10 @@ class PremiumChecker:
 
         async def predicate(ctx):
             # Skip checks for help/pomoc command
-            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
+            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in [
+                "help",
+                "pomoc",
+            ]:
                 return True
 
             # Skip checks for help context
@@ -373,7 +390,9 @@ class PremiumChecker:
             if voice_channel:
                 perms = voice_channel.overwrites_for(ctx.author)
                 is_channel_mod = (
-                    perms and perms.manage_messages is True and perms.priority_speaker is not True
+                    perms
+                    and perms.manage_messages is True
+                    and perms.priority_speaker is not True
                 )
 
             # TIER_0 - Available to everyone without any requirements
@@ -391,7 +410,9 @@ class PremiumChecker:
             if command_tier == CommandTier.TIER_1:
                 if has_premium:
                     return True
-                if (has_booster or is_channel_mod) and (has_bypass or has_alternative_access):
+                if (has_booster or is_channel_mod) and (
+                    has_bypass or has_alternative_access
+                ):
                     return True
                 if has_booster or is_channel_mod:
                     await checker.message_sender.send_bypass_expired(ctx)
@@ -463,7 +484,10 @@ class PremiumChecker:
 
         async def predicate(ctx):
             # Skip checks for help/pomoc command
-            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
+            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in [
+                "help",
+                "pomoc",
+            ]:
                 return True
 
             # Skip checks for help context
@@ -473,10 +497,14 @@ class PremiumChecker:
             checker = PremiumChecker(ctx.bot)
 
             # Sprawdź czy użytkownik ma którąkolwiek z wymaganych ról
-            has_required_role = any(role.name in required_roles for role in ctx.author.roles)
+            has_required_role = any(
+                role.name in required_roles for role in ctx.author.roles
+            )
 
             if not has_required_role:
-                await checker.message_sender.send_specific_roles_required(ctx, required_roles)
+                await checker.message_sender.send_specific_roles_required(
+                    ctx, required_roles
+                )
                 return False
 
             return True

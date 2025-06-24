@@ -94,7 +94,9 @@ class BasePermissionCommand:
             return
 
         voice_channel = ctx.author.voice.channel
-        permission_level = await cog.permission_checker.check_permission_level(voice_channel, ctx)
+        permission_level = await cog.permission_checker.check_permission_level(
+            voice_channel, ctx
+        )
         self.logger.info(f"User permission level: {permission_level}")
 
         # Check if user has required permissions
@@ -115,7 +117,10 @@ class BasePermissionCommand:
             return
 
         # Block setting manage_messages for @everyone
-        if self.permission_name == "manage_messages" and target == ctx.guild.default_role:
+        if (
+            self.permission_name == "manage_messages"
+            and target == ctx.guild.default_role
+        ):
             await cog.message_sender.send_error(
                 ctx, "Nie można ustawić uprawnień moderatora dla @everyone!"
             )
@@ -173,16 +178,24 @@ class BasePermissionCommand:
                     and overwrite.manage_messages is True
                     and not overwrite.priority_speaker
                 ]
-                await cog.message_sender.send_mod_limit_exceeded(ctx, mod_limit, current_mods)
+                await cog.message_sender.send_mod_limit_exceeded(
+                    ctx, mod_limit, current_mods
+                )
                 return
 
         # Check if user can modify target's permissions
-        if not await cog.permission_checker.can_modify_permissions(voice_channel, ctx, target):
+        if not await cog.permission_checker.can_modify_permissions(
+            voice_channel, ctx, target
+        ):
             self.logger.info("User cannot modify target permissions")
             if permission_level == "mod":
-                if await cog.permission_checker.check_channel_owner(voice_channel, target):
+                if await cog.permission_checker.check_channel_owner(
+                    voice_channel, target
+                ):
                     await cog.message_sender.send_cant_modify_owner_permissions(ctx)
-                elif await cog.permission_checker.check_channel_mod(voice_channel, target):
+                elif await cog.permission_checker.check_channel_mod(
+                    voice_channel, target
+                ):
                     await cog.message_sender.send_cant_modify_mod_permissions(ctx)
                 else:
                     await cog.message_sender.send_no_permission(
@@ -230,7 +243,10 @@ class PermissionChecker:
 
         async def predicate(ctx):
             # Skip checks for help command and help context
-            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in ["help", "pomoc"]:
+            if ctx.command.name in ["help", "pomoc"] or ctx.invoked_with in [
+                "help",
+                "pomoc",
+            ]:
                 return True
 
             checker = ctx.cog.permission_checker
@@ -248,7 +264,9 @@ class PermissionChecker:
                 )
                 return False
             elif permission_level == "none":
-                await checker.message_sender.send_no_permission(ctx, "zarządzania tym kanałem!")
+                await checker.message_sender.send_no_permission(
+                    ctx, "zarządzania tym kanałem!"
+                )
                 return False
 
             return True
@@ -276,7 +294,9 @@ class PermissionChecker:
         perms = channel.overwrites_for(ctx.author)
         return perms and perms.manage_messages is True and not perms.priority_speaker
 
-    async def check_permission_level(self, channel, ctx) -> Literal["owner", "mod", "none"]:
+    async def check_permission_level(
+        self, channel, ctx
+    ) -> Literal["owner", "mod", "none"]:
         """
         Check user's permission level in the channel based on overwrites.
 
@@ -316,7 +336,9 @@ class PermissionChecker:
         elif permission_level == "mod" and target:
             target_perms = channel.overwrites_for(target)
             # Mods cannot modify owner or other mod permissions
-            if target_perms and (target_perms.priority_speaker or target_perms.manage_messages):
+            if target_perms and (
+                target_perms.priority_speaker or target_perms.manage_messages
+            ):
                 return False
             return True
         return False
@@ -347,7 +369,9 @@ class PermissionChecker:
                         mention = message_parts[2]
                         if mention.startswith("<@") and not mention.startswith("<@&"):
                             user_id = "".join(filter(str.isdigit, mention))
-                            target = ctx.guild.get_member(int(user_id)) if user_id else None
+                            target = (
+                                ctx.guild.get_member(int(user_id)) if user_id else None
+                            )
                         elif mention.isdigit():  # Handle raw user ID
                             target = ctx.guild.get_member(int(mention))
                         else:
@@ -468,7 +492,9 @@ class VoicePermissionManager:
         for cat_type in ["git_categories", "public_categories"]:
             cat_config = config.get(cat_type, {})
             if category_id in cat_config.get("categories", []):
-                self.logger.info(f"Found {cat_type} limit: {cat_config.get('limit', 0)}")
+                self.logger.info(
+                    f"Found {cat_type} limit: {cat_config.get('limit', 0)}"
+                )
                 return cat_config.get("limit", 0)
 
         # Sprawdź kategorie max
@@ -501,10 +527,14 @@ class VoicePermissionManager:
 
         # Special handling for @everyone role in channels that should have clean permissions
         if isinstance(target, discord.Role) and target.id == ctx.guild.id:
-            if current_channel.category and current_channel.category.id in self.bot.config.get(
-                "clean_permission_categories", []
+            if (
+                current_channel.category
+                and current_channel.category.id
+                in self.bot.config.get("clean_permission_categories", [])
             ):
-                current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
+                current_perms = (
+                    current_channel.overwrites_for(target) or PermissionOverwrite()
+                )
                 current_value = getattr(current_perms, permission_flag, None)
                 self.logger.info(f"Current @everyone permission value: {current_value}")
 
@@ -532,7 +562,13 @@ class VoicePermissionManager:
         current_perms = current_channel.overwrites_for(target) or PermissionOverwrite()
 
         new_value = self._determine_new_permission_value(
-            current_perms, permission_flag, value, default_to_true, toggle, ctx=ctx, target=target
+            current_perms,
+            permission_flag,
+            value,
+            default_to_true,
+            toggle,
+            ctx=ctx,
+            target=target,
         )
         self.logger.info(f"New permission value determined: {new_value}")
 
@@ -540,10 +576,16 @@ class VoicePermissionManager:
 
         # Aktualizuj uprawnienia na kanale i w bazie
         try:
-            await self._update_channel_permission(ctx, target, current_perms, permission_flag)
+            await self._update_channel_permission(
+                ctx, target, current_perms, permission_flag
+            )
         except Exception as e:
-            self.logger.error(f"Error updating channel permissions: {str(e)}", exc_info=True)
-            await self.message_sender.send_permission_update_error(ctx, target, permission_flag)
+            self.logger.error(
+                f"Error updating channel permissions: {str(e)}", exc_info=True
+            )
+            await self.message_sender.send_permission_update_error(
+                ctx, target, permission_flag
+            )
             return
 
         if permission_flag == "manage_messages":
@@ -621,7 +663,9 @@ class VoicePermissionManager:
 
             # Check @everyone permissions
             if ctx and ctx.author.voice and ctx.author.voice.channel:
-                everyone_perms = ctx.author.voice.channel.overwrites_for(ctx.guild.default_role)
+                everyone_perms = ctx.author.voice.channel.overwrites_for(
+                    ctx.guild.default_role
+                )
                 everyone_value = getattr(everyone_perms, permission_flag, None)
                 self.logger.info(f"@everyone permission value: {everyone_value}")
 
@@ -631,7 +675,9 @@ class VoicePermissionManager:
         # Default toggle behavior
         return self.TOGGLE_MAP[bool(current_value)](permission_flag)
 
-    async def _update_channel_permission(self, ctx, target, current_perms, permission_name):
+    async def _update_channel_permission(
+        self, ctx, target, current_perms, permission_name
+    ):
         """Updates the channel permissions."""
         self.logger.info(
             f"Updating channel permissions for target={target} in channel={ctx.author.voice.channel}"
@@ -677,7 +723,9 @@ class VoicePermissionManager:
                 await session.commit()
                 self.logger.info("Successfully committed database changes")
         except Exception as e:
-            self.logger.error(f"Error in _update_channel_permission: {str(e)}", exc_info=True)
+            self.logger.error(
+                f"Error in _update_channel_permission: {str(e)}", exc_info=True
+            )
             raise
 
     async def get_premium_role_limit(self, member):
@@ -687,11 +735,15 @@ class VoicePermissionManager:
 
         for role in reversed(premium_roles):
             if any(r.name == role["name"] for r in member.roles):
-                logger.info(f"Found matching role: {role}, limit: {role['moderator_count']}")
+                logger.info(
+                    f"Found matching role: {role}, limit: {role['moderator_count']}"
+                )
                 return role["moderator_count"]
         return 0
 
-    async def _move_to_afk_if_needed(self, ctx, target, target_channel, permission_flag, value):
+    async def _move_to_afk_if_needed(
+        self, ctx, target, target_channel, permission_flag, value
+    ):
         """Moves the target to the AFK channel if needed based on permission changes."""
         afk_channel_id = self.bot.config["channels_voice"]["afk"]
         afk_channel = ctx.guild.get_channel(afk_channel_id)
@@ -738,20 +790,30 @@ class VoicePermissionManager:
                 try:
                     await channel.edit(user_limit=user_limit)
                 except Exception as e:
-                    self.logger.error(f"Failed to set user limit: {str(e)}", exc_info=True)
+                    self.logger.error(
+                        f"Failed to set user limit: {str(e)}", exc_info=True
+                    )
 
         # Sprawdź czy kanał jest w kategorii gdzie @everyone ma mieć czyste permisje
-        clean_perms_category = channel.category and channel.category.id in self.bot.config.get(
-            "clean_permission_categories", []
+        clean_perms_category = (
+            channel.category
+            and channel.category.id
+            in self.bot.config.get("clean_permission_categories", [])
         )
         if clean_perms_category:
             # Ustaw czyste permisje dla @everyone
             clean_perms = self._get_clean_everyone_permissions()
             try:
-                await channel.set_permissions(channel.guild.default_role, overwrite=clean_perms)
-                self.logger.info(f"Set clean permissions for @everyone in channel {channel.name}")
+                await channel.set_permissions(
+                    channel.guild.default_role, overwrite=clean_perms
+                )
+                self.logger.info(
+                    f"Set clean permissions for @everyone in channel {channel.name}"
+                )
             except Exception as e:
-                self.logger.error(f"Failed to set clean permissions: {str(e)}", exc_info=True)
+                self.logger.error(
+                    f"Failed to set clean permissions: {str(e)}", exc_info=True
+                )
 
         # Dla kanałów publicznych nie synchronizujemy uprawnień z bazy
         if is_public:
@@ -811,8 +873,10 @@ class VoicePermissionManager:
         """
         remaining_overwrites = {}
         async with self.bot.get_db() as session:
-            member_permissions = await ChannelPermissionQueries.get_permissions_for_member(
-                session, member_id, limit=95
+            member_permissions = (
+                await ChannelPermissionQueries.get_permissions_for_member(
+                    session, member_id, limit=95
+                )
             )
             self.logger.info(
                 f"Found {len(member_permissions)} permissions in database for member {member_id}"
@@ -821,19 +885,25 @@ class VoicePermissionManager:
         for permission in member_permissions:
             # Skip @everyone permissions for clean_perms channels
             if is_clean_perms and permission.target_id == guild.id:
-                self.logger.info(f"Skipping @everyone permissions from DB for clean perms channel")
+                self.logger.info(
+                    f"Skipping @everyone permissions from DB for clean perms channel"
+                )
                 continue
 
             allow_permissions = discord.Permissions(permission.allow_permissions_value)
             deny_permissions = discord.Permissions(permission.deny_permissions_value)
-            overwrite = PermissionOverwrite.from_pair(allow_permissions, deny_permissions)
+            overwrite = PermissionOverwrite.from_pair(
+                allow_permissions, deny_permissions
+            )
             self.logger.info(
                 f"Processing permission for target {permission.target_id}: "
                 f"allow={permission.allow_permissions_value}, deny={permission.deny_permissions_value}"
             )
 
             # Convert target_id to appropriate Discord object
-            target = guild.get_member(permission.target_id) or guild.get_role(permission.target_id)
+            target = guild.get_member(permission.target_id) or guild.get_role(
+                permission.target_id
+            )
             if target:
                 if target in permission_overwrites:
                     # If target already exists in main permissions, add new permissions to it
@@ -852,12 +922,17 @@ class VoicePermissionManager:
 
         return remaining_overwrites
 
-    async def reset_channel_permissions(self, channel: discord.VoiceChannel, owner: discord.Member):
+    async def reset_channel_permissions(
+        self, channel: discord.VoiceChannel, owner: discord.Member
+    ):
         """Deleguje do channel_perm_manager."""
         await self.channel_perm_manager.reset_channel_permissions(channel, owner)
 
     async def reset_user_permissions(
-        self, channel: discord.VoiceChannel, owner: discord.Member, target: discord.Member
+        self,
+        channel: discord.VoiceChannel,
+        owner: discord.Member,
+        target: discord.Member,
     ):
         """Deleguje do channel_perm_manager."""
         await self.channel_perm_manager.reset_user_permissions(channel, owner, target)

@@ -59,7 +59,9 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
 
         # Member has both roles
         member.roles = [role1, role2]
-        guild.get_role.side_effect = lambda id: role1 if id == 789 else role2 if id == 101 else None
+        guild.get_role.side_effect = (
+            lambda id: role1 if id == 789 else role2 if id == 101 else None
+        )
 
         # Make remove_roles a coroutine mock
         member.remove_roles = AsyncMock()
@@ -87,7 +89,9 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(member.remove_roles.call_count, 1)
 
         # Verify database operations
-        mock_role_queries.delete_member_role.assert_called_with(self.session, member.id, role1.id)
+        mock_role_queries.delete_member_role.assert_called_with(
+            self.session, member.id, role1.id
+        )
 
         # Verify notification was sent
         notification_handler.assert_called_once()
@@ -130,7 +134,11 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
 
         # Member has all three roles
         member.roles = [role1, role2, role3]
-        guild.get_role.side_effect = lambda id: {789: role1, 790: role2, 791: role3}.get(id)
+        guild.get_role.side_effect = lambda id: {
+            789: role1,
+            790: role2,
+            791: role3,
+        }.get(id)
 
         # Make remove_roles a coroutine mock
         member.remove_roles = AsyncMock()
@@ -246,7 +254,9 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         # Debug: print what actually happened
         print(f"Debug: call_order = {call_order}")
         print(f"Debug: removed_count = {removed_count}")
-        print(f"Debug: track_notification_mock.call_count = {track_notification_mock.call_count}")
+        print(
+            f"Debug: track_notification_mock.call_count = {track_notification_mock.call_count}"
+        )
 
         # Verify notification was called after commit
         self.assertEqual(call_order, ["commit", "notification"])

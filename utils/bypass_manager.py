@@ -33,7 +33,9 @@ class BypassManager:
         """
         return await self._extend_bypass(member_id, hours=6)
 
-    async def _extend_bypass(self, member_id: int, hours: int = 12) -> Optional[datetime]:
+    async def _extend_bypass(
+        self, member_id: int, hours: int = 12
+    ) -> Optional[datetime]:
         """
         Internal method to extend voice bypass duration.
         Returns new expiration datetime or None if failed.
@@ -56,7 +58,9 @@ class BypassManager:
             async with self.bot.get_db() as session:
                 return await MemberQueries.get_voice_bypass_status(session, member_id)
         except Exception as e:
-            logger.error(f"Failed to get bypass status for member {member_id}: {str(e)}")
+            logger.error(
+                f"Failed to get bypass status for member {member_id}: {str(e)}"
+            )
             return None
 
     async def clear_bypass(self, member_id: int) -> bool:

@@ -64,7 +64,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             logger.error("Cannot find guild with ID %d", self.bot.guild_id)
             return
 
-        logger.info("Setting guild for VoicePermissionManager in OnVoiceStateUpdateEvent")
+        logger.info(
+            "Setting guild for VoicePermissionManager in OnVoiceStateUpdateEvent"
+        )
         self.permission_manager.guild = self.guild
 
         # Start autokick worker
@@ -78,7 +80,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             try:
                 # Pobierz zadanie z queue (czekaj max 1 sekundę)
                 try:
-                    autokick_data = await asyncio.wait_for(self.autokick_queue.get(), timeout=1.0)
+                    autokick_data = await asyncio.wait_for(
+                        self.autokick_queue.get(), timeout=1.0
+                    )
                 except asyncio.TimeoutError:
                     continue
 
@@ -109,20 +113,28 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                     break
 
             if not owner:
-                self.logger.warning(f"No owner found for autokick of member {member.id}")
+                self.logger.warning(
+                    f"No owner found for autokick of member {member.id}"
+                )
                 return
 
             # Move member to AFK channel
-            afk_channel = self.guild.get_channel(self.bot.config["channels_voice"]["afk"])
+            afk_channel = self.guild.get_channel(
+                self.bot.config["channels_voice"]["afk"]
+            )
             if afk_channel:
                 await member.move_to(afk_channel)
-                self.logger.info(f"Moved member {member.id} to AFK channel {afk_channel.id}")
+                self.logger.info(
+                    f"Moved member {member.id} to AFK channel {afk_channel.id}"
+                )
             else:
                 await member.move_to(None)
                 self.logger.info(f"Disconnected member {member.id} (no AFK channel)")
 
             # Set connect permission to False
-            current_perms = channel.overwrites_for(member) or discord.PermissionOverwrite()
+            current_perms = (
+                channel.overwrites_for(member) or discord.PermissionOverwrite()
+            )
             current_perms.connect = False
             await channel.set_permissions(member, overwrite=current_perms)
             self.logger.info(
@@ -147,7 +159,10 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
             if after.channel and after.channel.id in self.channels_create:
                 await self.handle_create_channel(member, after)
-            elif after.channel and after.channel.id == self.bot.config["channels_voice"]["afk"]:
+            elif (
+                after.channel
+                and after.channel.id == self.bot.config["channels_voice"]["afk"]
+            ):
                 return
 
         if (
@@ -166,7 +181,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         # self.logger.info(f"Checking autokick for member {member.id} in channel {channel.id}")
 
         # Check if member should be autokicked using AutoKickManager
-        should_kick, matching_owners = await self.autokick_manager.check_autokick(member, channel)
+        should_kick, matching_owners = await self.autokick_manager.check_autokick(
+            member, channel
+        )
         # self.logger.info(f"Should kick member {member.id}: {should_kick}")
 
         if should_kick and matching_owners:
@@ -212,7 +229,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             custom_format = formats.get(category_id) or formats.get(str(category_id))
 
             # Cache czy to kategoria clean permissions
-            is_clean_perms = category_id in self.bot.config.get("clean_permission_categories", [])
+            is_clean_perms = category_id in self.bot.config.get(
+                "clean_permission_categories", []
+            )
 
             self._category_config_cache[category_id] = {
                 "user_limit": user_limit,
@@ -239,7 +258,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                 and channel.id != self.bot.config["channels_voice"]["afk"]
             ]
             self._empty_channels_cache[category.id] = empty_channels
-            logger.info(f"Cached {len(empty_channels)} empty channels for category {category.name}")
+            logger.info(
+                f"Cached {len(empty_channels)} empty channels for category {category.name}"
+            )
         else:
             self.metrics["cache_hits"] += 1
 
@@ -269,7 +290,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             # Get random emoji
             emoji = random.choice(self.bot.config.get("channel_emojis", ["🎮"]))
             channel_name = config["custom_format"].format(emoji=emoji)
-            logger.info(f"Using cached format for category {category_id}: {channel_name}")
+            logger.info(
+                f"Using cached format for category {category_id}: {channel_name}"
+            )
         else:
             # Check if this is a git category
             git_categories = (
@@ -282,8 +305,10 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                 logger.info(f"Added dash prefix for git category: {channel_name}")
 
         # Get default permission overwrites
-        permission_overwrites = self.permission_manager.get_default_permission_overwrites(
-            self.guild, member
+        permission_overwrites = (
+            self.permission_manager.get_default_permission_overwrites(
+                self.guild, member
+            )
         )
 
         # Use cached user limit
@@ -295,7 +320,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             permission_overwrites[
                 self.guild.default_role
             ] = self.permission_manager._get_clean_everyone_permissions()
-            logger.info(f"Set clean permissions for @everyone in category {category_id}")
+            logger.info(
+                f"Set clean permissions for @everyone in category {category_id}"
+            )
 
         # Add permissions from database
         db_overwrites = await self.permission_manager.add_db_overwrites_to_permissions(
@@ -323,14 +350,18 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             # Najpierw ustaw uprawnienia właściciela
             owner_permissions = permission_overwrites.get(member, None)
             if owner_permissions:
-                await existing_channel.set_permissions(member, overwrite=owner_permissions)
+                await existing_channel.set_permissions(
+                    member, overwrite=owner_permissions
+                )
                 logger.info(f"Dodano uprawnienia właściciela dla {member.display_name}")
 
             # Następnie dodaj wszystkie inne uprawnienia z bazy danych
             for target, overwrite in permission_overwrites.items():
                 if target != member and target != self.guild.default_role:
                     # Pomiń role wyciszające (już są na kanale) i @everyone (już jest ustawiony)
-                    mute_role_ids = [role["id"] for role in self.bot.config["mute_roles"]]
+                    mute_role_ids = [
+                        role["id"] for role in self.bot.config["mute_roles"]
+                    ]
                     if isinstance(target, discord.Role) and target.id in mute_role_ids:
                         continue
 
@@ -341,7 +372,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             if db_overwrites:
                 for target, overwrite in db_overwrites.items():
                     await existing_channel.set_permissions(target, overwrite=overwrite)
-                    logger.info(f"Dodano dodatkowe uprawnienia z bazy danych dla {target}")
+                    logger.info(
+                        f"Dodano dodatkowe uprawnienia z bazy danych dla {target}"
+                    )
 
             # Przenieś członka do kanału
             await member.move_to(existing_channel)
@@ -372,7 +405,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
         # Send channel creation info
         fake_ctx = FakeContext(self.bot, member.guild)
-        await self.message_sender.send_channel_creation_info(new_channel, fake_ctx, owner=member)
+        await self.message_sender.send_channel_creation_info(
+            new_channel, fake_ctx, owner=member
+        )
 
     def cog_unload(self):
         """Cleanup when cog is unloaded"""
@@ -439,13 +474,17 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                     f"Liczba pustych kanałów w kategorii {before.channel.category.name}: {len(empty_channels)}"
                 )
 
-                if len(empty_channels) <= 3:  # Zachowaj kanał, jeśli pustych jest 3 lub mniej
+                if (
+                    len(empty_channels) <= 3
+                ):  # Zachowaj kanał, jeśli pustych jest 3 lub mniej
                     self.logger.info(
                         f"Zachowuję pusty kanał {before.channel.name} w kategorii {before.channel.category.name}"
                     )
 
                     # Zoptymalizacja: Przygotuj wszystkie zmiany uprawnień na raz
-                    clean_perms = self.permission_manager._get_clean_everyone_permissions()
+                    clean_perms = (
+                        self.permission_manager._get_clean_everyone_permissions()
+                    )
 
                     # Przygotuj słownik wszystkich uprawnień do ustawienia za jednym razem
                     new_overwrites = {}
@@ -454,9 +493,14 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                     new_overwrites[before.channel.guild.default_role] = clean_perms
 
                     # Zachowaj tylko uprawnienia dla ról wyciszających
-                    mute_role_ids = [role["id"] for role in self.bot.config["mute_roles"]]
+                    mute_role_ids = [
+                        role["id"] for role in self.bot.config["mute_roles"]
+                    ]
                     for target, overwrite in before.channel.overwrites.items():
-                        if isinstance(target, discord.Role) and target.id in mute_role_ids:
+                        if (
+                            isinstance(target, discord.Role)
+                            and target.id in mute_role_ids
+                        ):
                             new_overwrites[target] = overwrite
 
                     # Ustaw odpowiedni limit użytkowników
@@ -465,7 +509,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                     )
 
                     # Zastosuj wszystkie zmiany jednym wywołaniem API
-                    await before.channel.edit(overwrites=new_overwrites, user_limit=user_limit)
+                    await before.channel.edit(
+                        overwrites=new_overwrites, user_limit=user_limit
+                    )
 
                     # Zakończ funkcję, nie usuwając kanału
                     return

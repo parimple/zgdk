@@ -41,7 +41,9 @@ class TestMuteType(unittest.TestCase):
         self.assertEqual(nick_type.display_name, "nicku")
         self.assertEqual(nick_type.action_name, "zmiany nicku")
         self.assertEqual(nick_type.reason_add, "Niewłaściwy nick")
-        self.assertEqual(nick_type.reason_remove, "Przywrócenie możliwości zmiany nicku")
+        self.assertEqual(
+            nick_type.reason_remove, "Przywrócenie możliwości zmiany nicku"
+        )
         self.assertIsInstance(nick_type.success_message_add, str)
         self.assertIsInstance(nick_type.success_message_remove, str)
         self.assertEqual(nick_type.default_duration, timedelta(days=30))

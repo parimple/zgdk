@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 MONTHLY_DURATION = 30  # Base duration for monthly subscription
 
 
-def calculate_refund(expiration_date: datetime, role_price: int, role_name: str = None) -> int:
+def calculate_refund(
+    expiration_date: datetime, role_price: int, role_name: str = None
+) -> int:
     """
     Calculate refund amount for a role based on remaining time.
 

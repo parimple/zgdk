@@ -86,11 +86,17 @@ class ActivityManager:
         if points > 0:
             await self._add_points(session, member_id, ActivityType.TEXT, points)
 
-    async def add_promotion_activity(self, session: AsyncSession, member_id: int) -> None:
+    async def add_promotion_activity(
+        self, session: AsyncSession, member_id: int
+    ) -> None:
         """Add promotion activity points for a member."""
-        await self._add_points(session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS)
+        await self._add_points(
+            session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS
+        )
 
-    async def add_bonus_activity(self, session: AsyncSession, member_id: int, points: int) -> None:
+    async def add_bonus_activity(
+        self, session: AsyncSession, member_id: int, points: int
+    ) -> None:
         """Add bonus activity points for a member."""
         await self._add_points(session, member_id, ActivityType.BONUS, points)
 
@@ -143,23 +149,33 @@ class ActivityManager:
             # Check custom status
             if isinstance(activity, discord.CustomActivity):
                 if activity.name and any(
-                    keyword in activity.name.lower() for keyword in self.promotion_keywords
+                    keyword in activity.name.lower()
+                    for keyword in self.promotion_keywords
                 ):
                     return True
 
             # Check activity name
             if hasattr(activity, "name") and activity.name:
-                if any(keyword in activity.name.lower() for keyword in self.promotion_keywords):
+                if any(
+                    keyword in activity.name.lower()
+                    for keyword in self.promotion_keywords
+                ):
                     return True
 
             # Check activity details
             if hasattr(activity, "details") and activity.details:
-                if any(keyword in activity.details.lower() for keyword in self.promotion_keywords):
+                if any(
+                    keyword in activity.details.lower()
+                    for keyword in self.promotion_keywords
+                ):
                     return True
 
             # Check activity state
             if hasattr(activity, "state") and activity.state:
-                if any(keyword in activity.state.lower() for keyword in self.promotion_keywords):
+                if any(
+                    keyword in activity.state.lower()
+                    for keyword in self.promotion_keywords
+                ):
                     return True
 
         return False
@@ -175,7 +191,8 @@ class ActivityManager:
                 if activity.name and ".gg/" in activity.name.lower():
                     # Check if it's NOT our server
                     if not any(
-                        keyword in activity.name.lower() for keyword in self.promotion_keywords
+                        keyword in activity.name.lower()
+                        for keyword in self.promotion_keywords
                     ):
                         return True
 
@@ -183,7 +200,8 @@ class ActivityManager:
             if hasattr(activity, "name") and activity.name:
                 if ".gg/" in activity.name.lower():
                     if not any(
-                        keyword in activity.name.lower() for keyword in self.promotion_keywords
+                        keyword in activity.name.lower()
+                        for keyword in self.promotion_keywords
                     ):
                         return True
 
@@ -198,7 +216,11 @@ class ActivityManager:
     ) -> discord.Embed:
         """Format leaderboard as Discord embed."""
         # Use author's color if provided, otherwise blue
-        color = author_color if author_color and author_color.value != 0 else discord.Color.blue()
+        color = (
+            author_color
+            if author_color and author_color.value != 0
+            else discord.Color.blue()
+        )
 
         embed = discord.Embed(
             title=f"🏆 Ranking Aktywności zaGadki",
@@ -208,7 +230,9 @@ class ActivityManager:
 
         if not leaderboard:
             embed.add_field(
-                name="Brak danych", value="Nie znaleziono aktywności w tym okresie", inline=False
+                name="Brak danych",
+                value="Nie znaleziono aktywności w tym okresie",
+                inline=False,
             )
             embed.set_footer(
                 text=f"💡 Aktualizacja: co godzinę | Dane z ostatnich {days_back} dni",
@@ -275,19 +299,28 @@ class ActivityManager:
         )
 
         # Main stats
-        position_text = f"**#{stats['position']}**" if stats["position"] > 0 else "Brak rankingu"
+        position_text = (
+            f"**#{stats['position']}**" if stats["position"] > 0 else "Brak rankingu"
+        )
         embed.add_field(name="🏆 Pozycja w rankingu", value=position_text, inline=True)
 
         embed.add_field(name="🏅 Ranga", value=f"**{stats['tier']}**", inline=True)
 
         embed.add_field(
-            name="⭐ Łączne punkty", value=f"**{stats['total_points']}** pkt", inline=True
+            name="⭐ Łączne punkty",
+            value=f"**{stats['total_points']}** pkt",
+            inline=True,
         )
 
         # Activity breakdown
         if stats["breakdown"]:
             breakdown_text = ""
-            activity_emojis = {"voice": "🎤", "text": "💬", "promotion": "📢", "bonus": "🎁"}
+            activity_emojis = {
+                "voice": "🎤",
+                "text": "💬",
+                "promotion": "📢",
+                "bonus": "🎁",
+            }
 
             activity_names = {
                 "voice": "Rozmowy głosowe",
@@ -302,7 +335,9 @@ class ActivityManager:
                 breakdown_text += f"{emoji} {name}: **{points}** pkt\n"
 
             embed.add_field(
-                name="📈 Podział punktów według aktywności", value=breakdown_text, inline=False
+                name="📈 Podział punktów według aktywności",
+                value=breakdown_text,
+                inline=False,
             )
         else:
             embed.add_field(
@@ -326,7 +361,9 @@ class ActivityManager:
         self, session: AsyncSession, member_id: int, activity_type: str
     ) -> bool:
         """Check if member already got points for this activity type today."""
-        today_breakdown = await get_member_activity_breakdown(session, member_id, days_back=1)
+        today_breakdown = await get_member_activity_breakdown(
+            session, member_id, days_back=1
+        )
         return activity_type in today_breakdown and today_breakdown[activity_type] > 0
 
     async def add_voice_activity_daily(
@@ -340,13 +377,19 @@ class ActivityManager:
         points = self.VOICE_WITH_OTHERS if is_with_others else self.VOICE_ALONE
         await self._add_points(session, member_id, ActivityType.VOICE, points)
 
-    async def add_promotion_activity_daily(self, session: AsyncSession, member_id: int) -> None:
+    async def add_promotion_activity_daily(
+        self, session: AsyncSession, member_id: int
+    ) -> None:
         """Add promotion activity points once per day (like original zagadka)."""
         # Check if user already got promotion points today
-        if await self.has_daily_activity_today(session, member_id, ActivityType.PROMOTION):
+        if await self.has_daily_activity_today(
+            session, member_id, ActivityType.PROMOTION
+        ):
             return
 
-        await self._add_points(session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS)
+        await self._add_points(
+            session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS
+        )
 
     def get_time_bonus(self) -> int:
         """Calculate time-based bonus points based on current hour."""

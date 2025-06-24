@@ -42,13 +42,17 @@ async def remove_premium_role_mod_permissions(session, bot, member_id: int):
     logger.info(f"Removing premium role-related privileges for user {member_id}")
 
     # 1. Usuń uprawnienia moderatorów kanałów głosowych
-    await ChannelPermissionQueries.remove_mod_permissions_granted_by_member(session, member_id)
+    await ChannelPermissionQueries.remove_mod_permissions_granted_by_member(
+        session, member_id
+    )
     logger.info(f"Voice channel permissions granted by {member_id} removed")
 
     # 2. Usuń teamy należące do tego użytkownika - używamy bezpieczniejszej metody SQL
     deleted_teams = await TeamManager.delete_user_teams_by_sql(session, bot, member_id)
     if deleted_teams > 0:
-        logger.info(f"Deleted {deleted_teams} teams owned by {member_id} using SQL method")
+        logger.info(
+            f"Deleted {deleted_teams} teams owned by {member_id} using SQL method"
+        )
 
     return deleted_teams
 
@@ -71,7 +75,8 @@ class InfoCog(commands.Cog):
         logger.info("Cog: info.py Loaded")
 
     @commands.hybrid_command(
-        name="invites", description="Wyświetla listę zaproszeń z możliwością sortowania."
+        name="invites",
+        description="Wyświetla listę zaproszeń z możliwością sortowania.",
     )
     @is_admin()
     @app_commands.describe(
@@ -108,7 +113,9 @@ class InfoCog(commands.Cog):
 
         if target:
             combined_invites = [
-                inv for inv in combined_invites if inv.inviter and inv.inviter.id == target.id
+                inv
+                for inv in combined_invites
+                if inv.inviter and inv.inviter.id == target.id
             ]
 
         view = InviteListView(self.bot, combined_invites, sort_by, order, target)
@@ -128,7 +135,9 @@ class InfoCog(commands.Cog):
         logging.info("ping")
         await ctx.reply("pong")
 
-    @commands.hybrid_command(name="guildinfo", description="Displays the current guild.")
+    @commands.hybrid_command(
+        name="guildinfo", description="Displays the current guild."
+    )
     @is_admin()
     async def guild_info(self, ctx: commands.Context):
         """Sends the current guild when guildinfo is used as a command."""
@@ -141,7 +150,9 @@ class InfoCog(commands.Cog):
     @commands.hybrid_command(
         name="profile", aliases=["p"], description="Wyświetla profil użytkownika."
     )
-    async def profile(self, ctx: commands.Context, member: Optional[discord.Member] = None):
+    async def profile(
+        self, ctx: commands.Context, member: Optional[discord.Member] = None
+    ):
         """Sends user profile when profile is used as a command."""
         if not member:
             member = ctx.author
@@ -149,7 +160,9 @@ class InfoCog(commands.Cog):
         if not isinstance(member, discord.Member):
             member = self.bot.guild.get_member(member.id)
             if not member:
-                raise commands.UserInputError("Nie można znaleźć członka na tym serwerze.")
+                raise commands.UserInputError(
+                    "Nie można znaleźć członka na tym serwerze."
+                )
 
         roles = [role for role in member.roles if role.name != "@everyone"]
 
@@ -158,22 +171,30 @@ class InfoCog(commands.Cog):
             all_member_premium_roles = await RoleQueries.get_member_premium_roles(
                 session, member.id
             )
-            bypass_until = await MemberQueries.get_voice_bypass_status(session, member.id)
+            bypass_until = await MemberQueries.get_voice_bypass_status(
+                session, member.id
+            )
 
             # Get owned teams from database
             owned_teams_query = await session.execute(
-                select(Role).where((Role.role_type == "team") & (Role.name == str(member.id)))
+                select(Role).where(
+                    (Role.role_type == "team") & (Role.name == str(member.id))
+                )
             )
             owned_teams = owned_teams_query.scalars().all()
 
             # Get teams from database
             teams_query = await session.execute(
-                select(Role).where((Role.role_type == "team") & (Role.name == str(member.id)))
+                select(Role).where(
+                    (Role.role_type == "team") & (Role.name == str(member.id))
+                )
             )
             teams = teams_query.scalars().all()
 
             colors_query = await session.execute(
-                select(Role).where((Role.role_type == "color") & (Role.name == str(member.id)))
+                select(Role).where(
+                    (Role.role_type == "color") & (Role.name == str(member.id))
+                )
             )
             colors = colors_query.scalars().all()
 
@@ -193,7 +214,9 @@ class InfoCog(commands.Cog):
                 for mr, r in all_member_premium_roles
                 if mr.expiration_date is None or mr.expiration_date > current_time
             ]
-            logger.info(f"All premium roles for {member.id}: {all_member_premium_roles}")
+            logger.info(
+                f"All premium roles for {member.id}: {all_member_premium_roles}"
+            )
             logger.info(f"Active premium roles for {member.id}: {active_premium_roles}")
 
         # Logowanie wygasłych ról dla celów diagnostycznych, jeśli jakieś są
@@ -236,7 +259,9 @@ class InfoCog(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(name="ID:", value=member.id)
         embed.add_field(name="Nazwa na serwerze:", value=member.display_name)
-        embed.add_field(name="Saldo G:", value=f"{db_member.wallet_balance}{CURRENCY_UNIT}")
+        embed.add_field(
+            name="Saldo G:", value=f"{db_member.wallet_balance}{CURRENCY_UNIT}"
+        )
 
         # Add bypass time info if active
         if bypass_until and bypass_until > current_time:
@@ -245,7 +270,9 @@ class InfoCog(commands.Cog):
             hours = int(time_left.total_seconds() // 3600)
             embed.add_field(name="Saldo T:", value=f"{hours}T")
 
-        embed.add_field(name="Konto od:", value=discord.utils.format_dt(member.created_at, "D"))
+        embed.add_field(
+            name="Konto od:", value=discord.utils.format_dt(member.created_at, "D")
+        )
         embed.add_field(
             name="Dołączył:",
             value=discord.utils.format_dt(member.joined_at, "D")
@@ -269,8 +296,12 @@ class InfoCog(commands.Cog):
                 # Sortuj role premium (jeśli jest ich wiele aktywnych) np. po ID, nazwie lub specjalnym polu, jeśli istnieje
                 # Dla uproszczenia, bierzemy pierwszą z listy aktywnych
                 # Można by tu dodać logikę wyboru 'najważniejszej' aktywnej roli, jeśli jest ich więcej
-                main_active_premium_role_obj = active_premium_roles[0][1]  # Obiekt discord.Role
-                roles = [role for role in roles if role.id != main_active_premium_role_obj.id]
+                main_active_premium_role_obj = active_premium_roles[0][
+                    1
+                ]  # Obiekt discord.Role
+                roles = [
+                    role for role in roles if role.id != main_active_premium_role_obj.id
+                ]
 
             PremiumManager.add_premium_roles_to_embed(
                 ctx, embed, active_premium_roles
@@ -284,7 +315,9 @@ class InfoCog(commands.Cog):
                 if team_role:
                     team_roles.append(team_role.mention)
             if team_roles:
-                embed.add_field(name="Właściciel Drużyny:", value=" ".join(team_roles), inline=True)
+                embed.add_field(
+                    name="Właściciel Drużyny:", value=" ".join(team_roles), inline=True
+                )
 
         if db_member.first_inviter_id is not None:
             first_inviter = self.bot.get_user(db_member.first_inviter_id)
@@ -311,7 +344,9 @@ class InfoCog(commands.Cog):
         )  # Przekaż aktywne role do widoku
         await ctx.send(embed=embed, view=view)
 
-    @commands.hybrid_command(name="roles", description="Lists all roles in the database")
+    @commands.hybrid_command(
+        name="roles", description="Lists all roles in the database"
+    )
     @is_admin()
     async def all_roles(self, ctx: commands.Context):
         """Fetch and display all roles in the database."""
@@ -327,7 +362,9 @@ class InfoCog(commands.Cog):
             )
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="bypass", description="Zarządza czasem bypassa (T) użytkownika.")
+    @commands.hybrid_command(
+        name="bypass", description="Zarządza czasem bypassa (T) użytkownika."
+    )
     @is_admin()
     async def bypass(
         self, ctx: commands.Context, member: discord.Member, hours: Optional[int] = None
@@ -347,7 +384,9 @@ class InfoCog(commands.Cog):
             else:
                 # Dodawanie nowego bypassa
                 bypass_until = current_time + timedelta(hours=hours)
-                await MemberQueries.set_voice_bypass_status(session, member.id, bypass_until)
+                await MemberQueries.set_voice_bypass_status(
+                    session, member.id, bypass_until
+                )
                 await ctx.send(f"Ustawiono bypass dla {member.mention} na {hours}T.")
 
     @commands.hybrid_command(
@@ -397,7 +436,8 @@ class InfoCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
-        name="games", description="Wyświetla listę aktywnych gier na serwerze wraz z liczbą graczy."
+        name="games",
+        description="Wyświetla listę aktywnych gier na serwerze wraz z liczbą graczy.",
     )
     async def games(self, ctx: commands.Context):
         """Wyświetla listę gier, w które aktualnie grają członkowie serwera."""
@@ -410,7 +450,9 @@ class InfoCog(commands.Cog):
         message = await ctx.send(embed=loading_embed)
 
         games_data = {}
-        online_members = [m for m in ctx.guild.members if m.status != discord.Status.offline]
+        online_members = [
+            m for m in ctx.guild.members if m.status != discord.Status.offline
+        ]
         total_online = len(online_members)
 
         for member in online_members:
@@ -421,7 +463,9 @@ class InfoCog(commands.Cog):
                         games_data[game_name] = games_data.get(game_name, 0) + 1
 
         if not games_data:
-            await message.edit(content="Aktualnie nikt nie gra w żadne gry.", embed=None)
+            await message.edit(
+                content="Aktualnie nikt nie gra w żadne gry.", embed=None
+            )
             return
 
         # Sort games by player count (descending)
@@ -467,13 +511,19 @@ class InfoCog(commands.Cog):
             ):
                 if self.page > 1:
                     self.page -= 1
-                    await interaction.response.edit_message(embed=create_games_embed(self.page))
+                    await interaction.response.edit_message(
+                        embed=create_games_embed(self.page)
+                    )
 
             @discord.ui.button(label="▶️", style=discord.ButtonStyle.secondary)
-            async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+            async def next_page(
+                self, interaction: discord.Interaction, button: discord.ui.Button
+            ):
                 if self.page < total_pages:
                     self.page += 1
-                    await interaction.response.edit_message(embed=create_games_embed(self.page))
+                    await interaction.response.edit_message(
+                        embed=create_games_embed(self.page)
+                    )
 
             async def on_timeout(self):
                 try:
@@ -491,12 +541,16 @@ class InfoCog(commands.Cog):
     async def add_t(self, ctx: commands.Context, user: discord.User, hours: int):
         """Add T time to a user."""
         async with self.bot.get_db() as session:
-            await MemberQueries.extend_voice_bypass(session, user.id, timedelta(hours=hours))
+            await MemberQueries.extend_voice_bypass(
+                session, user.id, timedelta(hours=hours)
+            )
             await session.commit()
 
         await ctx.reply(f"Dodano {hours}T do konta {user.mention}.")
 
-    @commands.command(name="checkroles", description="Sprawdza role użytkownika w logach.")
+    @commands.command(
+        name="checkroles", description="Sprawdza role użytkownika w logach."
+    )
     @is_admin()
     async def check_roles(self, ctx: commands.Context, user: discord.Member):
         """Sprawdza role użytkownika i wypisuje je w logach."""
@@ -511,7 +565,9 @@ class InfoCog(commands.Cog):
         # Sprawdza też w bazie danych
         async with self.bot.get_db() as session:
             premium_roles = await RoleQueries.get_member_premium_roles(session, user.id)
-            logger.info(f"[CHECK_ROLES] Role premium w bazie danych dla {user.display_name}:")
+            logger.info(
+                f"[CHECK_ROLES] Role premium w bazie danych dla {user.display_name}:"
+            )
             for member_role, role in premium_roles:
                 logger.info(
                     f"[CHECK_ROLES] Rola {role.name} (ID: {role.id}), wygasa: {member_role.expiration_date}"
@@ -558,9 +614,14 @@ class InfoCog(commands.Cog):
 
         # 2. Sprawdź kanały z topikiem zawierającym ID użytkownika
         for channel in ctx.guild.channels:
-            if hasattr(channel, "topic") and channel.topic and str(member.id) in channel.topic:
+            if (
+                hasattr(channel, "topic")
+                and channel.topic
+                and str(member.id) in channel.topic
+            ):
                 if "Team Channel" in channel.topic or (
-                    len(channel.topic.split()) >= 2 and channel.topic.split()[0] == str(member.id)
+                    len(channel.topic.split()) >= 2
+                    and channel.topic.split()[0] == str(member.id)
                 ):
                     team_channels.append(channel)
 
@@ -570,18 +631,24 @@ class InfoCog(commands.Cog):
 
         async with self.bot.get_db() as session:
             # Pobierz role premium z bazy danych
-            premium_roles_db = await RoleQueries.get_member_premium_roles(session, member.id)
+            premium_roles_db = await RoleQueries.get_member_premium_roles(
+                session, member.id
+            )
             for member_role, role in premium_roles_db:
                 expiry = (
                     member_role.expiration_date.strftime("%d.%m.%Y %H:%M")
                     if member_role.expiration_date
                     else "bez wygaśnięcia"
                 )
-                roles_db_info.append(f"Rola: {role.name}, ID: {role.id}, wygasa: {expiry}")
+                roles_db_info.append(
+                    f"Rola: {role.name}, ID: {role.id}, wygasa: {expiry}"
+                )
 
             # Pobierz teamy z bazy danych
             teams_query = await session.execute(
-                select(Role).where((Role.role_type == "team") & (Role.name == str(member.id)))
+                select(Role).where(
+                    (Role.role_type == "team") & (Role.name == str(member.id))
+                )
             )
             teams = teams_query.scalars().all()
 
@@ -590,11 +657,13 @@ class InfoCog(commands.Cog):
 
         # 4. Przygotuj i wyślij embed z informacjami
         embed = discord.Embed(
-            title=f"Status użytkownika {member.display_name}", color=discord.Color.blue()
+            title=f"Status użytkownika {member.display_name}",
+            color=discord.Color.blue(),
         )
         embed.add_field(
             name="Role premium (Discord)",
-            value="\n".join([f"{role.name} (ID: {role.id})" for role in premium_roles]) or "Brak",
+            value="\n".join([f"{role.name} (ID: {role.id})" for role in premium_roles])
+            or "Brak",
             inline=False,
         )
         embed.add_field(
@@ -604,17 +673,22 @@ class InfoCog(commands.Cog):
         )
         embed.add_field(
             name="Role teamów (Discord)",
-            value="\n".join([f"{role.name} (ID: {role.id})" for role in team_roles]) or "Brak",
-            inline=False,
-        )
-        embed.add_field(
-            name="Kanały teamów",
-            value="\n".join([f"{channel.name} (ID: {channel.id})" for channel in team_channels])
+            value="\n".join([f"{role.name} (ID: {role.id})" for role in team_roles])
             or "Brak",
             inline=False,
         )
         embed.add_field(
-            name="Teamy (baza danych)", value="\n".join(teams_db_info) or "Brak", inline=False
+            name="Kanały teamów",
+            value="\n".join(
+                [f"{channel.name} (ID: {channel.id})" for channel in team_channels]
+            )
+            or "Brak",
+            inline=False,
+        )
+        embed.add_field(
+            name="Teamy (baza danych)",
+            value="\n".join(teams_db_info) or "Brak",
+            inline=False,
         )
 
         await ctx.send(embed=embed)
@@ -625,7 +699,9 @@ class InfoCog(commands.Cog):
 
         # Sprawdź, czy użytkownik ma teamy ale nie ma roli premium
         if (team_roles or team_channels or teams_db_info) and not premium_roles:
-            inconsistencies.append("Użytkownik ma teamy, ale nie ma aktywnej roli premium.")
+            inconsistencies.append(
+                "Użytkownik ma teamy, ale nie ma aktywnej roli premium."
+            )
 
         # Sprawdź, czy są teamy w bazie danych, ale nie ma ich na Discord
         if teams_db_info and not team_roles:
@@ -663,7 +739,9 @@ class InfoCog(commands.Cog):
 
     @commands.command(name="force_check_user_premium_roles", aliases=["fcpr"])
     @is_admin()
-    async def force_check_user_premium_roles(self, ctx: commands.Context, member: discord.Member):
+    async def force_check_user_premium_roles(
+        self, ctx: commands.Context, member: discord.Member
+    ):
         """Ręcznie sprawdza i usuwa wygasłe role premium dla danego użytkownika."""
         now = datetime.now(timezone.utc)
         removed_roles_count = 0
@@ -672,11 +750,15 @@ class InfoCog(commands.Cog):
 
         async with self.bot.get_db() as session:
             # Pobierz wszystkie role premium użytkownika (aktywne i wygasłe)
-            member_premium_roles = await RoleQueries.get_member_premium_roles(session, member.id)
+            member_premium_roles = await RoleQueries.get_member_premium_roles(
+                session, member.id
+            )
             checked_roles_count = len(member_premium_roles)
 
             if not member_premium_roles:
-                await ctx.send(f"{member.mention} nie ma żadnych ról premium w bazie danych.")
+                await ctx.send(
+                    f"{member.mention} nie ma żadnych ról premium w bazie danych."
+                )
                 return
 
             for member_role_db, role_db in member_premium_roles:
@@ -695,7 +777,8 @@ class InfoCog(commands.Cog):
                         try:
                             # 1. Usuń rolę z Discord
                             await member.remove_roles(
-                                discord_role, reason="Ręczne usunięcie wygasłej roli premium"
+                                discord_role,
+                                reason="Ręczne usunięcie wygasłej roli premium",
                             )
                             messages.append(
                                 f"✅ Usunięto wygasłą rolę premium `{discord_role.name}` z {member.mention}."
@@ -705,7 +788,9 @@ class InfoCog(commands.Cog):
                             )
 
                             # 2. Usuń powiązane uprawnienia (teamy, mod voice)
-                            await remove_premium_role_mod_permissions(session, self.bot, member.id)
+                            await remove_premium_role_mod_permissions(
+                                session, self.bot, member.id
+                            )
                             messages.append(
                                 f"ℹ️ Usunięto powiązane uprawnienia (teamy, mod voice) dla {member.mention}."
                             )
@@ -785,7 +870,9 @@ class InfoCog(commands.Cog):
             await ctx.send(
                 f"Sprawdzono {checked_roles_count} ról premium dla {member.mention}. Usunięto {removed_roles_count} wygasłych ról. Logi są zbyt długie, sprawdź konsolę bota."
             )
-            logger.info(f"ForceCheck Summary for {member.display_name}:\n" + "\n".join(messages))
+            logger.info(
+                f"ForceCheck Summary for {member.display_name}:\n" + "\n".join(messages)
+            )
         else:
             await ctx.send(final_message)
 
@@ -793,7 +880,9 @@ class InfoCog(commands.Cog):
 class ProfileView(discord.ui.View):
     """View for profile command."""
 
-    def __init__(self, bot, member: discord.Member, active_premium_roles, viewer: discord.Member):
+    def __init__(
+        self, bot, member: discord.Member, active_premium_roles, viewer: discord.Member
+    ):
         super().__init__()
         self.bot = bot
         self.member = member
@@ -835,7 +924,9 @@ class SellRoleButton(discord.ui.Button):
     """Button for selling roles."""
 
     def __init__(self, bot, active_premium_roles, **kwargs):
-        super().__init__(style=discord.ButtonStyle.red, label="Sprzedaj rangę", emoji="💰", **kwargs)
+        super().__init__(
+            style=discord.ButtonStyle.red, label="Sprzedaj rangę", emoji="💰", **kwargs
+        )
         self.bot = bot
         self.active_premium_roles = active_premium_roles
         self.is_selling = False
@@ -844,7 +935,8 @@ class SellRoleButton(discord.ui.Button):
         """Handle button click."""
         if self.is_selling:
             await interaction.response.send_message(
-                "Transakcja jest już w toku. Poczekaj na jej zakończenie.", ephemeral=True
+                "Transakcja jest już w toku. Poczekaj na jej zakończenie.",
+                ephemeral=True,
             )
             return
 
@@ -853,7 +945,8 @@ class SellRoleButton(discord.ui.Button):
             # Używamy pierwszej roli z listy aktywnych ról premium do sprzedaży
             if not self.active_premium_roles:
                 await interaction.response.send_message(
-                    "Nie masz żadnych aktywnych ról premium do sprzedania.", ephemeral=True
+                    "Nie masz żadnych aktywnych ról premium do sprzedania.",
+                    ephemeral=True,
                 )
                 return
 
@@ -869,16 +962,23 @@ class SellRoleButton(discord.ui.Button):
 
             # Get role price from config
             role_price = next(
-                (r["price"] for r in self.bot.config["premium_roles"] if r["name"] == role.name),
+                (
+                    r["price"]
+                    for r in self.bot.config["premium_roles"]
+                    if r["name"] == role.name
+                ),
                 None,
             )
             if role_price is None:
                 await interaction.response.send_message(
-                    "Nie można znaleźć ceny roli. Skontaktuj się z administracją.", ephemeral=True
+                    "Nie można znaleźć ceny roli. Skontaktuj się z administracją.",
+                    ephemeral=True,
                 )
                 return
 
-            refund_amount = calculate_refund(member_role.expiration_date, role_price, role.name)
+            refund_amount = calculate_refund(
+                member_role.expiration_date, role_price, role.name
+            )
 
             # Use MessageSender for consistent formatting
             description = f"Czy na pewno chcesz sprzedać rangę **{role.name}**?\nOtrzymasz zwrot w wysokości **{refund_amount}{CURRENCY_UNIT}**."
@@ -901,7 +1001,9 @@ class SellRoleButton(discord.ui.Button):
 
                 @discord.ui.button(label="Potwierdź", style=discord.ButtonStyle.danger)
                 async def confirm(
-                    self, confirm_interaction: discord.Interaction, button: discord.ui.Button
+                    self,
+                    confirm_interaction: discord.Interaction,
+                    button: discord.ui.Button,
                 ):
                     if confirm_interaction.user.id != self.member.id:
                         await confirm_interaction.response.send_message(
@@ -934,10 +1036,14 @@ class SellRoleButton(discord.ui.Button):
                             self.member  # Pass context for premium text
                         )
                         if premium_text:
-                            success_description = f"{success_description}\n{premium_text}"
+                            success_description = (
+                                f"{success_description}\n{premium_text}"
+                            )
 
                         success_embed = MessageSender._create_embed(
-                            title="Sprzedaż rangi", description=success_description, ctx=self.member
+                            title="Sprzedaż rangi",
+                            description=success_description,
+                            ctx=self.member,
                         )
 
                         await confirm_interaction.followup.send(embed=success_embed)
@@ -950,7 +1056,9 @@ class SellRoleButton(discord.ui.Button):
                             color="error",
                             ctx=self.member,
                         )
-                        await confirm_interaction.followup.send(embed=error_embed, ephemeral=True)
+                        await confirm_interaction.followup.send(
+                            embed=error_embed, ephemeral=True
+                        )
 
                     # Update the message
                     try:
@@ -963,7 +1071,9 @@ class SellRoleButton(discord.ui.Button):
 
                 @discord.ui.button(label="Anuluj", style=discord.ButtonStyle.secondary)
                 async def cancel(
-                    self, cancel_interaction: discord.Interaction, button: discord.ui.Button
+                    self,
+                    cancel_interaction: discord.Interaction,
+                    button: discord.ui.Button,
                 ):
                     if cancel_interaction.user.id != self.member.id:
                         # Use embed for consistency
@@ -1034,7 +1144,9 @@ class InviteInfo:
 
 
 class InviteListView(discord.ui.View):
-    def __init__(self, bot, invites, sort_by="last_used", order="desc", target_user=None):
+    def __init__(
+        self, bot, invites, sort_by="last_used", order="desc", target_user=None
+    ):
         super().__init__()
         self.bot = bot
         self.invites = invites
@@ -1074,12 +1186,16 @@ class InviteListView(discord.ui.View):
         async def sort_callback(interaction: discord.Interaction, sort_type):
             self.sort_by = sort_type
             self.sort_invites()
-            await interaction.response.edit_message(embed=self.create_embed(), view=self)
+            await interaction.response.edit_message(
+                embed=self.create_embed(), view=self
+            )
 
         async def order_callback(interaction: discord.Interaction):
             self.order = "asc" if self.order == "desc" else "desc"
             self.sort_invites()
-            await interaction.response.edit_message(embed=self.create_embed(), view=self)
+            await interaction.response.edit_message(
+                embed=self.create_embed(), view=self
+            )
 
         sort_uses.callback = lambda i: sort_callback(i, "uses")
         sort_created.callback = lambda i: sort_callback(i, "created_at")
@@ -1127,7 +1243,9 @@ class InviteListView(discord.ui.View):
             value.append(f"Użycia: {invite.uses or 0}")
 
             if invite.created_at:
-                value.append(f"Utworzono: {discord.utils.format_dt(invite.created_at, style='R')}")
+                value.append(
+                    f"Utworzono: {discord.utils.format_dt(invite.created_at, style='R')}"
+                )
 
             if invite.last_used:
                 value.append(

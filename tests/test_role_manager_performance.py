@@ -85,7 +85,9 @@ async def test_role_manager_performance():
             expired_role = MagicMock()
             expired_role.member_id = user_id
             expired_role.role_id = actual_role_id
-            expired_role.expiration_date = datetime.now(timezone.utc) - timedelta(days=1)
+            expired_role.expiration_date = datetime.now(timezone.utc) - timedelta(
+                days=1
+            )
 
             expired_roles.append(expired_role)
 
@@ -123,10 +125,14 @@ async def test_role_manager_performance():
 
     # Verify the remove_roles calls
     for user_id, member in members.items():
-        logger.info(f"User {user_id}: remove_roles called {member.remove_roles.call_count} times")
+        logger.info(
+            f"User {user_id}: remove_roles called {member.remove_roles.call_count} times"
+        )
 
     # Calculate total remove_roles calls across all members
-    total_remove_calls = sum(member.remove_roles.call_count for member in members.values())
+    total_remove_calls = sum(
+        member.remove_roles.call_count for member in members.values()
+    )
     logger.info(f"Total remove_roles calls: {total_remove_calls}")
 
     # Check the number of database calls

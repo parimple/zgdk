@@ -31,7 +31,9 @@ class AutoKickManager:
         try:
             async with self.bot.get_db() as session:
                 # Get all autokicks using SQLAlchemy ORM
-                result = await session.execute(select(AutoKick.target_id, AutoKick.owner_id))
+                result = await session.execute(
+                    select(AutoKick.target_id, AutoKick.owner_id)
+                )
                 rows = result.all()
 
                 # Clear existing cache
@@ -42,7 +44,9 @@ class AutoKickManager:
                     if target_id not in self._autokick_cache:
                         self._autokick_cache[target_id] = set()
                     self._autokick_cache[target_id].add(owner_id)
-                    self.logger.info(f"Added autokick: target={target_id}, owner={owner_id}")
+                    self.logger.info(
+                        f"Added autokick: target={target_id}, owner={owner_id}"
+                    )
 
                 self.logger.info(f"Cache initialized with {len(rows)} entries")
                 self._cache_initialized = True
@@ -106,7 +110,9 @@ class AutoKickManager:
             # Update database
             async with self.bot.get_db() as session:
                 await AutoKickQueries.add_autokick(session, ctx.author.id, target.id)
-                self.logger.info(f"Added autokick: owner={ctx.author.id}, target={target.id}")
+                self.logger.info(
+                    f"Added autokick: owner={ctx.author.id}, target={target.id}"
+                )
                 await self.message_sender.send_autokick_added(ctx, target)
         except Exception as e:
             self.logger.error(f"Error in add_autokick: {str(e)}")
@@ -134,7 +140,9 @@ class AutoKickManager:
             # Update database
             async with self.bot.get_db() as session:
                 await AutoKickQueries.remove_autokick(session, ctx.author.id, target.id)
-                self.logger.info(f"Removed autokick: owner={ctx.author.id}, target={target.id}")
+                self.logger.info(
+                    f"Removed autokick: owner={ctx.author.id}, target={target.id}"
+                )
                 await self.message_sender.send_autokick_removed(ctx, target)
         except Exception as e:
             self.logger.error(f"Error in remove_autokick: {str(e)}")

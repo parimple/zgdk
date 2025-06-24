@@ -78,7 +78,9 @@ class BumpChecker:
             check_id = self.bot.guild_id if service in self.GLOBAL_SERVICES else user_id
             from datasources.queries import NotificationLogQueries
 
-            log = await NotificationLogQueries.get_notification_log(session, check_id, service)
+            log = await NotificationLogQueries.get_notification_log(
+                session, check_id, service
+            )
 
             if not log or now - log.sent_at > timedelta(hours=cooldown):
                 return {

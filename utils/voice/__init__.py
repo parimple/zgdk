@@ -2,7 +2,11 @@
 
 from .autokick import AutoKickManager
 from .channel import ChannelModManager, VoiceChannelManager
-from .permissions import BasePermissionCommand, PermissionChecker, VoicePermissionManager
+from .permissions import (
+    BasePermissionCommand,
+    PermissionChecker,
+    VoicePermissionManager,
+)
 
 __all__ = [
     "BasePermissionCommand",

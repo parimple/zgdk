@@ -34,9 +34,13 @@ class Member(Base):
         BigInteger, ForeignKey("members.id"), nullable=True
     )
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
-    rejoined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejoined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     wallet_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    voice_bypass_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    voice_bypass_until: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     first_inviter: Mapped["Member"] = relationship(
         "Member",
@@ -74,9 +78,15 @@ class MemberRole(Base):
     """MemberRole Model"""
 
     __tablename__ = "member_roles"
-    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
-    role_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(ROLE_ID), primary_key=True)
-    expiration_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    member_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(MEMBER_ID), primary_key=True
+    )
+    role_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(ROLE_ID), primary_key=True
+    )
+    expiration_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     member: Mapped[Member] = relationship("Member", backref="assigned_roles")
     role: Mapped[Role] = relationship("Role", backref="assigned_to_members")
@@ -89,12 +99,18 @@ class ChannelPermission(Base):
     """ChannelPermission Model"""
 
     __tablename__ = "channel_permissions"
-    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    member_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(MEMBER_ID), primary_key=True
+    )
     target_id: Mapped[int] = mapped_column(
         BigInteger, nullable=False, primary_key=True
     )  # Role or Member ID
-    allow_permissions_value: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
-    deny_permissions_value: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    allow_permissions_value: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0
+    )
+    deny_permissions_value: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0
+    )
     last_updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)
     )
@@ -111,7 +127,9 @@ class Activity(Base):
     """Activity Model"""
 
     __tablename__ = "activity"
-    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    member_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(MEMBER_ID), primary_key=True
+    )
     date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, primary_key=True
     )
@@ -123,9 +141,7 @@ class Activity(Base):
     member: Mapped[Member] = relationship("Member", backref="activities")
 
     def __repr__(self) -> str:
-        return (
-            f"<Activity(member_id={self.member_id}, date={self.date}, type={self.activity_type})>"
-        )
+        return f"<Activity(member_id={self.member_id}, date={self.date}, type={self.activity_type})>"
 
 
 class HandledPayment(Base):
@@ -149,7 +165,9 @@ class NotificationLog(Base):
     """NotificationLog Model"""
 
     __tablename__ = "notification_logs"
-    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    member_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(MEMBER_ID), primary_key=True
+    )
     notification_tag: Mapped[str] = mapped_column(String, primary_key=True)
     sent_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)
@@ -160,7 +178,9 @@ class NotificationLog(Base):
     member: Mapped[Member] = relationship("Member", backref="notification_logs")
 
     __table_args__ = (
-        PrimaryKeyConstraint("member_id", "notification_tag", name="notification_log_pk"),
+        PrimaryKeyConstraint(
+            "member_id", "notification_tag", name="notification_log_pk"
+        ),
     )
 
     def __repr__(self) -> str:
@@ -172,7 +192,9 @@ class Message(Base):
 
     __tablename__ = "messages"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)  # Discord message ID
-    author_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), nullable=False)
+    author_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(MEMBER_ID), nullable=False
+    )
     content: Mapped[str] = mapped_column(String, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
@@ -197,7 +219,9 @@ class Invite(Base):
     creator_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID))
     uses: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     creator: Mapped["Member"] = relationship("Member", back_populates="created_invites")
 
@@ -209,8 +233,12 @@ class AutoKick(Base):
     """AutoKick Model for storing automatic kick settings"""
 
     __tablename__ = "autokicks"
-    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
-    target_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(MEMBER_ID), primary_key=True
+    )
+    target_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(MEMBER_ID), primary_key=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)
     )
@@ -231,15 +259,21 @@ class ModerationLog(Base):
 
     __tablename__ = "moderation_logs"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    target_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), nullable=False)
-    moderator_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), nullable=False)
+    target_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(MEMBER_ID), nullable=False
+    )
+    moderator_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(MEMBER_ID), nullable=False
+    )
     action_type: Mapped[str] = mapped_column(
         String, nullable=False
     )  # 'mute', 'unmute', 'kick', 'ban'
     mute_type: Mapped[str] = mapped_column(
         String, nullable=True
     )  # 'nick', 'img', 'txt', 'live', 'rank'
-    duration_seconds: Mapped[int] = mapped_column(Integer, nullable=True)  # NULL = permanentny
+    duration_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=True
+    )  # NULL = permanentny
     reason: Mapped[str] = mapped_column(String, nullable=True)
     channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

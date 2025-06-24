@@ -26,7 +26,9 @@ class TeamManager:
         """
         # Szukamy teamów, których użytkownik jest właścicielem
         query_result = await session.execute(
-            select(DBRole).where((DBRole.role_type == "team") & (DBRole.name == str(member_id)))
+            select(DBRole).where(
+                (DBRole.role_type == "team") & (DBRole.name == str(member_id))
+            )
         )
 
         # Pobierz wyniki z zapytania - w testach możemy otrzymać obiekty
@@ -113,7 +115,9 @@ class TeamManager:
         """
         # Najpierw znajdujemy wszystkie teamy, których użytkownik jest właścicielem
         query_result = await session.execute(
-            select(DBRole).where((DBRole.role_type == "team") & (DBRole.name == str(member_id)))
+            select(DBRole).where(
+                (DBRole.role_type == "team") & (DBRole.name == str(member_id))
+            )
         )
 
         # Pobierz wyniki z zapytania bez używania ORM
@@ -189,7 +193,9 @@ class TeamManager:
                     )
                     member_result = await session.execute(member_roles_sql, params)
                     members_deleted = (
-                        member_result.rowcount if hasattr(member_result, "rowcount") else 0
+                        member_result.rowcount
+                        if hasattr(member_result, "rowcount")
+                        else 0
                     )
                     logger.info(
                         f"Deleted {members_deleted} member role records from database for teams owned by user {member_id}"

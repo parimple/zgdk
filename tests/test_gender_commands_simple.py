@@ -131,7 +131,9 @@ def test_config_validation():
         return "valid"
 
     # Test valid config
-    valid_config = {"gender_roles": {"male": 960665311701528599, "female": 960665311701528600}}
+    valid_config = {
+        "gender_roles": {"male": 960665311701528599, "female": 960665311701528600}
+    }
     result = validate_gender_config(valid_config)
     assert result == "valid", f"Expected 'valid', got '{result}'"
     print("✅ Test: Valid config")

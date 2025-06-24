@@ -58,7 +58,9 @@ class Zagadka(commands.Bot):
             pool_recycle=1800,
             pool_pre_ping=True,
         )
-        self.SessionLocal = sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
+        self.SessionLocal = sessionmaker(
+            self.engine, class_=AsyncSession, expire_on_commit=False
+        )
         self.base = Base
         self.payment_data_class = PaymentData
 
@@ -106,7 +108,9 @@ class Zagadka(commands.Bot):
             for cog in os.listdir(path):
                 if cog.endswith(".py") and cog != "__init__.py":
                     try:
-                        await self.load_extension(f"{folder.replace('/', '.')}.{cog[:-3]}")
+                        await self.load_extension(
+                            f"{folder.replace('/', '.')}.{cog[:-3]}"
+                        )
                         logging.info("Loaded cog: %s", cog)
                     except (commands.ExtensionError, commands.CommandError) as error:
                         logging.error("Failed to load cog: %s, error: %s", cog, error)
@@ -129,7 +133,9 @@ class Zagadka(commands.Bot):
         logging.info("Database create_all completed")
 
         await self.change_presence(
-            activity=discord.Activity(type=discord.ActivityType.playing, name="zaGadka bot")
+            activity=discord.Activity(
+                type=discord.ActivityType.playing, name="zaGadka bot"
+            )
         )
         logging.info("Event change_presence completed")
 
