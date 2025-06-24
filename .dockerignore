@@ -4,3 +4,11 @@
 .gitignore
 .gitlab-ci.yml
 .pytest_cache
+pg_log/
+.git/
+*.log
+__pycache__/
+.pytest_cache/
+tests/
+*.pyc
+.coverage
