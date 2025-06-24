@@ -151,10 +151,10 @@ jobs:
     - name: Run integration tests
       run: |
         echo "🚀 Starting integration test..."
-        docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
+        docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
         
         echo "🧹 Cleaning up test containers..."
-        docker-compose -f docker-compose.test.yml down -v
+        docker compose -f docker-compose.test.yml down -v
     
     - name: Validate Docker image efficiency
       run: |
