@@ -65,8 +65,9 @@ class InfoCog(commands.Cog):
         self.bot = bot
         # Remove default help command
         self.bot.remove_command("help")
-        # Get team symbol from config
-        team_config = self.bot.config.get("team", {})
+        # Get team symbol from config if available
+        config = getattr(self.bot, "config", {})
+        team_config = config.get("team", {})
         self.team_symbol = team_config.get("symbol", "☫")
 
     @commands.Cog.listener()

@@ -64,6 +64,13 @@ class GenderManager:
             male_id = gender_config.get("male")
             female_id = gender_config.get("female")
 
+            if not male_id or not female_id:
+                await ctx.send(
+                    "❌ Role płci nie są skonfigurowane",
+                    ephemeral=True,
+                )
+                return
+
             if gender_type.type_name == "male":
                 target_role_id = male_id
                 opposite_role_id = female_id

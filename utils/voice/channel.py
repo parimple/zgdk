@@ -38,10 +38,9 @@ class VoiceChannelManager:
             await self.message_sender.send_not_in_voice_channel(ctx)
             return
 
-        if max_members > 99:
-            max_members = 0  # Set to 0 for unlimited
-        elif max_members < 1:
-            max_members = 1  # Set to 1 as the minimum
+        if max_members < 1 or max_members > 99:
+            await self.message_sender.send_invalid_member_limit(ctx)
+            return
 
         voice_channel = ctx.author.voice.channel
         await voice_channel.edit(user_limit=max_members)

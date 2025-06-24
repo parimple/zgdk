@@ -54,7 +54,8 @@ class PremiumChecker:
 
     def __init__(self, bot):
         self.bot = bot
-        self.config = bot.config.get("voice_permission_levels", {})
+        config = getattr(bot, "config", {})
+        self.config = config.get("voice_permission_levels", {})
         self.message_sender = MessageSender()
 
     def get_command_tier(self, command_name: str) -> Optional[CommandTier]:

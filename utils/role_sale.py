@@ -1,4 +1,5 @@
 """Simplified role sale logic with better error handling and atomicity."""
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional, Tuple
@@ -50,12 +51,17 @@ class RoleSaleManager:
                 return False, "Nie można znaleźć konfiguracji roli.", None
 
             # 4. Perform all operations in a single transaction
-            async with self.bot.get_db() as session:
+            db_context = self.bot.get_db()
+            if asyncio.iscoroutine(db_context):
+                db_context = await db_context
+            async with db_context as session:
                 try:
                     # Check if user has the role in database
-                    db_role = await RoleQueries.get_member_role(
-                        session, member.id, role.id
-                    )
+                    get_member_role_fn = RoleQueries.get_member_role
+                    if asyncio.iscoroutinefunction(get_member_role_fn):
+                        db_role = await get_member_role_fn(session, member.id, role.id)
+                    else:
+                        db_role = get_member_role_fn(session, member.id, role.id)
                     if not db_role:
                         return False, "Nie posiadasz tej roli w bazie danych.", None
 
@@ -85,15 +91,21 @@ class RoleSaleManager:
 
                     # Add refund to wallet
                     if refund_amount > 0:
-                        await MemberQueries.add_to_wallet_balance(
-                            session, member.id, refund_amount
-                        )
+                        add_balance_fn = MemberQueries.add_to_wallet_balance
+                        if asyncio.iscoroutinefunction(add_balance_fn):
+                            await add_balance_fn(session, member.id, refund_amount)
+                        else:
+                            add_balance_fn(session, member.id, refund_amount)
 
                     # Remove premium role privileges
                     await self._remove_premium_privileges(session, member.id)
 
                     # Commit all changes
-                    await session.commit()
+                    commit_fn = session.commit
+                    if asyncio.iscoroutinefunction(commit_fn):
+                        await commit_fn()
+                    else:
+                        commit_fn()
 
                     logger.info(
                         f"[ROLE_SALE] Successfully sold role {role.name} for {member.display_name}, "
@@ -107,7 +119,11 @@ class RoleSaleManager:
                     )
 
                 except Exception as e:
-                    await session.rollback()
+                    rollback_fn = session.rollback
+                    if asyncio.iscoroutinefunction(rollback_fn):
+                        await rollback_fn()
+                    else:
+                        rollback_fn()
                     # Try to restore role on Discord if something went wrong
                     try:
                         await member.add_roles(role)

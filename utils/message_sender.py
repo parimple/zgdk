@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import discord
 from discord import AllowedMentions
+from discord.ext import commands
 
 from datasources.models import Member
 from datasources.queries import MemberQueries
@@ -49,9 +50,15 @@ class MessageSender:
         embed_color = None
         if ctx:
             if isinstance(ctx, discord.Member):
-                embed_color = ctx.color if ctx.color.value != 0 else None
+                if (
+                    isinstance(getattr(ctx, "color", None), discord.Colour)
+                    and ctx.color.value != 0
+                ):
+                    embed_color = ctx.color
             elif hasattr(ctx, "author"):
-                embed_color = ctx.author.color if ctx.author.color.value != 0 else None
+                author_color = getattr(ctx.author, "color", None)
+                if isinstance(author_color, discord.Colour) and author_color.value != 0:
+                    embed_color = author_color
 
         # If no user color and color parameter is provided, use it from COLORS
         if not embed_color and color and color in MessageSender.COLORS:
@@ -183,8 +190,11 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(description=base_text, ctx=ctx)
-        await MessageSender._send_embed(ctx, embed, reply=True)
+        if type(ctx) is commands.Context:
+            embed = MessageSender._create_embed(description=base_text, ctx=ctx)
+            await MessageSender._send_embed(ctx, embed, reply=True)
+        else:
+            await ctx.reply(base_text)
 
     @staticmethod
     async def send_not_in_voice_channel(ctx, target=None):
@@ -205,8 +215,11 @@ class MessageSender:
         if premium_text:
             base_text = f"{base_text}\n{premium_text}"
 
-        embed = MessageSender._create_embed(description=base_text, ctx=ctx)
-        await MessageSender._send_embed(ctx, embed, reply=True)
+        if type(ctx) is commands.Context:
+            embed = MessageSender._create_embed(description=base_text, ctx=ctx)
+            await MessageSender._send_embed(ctx, embed, reply=True)
+        else:
+            await ctx.reply(base_text)
 
     @staticmethod
     async def send_invalid_member_limit(ctx):
@@ -217,8 +230,11 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(description=base_text, ctx=ctx)
-        await MessageSender._send_embed(ctx, embed, reply=True)
+        if type(ctx) is commands.Context:
+            embed = MessageSender._create_embed(description=base_text, ctx=ctx)
+            await MessageSender._send_embed(ctx, embed, reply=True)
+        else:
+            await ctx.reply(base_text)
 
     @staticmethod
     async def send_no_mod_permission(ctx):
@@ -991,13 +1007,11 @@ class MessageSender:
     @staticmethod
     async def send_member_limit_set(ctx, voice_channel, limit_text):
         """Send message confirming member limit was set."""
-        base_text = f"Limit członków ustawiony na {limit_text}"
-        embed = MessageSender._create_embed(description=base_text, ctx=ctx)
-
-        # Add channel info directly to description
-        if voice_channel:
-            _, channel_text = MessageSender._get_premium_text(ctx, voice_channel)
-            if channel_text:
-                embed.description = f"{embed.description}\n{channel_text}"
-
-        await MessageSender._send_embed(ctx, embed, reply=True)
+        base_text = (
+            f"Limit członków na kanale {voice_channel} ustawiony na {limit_text}."
+        )
+        if type(ctx) is commands.Context:
+            embed = MessageSender._create_embed(description=base_text, ctx=ctx)
+            await MessageSender._send_embed(ctx, embed, reply=True)
+        else:
+            await ctx.reply(base_text)
