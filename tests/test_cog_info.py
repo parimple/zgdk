@@ -13,6 +13,7 @@ from .utils import get_command
 def info_cog(bot: Zagadka) -> InfoCog:
     """Fixture for the InfoCog"""
     bot.session = MagicMock()
+    bot.config = {}
     return InfoCog(bot)
 
 

@@ -1,5 +1,4 @@
 """Test script for testing role deletion"""
-import asyncio
 import logging
 import sys
 from datetime import datetime, timezone
@@ -19,6 +18,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+import pytest
+
+
+@pytest.mark.asyncio
 async def test_delete_role():
     """Test the delete_member_role function"""
     logger.info("Starting test_delete_role")
@@ -56,9 +59,3 @@ async def test_delete_role():
             logger.error("Verification failed - role still exists: %s", result)
 
     logger.info("Test completed successfully")
-
-
-if __name__ == "__main__":
-    logger.info("Script started")
-    asyncio.run(test_delete_role())
-    logger.info("Script finished")

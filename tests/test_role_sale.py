@@ -19,7 +19,7 @@ def mock_bot():
             {"name": "zG500", "price": 500},
         ]
     }
-    bot.get_db = AsyncMock()
+    bot.get_db = MagicMock()
     return bot
 
 
@@ -82,8 +82,9 @@ class TestRoleSaleManager:
             # Setup the database mock
             mock_bot.get_db.return_value = mock_context_manager
 
-            mock_role_queries.get_member_role.return_value = mock_db_role
+            mock_role_queries.get_member_role = AsyncMock(return_value=mock_db_role)
             mock_member.remove_roles = AsyncMock()
+            mock_member_queries.add_to_wallet_balance = AsyncMock()
 
             # Mock SQL execution
             mock_result = MagicMock()
@@ -149,7 +150,7 @@ class TestRoleSaleManager:
             mock_bot.get_db.return_value = mock_context_manager
 
             # Role not in database
-            mock_role_queries.get_member_role.return_value = None
+            mock_role_queries.get_member_role = AsyncMock(return_value=None)
 
             success, message, refund = await sale_manager.sell_role(
                 mock_member, mock_role, mock_interaction
@@ -185,7 +186,7 @@ class TestRoleSaleManager:
             # Setup the database mock
             mock_bot.get_db.return_value = mock_context_manager
 
-            mock_role_queries.get_member_role.return_value = mock_db_role
+            mock_role_queries.get_member_role = AsyncMock(return_value=mock_db_role)
             mock_member.remove_roles = AsyncMock()
             mock_member.add_roles = AsyncMock()  # For rollback
 

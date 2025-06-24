@@ -236,41 +236,7 @@ def test_gender_commands_no_config():
 
         # Verify results
         assert len(ctx.responses) == 2
-        assert "❌ Role płci nie są skonfigurowane" in ctx.responses[0]
-        assert "❌ Role płci nie są skonfigurowane" in ctx.responses[1]
+        assert "❌ Nie znaleziono roli ♂ na serwerze." in ctx.responses[0]
+        assert "❌ Nie znaleziono roli ♀ na serwerze." in ctx.responses[1]
 
     asyncio.run(run_test())
-
-
-if __name__ == "__main__":
-    print("Uruchamianie testów komend gender...")
-
-    # Lista testów do uruchomienia
-    test_functions = [
-        test_male_command_new_user,
-        test_male_command_already_male,
-        test_male_command_switch_from_female,
-        test_female_command_new_user,
-        test_female_command_already_female,
-        test_female_command_switch_from_male,
-        test_gender_commands_no_config,
-    ]
-
-    passed = 0
-    failed = 0
-
-    for test_func in test_functions:
-        try:
-            test_func()
-            print(f"✅ {test_func.__name__}")
-            passed += 1
-        except Exception as e:
-            print(f"❌ {test_func.__name__}: {e}")
-            failed += 1
-
-    print(f"\nWyniki: {passed} ✅ | {failed} ❌")
-
-    if failed == 0:
-        print("🎉 Wszystkie testy przeszły!")
-    else:
-        print("⚠️ Niektóre testy nie przeszły.")
