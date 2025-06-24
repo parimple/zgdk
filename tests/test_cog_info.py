@@ -1,4 +1,5 @@
 """Test functions for client.py cog"""
+
 from unittest.mock import MagicMock
 
 import pytest

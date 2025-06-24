@@ -26,6 +26,8 @@ from utils.premium import PaymentData
 
 intents = discord.Intents.all()
 
+logger = logging.getLogger(__name__)
+
 
 def load_config():
     with open("config.yml", encoding="utf-8") as f:
@@ -102,7 +104,7 @@ class Zagadka(commands.Bot):
 
     async def load_cogs(self):
         """Load all cogs"""
-        logging.info("Loading cogs...")
+        logger.info("Loading cogs...")
         for folder in ("cogs/commands", "cogs/events"):
             path = os.path.join(os.getcwd(), folder)
             for cog in os.listdir(path):
@@ -111,9 +113,9 @@ class Zagadka(commands.Bot):
                         await self.load_extension(
                             f"{folder.replace('/', '.')}.{cog[:-3]}"
                         )
-                        logging.info("Loaded cog: %s", cog)
+                        logger.info("Loaded cog: %s", cog)
                     except (commands.ExtensionError, commands.CommandError) as error:
-                        logging.error("Failed to load cog: %s, error: %s", cog, error)
+                        logger.error("Failed to load cog: %s, error: %s", cog, error)
 
     async def setup_hook(self):
         """Setup hook."""
@@ -122,37 +124,37 @@ class Zagadka(commands.Bot):
 
     async def on_ready(self):
         """On ready event"""
-        logging.info("Event on_ready started")
+        logger.info("Event on_ready started")
 
         async with self.engine.begin() as conn:
             table_names = self.base.metadata.tables.keys()
-            logging.info("Creating tables: %s", ", ".join(table_names))
+            logger.info("Creating tables: %s", ", ".join(table_names))
             # await conn.run_sync(self.base.metadata.drop_all)
             await conn.run_sync(self.base.metadata.create_all)
 
-        logging.info("Database create_all completed")
+        logger.info("Database create_all completed")
 
         await self.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.playing, name="zaGadka bot"
             )
         )
-        logging.info("Event change_presence completed")
+        logger.info("Event change_presence completed")
 
         if self.guild is None:
             # Get the guild object and assign it to self.guild
             guild = self.get_guild(self.guild_id)
             if guild is None:
-                logging.error("Cannot find a guild with the ID %d.", self.guild_id)
+                logger.error("Cannot find a guild with the ID %d.", self.guild_id)
             else:
-                logging.info("Found guild: %s", guild.name)
+                logger.info("Found guild: %s", guild.name)
                 self.guild = guild
 
         if not self.test:
             await self.tree.sync(guild=discord.Object(id=self.guild_id))
-            logging.info("Slash commands synchronized")
+            logger.info("Slash commands synchronized")
 
-        logging.info("Ready")
+        logger.info("Ready")
 
     def run(self):
         """Run the bot"""

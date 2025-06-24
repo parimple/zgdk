@@ -1,4 +1,5 @@
 """Shop cog for the Zagadka bot."""
+
 import logging
 from datetime import datetime, timezone
 

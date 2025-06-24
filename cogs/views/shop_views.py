@@ -1,4 +1,5 @@
 """Views for the shop cog."""
+
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -434,9 +435,11 @@ class RoleShopView(discord.ui.View):
 
                         if view.value == "cancel" or view.value == "timeout":
                             await interaction.followup.send(
-                                "Operacja została anulowana - nie dokonano wyboru w wyznaczonym czasie."
-                                if view.value == "timeout"
-                                else "Anulowałeś operację.",
+                                (
+                                    "Operacja została anulowana - nie dokonano wyboru w wyznaczonym czasie."
+                                    if view.value == "timeout"
+                                    else "Anulowałeś operację."
+                                ),
                                 ephemeral=True,
                             )
                             return
@@ -942,7 +945,8 @@ class BuyRoleButton(discord.ui.Button):
         kwargs.setdefault("style", discord.ButtonStyle.primary)
         kwargs.setdefault("label", "Kup rolę")
         kwargs.setdefault(
-            "emoji", bot.config.get("emojis", {}).get("mastercard", "💳") if bot else "💳"
+            "emoji",
+            bot.config.get("emojis", {}).get("mastercard", "💳") if bot else "💳",
         )
         super().__init__(**kwargs)
         self.bot = bot
@@ -1260,9 +1264,11 @@ class LowerRoleChoiceView(discord.ui.View):
         buy_button = discord.ui.Button(
             label=f"Kup nową rangę {new_role_name}"
             + (" (usuwa muty)" if is_upgrade else ""),
-            style=discord.ButtonStyle.primary
-            if is_upgrade
-            else discord.ButtonStyle.secondary,
+            style=(
+                discord.ButtonStyle.primary
+                if is_upgrade
+                else discord.ButtonStyle.secondary
+            ),
             row=0,
         )
         buy_button.callback = self.buy_button_callback

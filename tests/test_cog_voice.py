@@ -1,4 +1,5 @@
 """Tests for the VoiceCog."""
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

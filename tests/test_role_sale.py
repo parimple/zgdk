@@ -1,4 +1,5 @@
 """Tests for the role sale system."""
+
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -74,10 +75,10 @@ class TestRoleSaleManager:
         mock_context_manager.__aexit__ = AsyncMock(return_value=False)
 
         # Mock all the async operations
-        with patch("utils.role_sale.RoleQueries") as mock_role_queries, patch(
-            "utils.role_sale.MemberQueries"
-        ) as mock_member_queries, patch(
-            "utils.role_sale.calculate_refund", return_value=50
+        with (
+            patch("utils.role_sale.RoleQueries") as mock_role_queries,
+            patch("utils.role_sale.MemberQueries") as mock_member_queries,
+            patch("utils.role_sale.calculate_refund", return_value=50),
         ):
             # Setup the database mock
             mock_bot.get_db.return_value = mock_context_manager
@@ -179,8 +180,9 @@ class TestRoleSaleManager:
         mock_context_manager.__aenter__ = AsyncMock(return_value=mock_session)
         mock_context_manager.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("utils.role_sale.RoleQueries") as mock_role_queries, patch(
-            "utils.role_sale.calculate_refund", return_value=50
+        with (
+            patch("utils.role_sale.RoleQueries") as mock_role_queries,
+            patch("utils.role_sale.calculate_refund", return_value=50),
         ):
             # Setup the database mock
             mock_bot.get_db.return_value = mock_context_manager

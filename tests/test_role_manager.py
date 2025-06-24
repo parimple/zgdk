@@ -59,8 +59,8 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
 
         # Member has both roles
         member.roles = [role1, role2]
-        guild.get_role.side_effect = (
-            lambda id: role1 if id == 789 else role2 if id == 101 else None
+        guild.get_role.side_effect = lambda id: (
+            role1 if id == 789 else role2 if id == 101 else None
         )
 
         # Make remove_roles a coroutine mock

@@ -711,9 +711,11 @@ class ModCog(commands.Cog):
                 color = (
                     discord.Color.green()
                     if mute_count == 0
-                    else discord.Color.orange()
-                    if mute_count < 5
-                    else discord.Color.red()
+                    else (
+                        discord.Color.orange()
+                        if mute_count < 5
+                        else discord.Color.red()
+                    )
                 )
 
                 embed = discord.Embed(
@@ -759,5 +761,4 @@ class ModCog(commands.Cog):
 
 
 async def setup(bot):
-    logging.basicConfig(level=logging.DEBUG)
     await bot.add_cog(ModCog(bot))

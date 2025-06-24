@@ -132,7 +132,7 @@ class InfoCog(commands.Cog):
     @commands.hybrid_command(name="ping", description="Sends Pong!")
     async def ping(self, ctx: commands.Context):
         """Sends Pong! when ping is used as a command."""
-        logging.info("ping")
+        logger.info("ping command invoked")
         await ctx.reply("pong")
 
     @commands.hybrid_command(
@@ -275,9 +275,11 @@ class InfoCog(commands.Cog):
         )
         embed.add_field(
             name="Dołączył:",
-            value=discord.utils.format_dt(member.joined_at, "D")
-            if member.joined_at
-            else "Brak danych",
+            value=(
+                discord.utils.format_dt(member.joined_at, "D")
+                if member.joined_at
+                else "Brak danych"
+            ),
         )
 
         # Add invite count

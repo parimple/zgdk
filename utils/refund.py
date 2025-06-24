@@ -1,4 +1,5 @@
 """Refund calculation utilities."""
+
 from datetime import datetime, timezone
 
 # Configuration constants

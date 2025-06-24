@@ -317,9 +317,9 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         # Check if this is a clean permissions category (cached)
         is_clean_perms = config["is_clean_perms"]
         if is_clean_perms:
-            permission_overwrites[
-                self.guild.default_role
-            ] = self.permission_manager._get_clean_everyone_permissions()
+            permission_overwrites[self.guild.default_role] = (
+                self.permission_manager._get_clean_everyone_permissions()
+            )
             logger.info(
                 f"Set clean permissions for @everyone in category {category_id}"
             )
@@ -433,13 +433,15 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             preserve_categories = [
                 id
                 for key, id in {
-                    "publ": self.bot.config.get("default_user_limits", {})
-                    .get("public_categories", {})
-                    .get("categories", [])[0]
-                    if self.bot.config.get("default_user_limits", {})
-                    .get("public_categories", {})
-                    .get("categories", [])
-                    else None,
+                    "publ": (
+                        self.bot.config.get("default_user_limits", {})
+                        .get("public_categories", {})
+                        .get("categories", [])[0]
+                        if self.bot.config.get("default_user_limits", {})
+                        .get("public_categories", {})
+                        .get("categories", [])
+                        else None
+                    ),
                     "max2": self.bot.config.get("default_user_limits", {})
                     .get("max_categories", {})
                     .get("max2", {})

@@ -525,9 +525,9 @@ class PremiumCog(commands.Cog):
         team_info_embed = discord.Embed(
             title=f"Team **{self.team_symbol} {name}**",
             description="Witaj w twoim nowym teamie! Oto informacje o nim:",
-            color=team_role.color
-            if team_role.color.value != 0
-            else discord.Color.blue(),
+            color=(
+                team_role.color if team_role.color.value != 0 else discord.Color.blue()
+            ),
         )
         team_info_embed.add_field(
             name="Właściciel", value=ctx.author.mention, inline=True

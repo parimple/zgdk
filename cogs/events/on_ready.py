@@ -1,4 +1,5 @@
 """On Ready Event"""
+
 import logging
 
 from discord.ext import commands

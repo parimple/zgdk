@@ -126,9 +126,11 @@ class OwnerCog(commands.Cog):
         # Przygotuj embed z wynikami
         embed = discord.Embed(
             title="Status przeładowania cogów",
-            color=discord.Color.green()
-            if all(r[1] for r in results)
-            else discord.Color.red(),
+            color=(
+                discord.Color.green()
+                if all(r[1] for r in results)
+                else discord.Color.red()
+            ),
         )
 
         # Dodaj pola dla sukcesu i błędów

@@ -1,4 +1,5 @@
 """Premium role management logic shared between shop and payment handlers."""
+
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone

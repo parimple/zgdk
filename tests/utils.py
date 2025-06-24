@@ -1,4 +1,5 @@
 """Helper functions for tests."""
+
 from discord.ext import commands
 
 

@@ -1,4 +1,5 @@
 """Module for managing premium payments and wallet"""
+
 import json
 import logging
 import random

@@ -117,9 +117,7 @@ class VoiceService(BaseService):
                 value_desc = (
                     "enabled"
                     if value == "+"
-                    else "disabled"
-                    if value == "-"
-                    else "toggled"
+                    else "disabled" if value == "-" else "toggled"
                 )
                 target_desc = (
                     target.name

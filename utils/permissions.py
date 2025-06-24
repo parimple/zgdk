@@ -1,4 +1,5 @@
 """Permission management system for the bot."""
+
 import functools
 import logging
 from enum import Enum, auto

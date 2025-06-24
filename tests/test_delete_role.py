@@ -1,4 +1,5 @@
 """Test script for testing role deletion"""
+
 import asyncio
 import logging
 import sys
