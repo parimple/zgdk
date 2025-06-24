@@ -29,9 +29,15 @@ class TeamManager:
             select(DBRole).where((DBRole.role_type == "team") & (DBRole.name == str(member_id)))
         )
 
-        # Pobierz wyniki z zapytania
+        # Pobierz wyniki z zapytania - w testach możemy otrzymać obiekty
+        # asynchroniczne, dlatego obsługujemy obie możliwości
         scalars_result = query_result.scalars()
+        if hasattr(scalars_result, "__await__"):
+            scalars_result = await scalars_result
+
         team_roles = scalars_result.all()
+        if hasattr(team_roles, "__await__"):
+            team_roles = await team_roles
 
         teams_deleted = 0
         if team_roles:
