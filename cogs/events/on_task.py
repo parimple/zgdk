@@ -317,10 +317,10 @@ class OnTaskEvent(commands.Cog):
             recent_notifications = []
             notification_tags_to_check = [
                 "premium_role_expiry",  # Powiadomienie o wygasaniu
-                f"premium_expired",     # Powiadomienie o usunięciu wygasłej roli
+                f"premium_expired",  # Powiadomienie o usunięciu wygasłej roli
                 f"audit_removal_{discord_role.name}",  # Powiadomienie z audytu dla tej konkretnej roli
             ]
-            
+
             for tag in notification_tags_to_check:
                 notification_log = await NotificationLogQueries.get_notification_log(
                     session, member.id, tag
