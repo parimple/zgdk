@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import discord
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +15,6 @@ from datasources.queries import (
     get_member_ranking_position,
     get_member_total_points,
     get_ranking_tier,
-    get_top_members_by_points,
 )
 
 logger = logging.getLogger(__name__)

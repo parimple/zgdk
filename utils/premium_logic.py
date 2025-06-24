@@ -1,15 +1,13 @@
 """Premium role management logic shared between shop and payment handlers."""
+
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Optional, Tuple
 
 import discord
-from discord.ext.commands import Context
 
-from datasources.queries import MemberQueries, RoleQueries
-from utils.currency import CURRENCY_UNIT
-from utils.refund import calculate_refund
+from datasources.queries import RoleQueries
 
 logger = logging.getLogger(__name__)
 

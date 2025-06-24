@@ -4,7 +4,7 @@ import logging
 from typing import Literal, Optional
 
 import discord
-from discord import Member, PermissionOverwrite, Permissions
+from discord import PermissionOverwrite
 from discord.ext import commands
 
 from datasources.queries import ChannelPermissionQueries

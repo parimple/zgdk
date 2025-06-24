@@ -1,12 +1,10 @@
 """Message sender utility for sending formatted messages."""
 
-import random
 from datetime import datetime, timezone
 
 import discord
 from discord import AllowedMentions
 
-from datasources.models import Member
 from datasources.queries import MemberQueries
 from utils.bump_checker import BumpChecker
 

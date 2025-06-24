@@ -1,14 +1,12 @@
 """Shop service providing an interface to shop functionality."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import discord
-from discord.ext.commands import Context
 
-from utils.errors import ResourceNotFoundError, ZGDKError
 from utils.managers.shop_manager import ShopManager
-from utils.services import BaseService, ServiceResult
+from utils.services import BaseService
 
 
 class ShopService(BaseService):

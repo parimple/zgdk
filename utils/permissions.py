@@ -1,8 +1,8 @@
 """Permission management system for the bot."""
-import functools
+
 import logging
 from enum import Enum, auto
-from typing import List, Optional, Union
+from typing import List, Union
 
 import discord
 from discord import app_commands

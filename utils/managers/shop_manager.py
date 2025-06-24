@@ -1,13 +1,11 @@
 """Shop manager for business logic related to the shop."""
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import discord
-from discord.ext.commands import Context
 
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
-from utils.errors import BusinessRuleViolationError, ResourceNotFoundError
 from utils.managers import BaseManager
 from utils.premium import PaymentData
 

@@ -8,7 +8,7 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import discord
 from discord.ext import commands
@@ -322,9 +322,11 @@ class MessageCleaner:
         if target_id is None and not ctx.author.guild_permissions.administrator:
             embed = discord.Embed(
                 description="Musisz podać użytkownika, którego wiadomości chcesz usunąć.",
-                color=ctx.author.color
-                if ctx.author.color.value != 0
-                else discord.Color.red(),
+                color=(
+                    ctx.author.color
+                    if ctx.author.color.value != 0
+                    else discord.Color.red()
+                ),
             )
             await ctx.send(embed=embed)
             return
@@ -340,9 +342,11 @@ class MessageCleaner:
             if not confirm:
                 embed = discord.Embed(
                     description="Anulowano usuwanie wiadomości.",
-                    color=ctx.author.color
-                    if ctx.author.color.value != 0
-                    else discord.Color.blue(),
+                    color=(
+                        ctx.author.color
+                        if ctx.author.color.value != 0
+                        else discord.Color.blue()
+                    ),
                 )
                 await ctx.send(embed=embed)
                 return
@@ -371,9 +375,11 @@ class MessageCleaner:
         message = f"Usunięto łącznie {deleted_count} wiadomości{' ze wszystkich kanałów' if all_channels else ''}.\nWybierz swój <#{premium_info_id}> {mastercard}"
         embed = discord.Embed(
             description=message,
-            color=ctx.author.color
-            if ctx.author.color.value != 0
-            else discord.Color.green(),
+            color=(
+                ctx.author.color
+                if ctx.author.color.value != 0
+                else discord.Color.green()
+            ),
         )
         await ctx.send(embed=embed)
 
@@ -459,9 +465,11 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description="Nie mam uprawnień do usuwania wiadomości na tym kanale.",
-                    color=ctx.author.color
-                    if ctx.author.color.value != 0
-                    else discord.Color.red(),
+                    color=(
+                        ctx.author.color
+                        if ctx.author.color.value != 0
+                        else discord.Color.red()
+                    ),
                 )
             )
             return total_deleted
@@ -470,9 +478,11 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description=f"Wystąpił błąd podczas usuwania wiadomości: {e}",
-                    color=ctx.author.color
-                    if ctx.author.color.value != 0
-                    else discord.Color.red(),
+                    color=(
+                        ctx.author.color
+                        if ctx.author.color.value != 0
+                        else discord.Color.red()
+                    ),
                 )
             )
             return total_deleted
@@ -481,9 +491,11 @@ class MessageCleaner:
             await status_message.edit(
                 embed=discord.Embed(
                     description=f"Wystąpił nieoczekiwany błąd: {e}",
-                    color=ctx.author.color
-                    if ctx.author.color.value != 0
-                    else discord.Color.red(),
+                    color=(
+                        ctx.author.color
+                        if ctx.author.color.value != 0
+                        else discord.Color.red()
+                    ),
                 )
             )
             return total_deleted
@@ -620,9 +632,11 @@ class MessageCleaner:
         embed = discord.Embed(
             title="Potwierdzenie",
             description=message,
-            color=ctx.author.color
-            if ctx.author.color.value != 0
-            else discord.Color.orange(),
+            color=(
+                ctx.author.color
+                if ctx.author.color.value != 0
+                else discord.Color.orange()
+            ),
         )
 
         view = discord.ui.View()

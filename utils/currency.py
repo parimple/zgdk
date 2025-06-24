@@ -1,7 +1,5 @@
 """Currency conversion utilities"""
 
-import math
-
 CURRENCY_UNIT = "G"
 PLN_TO_G_RATIO = 1  # 1 PLN = 1G
 

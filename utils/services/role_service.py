@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import discord
 
-from utils.errors import ResourceNotFoundError, ZGDKError
+from utils.errors import ResourceNotFoundError
 from utils.managers.role_manager import RoleManager
 from utils.services import BaseService
 

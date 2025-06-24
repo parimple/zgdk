@@ -651,10 +651,11 @@ class RoleManager(BaseManager):
                         "name": role_name,
                         "type": role.role_type,
                         "expiry_date": member_role.expiration_date,
-                        "has_role_on_discord": discord_role
-                        in self.bot.guild.get_member(member_id).roles
-                        if discord_role and self.bot.guild.get_member(member_id)
-                        else False,
+                        "has_role_on_discord": (
+                            discord_role in self.bot.guild.get_member(member_id).roles
+                            if discord_role and self.bot.guild.get_member(member_id)
+                            else False
+                        ),
                     }
                 else:
                     # Get all roles
@@ -683,10 +684,13 @@ class RoleManager(BaseManager):
                                 "name": role_name,
                                 "type": role.role_type,
                                 "expiry_date": member_role.expiration_date,
-                                "has_role_on_discord": discord_role
-                                in self.bot.guild.get_member(member_id).roles
-                                if discord_role and self.bot.guild.get_member(member_id)
-                                else False,
+                                "has_role_on_discord": (
+                                    discord_role
+                                    in self.bot.guild.get_member(member_id).roles
+                                    if discord_role
+                                    and self.bot.guild.get_member(member_id)
+                                    else False
+                                ),
                             }
                         )
 

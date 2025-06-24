@@ -1,21 +1,18 @@
 """Voice system manager for handling voice channel operations."""
 
-import asyncio
 import logging
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import discord
 from discord import (
-    CategoryChannel,
     Member,
     PermissionOverwrite,
     Permissions,
-    TextChannel,
     VoiceChannel,
 )
 
 from datasources.queries import AutoKickQueries, ChannelPermissionQueries
-from utils.errors import PermissionError, ResourceNotFoundError
+from utils.errors import PermissionError
 from utils.managers import BaseManager
 from utils.message_sender import MessageSender
 

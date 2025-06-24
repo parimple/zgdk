@@ -1,11 +1,11 @@
 """Voice service providing an interface to voice channel functionality."""
 
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple, Union
 
 import discord
-from discord import Member, PermissionOverwrite, VoiceChannel
+from discord import Member, VoiceChannel
 
-from utils.errors import PermissionError, ResourceNotFoundError, ZGDKError
+from utils.errors import PermissionError
 from utils.managers.voice_manager import VoiceManager
 from utils.message_sender import MessageSender
 from utils.services import BaseService
@@ -117,9 +117,7 @@ class VoiceService(BaseService):
                 value_desc = (
                     "enabled"
                     if value == "+"
-                    else "disabled"
-                    if value == "-"
-                    else "toggled"
+                    else "disabled" if value == "-" else "toggled"
                 )
                 target_desc = (
                     target.name
