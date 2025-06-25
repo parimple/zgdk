@@ -61,12 +61,12 @@ class GenderManager:
         """
         try:
             gender_config = self.config.get("gender_roles", {})
-            
+
             # Sprawdź czy konfiguracja gender_roles istnieje
             if not gender_config:
                 await ctx.send("❌ Role płci nie są skonfigurowane.", ephemeral=True)
                 return
-                
+
             male_id = gender_config.get("male")
             female_id = gender_config.get("female")
 
