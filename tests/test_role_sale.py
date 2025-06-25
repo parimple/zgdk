@@ -19,7 +19,7 @@ def mock_bot():
             {"name": "zG500", "price": 500},
         ]
     }
-    bot.get_db = AsyncMock()
+    # Nie ustawiamy get_db tutaj - pozwolimy testom to kontrolować
     return bot
 
 
@@ -79,16 +79,20 @@ class TestRoleSaleManager:
         ) as mock_member_queries, patch(
             "utils.role_sale.calculate_refund", return_value=50
         ):
-            # Setup the database mock
-            mock_bot.get_db.return_value = mock_context_manager
+            # Setup the database mock - get_db powinno być funkcją zwracającą context manager
+            mock_bot.get_db = MagicMock(return_value=mock_context_manager)
 
-            mock_role_queries.get_member_role.return_value = mock_db_role
+            # Mock async queries
+            mock_role_queries.get_member_role = AsyncMock(return_value=mock_db_role)
+            mock_member_queries.add_to_wallet_balance = AsyncMock()
             mock_member.remove_roles = AsyncMock()
 
-            # Mock SQL execution
+            # Mock SQL execution - session.execute musi być AsyncMock
             mock_result = MagicMock()
             mock_result.rowcount = 1
-            mock_session.execute.return_value = mock_result
+            mock_session.execute = AsyncMock(return_value=mock_result)
+            mock_session.commit = AsyncMock()
+            mock_session.rollback = AsyncMock()
 
             # Mock _remove_premium_privileges
             sale_manager._remove_premium_privileges = AsyncMock()
@@ -145,11 +149,11 @@ class TestRoleSaleManager:
         mock_context_manager.__aexit__ = AsyncMock(return_value=False)
 
         with patch("utils.role_sale.RoleQueries") as mock_role_queries:
-            # Setup the database mock
-            mock_bot.get_db.return_value = mock_context_manager
+            # Setup the database mock - get_db powinno być funkcją zwracającą context manager
+            mock_bot.get_db = MagicMock(return_value=mock_context_manager)
 
-            # Role not in database
-            mock_role_queries.get_member_role.return_value = None
+            # Role not in database - mock as AsyncMock
+            mock_role_queries.get_member_role = AsyncMock(return_value=None)
 
             success, message, refund = await sale_manager.sell_role(
                 mock_member, mock_role, mock_interaction
@@ -182,17 +186,20 @@ class TestRoleSaleManager:
         with patch("utils.role_sale.RoleQueries") as mock_role_queries, patch(
             "utils.role_sale.calculate_refund", return_value=50
         ):
-            # Setup the database mock
-            mock_bot.get_db.return_value = mock_context_manager
+            # Setup the database mock - get_db powinno być funkcją zwracającą context manager
+            mock_bot.get_db = MagicMock(return_value=mock_context_manager)
 
-            mock_role_queries.get_member_role.return_value = mock_db_role
+            # Mock async queries
+            mock_role_queries.get_member_role = AsyncMock(return_value=mock_db_role)
             mock_member.remove_roles = AsyncMock()
             mock_member.add_roles = AsyncMock()  # For rollback
 
-            # Mock SQL execution failure
+            # Mock SQL execution failure - session.execute musi być AsyncMock
             mock_result = MagicMock()
             mock_result.rowcount = 0  # No rows deleted
-            mock_session.execute.return_value = mock_result
+            mock_session.execute = AsyncMock(return_value=mock_result)
+            mock_session.commit = AsyncMock()
+            mock_session.rollback = AsyncMock()
 
             success, message, refund = await sale_manager.sell_role(
                 mock_member, mock_role, mock_interaction
