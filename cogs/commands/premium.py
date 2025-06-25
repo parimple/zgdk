@@ -90,12 +90,16 @@ class PremiumCog(commands.Cog):
         # Konfiguracja kolorów
         color_config = self.bot.config.get("color", {})
         self.color_role_name = color_config.get("role_name", "✎")
-        self.base_role_id = color_config.get("base_role_id", 960665311772803184)
+        self.base_role_id = color_config.get("base_role_id")
+        if not self.base_role_id:
+            logger.warning("base_role_id not configured")
 
         # Konfiguracja teamów
         team_config = self.bot.config.get("team", {})
         self.team_symbol = team_config.get("symbol", "☫")
-        self.team_base_role_id = team_config.get("base_role_id", 960665311730868240)
+        self.team_base_role_id = team_config.get("base_role_id")
+        if not self.team_base_role_id:
+            logger.warning("team base_role_id not configured")
         self.team_category_id = team_config.get("category_id", 1344105013357842522)
 
         self.message_sender = MessageSender()
