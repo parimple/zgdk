@@ -1,11 +1,9 @@
-import asyncio
 import unittest
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
 
-from datasources.queries import RoleQueries
 from utils.role_manager import RoleManager
 
 

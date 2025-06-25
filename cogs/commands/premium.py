@@ -1,22 +1,17 @@
 """Premium commands cog for premium features like role colors and more."""
 
-import io
 import logging
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-import aiohttp
 import discord
 import httpx
 from colour import Color
 from discord import app_commands
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
 
-from datasources.models import MemberRole
 from datasources.models import Role as DBRole
-from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 from utils.permissions import is_admin, is_zagadka_owner
 from utils.premium_checker import PremiumChecker

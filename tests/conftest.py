@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock
 
-import pytest
 import discord
+import pytest
 from discord.ext import commands
 
 
@@ -19,7 +19,7 @@ def bot() -> MagicMock:
             {"name": "zG50", "moderator_count": 1},
             {"name": "zG100", "moderator_count": 2},
             {"name": "zG500", "moderator_count": 5},
-            {"name": "zG1000", "moderator_count": 10}
+            {"name": "zG1000", "moderator_count": 10},
         ],
         "prefix": ",",
         "channels_voice": {"afk": 123456789},
@@ -30,10 +30,16 @@ def bot() -> MagicMock:
                 "connect": {"require_bypass_if_no_role": True},
                 "text": {"require_bypass_if_no_role": True},
                 "live": {"require_bypass_if_no_role": True},
-                "mod": {"require_bypass_if_no_role": False, "allowed_roles": ["zG50", "zG100", "zG500", "zG1000"]},
-                "autokick": {"require_bypass_if_no_role": False, "allowed_roles": ["zG500", "zG1000"]}
+                "mod": {
+                    "require_bypass_if_no_role": False,
+                    "allowed_roles": ["zG50", "zG100", "zG500", "zG1000"],
+                },
+                "autokick": {
+                    "require_bypass_if_no_role": False,
+                    "allowed_roles": ["zG500", "zG1000"],
+                },
             }
-        }
+        },
     }
     return bot_mock
 

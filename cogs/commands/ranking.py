@@ -1,7 +1,6 @@
 """Ranking commands for the activity/points system."""
 
 import logging
-from datetime import datetime, timezone
 
 import discord
 from discord import app_commands

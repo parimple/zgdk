@@ -1,21 +1,16 @@
 """On Member Join Event"""
 
-import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
 import discord
-import sqlalchemy.exc
-from discord import AllowedMentions, utils
+from discord import AllowedMentions
 from discord.ext import commands, tasks
-from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 
 from datasources.queries import (
     ChannelPermissionQueries,
     InviteQueries,
     MemberQueries,
-    NotificationLogQueries,
     RoleQueries,
 )
 

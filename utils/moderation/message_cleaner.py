@@ -8,7 +8,7 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import discord
 from discord.ext import commands

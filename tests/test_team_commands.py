@@ -56,4 +56,4 @@ async def test_team_create_when_user_is_already_team_owner():
     cog._send_premium_embed.assert_called_once()
     description = cog._send_premium_embed.call_args[1]["description"]
     assert "Posiadasz już team" in description
-    assert "Nie możesz stworzyć kolejnego" in description 
+    assert "Nie możesz stworzyć kolejnego" in description

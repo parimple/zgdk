@@ -12,8 +12,6 @@ from discord.ext import commands, tasks
 
 from cogs.commands.info import remove_premium_role_mod_permissions
 from datasources.queries import (
-    ChannelPermissionQueries,
-    HandledPaymentQueries,
     MemberQueries,
     ModerationLogQueries,
     NotificationLogQueries,

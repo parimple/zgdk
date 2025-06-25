@@ -1,12 +1,9 @@
 import asyncio
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-import discord
-
 from utils.moderation.mute_manager import MuteManager
-from utils.moderation.mute_type import MuteType
 
 
 class TestMuteManager(unittest.TestCase):

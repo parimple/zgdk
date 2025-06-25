@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
 import pytest
-from sqlalchemy import select
 
 from datasources.models import Role as DBRole
 from utils.team_manager import TeamManager

@@ -8,13 +8,10 @@ from typing import Literal, Optional
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.ext.commands import Greedy
-from discord.ui import Button, View
 
-from datasources.queries import HandledPaymentQueries, MemberQueries
+from datasources.queries import HandledPaymentQueries
 from utils.message_sender import MessageSender
 from utils.permissions import is_zagadka_owner
-from utils.premium import PaymentData, PremiumManager, TipplyDataProvider
 
 logger = logging.getLogger(__name__)
 

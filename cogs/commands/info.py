@@ -1,6 +1,5 @@
 """Info cog."""
 
-import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
@@ -15,7 +14,6 @@ from datasources.queries import (
     ChannelPermissionQueries,
     InviteQueries,
     MemberQueries,
-    NotificationLogQueries,
     RoleQueries,
 )
 from utils.currency import CURRENCY_UNIT

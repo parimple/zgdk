@@ -7,9 +7,8 @@ from discord.ext.commands import Context
 
 from cogs.ui.shop_embeds import create_role_description_embed, create_shop_embed
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
-from utils.currency import CURRENCY_UNIT
 from utils.message_sender import MessageSender
-from utils.premium_logic import PARTIAL_EXTENSIONS, PREMIUM_PRIORITY, PremiumRoleManager
+from utils.premium_logic import PremiumRoleManager
 from utils.refund import calculate_refund
 
 # Configuration constants

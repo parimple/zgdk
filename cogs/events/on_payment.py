@@ -5,15 +5,12 @@ On Payments Event Cog
 import asyncio
 import logging
 import os
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import discord
 from discord.ext import commands, tasks
 
-from cogs.ui.shop_embeds import create_shop_embed
-from cogs.views.shop_views import BuyRoleButton, RoleShopView
-from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
+from cogs.views.shop_views import BuyRoleButton
+from datasources.queries import HandledPaymentQueries, MemberQueries
 from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager, TipplyDataProvider
 from utils.premium_logic import PREMIUM_PRIORITY, PremiumRoleManager

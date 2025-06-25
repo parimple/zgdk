@@ -1,6 +1,5 @@
 """Simplified role sale logic with better error handling and atomicity."""
 import logging
-from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 import discord

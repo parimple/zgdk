@@ -1,10 +1,6 @@
 """Test gender commands functionality."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import discord
-import pytest
 
 # Test configuration
 TEST_GUILD_ID = 960665311701528596

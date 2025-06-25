@@ -3,7 +3,6 @@ SQLAlchemy models for the database.
 """
 
 from datetime import datetime, timezone
-from typing import List, Optional
 
 from sqlalchemy import (
     BigInteger,

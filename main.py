@@ -3,7 +3,6 @@
 Main file for Zagadka bot.
 """
 
-import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -15,8 +14,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
-    async_scoped_session,
-    async_sessionmaker,
     create_async_engine,
 )
 from sqlalchemy.orm import sessionmaker

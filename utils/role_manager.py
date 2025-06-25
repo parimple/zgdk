@@ -6,14 +6,13 @@ na serwerze Discord, w tym rolami premium i wyciszeniami.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 import discord
 from discord import AllowedMentions
-from discord.ext import commands
 
-from datasources.queries import MemberQueries, NotificationLogQueries, RoleQueries
+from datasources.queries import NotificationLogQueries, RoleQueries
 
 logger = logging.getLogger(__name__)
 

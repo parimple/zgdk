@@ -1,14 +1,11 @@
-import asyncio
 import logging
-import re
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple, Union
+from datetime import datetime, timezone
+from typing import Optional
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
-from datasources.queries import MemberQueries, ModerationLogQueries, RoleQueries
+from datasources.queries import ModerationLogQueries
 from utils.message_sender import MessageSender
 from utils.moderation import (
     GenderManager,
@@ -17,7 +14,7 @@ from utils.moderation import (
     MuteManager,
     MuteType,
 )
-from utils.permissions import is_admin, is_mod_or_admin, is_owner_or_admin
+from utils.permissions import is_mod_or_admin, is_owner_or_admin
 
 logger = logging.getLogger(__name__)
 

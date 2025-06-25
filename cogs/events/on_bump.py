@@ -1,15 +1,12 @@
-import asyncio
 import logging
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
+from typing import Optional
 
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
-from sqlalchemy import select
+from discord.ext import commands
 
-from datasources.models import Member, NotificationLog
 from datasources.queries import MemberQueries, NotificationLogQueries
 from utils.message_sender import MessageSender
 

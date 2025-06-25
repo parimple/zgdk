@@ -1,6 +1,5 @@
 """Activity tracking event handlers for the ranking system."""
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Set

@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import random
-from collections import deque
 
 import discord
 from discord.ext import commands

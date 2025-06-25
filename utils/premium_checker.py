@@ -5,13 +5,11 @@ Premium role and bypass checking functionality.
 import logging
 from datetime import datetime, timezone
 from enum import IntEnum
-from functools import wraps
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import discord
 from discord.ext import commands
 
-from datasources.models import Member
 from datasources.queries import InviteQueries, MemberQueries
 from utils.message_sender import MessageSender
 
