@@ -48,4 +48,4 @@ COPY . .
 RUN ls -la main.py
 
 # Run the bot
-CMD ["python", "main.py", "&"]
+CMD ["python", "main.py"]

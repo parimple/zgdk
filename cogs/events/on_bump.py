@@ -7,6 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from datasources.models import Member
 from datasources.queries import MemberQueries, NotificationLogQueries
 from utils.message_sender import MessageSender
 

@@ -295,41 +295,76 @@ class TipplyDataProvider(DataProvider):
 
     async def fetch_payments(self) -> list[PaymentData]:
         """Fetch Payments from the Tipply widget"""
+        browser = None
         try:
             async with async_playwright() as playwright:
-                browser = await playwright.chromium.launch()
+                browser = await playwright.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--disable-web-security",
+                        "--disable-features=VizDisplayCompositor",
+                        "--disable-extensions",
+                        "--disable-background-timer-throttling",
+                        "--disable-backgrounding-occluded-windows",
+                        "--disable-renderer-backgrounding",
+                        "--single-process",
+                    ],
+                )
                 page = await browser.new_page()
-                await page.goto(self.widget_url)
-                await page.wait_for_selector(".ListItemWrapper-sc-1ode8mk-0")
-                content = await page.content()
-                soup = BeautifulSoup(content, "html.parser")
-                payments = []
-                for div in soup.find_all(
-                    "div",
-                    {"class": "ListItemWrapper-sc-1ode8mk-0 eYIAvf single-element"},
-                ):
-                    name = div.find("span", {"data-element": "nickname"}).text
-                    amount_str = div.find(
-                        "span", {"data-element": "price"}
-                    ).text.replace(",", ".")
-                    amount_str = amount_str.replace(" zł", "")
-                    # Konwertujemy na grosze, zaokrąglamy w górę jeśli >= 99 groszy, w dół jeśli mniej
-                    amount_groszy = round(float(amount_str) * 100)
-                    amount = (
-                        (amount_groszy + 99) // 100
-                        if amount_groszy % 100 >= 99
-                        else amount_groszy // 100
+                try:
+                    await page.goto(self.widget_url, timeout=30000)
+                    await page.wait_for_selector(
+                        ".ListItemWrapper-sc-1ode8mk-0", timeout=15000
                     )
-                    payment_time = datetime.now(timezone.utc)
-                    payment_data = PaymentData(
-                        name, amount, payment_time, self.payment_type
-                    )
-                    payments.append(payment_data)
-                await browser.close()
-            return payments
+                    content = await page.content()
+                    soup = BeautifulSoup(content, "html.parser")
+                    payments = []
+                    for div in soup.find_all(
+                        "div",
+                        {"class": "ListItemWrapper-sc-1ode8mk-0 eYIAvf single-element"},
+                    ):
+                        name = div.find("span", {"data-element": "nickname"}).text
+                        amount_str = div.find(
+                            "span", {"data-element": "price"}
+                        ).text.replace(",", ".")
+                        amount_str = amount_str.replace(" zł", "")
+                        # Konwertujemy na grosze, zaokrąglamy w górę jeśli >= 99 groszy, w dół jeśli mniej
+                        amount_groszy = round(float(amount_str) * 100)
+                        amount = (
+                            (amount_groszy + 99) // 100
+                            if amount_groszy % 100 >= 99
+                            else amount_groszy // 100
+                        )
+                        payment_time = datetime.now(timezone.utc)
+                        payment_data = PaymentData(
+                            name, amount, payment_time, self.payment_type
+                        )
+                        payments.append(payment_data)
+                    return payments
+                finally:
+                    # Zawsze zamknij stronę
+                    if page:
+                        await page.close()
         except Exception as e:
             logger.error(f"Error fetching payments: {str(e)}")
             return []
+        finally:
+            # Zawsze zamknij przeglądarkę
+            if browser:
+                try:
+                    await browser.close()
+                    # Dodatkowy cleanup procesów
+                    browser_process = getattr(browser, "_browser_process", None)
+                    if browser_process and hasattr(browser_process, "kill"):
+                        try:
+                            browser_process.kill()
+                        except Exception:
+                            pass
+                except Exception as cleanup_error:
+                    logger.error(f"Error during browser cleanup: {cleanup_error}")
 
     async def get_data(self, session):
         try:

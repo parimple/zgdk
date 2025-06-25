@@ -3,8 +3,11 @@
 Main file for Zagadka bot.
 """
 
+import asyncio
 import logging
 import os
+import signal
+import subprocess
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
@@ -24,6 +27,29 @@ intents = discord.Intents.all()
 def load_config():
     with open("config.yml", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def cleanup_zombie_processes():
+    """Cleanup zombie processes from previous Playwright sessions"""
+    try:
+        # Kill all headless_shell processes
+        subprocess.run(["pkill", "-f", "headless_shell"], capture_output=True)
+
+        # Kill orphaned Chrome processes
+        subprocess.run(["pkill", "-f", "chrome.*--headless"], capture_output=True)
+
+        # Wait a moment for processes to terminate
+        import time
+
+        time.sleep(0.5)
+
+        # Force kill if still running
+        subprocess.run(["pkill", "-9", "-f", "headless_shell"], capture_output=True)
+        subprocess.run(["pkill", "-9", "-f", "chrome.*--headless"], capture_output=True)
+
+        logging.info("Cleaned up zombie browser processes")
+    except Exception as e:
+        logging.warning(f"Error during zombie process cleanup: {e}")
 
 
 class Zagadka(commands.Bot):
@@ -179,6 +205,10 @@ def setup_logging():
 
 if __name__ == "__main__":
     setup_logging()
+
+    # Cleanup zombie processes before starting
+    cleanup_zombie_processes()
+
     config = load_config()
     bot = Zagadka(config=config)
     bot.run()

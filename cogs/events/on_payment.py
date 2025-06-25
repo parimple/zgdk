@@ -5,6 +5,7 @@ On Payments Event Cog
 import asyncio
 import logging
 import os
+import subprocess
 
 import discord
 from discord.ext import commands, tasks
@@ -21,6 +22,23 @@ TOKEN = os.environ.get("TIPO_API_TOKEN")
 
 # Flaga do łatwego wyłączenia starego systemu po testach
 LEGACY_SYSTEM_ENABLED = True
+
+# Licznik do cleanup zombie procesów co 10 minut
+cleanup_counter = 0
+
+
+def cleanup_zombie_browser_processes():
+    """Cleanup zombie browser processes"""
+    try:
+        subprocess.run(
+            ["pkill", "-f", "headless_shell"], capture_output=True, timeout=5
+        )
+        subprocess.run(
+            ["pkill", "-f", "chrome.*--headless"], capture_output=True, timeout=5
+        )
+        logger.debug("Cleaned up zombie browser processes")
+    except Exception as e:
+        logger.warning(f"Error during zombie browser cleanup: {e}")
 
 
 class OnPaymentEvent(commands.Cog):
@@ -43,6 +61,14 @@ class OnPaymentEvent(commands.Cog):
     @tasks.loop(minutes=1.0)
     async def check_payments(self):
         """Check Payments"""
+        global cleanup_counter
+        cleanup_counter += 1
+
+        # Co 10 minut (10 iteracji po 1 minucie) czyść zombie procesy
+        if cleanup_counter >= 10:
+            cleanup_zombie_browser_processes()
+            cleanup_counter = 0
+
         try:
             async with self.bot.get_db() as session:
                 payments_data = await self.data_provider.get_data(session)
