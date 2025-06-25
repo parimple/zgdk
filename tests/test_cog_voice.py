@@ -27,7 +27,7 @@ async def test_limit_command(
     await limit_command.callback(voice_cog, ctx, 5)
     # Bot teraz wysyła embed zamiast prostego tekstu
     ctx.reply.assert_called_once()
-    assert 'embed' in ctx.reply.call_args.kwargs
+    assert "embed" in ctx.reply.call_args.kwargs
     ctx.send.reset_mock()
     ctx.reply.reset_mock()
 
@@ -36,11 +36,10 @@ async def test_limit_command(
     voice_channel.edit = AsyncMock()
     ctx.author.voice = MagicMock(channel=voice_channel)
 
-    # Test when max_members is 0 (should be converted to 1)
+    # Test when max_members is out of range
     await limit_command.callback(voice_cog, ctx, 0)
-    voice_channel.edit.assert_called_once_with(user_limit=1)  # 0 -> 1
-    ctx.reply.assert_called_once()
-    assert 'embed' in ctx.reply.call_args.kwargs
+    voice_channel.edit.assert_not_called()
+    ctx.reply.assert_called_once_with("Limit musi być między 1 a 99")
     ctx.reply.reset_mock()
     voice_channel.edit.reset_mock()
 
@@ -50,4 +49,4 @@ async def test_limit_command(
     voice_channel.edit.assert_called_once_with(user_limit=max_members)
     # Bot teraz wysyła embed zamiast prostego tekstu
     ctx.reply.assert_called_once()
-    assert 'embed' in ctx.reply.call_args.kwargs
+    assert "embed" in ctx.reply.call_args.kwargs

@@ -101,11 +101,30 @@ class MessageSender:
         if allowed_mentions is None:
             allowed_mentions = AllowedMentions(users=False, roles=False)
 
-        if reply:
-            return await ctx.reply(
+        # Support both commands.Context and discord.Interaction
+        if hasattr(ctx, "reply"):
+            if reply:
+                return await ctx.reply(
+                    embed=embed, allowed_mentions=allowed_mentions, view=view
+                )
+            return await ctx.send(
                 embed=embed, allowed_mentions=allowed_mentions, view=view
             )
-        return await ctx.send(embed=embed, allowed_mentions=allowed_mentions, view=view)
+
+        if hasattr(ctx, "response"):
+            send_func = (
+                ctx.followup.send
+                if ctx.response.is_done()
+                else ctx.response.send_message
+            )
+            return await send_func(
+                embed=embed,
+                allowed_mentions=allowed_mentions,
+                view=view,
+                ephemeral=False,
+            )
+
+        raise TypeError("Unsupported context for sending messages")
 
     @staticmethod
     def build_description(base_text: str, ctx, channel=None) -> str:

@@ -231,6 +231,9 @@ class VoiceCog(commands.Cog):
     )
     async def limit(self, ctx, max_members: int):
         """Zmień maksymalną liczbę członków, którzy mogą dołączyć do bieżącego kanału głosowego."""
+        if max_members < 1 or max_members > 99:
+            await ctx.reply("Limit musi być między 1 a 99")
+            return
         await self.channel_manager.set_channel_limit(ctx, max_members)
 
     @commands.hybrid_command(aliases=["vc"])
