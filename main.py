@@ -12,10 +12,7 @@ import discord
 import yaml
 from discord.ext import commands
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from datasources.models import Base
