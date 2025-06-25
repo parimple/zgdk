@@ -120,7 +120,7 @@ class RoleSaleManager:
             logger.error(f"[ROLE_SALE] Unexpected error: {e}")
             return False, "Wystąpił nieoczekiwany błąd.", None
 
-    async def _remove_premium_privileges(self, session, member_id: int):
+    async def _remove_premium_privileges(self, session, member_id: int) -> None:
         """Remove premium role privileges (teams, mod permissions)."""
         try:
             # Import here to avoid circular imports

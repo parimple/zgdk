@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 class ChannelPermissionManager:
     """Manages channel permissions and their synchronization with the database."""
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         self.bot = bot
         self.logger = logging.getLogger(__name__)
 
     def get_default_permission_overwrites(
         self, guild: discord.Guild, owner: Member
-    ) -> dict:
+    ) -> dict[discord.abc.Snowflake, PermissionOverwrite]:
         """
         Get the default permission overwrites for a voice channel.
 
@@ -54,7 +54,7 @@ class ChannelPermissionManager:
 
     async def reset_user_permissions(
         self, channel: discord.VoiceChannel, owner: Member, target: Member
-    ):
+    ) -> None:
         """
         Reset permissions for a specific user.
 
@@ -74,7 +74,7 @@ class ChannelPermissionManager:
 
     async def reset_channel_permissions(
         self, channel: discord.VoiceChannel, owner: Member
-    ):
+    ) -> None:
         """
         Reset all channel permissions to default.
 
@@ -96,7 +96,7 @@ class ChannelPermissionManager:
 
     async def add_db_overwrites_to_permissions(
         self, guild: discord.Guild, member_id: int, permission_overwrites: dict
-    ) -> dict:
+    ) -> dict[discord.abc.Snowflake, PermissionOverwrite]:
         """
         Fetch permissions from the database and add them to the provided permission_overwrites dict.
 
@@ -152,7 +152,7 @@ class ChannelPermissionManager:
 
     async def add_remaining_overwrites(
         self, channel: discord.VoiceChannel, remaining_overwrites: dict
-    ):
+    ) -> None:
         """
         Add remaining overwrites to the channel.
 

@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 class VoiceChannelManager:
     """Manages voice channel operations."""
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         self.bot = bot
         self.message_sender = MessageSender()
 
-    async def join_channel(self, ctx):
+    async def join_channel(self, ctx) -> None:
         """Joins the voice channel of the command author."""
         if ctx.author.voice is None:
             await self.message_sender.send_not_in_voice_channel(ctx)
@@ -32,7 +32,7 @@ class VoiceChannelManager:
 
         await self.message_sender.send_joined_channel(ctx, channel)
 
-    async def set_channel_limit(self, ctx, max_members: int):
+    async def set_channel_limit(self, ctx, max_members: int) -> None:
         """Sets the member limit for the current voice channel."""
         if ctx.author.voice is None:
             await self.message_sender.send_not_in_voice_channel(ctx)
@@ -51,7 +51,7 @@ class VoiceChannelManager:
 
     async def get_channel_info(
         self, channel: discord.VoiceChannel, member: discord.Member
-    ):
+    ) -> dict[str, object]:
         """Get voice channel information including permissions and roles."""
         # Lista uprawnień do sprawdzenia
         permissions_to_check = {
@@ -99,7 +99,7 @@ class ChannelModManager:
         self.message_sender = MessageSender()
         self.logger = logging.getLogger(__name__)
 
-    async def show_mod_status(self, ctx, voice_channel, mod_limit):
+    async def show_mod_status(self, ctx, voice_channel, mod_limit) -> None:
         """Shows current mod status."""
         # Get current mods from channel overwrites only
         current_mods = [
