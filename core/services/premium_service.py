@@ -89,7 +89,7 @@ class PremiumService(
             current_time = datetime.now(timezone.utc)
             has_premium = False
             for role_data in premium_roles:
-                expiry = role_data["expiry_time"]
+                expiry = role_data["expiration_date"]
                 if expiry is None or expiry > current_time:
                     has_premium = True
                     break
@@ -122,7 +122,7 @@ class PremiumService(
 
             for role_data in premium_roles:
                 # Check if role is still valid
-                expiry = role_data["expiry_time"]
+                expiry = role_data["expiration_date"]
                 if expiry and expiry <= current_time:
                     continue
 
@@ -251,7 +251,7 @@ class PremiumService(
                 )
 
             # Calculate expiry time
-            expiry_time = datetime.now(timezone.utc) + timedelta(days=duration_days)
+            expiration_date = datetime.now(timezone.utc) + timedelta(days=duration_days)
 
             # Add Discord role
             await member.add_roles(
@@ -262,7 +262,7 @@ class PremiumService(
             await self.premium_repository.create_member_role(
                 member_id=member.id,
                 role_id=role_data["id"],
-                expiry_time=expiry_time,
+                expiration_date=expiration_date,
                 role_type="premium",
             )
 
@@ -281,7 +281,7 @@ class PremiumService(
                 success=True,
                 extension_type=ExtensionType.NORMAL,
                 days_added=duration_days,
-                new_expiry=expiry_time,
+                new_expiry=expiration_date,
                 message=f"Przyznano rolę {role_name} na {duration_days} dni",
             )
 
@@ -324,7 +324,7 @@ class PremiumService(
                 )
 
             # Calculate new expiry time
-            current_expiry = existing_role["expiry_time"]
+            current_expiry = existing_role["expiration_date"]
             if current_expiry and current_expiry > datetime.now(timezone.utc):
                 # Extend from current expiry
                 new_expiry = current_expiry + timedelta(days=additional_days)

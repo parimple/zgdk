@@ -135,14 +135,25 @@ class PremiumManager:
     @staticmethod
     def add_premium_roles_to_embed(ctx, embed, premium_roles):
         """Add premium roles to the provided embed."""
-        for member_role, role in premium_roles:
-            formatted_date = discord.utils.format_dt(member_role.expiration_date, "D")
-            relative_date = discord.utils.format_dt(member_role.expiration_date, "R")
-            embed.add_field(
-                name=f"Rola premium: {role.name}",
-                value=f"Do: {formatted_date} ({relative_date})",
-                inline=False,
-            )
+        for role_data in premium_roles:
+            # Extract data from dictionary format
+            role_name = role_data.get("role_name", "Unknown Role")
+            expiration_date = role_data.get("expiration_date")
+            
+            if expiration_date:
+                formatted_date = discord.utils.format_dt(expiration_date, "D")
+                relative_date = discord.utils.format_dt(expiration_date, "R")
+                embed.add_field(
+                    name=f"Rola premium: {role_name}",
+                    value=f"Do: {formatted_date} ({relative_date})",
+                    inline=False,
+                )
+            else:
+                embed.add_field(
+                    name=f"Rola premium: {role_name}",
+                    value="Permanentna",
+                    inline=False,
+                )
 
     async def process_data(self, session, payment_data: PaymentData) -> None:
         """Process Payment using new service architecture"""
@@ -156,8 +167,8 @@ class PremiumManager:
         logger.info("Processing payment: %s", payment_data)
         
         # Get services
-        member_service = self.bot.get_service(IMemberService, session)
-        premium_service = self.bot.get_service(IPremiumService, session)
+        member_service = await self.bot.get_service(IMemberService, session)
+        premium_service = await self.bot.get_service(IPremiumService, session)
         premium_service.set_guild(self.guild)
         
         # First, try to find the banned member

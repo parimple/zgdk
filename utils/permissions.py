@@ -28,7 +28,27 @@ def check_permission_level(bot, member: discord.Member, level: PermissionLevel) 
 
     # Check bot owner (ID from config)
     if level == PermissionLevel.OWNER:
-        return member.id == bot.config["owner_id"]
+        # New owner_ids list support
+        owner_ids = bot.config.get("owner_ids", [])
+        is_in_owner_list = member.id in owner_ids
+        
+        # Backward compatibility with single owner_id
+        is_main_owner = member.id == bot.config.get("owner_id")
+        
+        # Legacy test owner support
+        test_owner_ids = bot.config.get("test_owner_ids", [])
+        is_test_owner = member.id in test_owner_ids
+        single_test_owner = bot.config.get("test_owner_id")
+        is_legacy_test_owner = single_test_owner and member.id == single_test_owner
+        
+        # Debug logging
+        logger.info(f"OWNER CHECK: user_id={member.id}")
+        logger.info(f"  owner_ids list: {owner_ids}, in_list={is_in_owner_list}")
+        logger.info(f"  main_owner: {is_main_owner}, test_owners: {is_test_owner}, legacy: {is_legacy_test_owner}")
+        
+        result = is_in_owner_list or is_main_owner or is_test_owner or is_legacy_test_owner
+        logger.info(f"OWNER FINAL RESULT: {result}")
+        return result
 
     # Check admin role (from config)
     has_admin = discord.utils.get(member.roles, id=bot.config["admin_roles"]["admin"])
@@ -45,7 +65,9 @@ def check_permission_level(bot, member: discord.Member, level: PermissionLevel) 
         return bool(has_mod or has_admin)
 
     if level == PermissionLevel.OWNER_OR_ADMIN:
-        return member.id == bot.config["owner_id"] or bool(has_admin)
+        # Check owner permissions (including test owners)
+        is_owner = check_permission_level(bot, member, PermissionLevel.OWNER)
+        return is_owner or bool(has_admin)
 
     # Check premium roles (from config)
     if level == PermissionLevel.PREMIUM:
@@ -70,15 +92,20 @@ def has_permission_level(
     levels = [level] if isinstance(level, PermissionLevel) else level
 
     async def predicate(ctx):
+        logger.info(f"PERMISSION PREDICATE: user_id={ctx.author.id}, levels={levels}, require_all={require_all}")
         if require_all:
             for permission_level in levels:
-                if not check_permission_level(ctx.bot, ctx.author, permission_level):
+                result = check_permission_level(ctx.bot, ctx.author, permission_level)
+                logger.info(f"PERMISSION CHECK: level={permission_level}, result={result}")
+                if not result:
                     await ctx.send("Nie masz uprawnień do użycia tej komendy!")
                     return False
             return True
         else:
             for permission_level in levels:
-                if check_permission_level(ctx.bot, ctx.author, permission_level):
+                result = check_permission_level(ctx.bot, ctx.author, permission_level)
+                logger.info(f"PERMISSION CHECK: level={permission_level}, result={result}")
+                if result:
                     return True
             await ctx.send("Nie masz uprawnień do użycia tej komendy!")
             return False

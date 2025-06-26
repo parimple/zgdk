@@ -498,7 +498,7 @@ class OnTaskEvent(commands.Cog):
                     expiry_status = (
                         "aktywne" if role.expiration_date > now else "wygasłe"
                     )
-                    expiry_time = (
+                    expiration_date = (
                         f"wygasa {discord.utils.format_dt(role.expiration_date, 'R')}"
                         if role.expiration_date
                         else "stałe"
@@ -507,7 +507,7 @@ class OnTaskEvent(commands.Cog):
                     await ctx.send(
                         f"Wyciszenie {self.bot.guild.get_role(role.role_id).name} dla {member.display_name}:\n"
                         f"Status: {expiry_status}\n"
-                        f"Czas: {expiry_time}"
+                        f"Czas: {expiration_date}"
                     )
             else:
                 # Sprawdź wszystkie wyciszenia
@@ -530,13 +530,13 @@ class OnTaskEvent(commands.Cog):
                         else f"ID: {member_role.member_id}"
                     )
                     role_name = self.bot.guild.get_role(member_role.role_id).name
-                    expiry_time = (
+                    expiration_date = (
                         f"wygasa {discord.utils.format_dt(member_role.expiration_date, 'R')}"
                         if member_role.expiration_date
                         else "stałe"
                     )
 
-                    await ctx.send(f"{i}. {member_name}: {role_name} ({expiry_time})")
+                    await ctx.send(f"{i}. {member_name}: {role_name} ({expiration_date})")
 
                 if len(all_mute_roles) > 10:
                     await ctx.send(f"... i {len(all_mute_roles) - 10} więcej.")

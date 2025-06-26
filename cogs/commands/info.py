@@ -302,7 +302,7 @@ class InfoCog(commands.Cog):
         if all_member_premium_roles:
             active_premium_roles = [
                 role_data for role_data in all_member_premium_roles
-                if not role_data.get("expiry_time") or role_data.get("expiry_time") > current_time
+                if not role_data.get("expiration_date") or role_data.get("expiration_date") > current_time
             ]
 
         # Add activity statistics using new service architecture
@@ -339,12 +339,13 @@ class InfoCog(commands.Cog):
                 # Sortuj role premium (jeśli jest ich wiele aktywnych) np. po ID, nazwie lub specjalnym polu, jeśli istnieje
                 # Dla uproszczenia, bierzemy pierwszą z listy aktywnych
                 # Można by tu dodać logikę wyboru 'najważniejszej' aktywnej roli, jeśli jest ich więcej
-                main_active_premium_role_obj = active_premium_roles[0][
-                    1
-                ]  # Obiekt discord.Role
-                roles = [
-                    role for role in roles if role.id != main_active_premium_role_obj.id
-                ]
+                # Get the Discord role object from the role data
+                main_active_premium_role_data = active_premium_roles[0]
+                main_active_premium_role_obj = ctx.guild.get_role(main_active_premium_role_data["role_id"])
+                if main_active_premium_role_obj:
+                    roles = [
+                        role for role in roles if role.id != main_active_premium_role_obj.id
+                    ]
 
             PremiumManager.add_premium_roles_to_embed(
                 ctx, embed, active_premium_roles
@@ -996,7 +997,15 @@ class SellRoleButton(discord.ui.Button):
                 )
                 return
 
-            member_role, role = self.active_premium_roles[0]
+            # Get the first active premium role data
+            premium_role_data = self.active_premium_roles[0]
+            role = interaction.guild.get_role(premium_role_data["role_id"])
+            
+            if not role:
+                await interaction.response.send_message(
+                    "Rola nie została znaleziona na serwerze.", ephemeral=True
+                )
+                return
 
             # Verify if user still has the role by checking role IDs
             user_role_ids = [r.id for r in interaction.user.roles]
@@ -1023,7 +1032,7 @@ class SellRoleButton(discord.ui.Button):
                 return
 
             refund_amount = calculate_refund(
-                member_role.expiration_date, role_price, role.name
+                premium_role_data.get("expiration_date"), role_price, role.name
             )
 
             # Use MessageSender for consistent formatting

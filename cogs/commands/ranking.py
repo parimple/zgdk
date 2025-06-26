@@ -7,18 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.interfaces.member_interfaces import (
-    IActivityService,
-    IMemberService,
-)
-from utils.managers import ActivityManager
-from utils.message_sender import MessageSender
-from utils.permissions import is_zagadka_owner, is_mod_or_admin, is_mod_or_admin
-from core.interfaces.member_interfaces import (
-    IActivityService,
-    IMemberService,
-)
-from utils.message_sender import MessageSender
+from core.interfaces import IActivityTrackingService, IPermissionService
 
 logger = logging.getLogger(__name__)
 
@@ -28,13 +17,28 @@ class RankingCommands(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.activity_manager = ActivityManager()
+        self._activity_service: IActivityTrackingService = None
+        self._permission_service: IPermissionService = None
+
+    @property
+    def activity_service(self) -> IActivityTrackingService:
+        """Get activity tracking service."""
+        if self._activity_service is None and hasattr(self.bot, 'service_manager'):
+            self._activity_service = self.bot.service_manager.get_service(IActivityTrackingService)
+        return self._activity_service
+
+    @property
+    def permission_service(self) -> IPermissionService:
+        """Get permission service."""
+        if self._permission_service is None and hasattr(self.bot, 'service_manager'):
+            self._permission_service = self.bot.service_manager.get_service(IPermissionService)
+        return self._permission_service
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Set guild when bot is ready."""
-        if self.bot.guild:
-            self.activity_manager.set_guild(self.bot.guild)
+        if self.bot.guild and self.activity_service:
+            self.activity_service.set_guild(self.bot.guild)
 
     @commands.hybrid_command(
         name="ranking", description="Pokaż ranking aktywności serwera"
@@ -57,8 +61,12 @@ class RankingCommands(commands.Cog):
             return
 
         try:
+            if not self.activity_service:
+                await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
+                return
+
             async with self.bot.get_db() as session:
-                leaderboard = await self.activity_manager.get_leaderboard(
+                leaderboard = await self.activity_service.get_leaderboard(
                     session, limit, days
                 )
 
@@ -71,7 +79,7 @@ class RankingCommands(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            embed = self.activity_manager.format_leaderboard_embed(
+            embed = self.activity_service.format_leaderboard_embed(
                 leaderboard, ctx.guild, days, ctx.author.color
             )
             await ctx.send(embed=embed)
@@ -103,12 +111,16 @@ class RankingCommands(commands.Cog):
             return
 
         try:
+            if not self.activity_service:
+                await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
+                return
+
             async with self.bot.get_db() as session:
-                stats = await self.activity_manager.get_member_stats(
+                stats = await self.activity_service.get_member_stats(
                     session, target_member.id, days
                 )
 
-            embed = self.activity_manager.format_member_stats_embed(
+            embed = self.activity_service.format_member_stats_embed(
                 stats, target_member
             )
             await ctx.send(embed=embed)
@@ -133,8 +145,12 @@ class RankingCommands(commands.Cog):
             return
 
         try:
+            if not self.activity_service:
+                await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
+                return
+
             async with self.bot.get_db() as session:
-                stats = await self.activity_manager.get_member_stats(
+                stats = await self.activity_service.get_member_stats(
                     session, ctx.author.id, days
                 )
 
@@ -205,8 +221,12 @@ class RankingCommands(commands.Cog):
         limit = limits.get(category, 100)
 
         try:
+            if not self.activity_service:
+                await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
+                return
+
             async with self.bot.get_db() as session:
-                leaderboard = await self.activity_manager.get_leaderboard(
+                leaderboard = await self.activity_service.get_leaderboard(
                     session, limit, days
                 )
 
@@ -298,7 +318,7 @@ class RankingCommands(commands.Cog):
 
     # Admin commands
     @commands.hybrid_command(name="reset_daily_points")
-    @is_zagadka_owner()
+    @commands.check(lambda ctx: ctx.cog.permission_service and ctx.cog.permission_service.is_owner(ctx.author) if hasattr(ctx.cog, 'permission_service') else False)
     async def reset_daily_points(
         self, ctx: commands.Context, activity_type: str = None
     ):
@@ -320,7 +340,7 @@ class RankingCommands(commands.Cog):
             await ctx.send(f"❌ Error resetting points: {e}", ephemeral=True)
 
     @commands.hybrid_command(name="cleanup_old_activity")
-    @is_zagadka_owner()
+    @commands.check(lambda ctx: ctx.cog.permission_service and ctx.cog.permission_service.is_owner(ctx.author) if hasattr(ctx.cog, 'permission_service') else False)
     async def cleanup_old_activity(self, ctx: commands.Context, days_to_keep: int = 30):
         """Clean up old activity data."""
         await ctx.defer(ephemeral=True)

@@ -11,7 +11,7 @@ async def get_premium_users_count(ctx: Context) -> int:
     try:
         async with ctx.bot.get_db() as session:
             # Use new service architecture
-            premium_service = ctx.bot.get_service(IPremiumService, session)
+            premium_service = await ctx.bot.get_service(IPremiumService, session)
             
             # For now, return fallback until we implement the count method
             # TODO: Add count_unique_premium_users method to premium service
@@ -56,11 +56,18 @@ async def create_shop_embed(
     # Current role information
     current_role_info = ""
     if premium_roles:
-        current_role, role_obj = premium_roles[0]
-        expiration_date = discord.utils.format_dt(current_role.expiration_date, "D")
-        current_role_info = (
-            f"🗓 **Aktualna rola:** {role_obj.name} (ważna do {expiration_date})"
-        )
+        role_data = premium_roles[0]
+        role_name = role_data.get("role_name", "Unknown Role")
+        expiration_date = role_data.get("expiration_date")
+        if expiration_date:
+            formatted_date = discord.utils.format_dt(expiration_date, "D")
+            current_role_info = (
+                f"🗓 **Aktualna rola:** {role_name} (ważna do {formatted_date})"
+            )
+        else:
+            current_role_info = (
+                f"🗓 **Aktualna rola:** {role_name} (permanentna)"
+            )
     else:
         current_role_info = (
             "🗓 **Aktualna rola:** Brak – pomyśl, czy nie warto dołączyć?"

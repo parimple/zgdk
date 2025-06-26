@@ -6,6 +6,7 @@ import discord
 from discord.ext.commands import Context
 
 from cogs.ui.shop_embeds import create_role_description_embed, create_shop_embed
+from core.interfaces.premium_interfaces import IPremiumService
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
 from utils.message_sender import MessageSender
 from utils.premium_logic import PremiumRoleManager
@@ -162,9 +163,8 @@ class RoleShopView(discord.ui.View):
                 session, interaction.user.id
             )
             balance = db_viewer.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(
-                session, interaction.user.id
-            )
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            premium_roles = await premium_service.get_member_premium_roles(interaction.user.id)
             await session.commit()
 
         new_view = RoleShopView(
@@ -272,17 +272,20 @@ class RoleShopView(discord.ui.View):
                     return
 
                 # Check for existing premium roles
-                current_premium_roles = await RoleQueries.get_member_premium_roles(
-                    session, member.id
-                )
+                premium_service = await self.bot.get_service(IPremiumService, session)
+                current_premium_roles = await premium_service.get_member_premium_roles(member.id)
 
                 if current_premium_roles:
                     logger.info(
                         f"[SHOP] Found existing premium roles for {member.display_name}:"
-                        f"\n - Current roles: {[r[1].name for r in current_premium_roles]}"
+                        f"\n - Current roles: {[r.get('role_name', 'Unknown') for r in current_premium_roles]}"
                     )
 
-                    current_member_role, current_role = current_premium_roles[0]
+                    current_role_data = current_premium_roles[0]
+                    # Create compatibility objects for old code
+                    current_member_role = current_role_data.get("member_role")
+                    current_role = current_role_data.get("role")
+                    
                     current_role_config = next(
                         (
                             r
@@ -350,9 +353,8 @@ class RoleShopView(discord.ui.View):
                             )
 
                             # Update the original shop embed with new expiration date
-                            premium_roles = await RoleQueries.get_member_premium_roles(
-                                session, member.id
-                            )
+                            premium_service = await self.bot.get_service(IPremiumService, session)
+                            premium_roles = await premium_service.get_member_premium_roles(member.id)
                             updated_embed = await create_shop_embed(
                                 self.ctx,
                                 self.balance - price,  # Update balance
@@ -540,9 +542,8 @@ class RoleShopView(discord.ui.View):
                             )
 
                         # Update the original shop embed with new expiration date
-                        premium_roles = await RoleQueries.get_member_premium_roles(
-                            session, member.id
-                        )
+                        premium_service = await self.bot.get_service(IPremiumService, session)
+                        premium_roles = await premium_service.get_member_premium_roles(member.id)
                         updated_embed = await create_shop_embed(
                             self.ctx,
                             self.balance - price,  # Update balance
@@ -605,9 +606,8 @@ class RoleShopView(discord.ui.View):
                             )
 
                             # Update the original shop embed with new expiration date
-                            premium_roles = await RoleQueries.get_member_premium_roles(
-                                session, member.id
-                            )
+                            premium_service = await self.bot.get_service(IPremiumService, session)
+                            premium_roles = await premium_service.get_member_premium_roles(member.id)
                             updated_embed = await create_shop_embed(
                                 self.ctx,
                                 self.balance - price,  # Update balance
@@ -707,9 +707,8 @@ class RoleShopView(discord.ui.View):
                         await interaction.followup.send(embed=embed, ephemeral=False)
 
                         # Update the original shop embed with new expiration date
-                        premium_roles = await RoleQueries.get_member_premium_roles(
-                            session, member.id
-                        )
+                        premium_service = await self.bot.get_service(IPremiumService, session)
+                        premium_roles = await premium_service.get_member_premium_roles(member.id)
                         updated_embed = await create_shop_embed(
                             self.ctx,
                             self.balance - price,  # Update balance
@@ -807,9 +806,8 @@ class RoleShopView(discord.ui.View):
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
             balance = db_member.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(
-                session, self.member.id
-            )
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            premium_roles = await premium_service.get_member_premium_roles(self.member.id)
             await session.commit()
 
         view = RoleShopView(
@@ -851,9 +849,8 @@ class RoleShopView(discord.ui.View):
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
             balance = db_member.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(
-                session, self.member.id
-            )
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            premium_roles = await premium_service.get_member_premium_roles(self.member.id)
             await session.commit()
 
         view = RoleShopView(
@@ -912,9 +909,8 @@ class RoleShopView(discord.ui.View):
         """Generate the embed for the role shop."""
         db_member = await MemberQueries.get_or_add_member(session, self.viewer.id)
         balance = db_member.wallet_balance
-        premium_roles = await RoleQueries.get_member_premium_roles(
-            session, self.member.id
-        )
+        premium_service = await self.bot.get_service(IPremiumService, session)
+        premium_roles = await premium_service.get_member_premium_roles(self.member.id)
         return await create_shop_embed(
             self.ctx,
             balance,
@@ -1179,9 +1175,8 @@ class RoleDescriptionView(discord.ui.View):
             return
 
         async with self.bot.get_db() as session:
-            premium_roles = await RoleQueries.get_member_premium_roles(
-                session, self.member.id
-            )
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            premium_roles = await premium_service.get_member_premium_roles(self.member.id)
 
         view = RoleShopView(
             self.ctx,

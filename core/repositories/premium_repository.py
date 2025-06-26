@@ -40,8 +40,8 @@ class PremiumRepository(BaseRepository):
                         "member_id": member_role.member_id,
                         "role_id": member_role.role_id,
                         "role_name": role.name,
-                        "expiry_time": member_role.expiry_time,
-                        "role_type": member_role.role_type,
+                        "expiration_date": member_role.expiration_date,
+                        "role_type": role.role_type,
                     }
                 )
 
@@ -64,8 +64,8 @@ class PremiumRepository(BaseRepository):
             stmt = (
                 select(MemberRole, Role)
                 .join(Role, MemberRole.role_id == Role.id)
-                .where(MemberRole.expiry_time <= current_time)
-                .where(MemberRole.expiry_time.isnot(None))
+                .where(MemberRole.expiration_date <= current_time)
+                .where(MemberRole.expiration_date.isnot(None))
                 .where(Role.name.in_(premium_role_names))
             )
             result = await self.session.execute(stmt)
@@ -80,8 +80,8 @@ class PremiumRepository(BaseRepository):
                         "member_id": member_role.member_id,
                         "role_id": member_role.role_id,
                         "role_name": role.name,
-                        "expiry_time": member_role.expiry_time,
-                        "role_type": member_role.role_type,
+                        "expiration_date": member_role.expiration_date,
+                        "role_type": role.role_type,
                     }
                 )
 
@@ -120,7 +120,7 @@ class PremiumRepository(BaseRepository):
         self,
         member_id: int,
         role_id: int,
-        expiry_time: Optional[datetime] = None,
+        expiration_date: Optional[datetime] = None,
         role_type: str = "premium",
     ) -> bool:
         """Create a member role assignment."""
@@ -128,7 +128,7 @@ class PremiumRepository(BaseRepository):
             member_role = MemberRole(
                 member_id=member_id,
                 role_id=role_id,
-                expiry_time=expiry_time,
+                expiration_date=expiration_date,
                 role_type=role_type,
             )
 
@@ -154,7 +154,7 @@ class PremiumRepository(BaseRepository):
             member_role = result.scalar_one_or_none()
 
             if member_role:
-                member_role.expiry_time = new_expiry
+                member_role.expiration_date = new_expiry
                 await self.session.flush()
                 self.logger.debug(
                     f"Updated role expiry: member={member_id}, role={role_id}, new_expiry={new_expiry}"

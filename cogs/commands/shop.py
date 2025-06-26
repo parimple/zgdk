@@ -24,15 +24,15 @@ class ShopCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
-    @is_admin()
+    @is_zagadka_owner()
     async def shop(self, ctx: Context, member: discord.Member = None):
         viewer = ctx.author
         target_member = member or viewer
 
         async with self.bot.get_db() as session:
             # Use new service architecture
-            member_service = self.bot.get_service(IMemberService, session)
-            premium_service = self.bot.get_service(IPremiumService, session)
+            member_service = await self.bot.get_service(IMemberService, session)
+            premium_service = await self.bot.get_service(IPremiumService, session)
             
             db_viewer = await member_service.get_or_create_member(viewer)
             balance = db_viewer.wallet_balance
@@ -71,7 +71,7 @@ class ShopCog(commands.Cog):
 
         async with self.bot.get_db() as session:
             # Use new service architecture  
-            member_service = self.bot.get_service(IMemberService, session)
+            member_service = await self.bot.get_service(IMemberService, session)
             
             await HandledPaymentQueries.add_payment(
                 session,
@@ -96,7 +96,7 @@ class ShopCog(commands.Cog):
         """Assign a payment ID to a user."""
         async with self.bot.get_db() as session:
             # Use new service architecture
-            member_service = self.bot.get_service(IMemberService, session)
+            member_service = await self.bot.get_service(IMemberService, session)
             
             payment = await HandledPaymentQueries.get_payment_by_id(session, payment_id)
 
@@ -168,7 +168,7 @@ class ShopCog(commands.Cog):
         """
         async with self.bot.get_db() as session:
             # Use new service architecture
-            premium_service = self.bot.get_service(IPremiumService, session)
+            premium_service = await self.bot.get_service(IPremiumService, session)
             
             premium_roles = await premium_service.get_member_premium_roles(member.id)
 
@@ -223,7 +223,7 @@ class ShopCog(commands.Cog):
             for member in role.members:
                 async with self.bot.get_db() as session:
                     # Use new service architecture
-                    premium_service = self.bot.get_service(IPremiumService, session)
+                    premium_service = await self.bot.get_service(IPremiumService, session)
                     
                     # Set guild context for premium service
                     premium_service.set_guild(ctx.guild)
@@ -236,7 +236,7 @@ class ShopCog(commands.Cog):
                     role_expired = True
                     for role_data in premium_roles:
                         if role_data.get("role_name") == role.name:
-                            expiry = role_data.get("expiry_time")
+                            expiry = role_data.get("expiration_date")
                             if expiry and expiry > now:
                                 role_expired = False
                                 break

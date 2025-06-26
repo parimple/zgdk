@@ -1025,8 +1025,11 @@ class InviteService(BaseService, IInviteService):
     ) -> Optional[Invite]:
         """Create tracked invite in database."""
         try:
-            db_invite = await self.invite_repository.create_invite(
-                invite_code=invite.code,
+            # Use add_or_update_invite to handle existing invites
+            from datasources.queries import InviteQueries
+            db_invite = await InviteQueries.add_or_update_invite(
+                session=self.session,
+                invite_id=invite.code,
                 creator_id=creator.id,
                 uses=invite.uses,
                 created_at=invite.created_at,

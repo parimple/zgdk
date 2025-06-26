@@ -2,7 +2,12 @@ prefix: ","
 description: "Hello, my name is zaGadka"
 guild_id: 960665311701528596
 donate_url: "https://tipply.pl/u/zagadka"
-owner_id: 956602391891947592
+# Owner configuration - supports multiple owners
+owner_ids:  # List of all owner IDs
+  - 956602391891947592  # Main owner
+  - 968632323916566579  # Original test user
+  - 1387857653748732046  # claude_username for Discord API testing
+owner_id: 956602391891947592  # Backward compatibility
 
 # Emoji configuration
 emojis:

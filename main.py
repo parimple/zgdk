@@ -33,6 +33,10 @@ from core.interfaces.premium_interfaces import (
     IPremiumService,
 )
 from core.interfaces.role_interfaces import IRoleService
+from core.interfaces.activity_interfaces import IActivityTrackingService
+from core.interfaces.currency_interfaces import ICurrencyService
+from core.interfaces.permission_interfaces import IPermissionService
+from core.interfaces.team_interfaces import ITeamManagementService
 from core.repositories.activity_repository import ActivityRepository
 from core.repositories.invite_repository import InviteRepository
 from core.repositories.member_repository import MemberRepository
@@ -51,6 +55,10 @@ from core.services.notification_service import NotificationService
 from core.services.payment_processor_service import PaymentProcessorService
 from core.services.premium_service import PremiumService
 from core.services.role_service import RoleService
+from core.services.activity_tracking_service import ActivityTrackingService
+from core.services.currency_service import CurrencyService
+from core.services.permission_service import PermissionService
+from core.services.team_management_service import TeamManagementService
 from datasources.models import Base
 from utils.premium import PaymentData
 
@@ -138,6 +146,9 @@ class Zagadka(commands.Bot):
         # Initialize service container
         self.service_container = ServiceContainer()
         self._setup_services()
+        
+        # Create service manager interface for cogs
+        self.service_manager = self
 
         prefix = config.get("prefix")
         if prefix is None:
@@ -195,9 +206,13 @@ class Zagadka(commands.Bot):
         # Register messaging services as singletons (stateless)
         embed_builder = EmbedBuilderService()
         message_formatter = MessageFormatterService()
+        currency_service = CurrencyService()
+        permission_service = PermissionService(bot=self)
 
         self.service_container.register_singleton(IEmbedBuilder, embed_builder)
         self.service_container.register_singleton(IMessageFormatter, message_formatter)
+        self.service_container.register_singleton(ICurrencyService, currency_service)
+        self.service_container.register_singleton(IPermissionService, permission_service)
 
         # Note: Repository and service factories are handled in get_service method
         # since they require session and complex dependency injection
@@ -208,7 +223,7 @@ class Zagadka(commands.Bot):
         """Get a service instance with optional database session."""
 
         # Services that don't need database session
-        if service_type in [IEmbedBuilder, IMessageFormatter]:
+        if service_type in [IEmbedBuilder, IMessageFormatter, ICurrencyService, IPermissionService]:
             return self.service_container.get_service(service_type)
 
         # Services that need database session
@@ -331,6 +346,26 @@ class Zagadka(commands.Bot):
                 unit_of_work=unit_of_work,
             )
 
+        elif service_type == IActivityTrackingService:
+            # Create unit of work
+            unit_of_work = self.service_container.create_unit_of_work(session)
+            # Create activity tracking service
+            activity_service = ActivityTrackingService(
+                guild=self.guild if hasattr(self, 'guild') else None,
+                unit_of_work=unit_of_work
+            )
+            return activity_service
+
+        elif service_type == ITeamManagementService:
+            # Create unit of work
+            unit_of_work = self.service_container.create_unit_of_work(session)
+            # Create team management service
+            team_service = TeamManagementService(
+                bot=self,
+                unit_of_work=unit_of_work
+            )
+            return team_service
+
         # For other services, use the container
         return self.service_container.get_service(service_type)
 
@@ -399,6 +434,19 @@ class Zagadka(commands.Bot):
             logging.info("Slash commands synchronized")
 
         logging.info("Ready")
+
+    async def on_command_error(self, ctx, error):
+        """Handle command errors with detailed logging."""
+        from utils.error_logger import error_logger
+        
+        # Log the error with full context
+        error_logger.log_command_error(error, ctx)
+        
+        # Also log to console for immediate visibility
+        logging.error(f"An error occurred while executing command '{ctx.command}': {error}")
+        
+        # You can add user-friendly error responses here if needed
+        # For now, let the default error handling continue
 
     def run(self) -> None:
         """Run the bot"""
