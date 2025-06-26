@@ -26,7 +26,7 @@ profile = "black"
 line_length = 88
 skip = [".venv", "__pycache__"]
 skip_gitignore = true
-known_first_party = ["cogs", "datasources", "utils"]
+known_first_party = ["cogs", "datasources", "utils", "core"]
 
 [tool.pylint.messages_control]
 max-line-length = 88

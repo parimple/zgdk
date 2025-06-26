@@ -18,6 +18,11 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from core.containers.service_container import ServiceContainer
+from core.containers.unit_of_work import UnitOfWork
+from core.interfaces.role_interfaces import IRoleRepository, IRoleService
+from core.repositories.role_repository import RoleRepository
+from core.services.role_service import RoleService
 from datasources.models import Base
 from utils.premium import PaymentData
 
@@ -34,32 +39,25 @@ def cleanup_zombie_processes() -> None:
     try:
         # Kill all headless_shell processes
         result = subprocess.run(
-            ["pkill", "-f", "headless_shell"], 
-            capture_output=True, 
-            timeout=5
+            ["pkill", "-f", "headless_shell"], capture_output=True, timeout=5
         )
-        
+
         # Kill orphaned Chrome processes
         subprocess.run(
-            ["pkill", "-f", "chrome.*--headless"], 
-            capture_output=True, 
-            timeout=5
+            ["pkill", "-f", "chrome.*--headless"], capture_output=True, timeout=5
         )
 
         # Wait a moment for processes to terminate
         import time
+
         time.sleep(0.5)
 
         # Force kill if still running
         subprocess.run(
-            ["pkill", "-9", "-f", "headless_shell"], 
-            capture_output=True, 
-            timeout=3
+            ["pkill", "-9", "-f", "headless_shell"], capture_output=True, timeout=3
         )
         subprocess.run(
-            ["pkill", "-9", "-f", "chrome.*--headless"], 
-            capture_output=True, 
-            timeout=3
+            ["pkill", "-9", "-f", "chrome.*--headless"], capture_output=True, timeout=3
         )
 
         logging.info("Cleaned up zombie browser processes")
@@ -105,6 +103,10 @@ class Zagadka(commands.Bot):
         self.base = Base
         self.payment_data_class = PaymentData
 
+        # Initialize service container
+        self.service_container = ServiceContainer()
+        self._setup_services()
+
         super().__init__(
             command_prefix=config.get("prefix"),
             intents=intents,
@@ -137,6 +139,38 @@ class Zagadka(commands.Bot):
                 await session.rollback()
                 logging.error(f"Database session error: {e}")
                 raise
+
+    def _setup_services(self) -> None:
+        """Setup dependency injection container with services."""
+
+        # Register repository factory
+        def role_repository_factory() -> IRoleRepository:
+            # This will be called when needed with a fresh session
+            return RoleRepository
+
+        def role_service_factory() -> IRoleService:
+            # This creates the service with proper dependencies
+            return RoleService
+
+        self.service_container.register_factory(
+            IRoleRepository, role_repository_factory
+        )
+        self.service_container.register_factory(IRoleService, role_service_factory)
+
+    async def get_service(self, service_type: type, session: AsyncSession) -> Any:
+        """Get a service instance with database session."""
+        if service_type == IRoleService:
+            # Create repository with session
+            role_repository = RoleRepository(session)
+            # Create unit of work
+            unit_of_work = self.service_container.create_unit_of_work(session)
+            # Create service with dependencies
+            return RoleService(
+                role_repository=role_repository, unit_of_work=unit_of_work
+            )
+
+        # For other services, use the container
+        return self.service_container.get_service(service_type)
 
     async def close(self) -> None:
         await self.engine.dispose()
