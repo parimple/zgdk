@@ -6,13 +6,17 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
+from core.interfaces.member_interfaces import (
+    IMemberService,
+    IModerationService,
+)
+from core.interfaces.role_interfaces import IRoleService
 from datasources.queries import ModerationLogQueries
 from utils.message_sender import MessageSender
 from utils.moderation import (
     GenderManager,
     GenderType,
     MessageCleaner,
-    MuteManager,
     MuteType,
 )
 from utils.permissions import is_mod_or_admin, is_owner_or_admin
@@ -27,13 +31,42 @@ class ModCog(commands.Cog):
         self.bot = bot
         self.config = bot.config
         self.message_sender = MessageSender(bot)
-        self.mute_manager = MuteManager(bot)
+        # Keep legacy utilities for now, will be replaced gradually
         self.message_cleaner = MessageCleaner(bot)
         self.gender_manager = GenderManager(bot)
 
         # Ułatwia testowanie komend bez dodawania cogu do bota
         for command in self.get_commands():
             command.cog = self
+
+    def parse_duration(self, duration_str: str) -> Optional[int]:
+        """Parse duration string to seconds.
+        
+        :param duration_str: Duration string (e.g., "1h", "30m", "1d")
+        :return: Duration in seconds or None for permanent
+        """
+        if not duration_str:
+            return None
+        
+        import re
+        
+        # Simple duration parsing
+        matches = re.findall(r'(\d+)([dhm]?)', duration_str.lower())
+        total_seconds = 0
+        
+        for amount, unit in matches:
+            amount = int(amount)
+            if unit == 'd':
+                total_seconds += amount * 24 * 60 * 60
+            elif unit == 'h':
+                total_seconds += amount * 60 * 60  
+            elif unit == 'm':
+                total_seconds += amount * 60
+            else:
+                # Default to hours if no unit specified
+                total_seconds += amount * 60 * 60
+                
+        return total_seconds if total_seconds > 0 else None
 
     # Nowa metoda pomocnicza do wyświetlania pomocy dla komend
     async def send_subcommand_help(self, ctx, command_name):
@@ -145,7 +178,16 @@ class ModCog(commands.Cog):
     @discord.app_commands.describe(user="Użytkownik z niewłaściwym nickiem")
     async def mute_nick(self, ctx: commands.Context, user: discord.Member):
         """Usuwa niewłaściwy nick użytkownika i nadaje karę."""
-        await self.mute_manager.mute_user(ctx, user, MuteType.NICK)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.mute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="nick",
+                reason="Niewłaściwy nick",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @mute.command(
         name="img", description="Blokuje możliwość wysyłania obrazków i linków."
@@ -164,8 +206,18 @@ class ModCog(commands.Cog):
         :param user: Użytkownik do zablokowania
         :param duration: Czas trwania blokady (opcjonalnie)
         """
-        parsed_duration = self.mute_manager.parse_duration(duration)
-        await self.mute_manager.mute_user(ctx, user, MuteType.IMG, parsed_duration)
+        duration_seconds = self.parse_duration(duration)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.mute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="img",
+                duration_seconds=duration_seconds,
+                reason="Zablokowane obrazki/linki",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @mute.command(name="txt", description="Blokuje możliwość wysyłania wiadomości.")
     @is_mod_or_admin()
@@ -182,8 +234,18 @@ class ModCog(commands.Cog):
         :param user: Użytkownik do zablokowania
         :param duration: Czas trwania blokady (opcjonalnie)
         """
-        parsed_duration = self.mute_manager.parse_duration(duration)
-        await self.mute_manager.mute_user(ctx, user, MuteType.TXT, parsed_duration)
+        duration_seconds = self.parse_duration(duration)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.mute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="txt",
+                duration_seconds=duration_seconds,
+                reason="Zablokowane wiadomości tekstowe",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @mute.command(name="live", description="Blokuje możliwość streamowania.")
     @is_mod_or_admin()

@@ -18,6 +18,7 @@ from core.interfaces.role_interfaces import IRoleService
 from datasources.queries import (
     ChannelPermissionQueries,
     RoleQueries,
+    InviteQueries,  # Still used in clean_invites method
 )
 
 logger = logging.getLogger(__name__)
@@ -400,37 +401,31 @@ class OnMemberJoinEvent(commands.Cog):
     async def process_invite(self, member, invite):
         """
         Process the used invite.
-        This method checks if the inviter exists in the database, adds them if they don't,
-        and updates or adds the member's record in the database with details about
-        the invite used. It also sends a message to a specific text channel about the new
-        member and the invite used.
+        This method processes member join with invite information using the new service architecture.
         :param member: The member who joined
         :param invite: The invite that was used
         """
-        inviter_id = invite.inviter.id if invite.inviter else self.guild.id
-        now = datetime.now(timezone.utc)
-
+        inviter = invite.inviter if invite.inviter else None
+        
         async with self.bot.get_db() as session:
             try:
-                # Check if the inviter exists in the members table, if not, add them
-                await MemberQueries.get_or_add_member(session, inviter_id)
+                # Get services
+                member_service = await self.bot.get_service(IMemberService, session)
+                invite_service = await self.bot.get_service(IInviteService, session)
 
-                # Update or add the member's record
-                await MemberQueries.get_or_add_member(
-                    session,
-                    member.id,
-                    first_inviter_id=inviter_id,
-                    current_inviter_id=inviter_id,
-                    joined_at=now,
-                    rejoined_at=now,
+                # Process member join with invite information
+                processed_member = await member_service.process_member_join(
+                    member, 
+                    invite_code=invite.code,
+                    inviter=inviter
                 )
 
-                # Update or add the invite record
-                await InviteQueries.add_or_update_invite(
-                    session, invite.id, inviter_id, invite.uses, invite.created_at, now
-                )
+                # Create tracked invite if needed
+                if inviter:
+                    await invite_service.create_tracked_invite(invite, inviter)
 
                 await session.commit()
+                logger.info(f"Successfully processed member join for {member.id} with invite {invite.code}")
             except Exception as e:
                 logger.error(
                     f"Error processing invite for member {member.id}: {str(e)}"
@@ -500,17 +495,14 @@ class OnMemberJoinEvent(commands.Cog):
 
         async with self.bot.get_db() as session:
             try:
-                # First ensure guild exists in members table
-                guild_id = self.bot.guild_id
-                await MemberQueries.get_or_add_member(session, guild_id)
-                await session.flush()
+                # Get member service
+                member_service = await self.bot.get_service(IMemberService, session)
 
-                # Then add the new member
-                await MemberQueries.get_or_add_member(
-                    session,
-                    member.id,
-                    first_inviter_id=guild_id,  # Use guild_id as inviter for unknown invites
-                    joined_at=member.joined_at,
+                # Process member join without invite information
+                processed_member = await member_service.process_member_join(
+                    member,
+                    invite_code=None,
+                    inviter=None
                 )
                 await session.commit()
 
@@ -554,18 +546,17 @@ class OnMemberJoinEvent(commands.Cog):
         # Add the invite to the database
         async with self.bot.get_db() as session:
             try:
-                await InviteQueries.add_or_update_invite(
-                    session,
-                    invite.id,
-                    invite.inviter.id if invite.inviter else self.guild.id,
-                    invite.uses,
-                    invite.created_at,
-                    datetime.now(timezone.utc),
-                )
+                invite_service = await self.bot.get_service(IInviteService, session)
+                
+                # Create Discord invite object from the event
+                discord_invite = invite
+                creator = invite.inviter if invite.inviter else None
+                
+                if creator:
+                    await invite_service.create_tracked_invite(discord_invite, creator)
+                
                 await session.commit()
-                # logger.info(
-                #     f"Invite {invite.code} (ID: {invite.id}) created and added to database."
-                # )
+                logger.info(f"Invite {invite.code} created and tracked in database")
             except Exception as e:
                 logger.error(f"Error adding invite {invite.id} to database: {str(e)}")
                 await session.rollback()
@@ -580,53 +571,24 @@ class OnMemberJoinEvent(commands.Cog):
         # Remove the deleted invite from the invites dictionary
         self.invites.pop(invite.id, None)
 
-        # Remove the invite from the database
-        async with self.bot.get_db() as session:
-            try:
-                await InviteQueries.delete_invite(session, invite.id)
-                await session.commit()
-                # logger.info(
-                #     f"Invite {invite.code} (ID: {invite.id}) deleted from Discord and database."
-                # )
-            except Exception as e:
-                logger.error(
-                    f"Error deleting invite {invite.id} from database: {str(e)}"
-                )
-                await session.rollback()
+        # Remove the invite from the database  
+        # Note: Currently there's no direct delete method in IInviteService
+        # This will be handled by the cleanup process
+        logger.info(f"Invite {invite.code} (ID: {invite.id}) deleted from Discord")
 
     async def sync_invites(self):
-        guild_invites = await self.guild.invites()
-        async with self.bot.get_db() as session:
-            # Pobierz wszystkie zaproszenia z bazy danych
-            db_invites = await InviteQueries.get_all_invites(session)
-
-            # Utwórz zbiór ID zaproszeń z Discord
-            discord_invite_ids = {invite.id for invite in guild_invites}
-
-            # Usuń zaproszenia z bazy danych, których nie ma na Discord
-            for db_invite in db_invites:
-                if db_invite.id not in discord_invite_ids:
-                    await InviteQueries.delete_invite(session, db_invite.id)
-                    # logger.info(f"Deleted invite from database: {db_invite.id}")
-
-            # Dodaj lub zaktualizuj zaproszenia z Discord w bazie danych
-            for invite in guild_invites:
-                creator_id = invite.inviter.id if invite.inviter else None
-                try:
-                    await InviteQueries.add_or_update_invite(
-                        session,
-                        invite.id,
-                        creator_id,
-                        invite.uses,
-                        invite.created_at,
-                        None,  # Nie aktualizujemy last_used_at podczas synchronizacji
-                    )
-                except Exception as e:
-                    logger.error(f"Error syncing invite {invite.id}: {str(e)}")
-
-            await session.commit()
-
-        logger.info(f"Synchronized {len(guild_invites)} invites with the database")
+        """Synchronize server invites with database using invite service."""
+        try:
+            async with self.bot.get_db() as session:
+                invite_service = await self.bot.get_service(IInviteService, session)
+                
+                # Use the invite service's sync method
+                synced_invites = await invite_service.sync_server_invites(self.guild)
+                
+                await session.commit()
+                logger.info(f"Synchronized {len(synced_invites)} invites with the database")
+        except Exception as e:
+            logger.error(f"Error syncing invites: {str(e)}")
 
     @tasks.loop(hours=1)
     async def clean_invites(self):
@@ -678,6 +640,11 @@ class OnMemberJoinEvent(commands.Cog):
                 logger.info(
                     f"Number of invites ({len(guild_invites)}) exceeds 900. Cleaning up..."
                 )
+                
+                # Use invite service cleanup method
+                invite_service = await self.bot.get_service(IInviteService, session)
+                cleaned_count = await invite_service.cleanup_expired_invites(self.guild)
+                logger.info(f"Invite service cleaned up {cleaned_count} expired invites")
 
                 inactive_threshold = timedelta(days=1)  # Konfigurowalny próg czasowy
 
