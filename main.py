@@ -9,7 +9,7 @@ import os
 import signal
 import subprocess
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Any, AsyncGenerator, Optional
 
 import discord
 import yaml
@@ -24,38 +24,59 @@ from utils.premium import PaymentData
 intents = discord.Intents.all()
 
 
-def load_config():
+def load_config() -> dict[str, Any]:
     with open("config.yml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-def cleanup_zombie_processes():
+def cleanup_zombie_processes() -> None:
     """Cleanup zombie processes from previous Playwright sessions"""
     try:
         # Kill all headless_shell processes
-        subprocess.run(["pkill", "-f", "headless_shell"], capture_output=True)
-
+        result = subprocess.run(
+            ["pkill", "-f", "headless_shell"], 
+            capture_output=True, 
+            timeout=5
+        )
+        
         # Kill orphaned Chrome processes
-        subprocess.run(["pkill", "-f", "chrome.*--headless"], capture_output=True)
+        subprocess.run(
+            ["pkill", "-f", "chrome.*--headless"], 
+            capture_output=True, 
+            timeout=5
+        )
 
         # Wait a moment for processes to terminate
         import time
-
         time.sleep(0.5)
 
         # Force kill if still running
-        subprocess.run(["pkill", "-9", "-f", "headless_shell"], capture_output=True)
-        subprocess.run(["pkill", "-9", "-f", "chrome.*--headless"], capture_output=True)
+        subprocess.run(
+            ["pkill", "-9", "-f", "headless_shell"], 
+            capture_output=True, 
+            timeout=3
+        )
+        subprocess.run(
+            ["pkill", "-9", "-f", "chrome.*--headless"], 
+            capture_output=True, 
+            timeout=3
+        )
 
         logging.info("Cleaned up zombie browser processes")
+    except subprocess.TimeoutExpired:
+        logging.warning("Timeout during browser process cleanup")
+    except FileNotFoundError:
+        logging.debug("pkill command not found - skipping browser cleanup")
+    except subprocess.SubprocessError as e:
+        logging.warning(f"Subprocess error during zombie process cleanup: {e}")
     except Exception as e:
-        logging.warning(f"Error during zombie process cleanup: {e}")
+        logging.error(f"Unexpected error during zombie process cleanup: {e}")
 
 
 class Zagadka(commands.Bot):
     """Bot class."""
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, config: dict[str, Any], **kwargs: Any) -> None:
         load_dotenv()
 
         self.test: bool = kwargs.get("test", False)
@@ -92,7 +113,7 @@ class Zagadka(commands.Bot):
             **kwargs,
         )
 
-    def get_database_url(self):
+    def get_database_url(self) -> str:
         postgres_user: str = os.environ.get("POSTGRES_USER", "")
         postgres_password: str = os.environ.get("POSTGRES_PASSWORD", "")
         postgres_db: str = os.environ.get("POSTGRES_DB", "")
@@ -107,20 +128,21 @@ class Zagadka(commands.Bot):
         )
 
     @asynccontextmanager
-    async def get_db(self):
+    async def get_db(self) -> AsyncGenerator[AsyncSession, None]:
         async with self.SessionLocal() as session:
             try:
                 yield session
                 await session.commit()
-            except Exception:
+            except Exception as e:
                 await session.rollback()
+                logging.error(f"Database session error: {e}")
                 raise
 
-    async def close(self):
+    async def close(self) -> None:
         await self.engine.dispose()
         await super().close()
 
-    async def load_cogs(self):
+    async def load_cogs(self) -> None:
         """Load all cogs"""
         logging.info("Loading cogs...")
         for folder in ("cogs/commands", "cogs/events"):
@@ -132,15 +154,23 @@ class Zagadka(commands.Bot):
                             f"{folder.replace('/', '.')}.{cog[:-3]}"
                         )
                         logging.info("Loaded cog: %s", cog)
-                    except (commands.ExtensionError, commands.CommandError) as error:
-                        logging.error("Failed to load cog: %s, error: %s", cog, error)
+                    except commands.ExtensionAlreadyLoaded:
+                        logging.warning("Cog %s is already loaded", cog)
+                    except commands.ExtensionNotFound:
+                        logging.error("Cog %s not found", cog)
+                    except commands.NoEntryPointError:
+                        logging.error("Cog %s has no setup function", cog)
+                    except commands.ExtensionFailed as error:
+                        logging.error("Failed to load cog %s: %s", cog, error)
+                    except Exception as error:
+                        logging.error("Unexpected error loading cog %s: %s", cog, error)
 
-    async def setup_hook(self):
+    async def setup_hook(self) -> None:
         """Setup hook."""
         if not self.test:
             await self.load_cogs()
 
-    async def on_ready(self):
+    async def on_ready(self) -> None:
         """On ready event"""
         logging.info("Event on_ready started")
 
@@ -174,7 +204,7 @@ class Zagadka(commands.Bot):
 
         logging.info("Ready")
 
-    def run(self):
+    def run(self) -> None:
         """Run the bot"""
         token = os.environ.get("ZAGADKA_TOKEN")
         if token is None:
@@ -194,7 +224,7 @@ class Zagadka(commands.Bot):
         self.config["force_channel_notifications"] = value
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Setup logging"""
     logging.basicConfig(
         level=logging.INFO,
