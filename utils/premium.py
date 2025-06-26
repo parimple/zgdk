@@ -13,7 +13,9 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright  # pylint: disable=import-error
 from sqlalchemy.exc import IntegrityError
 
-from datasources.queries import HandledPaymentQueries, MemberQueries
+from core.interfaces.member_interfaces import IMemberService
+from core.interfaces.premium_interfaces import IPremiumService
+from datasources.queries import HandledPaymentQueries
 
 TIPPLY_API_URL = (
     "https://widgets.tipply.pl/LATEST_MESSAGES/"
@@ -143,7 +145,7 @@ class PremiumManager:
             )
 
     async def process_data(self, session, payment_data: PaymentData) -> None:
-        """Process Payment"""
+        """Process Payment using new service architecture"""
         if not self.guild:
             logger.error(
                 "Guild is not set in process_data. Cannot process payment: %s",
@@ -152,6 +154,12 @@ class PremiumManager:
             return
 
         logger.info("Processing payment: %s", payment_data)
+        
+        # Get services
+        member_service = self.bot.get_service(IMemberService, session)
+        premium_service = self.bot.get_service(IPremiumService, session)
+        premium_service.set_guild(self.guild)
+        
         # First, try to find the banned member
         banned_member = await self.get_banned_member(payment_data.name)
         if banned_member:
@@ -180,7 +188,9 @@ class PremiumManager:
                     payment_data.payment_type,
                 )
                 logger.info("payment: %s", payment)
-                await MemberQueries.get_or_add_member(session, member.id)
+                
+                # Use new service architecture
+                await member_service.get_or_create_member(member)
 
                 # Najpierw sprawdź konwersję legacy i ustal finalną kwotę
                 final_amount = payment_data.amount
@@ -215,9 +225,10 @@ class PremiumManager:
                     logger.info(
                         f"No premium role match for amount {final_amount}, adding to wallet: {payment_data.amount}"
                     )
-                    await MemberQueries.add_to_wallet_balance(
-                        session, member.id, payment_data.amount
-                    )
+                    # Use new service architecture
+                    db_member = await member_service.get_or_create_member(member)
+                    new_balance = db_member.wallet_balance + payment_data.amount
+                    await member_service.update_member_info(db_member, wallet_balance=new_balance)
             else:
                 logger.warning("Member not found for payment: %s", payment_data.name)
                 payment = await HandledPaymentQueries.add_payment(

@@ -11,7 +11,8 @@ import discord
 from discord.ext import commands, tasks
 
 from cogs.views.shop_views import BuyRoleButton
-from datasources.queries import HandledPaymentQueries, MemberQueries
+from core.interfaces.member_interfaces import IMemberService
+from datasources.queries import HandledPaymentQueries
 from utils.currency import CURRENCY_UNIT
 from utils.premium import PremiumManager, TipplyDataProvider
 from utils.premium_logic import PREMIUM_PRIORITY, PremiumRoleManager
@@ -77,7 +78,9 @@ class OnPaymentEvent(commands.Cog):
 
                 logger.info("Found %s new payments", len(payments_data))
 
-                # First ensure all members exist in database
+                # First ensure all members exist in database using service architecture
+                member_service = self.bot.get_service(IMemberService, session)
+                
                 for payment_data in payments_data:
                     try:
                         if not self.premium_manager:
@@ -87,7 +90,7 @@ class OnPaymentEvent(commands.Cog):
                             payment_data.name
                         )
                         if member:
-                            await MemberQueries.get_or_add_member(session, member.id)
+                            await member_service.get_or_create_member(member)
                             logger.info(
                                 f"Ensured member {member.display_name} exists in database"
                             )

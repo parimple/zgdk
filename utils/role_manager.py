@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Optional
 import discord
 from discord import AllowedMentions
 
+from core.interfaces.premium_interfaces import IPremiumService
 from datasources.queries import NotificationLogQueries, RoleQueries
 
 logger = logging.getLogger(__name__)
