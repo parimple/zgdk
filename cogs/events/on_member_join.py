@@ -17,7 +17,6 @@ from core.interfaces.member_interfaces import (
 from core.interfaces.role_interfaces import IRoleService
 from datasources.queries import (
     ChannelPermissionQueries,
-    RoleQueries,
     InviteQueries,  # Still used in clean_invites method
 )
 
@@ -120,7 +119,8 @@ class OnMemberJoinEvent(commands.Cog):
 
             async with self.bot.get_db() as session:
                 # Sprawdź, czy użytkownik ma jakiekolwiek role wyciszenia w bazie danych
-                member_roles = await RoleQueries.get_member_roles(session, member.id)
+                role_service = await self.bot.get_service(IRoleService, session)
+                member_roles = await role_service.get_member_roles(member.id)
 
                 # Filtruj tylko role wyciszenia
                 mute_member_roles = [
@@ -169,8 +169,8 @@ class OnMemberJoinEvent(commands.Cog):
                             f"Rola wyciszenia {role_id} ({role_desc}) dla {member.id} wygasła, nie przywracam"
                         )
                         # Usuń wygasłą rolę z bazy danych
-                        await RoleQueries.delete_member_role(
-                            session, member.id, role_id
+                        await role_service.remove_role_from_member(
+                            member.id, role_id
                         )
                         continue
 
@@ -758,9 +758,8 @@ class OnMemberJoinEvent(commands.Cog):
         try:
             async with self.bot.get_db() as session:
                 # Pobierz wszystkie role użytkownika z bazy danych
-                all_role_records = await RoleQueries.get_member_roles(
-                    session, member.id
-                )
+                role_service = await self.bot.get_service(IRoleService, session)
+                all_role_records = await role_service.get_member_roles(member.id)
 
                 if all_role_records:
                     for role_record in all_role_records:

@@ -79,7 +79,7 @@ class OnPaymentEvent(commands.Cog):
                 logger.info("Found %s new payments", len(payments_data))
 
                 # First ensure all members exist in database using service architecture
-                member_service = self.bot.get_service(IMemberService, session)
+                member_service = await self.bot.get_service(IMemberService, session)
                 
                 for payment_data in payments_data:
                     try:
@@ -228,7 +228,8 @@ class OnPaymentEvent(commands.Cog):
 
         # Ensure member exists in database before proceeding
         try:
-            await MemberQueries.get_or_add_member(session, member.id)
+            member_service = await self.bot.get_service(IMemberService, session)
+            await member_service.get_or_create_member(member)
             await session.flush()
             logger.info(
                 f"Ensured member {member.display_name} exists in database before payment processing"
@@ -312,8 +313,10 @@ class OnPaymentEvent(commands.Cog):
                         if highest_role_priority > target_role_priority:
                             # User has higher role than what they're trying to buy with original amount
                             # Add original amount to wallet and don't process legacy conversion
-                            await MemberQueries.add_to_wallet_balance(
-                                session, member.id, original_amount
+                            member_service = await self.bot.get_service(IMemberService, session)
+                            db_member = await member_service.get_or_create_member(member)
+                            updated_member = await member_service.update_member_info(
+                                db_member, wallet_balance=db_member.wallet_balance + original_amount
                             )
                             await session.flush()
 
@@ -376,8 +379,10 @@ class OnPaymentEvent(commands.Cog):
                                 if original_amount in legacy_amounts:
                                     # This is a legacy conversion - user didn't pay enough for real upgrade
                                     # Add original amount to wallet instead
-                                    await MemberQueries.add_to_wallet_balance(
-                                        session, member.id, original_amount
+                                    member_service = await self.bot.get_service(IMemberService, session)
+                                    db_member = await member_service.get_or_create_member(member)
+                                    updated_member = await member_service.update_member_info(
+                                        db_member, wallet_balance=db_member.wallet_balance + original_amount
                                     )
                                     await session.flush()
 
@@ -475,8 +480,10 @@ class OnPaymentEvent(commands.Cog):
                                     amount_to_add = final_amount - role_price
 
                                 if amount_to_add > 0:
-                                    await MemberQueries.add_to_wallet_balance(
-                                        session, member.id, amount_to_add
+                                    member_service = await self.bot.get_service(IMemberService, session)
+                                    db_member = await member_service.get_or_create_member(member)
+                                    updated_member = await member_service.update_member_info(
+                                        db_member, wallet_balance=db_member.wallet_balance + amount_to_add
                                     )
                                     await session.flush()
                             break
@@ -490,8 +497,10 @@ class OnPaymentEvent(commands.Cog):
                 # Jeśli nie znaleziono pasującej roli lub użytkownik ma wyższą rolę, dodaj całą kwotę do portfela
                 if amount_to_add == final_amount:
                     try:
-                        await MemberQueries.add_to_wallet_balance(
-                            session, member.id, amount_to_add
+                        member_service = await self.bot.get_service(IMemberService, session)
+                        db_member = await member_service.get_or_create_member(member)
+                        updated_member = await member_service.update_member_info(
+                            db_member, wallet_balance=db_member.wallet_balance + amount_to_add
                         )
                         await session.flush()
                         # Remove mute roles even if no role was purchased

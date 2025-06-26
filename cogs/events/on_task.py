@@ -12,10 +12,13 @@ from discord.ext import commands, tasks
 
 from cogs.commands.info import remove_premium_role_mod_permissions
 from datasources.queries import (
-    MemberQueries,
     ModerationLogQueries,
     NotificationLogQueries,
     RoleQueries,
+)
+from core.interfaces.member_interfaces import (
+    IMemberService,
+    IModerationService,
 )
 from utils.currency import CURRENCY_UNIT, g_to_pln
 from utils.role_manager import RoleManager
@@ -303,8 +306,10 @@ class OnTaskEvent(commands.Cog):
                     bot_id = self.bot.user.id
 
                     # Upewnij się, że użytkownicy istnieją w bazie
-                    await MemberQueries.get_or_add_member(session, member.id)
-                    await MemberQueries.get_or_add_member(session, bot_id)
+                    member_service = await self.bot.get_service(IMemberService, session)
+                    await member_service.get_or_create_member(member)
+                    bot_user = await self.bot.fetch_user(bot_id)
+                    await member_service.get_or_create_member(bot_user)
 
                     # Zapisz automatyczne unmute do logu
                     await ModerationLogQueries.log_mute_action(

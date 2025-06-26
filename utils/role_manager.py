@@ -334,7 +334,7 @@ class RoleManager:
                                 await RoleQueries.delete_member_role(
                                     session,
                                     member_role_db_entry.member_id,
-                                    member_role_db_entry.role_id,
+                                    member_role_db_entry.role_id
                                 )
                                 removed_count += 1
                                 stats["removed_count"] += 1
