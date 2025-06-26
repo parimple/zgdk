@@ -8,10 +8,15 @@ import discord
 from discord import AllowedMentions
 from discord.ext import commands, tasks
 
+from core.interfaces.member_interfaces import (
+    IActivityService,
+    IInviteService,
+    IMemberService,
+    IModerationService,
+)
+from core.interfaces.role_interfaces import IRoleService
 from datasources.queries import (
     ChannelPermissionQueries,
-    InviteQueries,
-    MemberQueries,
     RoleQueries,
 )
 

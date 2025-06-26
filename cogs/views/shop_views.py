@@ -324,7 +324,8 @@ class RoleShopView(discord.ui.View):
                             )
 
                             # Remove mute roles and update balance
-                            await self.premium_manager.remove_mute_roles(member)
+                            if self.premium_manager:
+                                await self.premium_manager.remove_mute_roles(member)
                             await MemberQueries.add_to_wallet_balance(
                                 session, self.viewer.id, -price
                             )
@@ -459,7 +460,8 @@ class RoleShopView(discord.ui.View):
                             )
 
                             # Remove mute roles
-                            await self.premium_manager.remove_mute_roles(member)
+                            if self.premium_manager:
+                                await self.premium_manager.remove_mute_roles(member)
 
                             await session.commit()
                             await session.refresh(current_member_role)
@@ -503,7 +505,8 @@ class RoleShopView(discord.ui.View):
                                 )
 
                             # Remove mute roles before adding new role
-                            await self.premium_manager.remove_mute_roles(member)
+                            if self.premium_manager:
+                                await self.premium_manager.remove_mute_roles(member)
 
                             # Add new role - use MONTHLY_DURATION without bonus days for role changes
                             duration = timedelta(days=MONTHLY_DURATION)
@@ -569,7 +572,8 @@ class RoleShopView(discord.ui.View):
                             )
 
                             # Remove mute roles and update balance
-                            await self.premium_manager.remove_mute_roles(member)
+                            if self.premium_manager:
+                                await self.premium_manager.remove_mute_roles(member)
                             await MemberQueries.add_to_wallet_balance(
                                 session, self.viewer.id, -price
                             )
@@ -680,7 +684,8 @@ class RoleShopView(discord.ui.View):
                         )
 
                         # Remove mute roles
-                        await self.premium_manager.remove_mute_roles(member)
+                        if self.premium_manager:
+                            await self.premium_manager.remove_mute_roles(member)
 
                         # Update wallet balance
                         await MemberQueries.add_to_wallet_balance(
@@ -737,7 +742,8 @@ class RoleShopView(discord.ui.View):
                     await member.add_roles(role)
 
                 # Remove mute roles before updating balance
-                await self.premium_manager.remove_mute_roles(member)
+                if self.premium_manager:
+                    await self.premium_manager.remove_mute_roles(member)
 
                 await MemberQueries.add_to_wallet_balance(
                     session, self.viewer.id, -price

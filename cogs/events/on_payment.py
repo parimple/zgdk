@@ -306,7 +306,8 @@ class OnPaymentEvent(commands.Cog):
                             await session.flush()
 
                             # Remove mute roles regardless
-                            await self.role_manager.remove_mute_roles(member)
+                            if self.role_manager:
+                                await self.role_manager.remove_mute_roles(member)
 
                             embed = discord.Embed(
                                 title="Doładowanie konta",
@@ -369,7 +370,8 @@ class OnPaymentEvent(commands.Cog):
                                     await session.flush()
 
                                     # Remove mute roles regardless
-                                    await self.role_manager.remove_mute_roles(member)
+                                    if self.role_manager:
+                                        await self.role_manager.remove_mute_roles(member)
 
                                     embed = discord.Embed(
                                         title="Doładowanie konta",
@@ -449,7 +451,8 @@ class OnPaymentEvent(commands.Cog):
                             await session.flush()
 
                             # Remove mute roles regardless of the role assignment result
-                            await self.role_manager.remove_mute_roles(member)
+                            if self.role_manager:
+                                await self.role_manager.remove_mute_roles(member)
 
                             # Handle wallet balance - only add if not explicitly set to False
                             if add_to_wallet is not False:
@@ -480,7 +483,8 @@ class OnPaymentEvent(commands.Cog):
                         )
                         await session.flush()
                         # Remove mute roles even if no role was purchased
-                        await self.role_manager.remove_mute_roles(member)
+                        if self.role_manager:
+                            await self.role_manager.remove_mute_roles(member)
                     except Exception as e:
                         logger.error(f"Error adding balance to wallet: {str(e)}")
                         raise
