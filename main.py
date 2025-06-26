@@ -175,6 +175,19 @@ class Zagadka(commands.Bot):
                 await session.rollback()
                 logging.error(f"Database session error: {e}")
                 raise
+    
+    @asynccontextmanager
+    async def get_unit_of_work(self):
+        """Get Unit of Work for comprehensive transaction management with service access."""
+        async with self.get_db() as session:
+            try:
+                unit_of_work = self.service_container.create_unit_of_work(session)
+                async with unit_of_work:
+                    yield unit_of_work
+                    await unit_of_work.commit()
+            except Exception as e:
+                logging.error(f"Unit of Work error: {e}")
+                raise
 
     def _setup_services(self) -> None:
         """Setup dependency injection container with services."""

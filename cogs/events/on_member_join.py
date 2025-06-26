@@ -516,7 +516,7 @@ class OnMemberJoinEvent(commands.Cog):
                 if self.welcome_channel:
                     await self.welcome_channel.send(
                         f"{member.mention} {member.display_name} zaproszony przez {self.bot.user.mention} "
-                        f"Kod: {self.guild.vanity_url_code or 'nieznany'}",
+                        f"Kod: {self.guild.vanity_url_code if self.guild and self.guild.vanity_url_code else 'nieznany'}",
                         allowed_mentions=AllowedMentions(users=False),
                     )
                 else:
@@ -596,6 +596,9 @@ class OnMemberJoinEvent(commands.Cog):
     async def clean_invites(self):
         logger.info("Starting invite cleanup process")
         try:
+            if not self.guild:
+                logger.error("Guild not available for invite cleanup")
+                return
             guild_invites = await self.guild.invites()
         except discord.HTTPException as e:
             logger.error(f"Failed to fetch guild invites: {e}")
@@ -724,6 +727,9 @@ class OnMemberJoinEvent(commands.Cog):
         """
         try:
             # Get the member
+            if not self.guild:
+                logger.warning("Guild not available for invite deletion notification")
+                return
             member = self.guild.get_member(user_id)
             if not member:
                 logger.warning(
@@ -764,7 +770,7 @@ class OnMemberJoinEvent(commands.Cog):
                 if all_role_records:
                     for role_record in all_role_records:
                         # Sprawdź czy rola istnieje na serwerze
-                        discord_role = self.guild.get_role(role_record.role_id)
+                        discord_role = self.guild.get_role(role_record.role_id) if self.guild else None
                         if not discord_role:
                             logger.warning(
                                 f"Rola {role_record.role_id} nie istnieje na serwerze"
@@ -851,7 +857,7 @@ class OnMemberJoinEvent(commands.Cog):
 
                 # Dla każdego uprawnienia sprawdź czy właściciel jest w kanale głosowym
                 for permission in target_permissions:
-                    owner = self.guild.get_member(permission.member_id)
+                    owner = self.guild.get_member(permission.member_id) if self.guild else None
                     if not owner:
                         continue  # Właściciel już nie jest na serwerze
 

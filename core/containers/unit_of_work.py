@@ -6,6 +6,13 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.interfaces.base import IUnitOfWork
+from core.repositories.member_repository import (
+    ActivityRepository,
+    InviteRepository, 
+    MemberRepository,
+    ModerationRepository,
+)
+from core.repositories.role_repository import RoleRepository
 
 
 class UnitOfWork(IUnitOfWork):
@@ -15,6 +22,13 @@ class UnitOfWork(IUnitOfWork):
         self.session = session
         self.logger = logging.getLogger(self.__class__.__name__)
         self._transaction_started = False
+        
+        # Initialize repositories with shared session
+        self.members = MemberRepository(session)
+        self.activities = ActivityRepository(session)
+        self.invites = InviteRepository(session)
+        self.moderation = ModerationRepository(session)
+        self.roles = RoleRepository(session)
 
     async def __aenter__(self) -> "UnitOfWork":
         """Enter async context manager."""
