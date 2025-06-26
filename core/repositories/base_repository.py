@@ -1,25 +1,24 @@
 """Base repository implementation with common CRUD operations."""
 
+from __future__ import annotations
+
 import logging
-from typing import Any, List, Optional, Type, TypeVar
+from typing import Any, Optional, Type
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.interfaces.base import IRepository
-
-T = TypeVar("T")
 
 
-class BaseRepository(IRepository[T]):
+class BaseRepository:
     """Base repository class providing common CRUD operations."""
 
-    def __init__(self, session: AsyncSession, entity_class: Type[T]) -> None:
-        super().__init__(session)
+    def __init__(self, entity_class: Type[Any], session: AsyncSession) -> None:
+        self.session = session
         self.entity_class = entity_class
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def get_by_id(self, entity_id: Any) -> Optional[T]:
+    async def get_by_id(self, entity_id: Any) -> Optional[Any]:
         """Get entity by ID."""
         try:
             result = await self.session.get(self.entity_class, entity_id)
@@ -40,7 +39,7 @@ class BaseRepository(IRepository[T]):
 
     async def get_all(
         self, limit: Optional[int] = None, offset: Optional[int] = None
-    ) -> List[T]:
+    ) -> list[Any]:
         """Get all entities with optional pagination."""
         try:
             stmt = select(self.entity_class)
@@ -59,7 +58,7 @@ class BaseRepository(IRepository[T]):
             self.logger.error(f"Error getting all {self.entity_class.__name__}: {e}")
             raise
 
-    async def create(self, entity: T) -> T:
+    async def create(self, entity: Any) -> Any:
         """Create new entity."""
         try:
             self.session.add(entity)
@@ -70,7 +69,7 @@ class BaseRepository(IRepository[T]):
             self.logger.error(f"Error creating {self.entity_class.__name__}: {e}")
             raise
 
-    async def update(self, entity: T) -> T:
+    async def update(self, entity: Any) -> Any:
         """Update existing entity."""
         try:
             # Entity should already be tracked by session
@@ -113,3 +112,13 @@ class BaseRepository(IRepository[T]):
                 f"Error checking existence of {self.entity_class.__name__} with ID {entity_id}: {e}"
             )
             raise
+
+    def _log_operation(self, operation_name: str, **context: Any) -> None:
+        """Log repository operation with context."""
+        context_str = ", ".join([f"{k}={v}" for k, v in context.items()])
+        self.logger.info(f"{operation_name}: {context_str}")
+
+    def _log_error(self, operation_name: str, error: Exception, **context: Any) -> None:
+        """Log repository error with context."""
+        context_str = ", ".join([f"{k}={v}" for k, v in context.items()])
+        self.logger.error(f"{operation_name} failed: {error} | Context: {context_str}")

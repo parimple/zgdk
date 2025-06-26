@@ -1,23 +1,22 @@
 """Role repository implementation."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.interfaces.role_interfaces import IRoleRepository
 from core.repositories.base_repository import BaseRepository
 from datasources.models import MemberRole, Role
 
 
-class RoleRepository(BaseRepository, IRoleRepository):
+class RoleRepository(BaseRepository):
     """Repository for role data access operations."""
 
     def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session, MemberRole)
+        super().__init__(MemberRole, session)
 
-    async def get_roles_by_member_id(self, member_id: int) -> List[dict]:
+    async def get_roles_by_member_id(self, member_id: int) -> list[dict]:
         """Get all roles for a specific member."""
         try:
             stmt = (
@@ -49,7 +48,7 @@ class RoleRepository(BaseRepository, IRoleRepository):
             self.logger.error(f"Error getting roles for member {member_id}: {e}")
             raise
 
-    async def get_expired_roles(self, current_time: datetime) -> List[dict]:
+    async def get_expired_roles(self, current_time: datetime) -> list[dict]:
         """Get all roles that have expired."""
         try:
             stmt = (

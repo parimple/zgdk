@@ -1,11 +1,10 @@
 """Payment processor service for handling external payment integrations."""
 
 import asyncio
-import json
 import logging
 import re
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import httpx
 from bs4 import BeautifulSoup
@@ -38,7 +37,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
         """Validate payment processing operations."""
         return True
 
-    async def fetch_recent_payments(self) -> List[PaymentData]:
+    async def fetch_recent_payments(self) -> list[PaymentData]:
         """Fetch recent payments from Tipply API."""
         try:
             self._log_operation("fetch_recent_payments_start")
@@ -58,7 +57,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
             self._log_error("fetch_recent_payments", e)
             return []
 
-    async def _fetch_payments_via_http(self) -> List[PaymentData]:
+    async def _fetch_payments_via_http(self) -> list[PaymentData]:
         """Fetch payments using HTTP client."""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -73,7 +72,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
             self._log_error("fetch_payments_via_http", e)
             return []
 
-    async def _fetch_payments_via_browser(self) -> List[PaymentData]:
+    async def _fetch_payments_via_browser(self) -> list[PaymentData]:
         """Fetch payments using browser automation (fallback)."""
         try:
             async with async_playwright() as playwright:
@@ -107,7 +106,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
             self._log_error("fetch_payments_via_browser", e)
             return []
 
-    def _parse_payments_from_html(self, soup: BeautifulSoup) -> List[PaymentData]:
+    def _parse_payments_from_html(self, soup: BeautifulSoup) -> list[PaymentData]:
         """Parse payment data from HTML soup."""
         payments = []
 
@@ -196,7 +195,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
         """Set premium service to avoid circular dependency."""
         self.premium_service = premium_service
 
-    async def process_payment(self, payment: PaymentData) -> Tuple[bool, str]:
+    async def process_payment(self, payment: PaymentData) -> tuple[bool, str]:
         """Process a single payment and assign premium benefits."""
         try:
             if not self.premium_service:
@@ -282,7 +281,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
             self._log_error("extract_member_id", e, payment_name=payment_name)
             return None
 
-    def calculate_premium_benefits(self, amount: int) -> Optional[Tuple[str, int]]:
+    def calculate_premium_benefits(self, amount: int) -> Optional[tuple[str, int]]:
         """Calculate premium role and duration from payment amount."""
         try:
             # Standard premium role pricing
@@ -323,7 +322,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
             self._log_error("calculate_premium_benefits", e, amount=amount)
             return None
 
-    async def process_batch_payments(self, max_payments: int = 50) -> Dict[str, int]:
+    async def process_batch_payments(self, max_payments: int = 50) -> dict[str, int]:
         """Process a batch of recent payments."""
         try:
             payments = await self.fetch_recent_payments()

@@ -1,7 +1,7 @@
 """Role service implementation with business logic."""
 
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Optional
 
 import discord
 
@@ -117,7 +117,7 @@ class RoleService(BaseService, IRoleService):
             )
             return False
 
-    async def process_expired_roles(self) -> List[dict]:
+    async def process_expired_roles(self) -> list[dict]:
         """Process all expired roles and remove them."""
         try:
             current_time = datetime.utcnow()
@@ -202,7 +202,7 @@ class RoleService(BaseService, IRoleService):
             )
             return False
 
-    async def get_member_role_info(self, member_id: int) -> List[dict]:
+    async def get_member_role_info(self, member_id: int) -> list[dict]:
         """Get detailed role information for a member."""
         try:
             roles = await self.role_repository.get_roles_by_member_id(member_id)

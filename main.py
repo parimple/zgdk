@@ -3,10 +3,8 @@
 Main file for Zagadka bot.
 """
 
-import asyncio
 import logging
 import os
-import signal
 import subprocess
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Optional
@@ -15,27 +13,41 @@ import discord
 import yaml
 from discord.ext import commands
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from core.containers.service_container import ServiceContainer
-from core.containers.unit_of_work import UnitOfWork
 from core.interfaces.messaging_interfaces import (
     IEmbedBuilder,
     IMessageFormatter,
     IMessageSender,
     INotificationService,
 )
+from core.interfaces.member_interfaces import (
+    IActivityService,
+    IInviteService,
+    IMemberService,
+    IModerationService,
+)
 from core.interfaces.premium_interfaces import (
     IPaymentProcessor,
-    IPremiumChecker,
-    IPremiumRoleManager,
     IPremiumService,
 )
-from core.interfaces.role_interfaces import IRoleRepository, IRoleService
+from core.interfaces.role_interfaces import IRoleService
+from core.repositories.member_repository import (
+    ActivityRepository,
+    InviteRepository,
+    MemberRepository,
+    ModerationRepository,
+)
 from core.repositories.premium_repository import PaymentRepository, PremiumRepository
 from core.repositories.role_repository import RoleRepository
 from core.services.embed_builder_service import EmbedBuilderService
+from core.services.member_service import (
+    ActivityService,
+    InviteService,
+    MemberService,
+    ModerationService,
+)
 from core.services.message_formatter_service import MessageFormatterService
 from core.services.message_sender_service import MessageSenderService
 from core.services.notification_service import NotificationService
@@ -57,7 +69,7 @@ def cleanup_zombie_processes() -> None:
     """Cleanup zombie processes from previous Playwright sessions"""
     try:
         # Kill all headless_shell processes
-        result = subprocess.run(
+        subprocess.run(
             ["pkill", "-f", "headless_shell"], capture_output=True, timeout=5
         )
 
@@ -99,7 +111,11 @@ class Zagadka(commands.Bot):
         self.test: bool = kwargs.get("test", False)
         self.config: dict[str, Any] = config
 
-        self.guild_id: int = config.get("guild_id")
+        guild_id = config.get("guild_id")
+        if guild_id is None:
+            raise ValueError("guild_id is required in config")
+        self.guild_id: int = guild_id
+        
         self.donate_url: str = config.get("donate_url", "")
         self.channels: dict[str, int] = config.get("channels", {})
 
@@ -116,7 +132,7 @@ class Zagadka(commands.Bot):
             pool_recycle=1800,
             pool_pre_ping=True,
         )
-        self.SessionLocal = sessionmaker(
+        self.SessionLocal = async_sessionmaker(
             self.engine, class_=AsyncSession, expire_on_commit=False
         )
         self.base = Base
@@ -126,8 +142,12 @@ class Zagadka(commands.Bot):
         self.service_container = ServiceContainer()
         self._setup_services()
 
+        prefix = config.get("prefix")
+        if prefix is None:
+            raise ValueError("prefix is required in config")
+
         super().__init__(
-            command_prefix=config.get("prefix"),
+            command_prefix=prefix,
             intents=intents,
             status=discord.Status.do_not_disturb,
             allowed_mentions=discord.AllowedMentions.all(),
@@ -169,22 +189,11 @@ class Zagadka(commands.Bot):
         self.service_container.register_singleton(IEmbedBuilder, embed_builder)
         self.service_container.register_singleton(IMessageFormatter, message_formatter)
 
-        # Register repository factory
-        def role_repository_factory() -> IRoleRepository:
-            # This will be called when needed with a fresh session
-            return RoleRepository
-
-        def role_service_factory() -> IRoleService:
-            # This creates the service with proper dependencies
-            return RoleService
-
-        self.service_container.register_factory(
-            IRoleRepository, role_repository_factory
-        )
-        self.service_container.register_factory(IRoleService, role_service_factory)
+        # Note: Repository and service factories are handled in get_service method
+        # since they require session and complex dependency injection
 
     async def get_service(
-        self, service_type: type, session: AsyncSession = None
+        self, service_type: type, session: Optional[AsyncSession] = None
     ) -> Any:
         """Get a service instance with optional database session."""
 
@@ -261,6 +270,56 @@ class Zagadka(commands.Bot):
             payment_processor.set_premium_service(premium_service)
 
             return payment_processor
+
+        elif service_type == IMemberService:
+            # Create repositories
+            member_repository = MemberRepository(session)
+            activity_repository = ActivityRepository(session)
+            invite_repository = InviteRepository(session)
+            unit_of_work = self.service_container.create_unit_of_work(session)
+
+            return MemberService(
+                member_repository=member_repository,
+                activity_repository=activity_repository,
+                invite_repository=invite_repository,
+                unit_of_work=unit_of_work,
+            )
+
+        elif service_type == IActivityService:
+            # Create repositories
+            activity_repository = ActivityRepository(session)
+            member_repository = MemberRepository(session)
+            unit_of_work = self.service_container.create_unit_of_work(session)
+
+            return ActivityService(
+                activity_repository=activity_repository,
+                member_repository=member_repository,
+                unit_of_work=unit_of_work,
+            )
+
+        elif service_type == IModerationService:
+            # Create repositories
+            moderation_repository = ModerationRepository(session)
+            member_repository = MemberRepository(session)
+            unit_of_work = self.service_container.create_unit_of_work(session)
+
+            return ModerationService(
+                moderation_repository=moderation_repository,
+                member_repository=member_repository,
+                unit_of_work=unit_of_work,
+            )
+
+        elif service_type == IInviteService:
+            # Create repositories
+            invite_repository = InviteRepository(session)
+            member_repository = MemberRepository(session)
+            unit_of_work = self.service_container.create_unit_of_work(session)
+
+            return InviteService(
+                invite_repository=invite_repository,
+                member_repository=member_repository,
+                unit_of_work=unit_of_work,
+            )
 
         # For other services, use the container
         return self.service_container.get_service(service_type)

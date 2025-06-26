@@ -1,8 +1,8 @@
 """Interfaces for role management domain."""
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 import discord
 
@@ -13,12 +13,12 @@ class IRoleRepository(IRepository):
     """Interface for role data access operations."""
 
     @abstractmethod
-    async def get_roles_by_member_id(self, member_id: int) -> List[dict]:
+    async def get_roles_by_member_id(self, member_id: int) -> list[dict]:
         """Get all roles for a specific member."""
         pass
 
     @abstractmethod
-    async def get_expired_roles(self, current_time: datetime) -> List[dict]:
+    async def get_expired_roles(self, current_time: datetime) -> list[dict]:
         """Get all roles that have expired."""
         pass
 
@@ -59,7 +59,7 @@ class IRoleService(IService):
         pass
 
     @abstractmethod
-    async def process_expired_roles(self) -> List[dict]:
+    async def process_expired_roles(self) -> list[dict]:
         """Process all expired roles and remove them."""
         pass
 
@@ -71,6 +71,6 @@ class IRoleService(IService):
         pass
 
     @abstractmethod
-    async def get_member_role_info(self, member_id: int) -> List[dict]:
+    async def get_member_role_info(self, member_id: int) -> list[dict]:
         """Get detailed role information for a member."""
         pass

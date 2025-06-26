@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import discord
 
@@ -78,7 +78,7 @@ class IPremiumChecker(ABC):
     @abstractmethod
     async def check_command_access(
         self, member: discord.Member, command_name: str
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Check if member can access a specific command."""
         pass
 
@@ -133,12 +133,12 @@ class IPremiumRoleManager(ABC):
     @abstractmethod
     async def get_premium_role_info(
         self, member: discord.Member
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get premium role information for a member."""
         pass
 
     @abstractmethod
-    async def process_expired_premium_roles(self) -> List[Dict[str, Any]]:
+    async def process_expired_premium_roles(self) -> list[dict[str, Any]]:
         """Process all expired premium roles."""
         pass
 
@@ -147,12 +147,12 @@ class IPaymentProcessor(ABC):
     """Interface for processing premium payments."""
 
     @abstractmethod
-    async def fetch_recent_payments(self) -> List[PaymentData]:
+    async def fetch_recent_payments(self) -> list[PaymentData]:
         """Fetch recent payments from external service."""
         pass
 
     @abstractmethod
-    async def process_payment(self, payment: PaymentData) -> Tuple[bool, str]:
+    async def process_payment(self, payment: PaymentData) -> tuple[bool, str]:
         """Process a single payment and assign premium benefits."""
         pass
 
@@ -172,7 +172,7 @@ class IPaymentProcessor(ABC):
         pass
 
     @abstractmethod
-    def calculate_premium_benefits(self, amount: int) -> Optional[Tuple[str, int]]:
+    def calculate_premium_benefits(self, amount: int) -> Optional[tuple[str, int]]:
         """Calculate premium role and duration from payment amount."""
         pass
 
@@ -183,24 +183,24 @@ class IPremiumService(ABC):
     @abstractmethod
     async def validate_premium_access(
         self, member: discord.Member, required_tier: CommandTier
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Validate if member has required premium access."""
         pass
 
     @abstractmethod
     async def handle_premium_payment(
         self, payment: PaymentData
-    ) -> Tuple[bool, str, Optional[discord.Member]]:
+    ) -> tuple[bool, str, Optional[discord.Member]]:
         """Handle a premium payment end-to-end."""
         pass
 
     @abstractmethod
-    async def get_member_premium_status(self, member: discord.Member) -> Dict[str, Any]:
+    async def get_member_premium_status(self, member: discord.Member) -> dict[str, Any]:
         """Get comprehensive premium status for a member."""
         pass
 
     @abstractmethod
-    async def process_premium_maintenance(self) -> Dict[str, int]:
+    async def process_premium_maintenance(self) -> dict[str, int]:
         """Process premium maintenance tasks (expired roles, etc.)."""
         pass
 

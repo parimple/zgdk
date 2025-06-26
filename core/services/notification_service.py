@@ -3,7 +3,6 @@
 from typing import Any
 
 import discord
-from discord.ext import commands
 
 from core.interfaces.messaging_interfaces import (
     IEmbedBuilder,

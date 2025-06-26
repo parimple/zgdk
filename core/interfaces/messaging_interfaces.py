@@ -1,7 +1,7 @@
 """Interfaces for messaging and notification system."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import discord
 
@@ -15,9 +15,9 @@ class IEmbedBuilder(ABC):
         title: Optional[str] = None,
         description: Optional[str] = None,
         color: Optional[str] = None,
-        fields: Optional[List[Dict[str, Any]]] = None,
+        fields: Optional[list[dict[str, Any]]] = None,
         footer: Optional[str] = None,
-        author: Optional[Dict[str, str]] = None,
+        author: Optional[dict[str, str]] = None,
     ) -> discord.Embed:
         """Create a Discord embed with given parameters."""
         pass

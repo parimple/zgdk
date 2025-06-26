@@ -2,7 +2,7 @@
 
 import re
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import discord
 
@@ -119,7 +119,7 @@ class PremiumService(
 
     async def check_command_access(
         self, member: discord.Member, command_name: str
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Check if member can access a specific command."""
         try:
             command_tier = await self.get_command_tier(command_name)
@@ -401,7 +401,7 @@ class PremiumService(
 
     async def get_premium_role_info(
         self, member: discord.Member
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get premium role information for a member."""
         try:
             return await self.premium_repository.get_member_premium_roles(member.id)
@@ -409,7 +409,7 @@ class PremiumService(
             self._log_error("get_premium_role_info", e, member_id=member.id)
             return []
 
-    async def process_expired_premium_roles(self) -> List[Dict[str, Any]]:
+    async def process_expired_premium_roles(self) -> list[dict[str, Any]]:
         """Process all expired premium roles."""
         try:
             current_time = datetime.utcnow()
@@ -439,7 +439,7 @@ class PremiumService(
     # IPremiumService implementation
     async def validate_premium_access(
         self, member: discord.Member, required_tier: CommandTier
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Validate if member has required premium access."""
         try:
             if required_tier == CommandTier.TIER_0:
@@ -484,7 +484,7 @@ class PremiumService(
 
     async def handle_premium_payment(
         self, payment: PaymentData
-    ) -> Tuple[bool, str, Optional[discord.Member]]:
+    ) -> tuple[bool, str, Optional[discord.Member]]:
         """Handle a premium payment end-to-end."""
         try:
             # Extract member ID from payment name
@@ -525,7 +525,7 @@ class PremiumService(
             self._log_error("handle_premium_payment", e, payment_name=payment.name)
             return False, f"Błąd przetwarzania płatności: {str(e)}", None
 
-    async def get_member_premium_status(self, member: discord.Member) -> Dict[str, Any]:
+    async def get_member_premium_status(self, member: discord.Member) -> dict[str, Any]:
         """Get comprehensive premium status for a member."""
         try:
             premium_roles = await self.get_premium_role_info(member)
@@ -554,7 +554,7 @@ class PremiumService(
             self._log_error("get_member_premium_status", e, member_id=member.id)
             return {"error": str(e)}
 
-    async def process_premium_maintenance(self) -> Dict[str, int]:
+    async def process_premium_maintenance(self) -> dict[str, int]:
         """Process premium maintenance tasks."""
         try:
             expired_roles = await self.process_expired_premium_roles()
@@ -584,7 +584,7 @@ class PremiumService(
             return int(match.group(1))
         return None
 
-    def calculate_premium_benefits(self, amount: int) -> Optional[Tuple[str, int]]:
+    def calculate_premium_benefits(self, amount: int) -> Optional[tuple[str, int]]:
         """Calculate premium role and duration from payment amount."""
         # Mapping based on original premium logic
         amount_mapping = {

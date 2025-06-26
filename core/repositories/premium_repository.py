@@ -1,7 +1,7 @@
 """Repository for premium-related data operations."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,9 +14,9 @@ class PremiumRepository(BaseRepository):
     """Repository for premium data access operations."""
 
     def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session, MemberRole)
+        super().__init__(MemberRole, session)
 
-    async def get_member_premium_roles(self, member_id: int) -> List[dict]:
+    async def get_member_premium_roles(self, member_id: int) -> list[dict]:
         """Get all premium roles for a member."""
         try:
             # Premium role names (based on config)
@@ -56,7 +56,7 @@ class PremiumRepository(BaseRepository):
             )
             raise
 
-    async def get_expired_premium_roles(self, current_time: datetime) -> List[dict]:
+    async def get_expired_premium_roles(self, current_time: datetime) -> list[dict]:
         """Get all expired premium roles."""
         try:
             premium_role_names = ["zG50", "zG100", "zG500", "zG1000"]
@@ -201,7 +201,7 @@ class PaymentRepository(BaseRepository):
     """Repository for payment data operations."""
 
     def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session, HandledPayment)
+        super().__init__(HandledPayment, session)
 
     async def is_payment_handled(
         self, payment_name: str, amount: int, paid_at: datetime
@@ -257,7 +257,7 @@ class PaymentRepository(BaseRepository):
 
     async def get_handled_payments_for_member(
         self, member_id: int, limit: int = 10
-    ) -> List[dict]:
+    ) -> list[dict]:
         """Get recent handled payments for a member."""
         try:
             stmt = (

@@ -1,38 +1,32 @@
 """Base interfaces for the application architecture."""
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncGenerator, TypeVar
+from typing import Any, Protocol, runtime_checkable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-T = TypeVar("T")
 
-
-class IRepository(ABC):
+@runtime_checkable
+class IRepository(Protocol):
     """Base repository interface for data access operations."""
-
-    def __init__(self, session: AsyncSession) -> None:
-        self.session = session
-
-    @abstractmethod
-    async def get_by_id(self, entity_id: Any) -> T | None:
+    
+    session: AsyncSession
+    
+    async def get_by_id(self, entity_id: Any) -> Any:
         """Get entity by ID."""
-        pass
+        ...
 
-    @abstractmethod
-    async def create(self, entity: T) -> T:
+    async def create(self, entity: Any) -> Any:
         """Create new entity."""
-        pass
+        ...
 
-    @abstractmethod
-    async def update(self, entity: T) -> T:
+    async def update(self, entity: Any) -> Any:
         """Update existing entity."""
-        pass
+        ...
 
-    @abstractmethod
     async def delete(self, entity_id: Any) -> bool:
         """Delete entity by ID."""
-        pass
+        ...
 
 
 class IService(ABC):

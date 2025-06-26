@@ -33,3 +33,12 @@ max-line-length = 88
 
 [tool.pytest.ini_options]
 python_paths = "."
+pythonpath = ["."]
+
+[tool.pyright]
+include = ["."]
+extraPaths = ["."]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+reportMissingImports = false
+reportMissingTypeStubs = false
