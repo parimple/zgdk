@@ -16,6 +16,11 @@ from datasources.queries import (
     MemberQueries,
     RoleQueries,
 )
+from core.interfaces.member_interfaces import (
+    IActivityService,
+    IMemberService,
+)
+from core.interfaces.premium_interfaces import IPremiumService
 from utils.currency import CURRENCY_UNIT
 from utils.message_sender import MessageSender
 from utils.permissions import is_admin
@@ -165,13 +170,14 @@ class InfoCog(commands.Cog):
         roles = [role for role in member.roles if role.name != "@everyone"]
 
         async with self.bot.get_db() as session:
-            db_member = await MemberQueries.get_or_add_member(session, member.id)
-            all_member_premium_roles = await RoleQueries.get_member_premium_roles(
-                session, member.id
-            )
-            bypass_until = await MemberQueries.get_voice_bypass_status(
-                session, member.id
-            )
+            # Use new service architecture
+            member_service = await self.bot.get_service(IMemberService, session)
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            
+            db_member = await member_service.get_or_create_member(member)
+            # Get premium roles through service (with caching)
+            all_member_premium_roles = await premium_service.get_member_premium_roles(member.id)
+            bypass_until = await member_service.get_voice_bypass_status(member.id)
 
             # Get owned teams from database
             owned_teams_query = await session.execute(
@@ -281,6 +287,26 @@ class InfoCog(commands.Cog):
         # Add invite count
         embed.add_field(name="Zaproszenia:", value=f"{invite_count}", inline=True)
 
+        # Add activity statistics using new service architecture
+        try:
+            activity_service = await self.bot.get_service(IActivityService, session)
+            activity_summary = await activity_service.get_member_activity_summary(member.id, days=30)
+            
+            if activity_summary:
+                total_points = activity_summary.get("total_points", 0)
+                voice_points = activity_summary.get("breakdown", {}).get("voice", 0)
+                text_points = activity_summary.get("breakdown", {}).get("text", 0)
+                
+                embed.add_field(
+                    name="📊 Aktywność (30 dni)",
+                    value=f"**Łącznie:** {total_points:,} pkt\n"
+                          f"• Głos: {voice_points:,} pkt\n"
+                          f"• Tekst: {text_points:,} pkt",
+                    inline=False
+                )
+        except Exception as e:
+            logger.error(f"Error getting activity stats for {member.id}: {e}")
+
         # Add mute information if user has any mutes
         if active_mutes:
             mutes_text = ", ".join(active_mutes)
@@ -375,16 +401,16 @@ class InfoCog(commands.Cog):
         current_time = datetime.now(timezone.utc)
 
         async with self.bot.get_db() as session:
+            member_service = await self.bot.get_service(IMemberService, session)
+            
             if hours is None or hours == 0:
                 # Zerowanie bypassa
-                await MemberQueries.set_voice_bypass_status(session, member.id, None)
+                await member_service.set_voice_bypass_status(member.id, None)
                 await ctx.send(f"Usunięto bypass dla {member.mention}.")
             else:
                 # Dodawanie nowego bypassa
                 bypass_until = current_time + timedelta(hours=hours)
-                await MemberQueries.set_voice_bypass_status(
-                    session, member.id, bypass_until
-                )
+                await member_service.set_voice_bypass_status(member.id, bypass_until)
                 await ctx.send(f"Ustawiono bypass dla {member.mention} na {hours}T.")
 
     @commands.hybrid_command(

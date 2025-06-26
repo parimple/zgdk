@@ -12,6 +12,8 @@ from discord.ext import commands
 from sqlalchemy import select
 
 from datasources.models import Role as DBRole
+from core.interfaces.premium_interfaces import IPremiumService
+from core.interfaces.role_interfaces import IRoleService
 from utils.message_sender import MessageSender
 from utils.permissions import is_admin, is_zagadka_owner
 from utils.premium_checker import PremiumChecker
@@ -93,14 +95,25 @@ class PremiumCog(commands.Cog):
         self.team_base_role_id = team_config.get("base_role_id", 960665311730868240)
         self.team_category_id = team_config.get("category_id", 1344105013357842522)
 
-        self.message_sender = MessageSender()
+        self.message_sender = MessageSender(bot)
 
     @commands.hybrid_command(aliases=["colour", "kolor"])
-    @PremiumChecker.requires_premium_tier("color")
+    # @PremiumChecker.requires_premium_tier("color")  # Will be replaced with service-based check
     @is_zagadka_owner()
     @app_commands.describe(color="Kolor roli (angielska nazwa, hex lub polska nazwa)")
     async def color(self, ctx, color: str):
         """Zmień kolor swojej roli."""
+        # Check premium access using the new service
+        async with self.bot.get_db() as session:
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            premium_service.set_guild(ctx.guild)
+            
+            # Check if user has access to color command
+            has_access, message = await premium_service.check_command_access(ctx.author, "color")
+            if not has_access:
+                await self.message_sender.send_error(ctx, message)
+                return
+        
         # Logika zmiany koloru roli
         try:
             # Próba konwersji koloru na obiekt discord.Color
@@ -214,35 +227,48 @@ class PremiumCog(commands.Cog):
         # Use only the role name without adding the username
         role_name = self.color_role_name
 
-        # Check if the user already has a color role
-        existing_role = None
-        for role in member.roles:
-            if role.name == self.color_role_name:
-                existing_role = role
-                break
+        # Use the new role service to handle color role management
+        async with self.bot.get_db() as session:
+            role_service = await self.bot.get_service(IRoleService, session)
+            
+            # Check if the user already has a color role
+            existing_role = None
+            for role in member.roles:
+                if role.name == self.color_role_name:
+                    existing_role = role
+                    break
 
-        if existing_role:
-            # Update existing role
-            await existing_role.edit(color=color)
-        else:
-            # Create a new role
-            base_role = member.guild.get_role(self.base_role_id)
-            if not base_role:
-                raise ValueError(f"Base role with ID {self.base_role_id} not found")
+            if existing_role:
+                # Update existing role
+                await existing_role.edit(color=color)
+            else:
+                # Create a new role
+                base_role = member.guild.get_role(self.base_role_id)
+                if not base_role:
+                    raise ValueError(f"Base role with ID {self.base_role_id} not found")
 
-            # Create the role
-            new_role = await member.guild.create_role(
-                name=role_name,
-                color=color,
-                reason=f"Color role for {member.display_name}",
-            )
+                # Create the role
+                new_role = await member.guild.create_role(
+                    name=role_name,
+                    color=color,
+                    reason=f"Color role for {member.display_name}",
+                )
 
-            # Move the role above the base role
-            positions = {new_role: base_role.position + 1}
-            await member.guild.edit_role_positions(positions=positions)
+                # Move the role above the base role
+                positions = {new_role: base_role.position + 1}
+                await member.guild.edit_role_positions(positions=positions)
 
-            # Assign the role to the user
-            await member.add_roles(new_role)
+                # Assign the role to the user
+                await member.add_roles(new_role)
+                
+                # Record the role in the database for tracking
+                await role_service.create_role(
+                    discord_id=new_role.id,
+                    name=role_name,
+                    role_type="color"
+                )
+                
+            await session.commit()
 
     # Helper method for sending messages with premium plan information
     async def _send_premium_embed(self, ctx, title=None, description=None, color=None):
@@ -320,7 +346,7 @@ class PremiumCog(commands.Cog):
         await self._send_premium_embed(ctx, description=description)
 
     @team.command(name="create")
-    @PremiumChecker.requires_specific_roles(["zG100", "zG500", "zG1000"])
+    # @PremiumChecker.requires_specific_roles(["zG100", "zG500", "zG1000"])  # Will be replaced with service-based check
     @app_commands.describe(
         name="Nazwa teamu (klanu) - jeśli nie podano, użyta zostanie nazwa użytkownika",
         color="Kolor teamu (opcjonalne, wymaga rangi zG500+)",
@@ -347,6 +373,25 @@ class PremiumCog(commands.Cog):
 
         # 1. Sprawdź, czy użytkownik jest już właścicielem teamu w bazie danych
         async with self.bot.get_db() as session:
+            role_service = await self.bot.get_service(IRoleService, session)
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            
+            # Set guild for premium service
+            premium_service.set_guild(ctx.guild)
+            
+            # Check if user has premium role required for team creation
+            has_premium = await premium_service.has_premium_role(ctx.author)
+            if not has_premium:
+                # Check if user has at least zG100 role
+                has_zg100 = any(role.name in ["zG100", "zG500", "zG1000"] for role in ctx.author.roles)
+                if not has_zg100:
+                    await self._send_premium_embed(
+                        ctx,
+                        description="Aby stworzyć team, potrzebujesz co najmniej rangi zG100.",
+                        color=0xFF0000,
+                    )
+                    return
+            
             result = await session.execute(
                 select(DBRole).where(
                     (DBRole.role_type == "team") & (DBRole.name == str(ctx.author.id))
@@ -388,14 +433,12 @@ class PremiumCog(commands.Cog):
                 # 5. Przypisanie roli do użytkownika
                 await ctx.author.add_roles(team_role)
 
-                # 6. Zapisanie informacji o teamie w bazie danych
-                db_role = DBRole(
-                    id=team_role.id,
+                # 6. Zapisanie informacji o teamie w bazie danych używając role service
+                await role_service.create_role(
+                    discord_id=team_role.id,
                     name=str(ctx.author.id),
-                    role_type="team",
-                    created_at=datetime.now(timezone.utc),
+                    role_type="team"
                 )
-                session.add(db_role)
                 await session.commit()
 
                 await self.message_sender.send_success(

@@ -33,12 +33,9 @@ from core.interfaces.premium_interfaces import (
     IPremiumService,
 )
 from core.interfaces.role_interfaces import IRoleService
-from core.repositories.member_repository import (
-    ActivityRepository,
-    InviteRepository,
-    MemberRepository,
-    ModerationRepository,
-)
+from core.repositories.activity_repository import ActivityRepository
+from core.repositories.invite_repository import InviteRepository
+from core.repositories.member_repository import MemberRepository
 from core.repositories.premium_repository import PaymentRepository, PremiumRepository
 from core.repositories.role_repository import RoleRepository
 from core.services.embed_builder_service import EmbedBuilderService

@@ -1,13 +1,24 @@
 """Ranking commands for the activity/points system."""
 
 import logging
+from typing import Optional
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
+from core.interfaces.member_interfaces import (
+    IActivityService,
+    IMemberService,
+)
 from utils.managers import ActivityManager
-from utils.permissions import is_zagadka_owner
+from utils.message_sender import MessageSender
+from utils.permissions import is_zagadka_owner, is_mod_or_admin, is_mod_or_admin
+from core.interfaces.member_interfaces import (
+    IActivityService,
+    IMemberService,
+)
+from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
 

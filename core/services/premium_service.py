@@ -1,7 +1,7 @@
 """Premium service implementation with business logic."""
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import discord
@@ -18,6 +18,7 @@ from core.interfaces.premium_interfaces import (
 )
 from core.repositories.premium_repository import PaymentRepository, PremiumRepository
 from core.services.base_service import BaseService
+from core.services.cache_service import CacheService
 
 
 class PremiumService(
@@ -58,6 +59,7 @@ class PremiumService(
         self.payment_repository = payment_repository
         self.bot = bot
         self.guild: Optional[discord.Guild] = None
+        self.cache_service = CacheService(max_size=5000, default_ttl=300)  # 5 min cache
 
     async def validate_operation(self, *args, **kwargs) -> bool:
         """Validate premium operations."""
@@ -70,20 +72,39 @@ class PremiumService(
 
     # IPremiumChecker implementation
     async def has_premium_role(self, member: discord.Member) -> bool:
-        """Check if member has any premium role."""
+        """Check if member has any premium role (cached)."""
         try:
+            # Try cache first
+            cached_result = await self.cache_service.get(
+                "premium", "has_premium_role", member_id=member.id
+            )
+            if cached_result is not None:
+                return cached_result
+            
             premium_roles = await self.premium_repository.get_member_premium_roles(
                 member.id
             )
 
             # Check if any premium role is still valid
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc)
+            has_premium = False
             for role_data in premium_roles:
                 expiry = role_data["expiry_time"]
                 if expiry is None or expiry > current_time:
-                    return True
-
-            return False
+                    has_premium = True
+                    break
+            
+            # Cache result for 5 minutes with member tag for invalidation
+            await self.cache_service.set(
+                "premium", 
+                "has_premium_role",
+                has_premium,
+                ttl=300,
+                tags={f"member:{member.id}", "premium_roles"},
+                member_id=member.id
+            )
+            
+            return has_premium
         except Exception as e:
             self._log_error("has_premium_role", e, member_id=member.id)
             return False
@@ -94,7 +115,7 @@ class PremiumService(
             premium_roles = await self.premium_repository.get_member_premium_roles(
                 member.id
             )
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc)
 
             highest_priority = 0
             highest_role = None
@@ -116,6 +137,34 @@ class PremiumService(
         except Exception as e:
             self._log_error("get_member_premium_level", e, member_id=member.id)
             return None
+
+    async def get_member_premium_roles(self, member_id: int) -> list[dict]:
+        """Get all premium roles for a member (cached)."""
+        try:
+            # Try cache first
+            cached_result = await self.cache_service.get(
+                "premium", "member_roles", member_id=member_id
+            )
+            if cached_result is not None:
+                return cached_result
+            
+            premium_roles = await self.premium_repository.get_member_premium_roles(member_id)
+            
+            # Cache for 5 minutes
+            await self.cache_service.set(
+                "premium",
+                "member_roles", 
+                premium_roles,
+                ttl=300,
+                tags={f"member:{member_id}", "premium_roles"},
+                member_id=member_id
+            )
+            
+            return premium_roles
+            
+        except Exception as e:
+            self._log_error("get_member_premium_roles", e, member_id=member_id)
+            return []
 
     async def check_command_access(
         self, member: discord.Member, command_name: str
@@ -202,7 +251,7 @@ class PremiumService(
                 )
 
             # Calculate expiry time
-            expiry_time = datetime.utcnow() + timedelta(days=duration_days)
+            expiry_time = datetime.now(timezone.utc) + timedelta(days=duration_days)
 
             # Add Discord role
             await member.add_roles(
@@ -224,6 +273,9 @@ class PremiumService(
                 duration_days=duration_days,
                 payment_amount=payment_amount,
             )
+
+            # Invalidate cache for this member
+            await self.cache_service.invalidate_by_tags({f"member:{member.id}", "premium_roles"})
 
             return ExtensionResult(
                 success=True,
@@ -273,12 +325,12 @@ class PremiumService(
 
             # Calculate new expiry time
             current_expiry = existing_role["expiry_time"]
-            if current_expiry and current_expiry > datetime.utcnow():
+            if current_expiry and current_expiry > datetime.now(timezone.utc):
                 # Extend from current expiry
                 new_expiry = current_expiry + timedelta(days=additional_days)
             else:
                 # Role expired, extend from now
-                new_expiry = datetime.utcnow() + timedelta(days=additional_days)
+                new_expiry = datetime.now(timezone.utc) + timedelta(days=additional_days)
 
             # Update in database
             await self.premium_repository.update_role_expiry(
@@ -385,7 +437,7 @@ class PremiumService(
 
             # Remove from Discord
             if not self.guild:
-                self._log_error("remove_premium_role", "Guild not set", member_id=member_id)
+                self._log_error("remove_premium_role", Exception("Guild not set"), member_id=member.id)
                 return False
                 
             discord_role = discord.utils.get(
@@ -425,14 +477,14 @@ class PremiumService(
     async def process_expired_premium_roles(self) -> list[dict[str, Any]]:
         """Process all expired premium roles."""
         try:
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc)
             expired_roles = await self.premium_repository.get_expired_premium_roles(
                 current_time
             )
 
             processed = []
             if not self.guild:
-                self._log_error("process_expired_roles", "Guild not set")
+                self._log_error("process_expired_roles", Exception("Guild not set"))
                 return processed
                 
             for role_data in expired_roles:

@@ -124,7 +124,7 @@ class IInviteRepository(IRepository):
         creator_id: int,
         uses: int = 0,
         created_at: Optional[datetime] = None,
-    ) -> Invite:
+    ) -> Optional[Invite]:
         """Create new invite record."""
         pass
 
@@ -296,6 +296,25 @@ class IActivityService(IService):
         """Get overall server activity statistics."""
         pass
 
+    @abstractmethod
+    async def track_message_activity(
+        self, member_id: int, message_content: str, channel_id: int
+    ) -> Activity:
+        """Track text message activity."""
+        pass
+
+    @abstractmethod
+    async def track_voice_activity(
+        self, member_id: int, channel_id: int, is_with_others: bool
+    ) -> Activity:
+        """Track voice channel activity."""
+        pass
+
+    @abstractmethod
+    async def track_promotion_activity(self, member_id: int) -> Activity:
+        """Track server promotion activity."""
+        pass
+
 
 class IModerationService(IService):
     """Service interface for moderation operations."""
@@ -386,7 +405,7 @@ class IInviteService(IService):
     @abstractmethod
     async def create_tracked_invite(
         self, invite: discord.Invite, creator: discord.Member
-    ) -> Invite:
+    ) -> Optional[Invite]:
         """Create tracked invite in database."""
         pass
 

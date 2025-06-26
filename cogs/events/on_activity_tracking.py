@@ -7,6 +7,7 @@ from typing import Dict, Set
 import discord
 from discord.ext import commands, tasks
 
+from core.interfaces.member_interfaces import IActivityService, IMemberService
 from utils.managers import ActivityManager
 from utils.permissions import is_zagadka_owner
 
@@ -89,9 +90,11 @@ class OnActivityTracking(commands.Cog):
 
         try:
             async with self.bot.get_db() as session:
-                await self.activity_manager.add_text_activity(
-                    session, message.author.id, message.content
+                activity_service = await self.bot.get_service(IActivityService, session)
+                await activity_service.track_message_activity(
+                    message.author.id, message.content, message.channel.id
                 )
+                await session.commit()
         except Exception as e:
             logger.error(f"Failed to track text activity for {message.author.id}: {e}")
 
@@ -148,9 +151,12 @@ class OnActivityTracking(commands.Cog):
                     # Award points based on whether they're alone or with others
                     is_with_others = len(active_members) > 1
 
+                    # Use the new activity service
+                    activity_service = await self.bot.get_service(IActivityService, session)
+                    
                     for member_id in active_members:
-                        await self.activity_manager.add_voice_activity(
-                            session, member_id, is_with_others
+                        await activity_service.track_voice_activity(
+                            member_id, channel_id, is_with_others
                         )
 
                     if active_members:
@@ -159,6 +165,7 @@ class OnActivityTracking(commands.Cog):
                             f"Awarded voice points to {len(active_members)} members in {channel.name} ({points_type})"
                         )
 
+                await session.commit()
         except Exception as e:
             logger.error(f"Error in voice point tracker: {e}")
 
@@ -191,9 +198,8 @@ class OnActivityTracking(commands.Cog):
                         current_promoters.add(member.id)
                         # Only award points every 3 minutes
                         if should_award_points:
-                            await self.activity_manager.add_promotion_activity(
-                                session, member.id
-                            )
+                            activity_service = await self.bot.get_service(IActivityService, session)
+                            await activity_service.track_promotion_activity(member.id)
 
                     # Check for anti-promotion (promoting other servers)
                     if await self.activity_manager.check_member_antipromo_status(
@@ -215,6 +221,7 @@ class OnActivityTracking(commands.Cog):
 
                 self.promotion_members = current_promoters
 
+                await session.commit()
         except Exception as e:
             logger.error(f"Error in promotion checker: {e}")
 

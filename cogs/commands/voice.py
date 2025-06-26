@@ -7,6 +7,7 @@ import discord
 from discord import Member
 from discord.ext import commands
 
+from core.interfaces.premium_interfaces import IPremiumService
 from utils.database.voice_manager import DatabaseManager
 from utils.message_sender import MessageSender
 from utils.premium_checker import PremiumChecker
@@ -29,7 +30,7 @@ class VoiceCog(commands.Cog):
         self.permission_manager = VoicePermissionManager(bot)
         self.channel_manager = VoiceChannelManager(bot)
         self.mod_manager = ChannelModManager(bot)
-        self.message_sender = MessageSender()
+        self.message_sender = MessageSender(bot)
         self.db_manager = DatabaseManager(bot)
         self.permission_checker = PermissionChecker(bot)
         self.autokick_manager = AutoKickManager(bot)
@@ -62,7 +63,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["s"])
     @PermissionChecker.voice_command()
-    @PremiumChecker.requires_voice_access("speak")
+    # @PremiumChecker.requires_voice_access("speak")  # Will be replaced with service-based check
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_speak="Ustaw uprawnienie mówienia (+ lub -)",
@@ -74,11 +75,22 @@ class VoiceCog(commands.Cog):
         can_speak: Optional[Literal["+", "-"]] = None,
     ):
         """Set the speak permission for the target."""
+        # Check premium access using the new service
+        async with self.bot.get_db() as session:
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            premium_service.set_guild(ctx.guild)
+            
+            # Check if user has access to speak command
+            has_access, message = await premium_service.check_command_access(ctx.author, "speak")
+            if not has_access:
+                await self.message_sender.send_error(ctx, message)
+                return
+        
         await self.permission_commands["speak"].execute(self, ctx, target, can_speak)
 
     @commands.hybrid_command(aliases=["v"])
     @PermissionChecker.voice_command()
-    @PremiumChecker.requires_voice_access("view")
+    # @PremiumChecker.requires_voice_access("view")  # Will be replaced with service-based check
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_view="Ustaw uprawnienie widzenia kanału (+ lub -)",
@@ -94,7 +106,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["c"])
     @PermissionChecker.voice_command()
-    @PremiumChecker.requires_voice_access("connect")
+    # @PremiumChecker.requires_voice_access("connect")  # Will be replaced with service-based check
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_connect="Ustaw uprawnienie połączenia (+ lub -)",
@@ -112,7 +124,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["t"])
     @PermissionChecker.voice_command()
-    @PremiumChecker.requires_voice_access("text")
+    # @PremiumChecker.requires_voice_access("text")  # Will be replaced with service-based check
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_message="Ustaw uprawnienie pisania (+ lub -)",
@@ -128,7 +140,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["lv"])
     @PermissionChecker.voice_command()
-    @PremiumChecker.requires_voice_access("live")
+    # @PremiumChecker.requires_voice_access("live")  # Will be replaced with service-based check
     @discord.app_commands.describe(
         target="Użytkownik do modyfikacji uprawnień",
         can_stream="Ustaw uprawnienie streamowania (+ lub -)",
@@ -144,7 +156,7 @@ class VoiceCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["m"])
     @PermissionChecker.voice_command(requires_owner=True)
-    @PremiumChecker.requires_voice_access("mod")
+    # @PremiumChecker.requires_voice_access("mod")  # Will be replaced with service-based check
     @discord.app_commands.describe(
         target="Użytkownik do dodania lub usunięcia jako moderator kanału",
         can_manage="Dodaj (+) lub usuń (-) uprawnienia moderatora kanału",

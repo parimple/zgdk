@@ -8,7 +8,9 @@ from discord.ext.commands import Context
 
 from cogs.ui.shop_embeds import create_shop_embed
 from cogs.views.shop_views import PaymentsView, RoleShopView
-from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
+from core.interfaces.member_interfaces import IMemberService
+from core.interfaces.premium_interfaces import IPremiumService
+from datasources.queries import HandledPaymentQueries
 from utils.permissions import is_admin, is_zagadka_owner
 from utils.premium import PaymentData
 
@@ -28,12 +30,13 @@ class ShopCog(commands.Cog):
         target_member = member or viewer
 
         async with self.bot.get_db() as session:
-            db_viewer = await MemberQueries.get_or_add_member(session, viewer.id)
+            # Use new service architecture
+            member_service = self.bot.get_service(IMemberService, session)
+            premium_service = self.bot.get_service(IPremiumService, session)
+            
+            db_viewer = await member_service.get_or_create_member(viewer)
             balance = db_viewer.wallet_balance
-            premium_roles = await RoleQueries.get_member_premium_roles(
-                session, target_member.id
-            )
-            await session.commit()
+            premium_roles = await premium_service.get_member_premium_roles(target_member.id)
 
         view = RoleShopView(
             ctx,
@@ -67,6 +70,9 @@ class ShopCog(commands.Cog):
         )
 
         async with self.bot.get_db() as session:
+            # Use new service architecture  
+            member_service = self.bot.get_service(IMemberService, session)
+            
             await HandledPaymentQueries.add_payment(
                 session,
                 user.id,
@@ -75,10 +81,11 @@ class ShopCog(commands.Cog):
                 payment_data.paid_at,
                 payment_data.payment_type,
             )
-            await MemberQueries.get_or_add_member(session, user.id)
-            await MemberQueries.add_to_wallet_balance(
-                session, user.id, payment_data.amount
-            )
+            
+            # Get or create member and update wallet balance
+            db_member = await member_service.get_or_create_member(user)
+            new_balance = db_member.wallet_balance + payment_data.amount
+            await member_service.update_member_info(db_member, wallet_balance=new_balance)
             await session.commit()
 
         await ctx.reply(f"Dodano {amount} do portfela {user.mention}.")
@@ -88,13 +95,19 @@ class ShopCog(commands.Cog):
     async def assign_payment(self, ctx: Context, payment_id: int, user: discord.Member):
         """Assign a payment ID to a user."""
         async with self.bot.get_db() as session:
+            # Use new service architecture
+            member_service = self.bot.get_service(IMemberService, session)
+            
             payment = await HandledPaymentQueries.get_payment_by_id(session, payment_id)
 
             if payment:
                 payment.member_id = user.id
-                await MemberQueries.add_to_wallet_balance(
-                    session, user.id, payment.amount
-                )
+                
+                # Get or create member and update wallet balance
+                db_member = await member_service.get_or_create_member(user)
+                new_balance = db_member.wallet_balance + payment.amount
+                await member_service.update_member_info(db_member, wallet_balance=new_balance)
+                
                 await session.commit()
 
                 msg1 = (
@@ -154,26 +167,33 @@ class ShopCog(commands.Cog):
             hours: Liczba godzin do wygaśnięcia roli
         """
         async with self.bot.get_db() as session:
-            premium_roles = await RoleQueries.get_member_premium_roles(
-                session, member.id
-            )
+            # Use new service architecture
+            premium_service = self.bot.get_service(IPremiumService, session)
+            
+            premium_roles = await premium_service.get_member_premium_roles(member.id)
 
             if not premium_roles:
                 await ctx.reply("Ten użytkownik nie ma żadnej roli premium.")
                 return
 
-            member_role, role = premium_roles[0]
+            # Get first premium role
+            role_data = premium_roles[0]
+            role_name = role_data.get("role_name", "Unknown")
             new_expiry = datetime.now(timezone.utc) + timedelta(hours=hours)
 
-            await RoleQueries.update_role_expiration_date_direct(
-                session, member.id, role.id, new_expiry
+            # Extend the role (this will update the expiry time)
+            result = await premium_service.extend_premium_role(
+                member, role_name, 0, 0  # 0 days extension, just updating expiry
             )
-            await session.commit()
-
-            await ctx.reply(
-                f"Zaktualizowano czas wygaśnięcia roli {role.name} dla {member.display_name}.\n"
-                f"Nowy czas wygaśnięcia: {discord.utils.format_dt(new_expiry, 'R')}"
-            )
+            
+            if result.success:
+                await session.commit()
+                await ctx.reply(
+                    f"Zaktualizowano czas wygaśnięcia roli {role_name} dla {member.display_name}.\n"
+                    f"Nowy czas wygaśnięcia: {discord.utils.format_dt(new_expiry, 'R')}"
+                )
+            else:
+                await ctx.reply(f"Błąd aktualizacji roli: {result.message}")
 
     @commands.command(name="shop_force_check_roles")
     @commands.has_permissions(administrator=True)
@@ -202,11 +222,26 @@ class ShopCog(commands.Cog):
             # Sprawdź członków z tą rolą
             for member in role.members:
                 async with self.bot.get_db() as session:
-                    db_role = await RoleQueries.get_member_role(
-                        session, member.id, role.id
-                    )
+                    # Use new service architecture
+                    premium_service = self.bot.get_service(IPremiumService, session)
+                    
+                    # Set guild context for premium service
+                    premium_service.set_guild(ctx.guild)
+                    
+                    # Check if member has valid premium role
+                    has_valid_premium = await premium_service.has_premium_role(member)
+                    premium_roles = await premium_service.get_member_premium_roles(member.id)
+                    
+                    # Check if this specific role is expired
+                    role_expired = True
+                    for role_data in premium_roles:
+                        if role_data.get("role_name") == role.name:
+                            expiry = role_data.get("expiry_time")
+                            if expiry and expiry > now:
+                                role_expired = False
+                                break
 
-                    if not db_role or db_role.expiration_date <= now:
+                    if not has_valid_premium or role_expired:
                         try:
                             await member.remove_roles(role)
                             count += 1

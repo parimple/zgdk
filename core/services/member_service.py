@@ -252,35 +252,43 @@ class MemberService(BaseService, IMemberService):
             return {}
 
     async def get_invite_leaderboard(self, limit: int = 10) -> list[dict[str, Any]]:
-        """Get invite leaderboard."""
+        """Get invite leaderboard with optimized single query (eliminates N+1 problem)."""
         try:
-            # Get all members with invite counts
-            # This is a simplified implementation - could be optimized with a direct query
-            all_members = await self.member_repository.get_all()
+            # Use optimized repository method that eliminates N+1 queries
+            leaderboard = await self.member_repository.get_invite_leaderboard_optimized(limit)
             
-            leaderboard_data = []
-            for member in all_members:
-                invite_stats = await self.invite_repository.get_invite_stats(member.id)
-                invited_members = await self.member_repository.get_members_by_inviter(member.id)
-                
-                leaderboard_data.append({
-                    "member_id": member.id,
-                    "total_invites": invite_stats["total_invites"],
-                    "total_uses": invite_stats["total_uses"],
-                    "members_invited": len(invited_members),
-                    "joined_at": member.joined_at,
-                })
-
-            # Sort by total uses and limit
-            leaderboard_data.sort(key=lambda x: x["total_uses"], reverse=True)
-            leaderboard = leaderboard_data[:limit]
-
-            self._log_operation("get_invite_leaderboard", limit=limit)
+            self._log_operation("get_invite_leaderboard", limit=limit, count=len(leaderboard))
             return leaderboard
 
         except Exception as e:
             self._log_error("get_invite_leaderboard", e)
             return []
+
+    async def get_voice_bypass_status(self, member_id: int) -> Optional[datetime]:
+        """Get voice bypass expiration for member."""
+        try:
+            member = await self.member_repository.get_by_discord_id(member_id)
+            if not member:
+                return None
+            
+            self._log_operation("get_voice_bypass_status", member_id=member_id)
+            return member.voice_bypass_until
+            
+        except Exception as e:
+            self._log_error("get_voice_bypass_status", e, member_id=member_id)
+            return None
+
+    async def set_voice_bypass_status(self, member_id: int, expiration: Optional[datetime]) -> bool:
+        """Set voice bypass expiration for member."""
+        try:
+            success = await self.member_repository.update_voice_bypass(member_id, expiration)
+            
+            self._log_operation("set_voice_bypass_status", member_id=member_id, expiration=expiration)
+            return success
+            
+        except Exception as e:
+            self._log_error("set_voice_bypass_status", e, member_id=member_id)
+            return False
 
 
 class ActivityService(BaseService, IActivityService):
@@ -413,6 +421,180 @@ class ActivityService(BaseService, IActivityService):
         except Exception as e:
             self._log_error("get_activity_leaderboard", e)
             return []
+
+    async def track_message_activity(
+        self, member_id: int, message_content: str, channel_id: int
+    ) -> Activity:
+        """Track text message activity."""
+        try:
+            # Ensure member exists
+            member = await self.member_repository.get_or_create(member_id)
+            
+            # Calculate points based on message length (1-3 points)
+            message_length = len(message_content.strip())
+            if message_length < 10:
+                points = 1
+            elif message_length < 50:
+                points = 2
+            else:
+                points = 3
+
+            activity = await self.activity_repository.add_activity(
+                member_id=member_id,
+                points=points,
+                activity_type="text",
+            )
+
+            # Reduced logging for frequent activity operations
+            # self._log_operation(
+            #     "track_message_activity",
+            #     member_id=member_id,
+            #     points=points,
+            #     channel_id=channel_id,
+            # )
+
+            return activity
+
+        except Exception as e:
+            self._log_error("track_message_activity", e, member_id=member_id)
+            raise
+
+    async def track_voice_activity(
+        self, member_id: int, channel_id: int, is_with_others: bool
+    ) -> Activity:
+        """Track voice channel activity."""
+        try:
+            # Ensure member exists
+            member = await self.member_repository.get_or_create(member_id)
+            
+            # Award more points when with others (social bonus)
+            points = 2 if is_with_others else 1
+
+            activity = await self.activity_repository.add_activity(
+                member_id=member_id,
+                points=points,
+                activity_type="voice",
+            )
+
+            # Reduced logging for frequent activity operations
+            # self._log_operation(
+            #     "track_voice_activity",
+            #     member_id=member_id,
+            #     points=points,
+            #     channel_id=channel_id,
+            #     is_with_others=is_with_others,
+            # )
+
+            return activity
+
+        except Exception as e:
+            self._log_error("track_voice_activity", e, member_id=member_id)
+            raise
+
+    async def track_promotion_activity(self, member_id: int) -> Activity:
+        """Track server promotion activity."""
+        try:
+            # Ensure member exists
+            member = await self.member_repository.get_or_create(member_id)
+            
+            # Award bonus points for promoting the server
+            points = 5
+
+            activity = await self.activity_repository.add_activity(
+                member_id=member_id,
+                points=points,
+                activity_type="promotion",
+            )
+
+            self._log_operation(
+                "track_promotion_activity",
+                member_id=member_id,
+                points=points,
+            )
+
+            return activity
+
+        except Exception as e:
+            self._log_error("track_promotion_activity", e, member_id=member_id)
+            raise
+
+    async def award_bonus_points(
+        self, member: Member, points: int, reason: str = "bonus"
+    ) -> Activity:
+        """Award bonus points to member."""
+        try:
+            activity = await self.activity_repository.add_activity(
+                member_id=member.id,
+                points=points,
+                activity_type="bonus",
+            )
+
+            self._log_operation(
+                "award_bonus_points",
+                member_id=member.id,
+                points=points,
+                reason=reason,
+            )
+
+            return activity
+
+        except Exception as e:
+            self._log_error("award_bonus_points", e, member_id=member.id)
+            raise
+
+    async def get_server_activity_stats(self, days: int = 30) -> dict[str, Any]:
+        """Get overall server activity statistics."""
+        try:
+            start_date = datetime.now(timezone.utc) - timedelta(days=days)
+
+            # Get total points across all activity types
+            total_points = await self.activity_repository.get_total_points(
+                start_date=start_date
+            )
+
+            # Get activity breakdown
+            voice_activity = await self.activity_repository.get_total_points(
+                activity_type="voice", start_date=start_date
+            )
+            
+            text_activity = await self.activity_repository.get_total_points(
+                activity_type="text", start_date=start_date
+            )
+            
+            promotion_activity = await self.activity_repository.get_total_points(
+                activity_type="promotion", start_date=start_date
+            )
+            
+            bonus_activity = await self.activity_repository.get_total_points(
+                activity_type="bonus", start_date=start_date
+            )
+
+            # Get active members count
+            active_members = await self.activity_repository.get_active_members_count(
+                start_date=start_date
+            )
+
+            stats = {
+                "period_days": days,
+                "total_points": total_points or 0,
+                "active_members": active_members or 0,
+                "breakdown": {
+                    "voice_activity": voice_activity or 0,
+                    "text_activity": text_activity or 0,
+                    "promotion_activity": promotion_activity or 0,
+                    "bonus_activity": bonus_activity or 0,
+                },
+                # Legacy format for backwards compatibility
+                "voice_activity": voice_activity or 0,
+                "text_activity": text_activity or 0,
+            }
+
+            self._log_operation("get_server_activity_stats", days=days)
+            return stats
+
+        except Exception as e:
+            self._log_error("get_server_activity_stats", e)
+            return {}
 
     async def award_bonus_points(
         self, member: Member, points: int, reason: str = "bonus"
@@ -817,7 +999,7 @@ class InviteService(BaseService, IInviteService):
 
     async def create_tracked_invite(
         self, invite: discord.Invite, creator: discord.Member
-    ) -> Invite:
+    ) -> Optional[Invite]:
         """Create tracked invite in database."""
         try:
             db_invite = await self.invite_repository.create_invite(
@@ -837,7 +1019,7 @@ class InviteService(BaseService, IInviteService):
 
         except Exception as e:
             self._log_error("create_tracked_invite", e, invite_code=invite.code)
-            raise
+            return None
 
     async def cleanup_expired_invites(self, guild: discord.Guild) -> int:
         """Remove expired/invalid invites from database."""

@@ -31,6 +31,35 @@ class MemberRepository(BaseRepository):
             self._log_error("get_by_discord_id", e, discord_id=discord_id)
             return None
 
+    async def get_or_create(self, discord_id: int, **kwargs) -> Member:
+        """Get existing member or create new one."""
+        try:
+            # Try to get existing member
+            member = await self.get_by_discord_id(discord_id)
+            if member:
+                return member
+            
+            # Create new member if not found
+            return await self.create_member(
+                discord_id=discord_id,
+                first_inviter_id=kwargs.get('first_inviter_id'),
+                current_inviter_id=kwargs.get('current_inviter_id'),
+                joined_at=kwargs.get('joined_at')
+            )
+            
+        except Exception as e:
+            self._log_error("get_or_create", e, discord_id=discord_id)
+            raise
+    
+    async def get_all(self) -> list[Member]:
+        """Get all members."""
+        try:
+            result = await self.session.execute(select(Member))
+            return list(result.scalars().all())
+        except Exception as e:
+            self._log_error("get_all", e)
+            return []
+
     async def create_member(
         self,
         discord_id: int,
@@ -228,12 +257,13 @@ class ActivityRepository(BaseRepository):
             await self.session.flush()
             await self.session.refresh(activity)
 
-            self._log_operation(
-                "add_activity",
-                member_id=member_id,
-                points=points,
-                activity_type=activity_type,
-            )
+            # Reduced logging for frequent activity operations
+            # self._log_operation(
+            #     "add_activity",
+            #     member_id=member_id,
+            #     points=points,
+            #     activity_type=activity_type,
+            # )
 
             return activity
 
@@ -304,6 +334,54 @@ class ActivityRepository(BaseRepository):
             self._log_error("get_leaderboard", e)
             return []
 
+    async def get_total_points(
+        self,
+        activity_type: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> int:
+        """Get total points across all members."""
+        try:
+            query = select(func.sum(Activity.points))
+
+            if activity_type:
+                query = query.where(Activity.activity_type == activity_type)
+
+            if start_date:
+                query = query.where(Activity.date >= start_date)
+
+            if end_date:
+                query = query.where(Activity.date <= end_date)
+
+            result = await self.session.execute(query)
+            return result.scalar() or 0
+
+        except Exception as e:
+            self._log_error("get_total_points", e)
+            return 0
+
+    async def get_active_members_count(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> int:
+        """Get count of members who had activity in the period."""
+        try:
+            query = select(func.count(func.distinct(Activity.member_id)))
+
+            if start_date:
+                query = query.where(Activity.date >= start_date)
+
+            if end_date:
+                query = query.where(Activity.date <= end_date)
+
+            result = await self.session.execute(query)
+            return result.scalar() or 0
+
+        except Exception as e:
+            self._log_error("get_active_members_count", e)
+            return 0
+
 
 class InviteRepository(BaseRepository):
     """Repository for invite tracking operations."""
@@ -331,9 +409,22 @@ class InviteRepository(BaseRepository):
         creator_id: int,
         uses: int = 0,
         created_at: Optional[datetime] = None,
-    ) -> Invite:
+    ) -> Optional[Invite]:
         """Create new invite record."""
         try:
+            # Check if creator exists in members table
+            member_repo = MemberRepository(self.session)
+            creator = await member_repo.get_by_discord_id(creator_id)
+            
+            if not creator:
+                # Create the member first if they don't exist
+                self._log_operation(
+                    "create_invite_with_member", 
+                    invite_code=invite_code, 
+                    creator_id=creator_id
+                )
+                creator = await member_repo.get_or_create(creator_id)
+            
             if created_at is None:
                 created_at = datetime.now(timezone.utc)
 
@@ -636,4 +727,99 @@ class AutoKickRepository(BaseRepository):
 
         except Exception as e:
             self._log_error("get_targets_for_autokick", e, target_id=target_id)
+            return []
+
+    async def get_invite_leaderboard_optimized(self, limit: int = 10) -> list[dict]:
+        """Get invite leaderboard with optimized single query (eliminates N+1 problem)."""
+        try:
+            # Single aggregated query that replaces N+1 pattern
+            query = select(
+                Member.id.label("member_id"),
+                Member.joined_at,
+                func.count(Invite.id).label("total_invites"),
+                func.sum(Invite.uses).label("total_uses"),
+                func.count(Member.current_inviter_id).label("members_invited")
+            ).select_from(
+                Member
+            ).outerjoin(
+                # Join with invites created by this member
+                Invite, Member.id == Invite.creator_id
+            ).group_by(
+                Member.id, Member.joined_at
+            ).order_by(
+                func.sum(Invite.uses).desc().nulls_last()
+            ).limit(limit)
+
+            result = await self.session.execute(query)
+            
+            leaderboard_data = []
+            for row in result:
+                leaderboard_data.append({
+                    "member_id": row.member_id,
+                    "total_invites": row.total_invites or 0,
+                    "total_uses": row.total_uses or 0,
+                    "members_invited": row.members_invited or 0,
+                    "joined_at": row.joined_at,
+                })
+
+            self._log_operation("get_invite_leaderboard_optimized", limit=limit, count=len(leaderboard_data))
+            return leaderboard_data
+
+        except Exception as e:
+            self._log_error("get_invite_leaderboard_optimized", e, limit=limit)
+            return []
+
+    async def get_activity_leaderboard_optimized(self, days: int = 30, limit: int = 10) -> list[dict]:
+        """Get activity leaderboard with optimized aggregated query."""
+        try:
+            cutoff_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            cutoff_date = cutoff_date.replace(day=cutoff_date.day - days)
+
+            # Single aggregated query for activity leaderboard
+            query = select(
+                Activity.member_id,
+                func.sum(Activity.points).label("total_points"),
+                func.sum(
+                    func.case(
+                        (Activity.activity_type == 'voice', Activity.points),
+                        else_=0
+                    )
+                ).label("voice_points"),
+                func.sum(
+                    func.case(
+                        (Activity.activity_type == 'text', Activity.points),
+                        else_=0
+                    )
+                ).label("text_points"),
+                func.sum(
+                    func.case(
+                        (Activity.activity_type == 'bonus', Activity.points),
+                        else_=0
+                    )
+                ).label("bonus_points")
+            ).where(
+                Activity.date >= cutoff_date
+            ).group_by(
+                Activity.member_id
+            ).order_by(
+                func.sum(Activity.points).desc()
+            ).limit(limit)
+
+            result = await self.session.execute(query)
+            
+            leaderboard_data = []
+            for row in result:
+                leaderboard_data.append({
+                    "member_id": row.member_id,
+                    "total_points": row.total_points or 0,
+                    "voice_points": row.voice_points or 0,
+                    "text_points": row.text_points or 0,
+                    "bonus_points": row.bonus_points or 0,
+                })
+
+            self._log_operation("get_activity_leaderboard_optimized", days=days, limit=limit, count=len(leaderboard_data))
+            return leaderboard_data
+
+        except Exception as e:
+            self._log_error("get_activity_leaderboard_optimized", e, days=days, limit=limit)
             return []

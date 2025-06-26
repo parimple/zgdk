@@ -17,7 +17,6 @@ from utils.moderation import (
     GenderManager,
     GenderType,
     MessageCleaner,
-    MuteType,
 )
 from utils.permissions import is_mod_or_admin, is_owner_or_admin
 
@@ -258,7 +257,16 @@ class ModCog(commands.Cog):
         :param ctx: Kontekst komendy
         :param user: Użytkownik do zablokowania
         """
-        await self.mute_manager.mute_user(ctx, user, MuteType.LIVE)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.mute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="live",
+                reason="Zablokowane streamowanie",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @mute.command(
         name="rank", description="Blokuje możliwość zdobywania punktów rankingowych."
@@ -273,7 +281,16 @@ class ModCog(commands.Cog):
         :param ctx: Kontekst komendy
         :param user: Użytkownik do zablokowania
         """
-        await self.mute_manager.mute_user(ctx, user, MuteType.RANK)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.mute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="rank",
+                reason="Zablokowane zdobywanie punktów rankingowych",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.hybrid_group(
         name="unmute", description="Komendy związane z odwyciszaniem użytkowników."
@@ -309,7 +326,15 @@ class ModCog(commands.Cog):
         :param ctx: Kontekst komendy
         :param user: Użytkownik do odblokowania
         """
-        await self.mute_manager.unmute_user(ctx, user, MuteType.NICK)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="nick",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @unmute.command(
         name="img", description="Przywraca możliwość wysyłania obrazków i linków."
@@ -322,7 +347,15 @@ class ModCog(commands.Cog):
         :param ctx: Kontekst komendy
         :param user: Użytkownik do odblokowania
         """
-        await self.mute_manager.unmute_user(ctx, user, MuteType.IMG)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="img",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @unmute.command(name="txt", description="Przywraca możliwość wysyłania wiadomości.")
     @is_mod_or_admin()
@@ -335,7 +368,15 @@ class ModCog(commands.Cog):
         :param ctx: Kontekst komendy
         :param user: Użytkownik do odblokowania
         """
-        await self.mute_manager.unmute_user(ctx, user, MuteType.TXT)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="txt",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @unmute.command(name="live", description="Przywraca możliwość streamowania.")
     @is_mod_or_admin()
@@ -346,7 +387,15 @@ class ModCog(commands.Cog):
         :param ctx: Kontekst komendy
         :param user: Użytkownik do odblokowania
         """
-        await self.mute_manager.unmute_user(ctx, user, MuteType.LIVE)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="live",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @unmute.command(
         name="rank", description="Przywraca możliwość zdobywania punktów rankingowych."
@@ -359,7 +408,15 @@ class ModCog(commands.Cog):
         :param ctx: Kontekst komendy
         :param user: Użytkownik do odblokowania
         """
-        await self.mute_manager.unmute_user(ctx, user, MuteType.RANK)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="rank",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(
         name="mutenick", description="Usuwa niewłaściwy nick użytkownika i nadaje karę."
@@ -380,7 +437,16 @@ class ModCog(commands.Cog):
             )
 
             # Wykonaj standardową logikę mutenick
-            await self.mute_manager.mute_user(ctx, user, MuteType.NICK)
+            async with self.bot.get_db() as session:
+                moderation_service = await self.bot.get_service(IModerationService, session)
+                await moderation_service.mute_member(
+                    target=user,
+                    moderator=ctx.author,
+                    mute_type="nick",
+                    reason="Niewłaściwy nick",
+                    channel_id=ctx.channel.id
+                )
+                await session.commit()
 
             # Dodatkowe sprawdzenie po 3 sekundach, czy nick został faktycznie ustawiony
             import asyncio
@@ -450,7 +516,15 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def unmutenick_prefix(self, ctx: commands.Context, user: discord.Member):
         """Przywraca możliwość zmiany nicku użytkownikowi (wersja prefiksowa)."""
-        await self.mute_manager.unmute_user(ctx, user, MuteType.NICK)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="nick",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(
         name="muteimg", description="Blokuje możliwość wysyłania obrazków i linków."
@@ -460,8 +534,18 @@ class ModCog(commands.Cog):
         self, ctx: commands.Context, user: discord.Member, duration: str = ""
     ):
         """Blokuje możliwość wysyłania obrazków i linków (wersja prefiksowa)."""
-        parsed_duration = self.mute_manager.parse_duration(duration)
-        await self.mute_manager.mute_user(ctx, user, MuteType.IMG, parsed_duration)
+        duration_seconds = self.parse_duration(duration)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.mute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="img",
+                duration_seconds=duration_seconds,
+                reason="Zablokowane obrazki/linki",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(
         name="unmuteimg", description="Przywraca możliwość wysyłania obrazków i linków."
@@ -469,7 +553,15 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def unmuteimg_prefix(self, ctx: commands.Context, user: discord.Member):
         """Przywraca możliwość wysyłania obrazków i linków (wersja prefiksowa)."""
-        await self.mute_manager.unmute_user(ctx, user, MuteType.IMG)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="img",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(
         name="mutetxt", description="Blokuje możliwość wysyłania wiadomości."
@@ -479,8 +571,18 @@ class ModCog(commands.Cog):
         self, ctx: commands.Context, user: discord.Member, duration: str = ""
     ):
         """Blokuje możliwość wysyłania wiadomości (wersja prefiksowa)."""
-        parsed_duration = self.mute_manager.parse_duration(duration)
-        await self.mute_manager.mute_user(ctx, user, MuteType.TXT, parsed_duration)
+        duration_seconds = self.parse_duration(duration)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.mute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="txt",
+                duration_seconds=duration_seconds,
+                reason="Zablokowane wiadomości tekstowe",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(
         name="unmutetxt", description="Przywraca możliwość wysyłania wiadomości."
@@ -488,13 +590,30 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def unmutetxt_prefix(self, ctx: commands.Context, user: discord.Member):
         """Przywraca możliwość wysyłania wiadomości (wersja prefiksowa)."""
-        await self.mute_manager.unmute_user(ctx, user, MuteType.TXT)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="txt",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(name="mutelive", description="Blokuje możliwość streamowania.")
     @is_mod_or_admin()
     async def mutelive_prefix(self, ctx: commands.Context, user: discord.Member):
         """Blokuje możliwość streamowania (wersja prefiksowa)."""
-        await self.mute_manager.mute_user(ctx, user, MuteType.LIVE)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.mute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="live",
+                reason="Zablokowane streamowanie",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(
         name="unmutelive", description="Przywraca możliwość streamowania."
@@ -502,7 +621,15 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def unmutelive_prefix(self, ctx: commands.Context, user: discord.Member):
         """Przywraca możliwość streamowania (wersja prefiksowa)."""
-        await self.mute_manager.unmute_user(ctx, user, MuteType.LIVE)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="live",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(
         name="muterank",
@@ -511,7 +638,16 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def muterank_prefix(self, ctx: commands.Context, user: discord.Member):
         """Blokuje możliwość zdobywania punktów rankingowych (wersja prefiksowa)."""
-        await self.mute_manager.mute_user(ctx, user, MuteType.RANK)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.mute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="rank",
+                reason="Zablokowane zdobywanie punktów rankingowych",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(
         name="unmuterank",
@@ -520,7 +656,15 @@ class ModCog(commands.Cog):
     @is_mod_or_admin()
     async def unmuterank_prefix(self, ctx: commands.Context, user: discord.Member):
         """Przywraca możliwość zdobywania punktów rankingowych (wersja prefiksowa)."""
-        await self.mute_manager.unmute_user(ctx, user, MuteType.RANK)
+        async with self.bot.get_db() as session:
+            moderation_service = await self.bot.get_service(IModerationService, session)
+            await moderation_service.unmute_member(
+                target=user,
+                moderator=ctx.author,
+                mute_type="rank",
+                channel_id=ctx.channel.id
+            )
+            await session.commit()
 
     @commands.command(name="male", description="Nadaje rolę mężczyzny użytkownikowi")
     @is_mod_or_admin()

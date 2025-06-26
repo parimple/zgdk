@@ -2,7 +2,7 @@
 import discord
 from discord.ext.commands import Context
 
-from datasources.queries import RoleQueries
+from core.interfaces.premium_interfaces import IPremiumService
 from utils.currency import CURRENCY_UNIT
 
 
@@ -10,9 +10,12 @@ async def get_premium_users_count(ctx: Context) -> int:
     """Get total count of users with any premium role for social proof."""
     try:
         async with ctx.bot.get_db() as session:
-            # Count unique members with any premium role
-            premium_users_count = await RoleQueries.count_unique_premium_users(session)
-            return premium_users_count
+            # Use new service architecture
+            premium_service = ctx.bot.get_service(IPremiumService, session)
+            
+            # For now, return fallback until we implement the count method
+            # TODO: Add count_unique_premium_users method to premium service
+            return 200  # Fallback social proof number
     except Exception:
         # Return fallback number if database query fails
         return 200  # Fallback social proof number
