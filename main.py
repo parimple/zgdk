@@ -20,8 +20,18 @@ from sqlalchemy.orm import sessionmaker
 
 from core.containers.service_container import ServiceContainer
 from core.containers.unit_of_work import UnitOfWork
+from core.interfaces.messaging_interfaces import (
+    IEmbedBuilder,
+    IMessageFormatter,
+    IMessageSender,
+    INotificationService,
+)
 from core.interfaces.role_interfaces import IRoleRepository, IRoleService
 from core.repositories.role_repository import RoleRepository
+from core.services.embed_builder_service import EmbedBuilderService
+from core.services.message_formatter_service import MessageFormatterService
+from core.services.message_sender_service import MessageSenderService
+from core.services.notification_service import NotificationService
 from core.services.role_service import RoleService
 from datasources.models import Base
 from utils.premium import PaymentData
@@ -143,6 +153,13 @@ class Zagadka(commands.Bot):
     def _setup_services(self) -> None:
         """Setup dependency injection container with services."""
 
+        # Register messaging services as singletons (stateless)
+        embed_builder = EmbedBuilderService()
+        message_formatter = MessageFormatterService()
+
+        self.service_container.register_singleton(IEmbedBuilder, embed_builder)
+        self.service_container.register_singleton(IMessageFormatter, message_formatter)
+
         # Register repository factory
         def role_repository_factory() -> IRoleRepository:
             # This will be called when needed with a fresh session
@@ -157,8 +174,21 @@ class Zagadka(commands.Bot):
         )
         self.service_container.register_factory(IRoleService, role_service_factory)
 
-    async def get_service(self, service_type: type, session: AsyncSession) -> Any:
-        """Get a service instance with database session."""
+    async def get_service(
+        self, service_type: type, session: AsyncSession = None
+    ) -> Any:
+        """Get a service instance with optional database session."""
+
+        # Services that don't need database session
+        if service_type in [IEmbedBuilder, IMessageFormatter]:
+            return self.service_container.get_service(service_type)
+
+        # Services that need database session
+        if session is None:
+            raise ValueError(
+                f"Service {service_type.__name__} requires a database session"
+            )
+
         if service_type == IRoleService:
             # Create repository with session
             role_repository = RoleRepository(session)
@@ -167,6 +197,23 @@ class Zagadka(commands.Bot):
             # Create service with dependencies
             return RoleService(
                 role_repository=role_repository, unit_of_work=unit_of_work
+            )
+
+        elif service_type == IMessageSender:
+            # Create unit of work (needed for BaseService)
+            unit_of_work = self.service_container.create_unit_of_work(session)
+            return MessageSenderService(unit_of_work=unit_of_work)
+
+        elif service_type == INotificationService:
+            # Get dependencies
+            embed_builder = self.service_container.get_service(IEmbedBuilder)
+            unit_of_work = self.service_container.create_unit_of_work(session)
+            message_sender = MessageSenderService(unit_of_work=unit_of_work)
+
+            return NotificationService(
+                embed_builder=embed_builder,
+                message_sender=message_sender,
+                unit_of_work=unit_of_work,
             )
 
         # For other services, use the container
