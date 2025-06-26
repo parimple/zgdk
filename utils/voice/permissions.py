@@ -374,6 +374,9 @@ class PermissionChecker:
                             )
                         elif mention.isdigit():  # Handle raw user ID
                             target = ctx.guild.get_member(int(mention))
+                            if not target:
+                                # Log when member is not found
+                                logger.warning(f"Member with ID {mention} not found in guild")
                         else:
                             target = ctx.guild.default_role
                         return target, second_arg

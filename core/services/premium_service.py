@@ -180,6 +180,15 @@ class PremiumService(
                 )
 
             # Get Discord role
+            if not self.guild:
+                return ExtensionResult(
+                    success=False,
+                    extension_type=ExtensionType.NORMAL,
+                    days_added=0,
+                    new_expiry=None,
+                    message="Guild nie jest ustawiony w premium service",
+                )
+            
             discord_role = discord.utils.get(
                 self.guild.roles, id=role_data["discord_id"]
             )
@@ -375,6 +384,10 @@ class PremiumService(
                 return False
 
             # Remove from Discord
+            if not self.guild:
+                self._log_error("remove_premium_role", "Guild not set", member_id=member_id)
+                return False
+                
             discord_role = discord.utils.get(
                 self.guild.roles, id=role_data["discord_id"]
             )
@@ -418,6 +431,10 @@ class PremiumService(
             )
 
             processed = []
+            if not self.guild:
+                self._log_error("process_expired_roles", "Guild not set")
+                return processed
+                
             for role_data in expired_roles:
                 try:
                     member = self.guild.get_member(role_data["member_id"])
@@ -496,6 +513,13 @@ class PremiumService(
                     None,
                 )
 
+            if not self.guild:
+                return (
+                    False,
+                    "Guild nie jest ustawiony",
+                    None,
+                )
+                
             member = self.guild.get_member(member_id)
             if not member:
                 return (

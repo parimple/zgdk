@@ -855,7 +855,7 @@ class OnMemberJoinEvent(commands.Cog):
                         continue  # Właściciel już nie jest na serwerze
 
                     # Sprawdź czy właściciel jest w jakimś kanale głosowym i ma priority_speaker
-                    if not owner.voice or not owner.voice.channel:
+                    if not owner.voice or owner.voice is None or not owner.voice.channel:
                         continue  # Właściciel nie jest w kanale głosowym
 
                     channel = owner.voice.channel

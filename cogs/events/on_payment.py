@@ -80,6 +80,9 @@ class OnPaymentEvent(commands.Cog):
                 # First ensure all members exist in database
                 for payment_data in payments_data:
                     try:
+                        if not self.premium_manager:
+                            logger.error("Premium manager not initialized")
+                            continue
                         member = await self.premium_manager.get_member(
                             payment_data.name
                         )
@@ -99,6 +102,9 @@ class OnPaymentEvent(commands.Cog):
                 async with self.bot.get_db() as session:
                     for payment_data in payments_data:
                         try:
+                            if not self.premium_manager:
+                                logger.error("Premium manager not initialized for payment processing")
+                                continue
                             # Process payment data first
                             await self.premium_manager.process_data(
                                 session, payment_data
@@ -182,6 +188,9 @@ class OnPaymentEvent(commands.Cog):
                 logger.error("Timeout waiting for guild to be ready")
                 return
 
+        if not self.premium_manager:
+            logger.error("Premium manager not initialized in handle_payment")
+            return
         member = await self.premium_manager.get_member(payment_data.name)
 
         if member is None:

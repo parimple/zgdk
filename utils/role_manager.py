@@ -163,6 +163,9 @@ class RoleManager:
                             member = await self.bot.guild.fetch_member(
                                 member_role.member_id
                             )
+                            if not member:
+                                logger.warning(f"Could not fetch member {member_role.member_id}")
+                                continue
                             # Zapisz pobranego użytkownika, aby uniknąć wielokrotnego fetchowania
                             member_data_map[member_role.member_id] = {
                                 "member": member,
