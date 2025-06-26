@@ -150,91 +150,58 @@ class InfoCog(commands.Cog):
         else:
             await ctx.send(f"Guild ID: {guild}")
 
-    @commands.hybrid_command(
-        name="profile", aliases=["p"], description="Wyświetla profil użytkownika."
-    )
-    async def profile(
-        self, ctx: commands.Context, member: Optional[discord.Member] = None
-    ):
-        """Sends user profile when profile is used as a command."""
-        if not member:
-            member = ctx.author
+    async def _get_profile_data(self, member: discord.Member, session, ctx: commands.Context) -> dict:
+        """Get all necessary data for member profile."""
+        # Use new service architecture
+        member_service = await self.bot.get_service(IMemberService, session)
+        premium_service = await self.bot.get_service(IPremiumService, session)
+        
+        db_member = await member_service.get_or_create_member(member)
+        # Get premium roles through service (with caching)
+        all_member_premium_roles = await premium_service.get_member_premium_roles(member.id)
+        bypass_until = await member_service.get_voice_bypass_status(member.id)
 
-        if not isinstance(member, discord.Member):
-            member = self.bot.guild.get_member(member.id)
-            if not member:
-                raise commands.UserInputError(
-                    "Nie można znaleźć członka na tym serwerze."
-                )
-
-        roles = [role for role in member.roles if role.name != "@everyone"]
-
-        async with self.bot.get_db() as session:
-            # Use new service architecture
-            member_service = await self.bot.get_service(IMemberService, session)
-            premium_service = await self.bot.get_service(IPremiumService, session)
-            
-            db_member = await member_service.get_or_create_member(member)
-            # Get premium roles through service (with caching)
-            all_member_premium_roles = await premium_service.get_member_premium_roles(member.id)
-            bypass_until = await member_service.get_voice_bypass_status(member.id)
-
-            # Get owned teams from database
-            owned_teams_query = await session.execute(
-                select(Role).where(
-                    (Role.role_type == "team") & (Role.name == str(member.id))
-                )
+        # Get owned teams from database
+        owned_teams_query = await session.execute(
+            select(Role).where(
+                (Role.role_type == "team") & (Role.name == str(member.id))
             )
-            owned_teams = owned_teams_query.scalars().all()
+        )
+        owned_teams = owned_teams_query.scalars().all()
 
-            # Get teams from database
-            teams_query = await session.execute(
-                select(Role).where(
-                    (Role.role_type == "team") & (Role.name == str(member.id))
-                )
+        # Get teams from database
+        teams_query = await session.execute(
+            select(Role).where(
+                (Role.role_type == "team") & (Role.name == str(member.id))
             )
-            teams = teams_query.scalars().all()
+        )
+        teams = teams_query.scalars().all()
 
-            colors_query = await session.execute(
-                select(Role).where(
-                    (Role.role_type == "color") & (Role.name == str(member.id))
-                )
+        colors_query = await session.execute(
+            select(Role).where(
+                (Role.role_type == "color") & (Role.name == str(member.id))
             )
-            colors = colors_query.scalars().all()
+        )
+        colors = colors_query.scalars().all()
 
-            # Get invite count for this member (with validation like legacy system)
-            # Use 7 days as minimum account age (like in legacy with GUILD["join_days"])
-            invite_count = await InviteQueries.get_member_valid_invite_count(
-                session, member.id, ctx.guild, min_days=7
-            )
+        # Get invite count for this member (with validation like legacy system)
+        # Use 7 days as minimum account age (like in legacy with GUILD["join_days"])
+        invite_count = await InviteQueries.get_member_valid_invite_count(
+            session, member.id, ctx.guild, min_days=7
+        )
 
-        current_time = datetime.now(timezone.utc)
-        logger.info(f"Current time: {current_time}")
-        # Filtruj role premium, aby przetwarzać tylko aktywne w logice profilu
-        active_premium_roles = []
-        if all_member_premium_roles:
-            active_premium_roles = [
-                (mr, r)
-                for mr, r in all_member_premium_roles
-                if mr.expiration_date is None or mr.expiration_date > current_time
-            ]
-            logger.info(
-                f"All premium roles for {member.id}: {all_member_premium_roles}"
-            )
-            logger.info(f"Active premium roles for {member.id}: {active_premium_roles}")
+        return {
+            'db_member': db_member,
+            'all_member_premium_roles': all_member_premium_roles,
+            'bypass_until': bypass_until,
+            'owned_teams': owned_teams,
+            'teams': teams,
+            'colors': colors,
+            'invite_count': invite_count
+        }
 
-        # Logowanie wygasłych ról dla celów diagnostycznych, jeśli jakieś są
-        expired_premium_roles_in_profile_check = [
-            (mr, r)
-            for mr, r in all_member_premium_roles
-            if mr.expiration_date is not None and mr.expiration_date <= current_time
-        ]
-        if expired_premium_roles_in_profile_check:
-            logger.info(
-                f"Found expired premium roles in DB for {member.id} during profile check: {expired_premium_roles_in_profile_check}"
-            )
-
-        # Check for active mute roles
+    async def _get_active_mutes(self, member: discord.Member, ctx: commands.Context) -> tuple[list, bool]:
+        """Get active mute roles for member."""
         mute_roles_config = self.bot.config.get("mute_roles", [])
         active_mutes = []
         has_any_mute = False
@@ -254,6 +221,16 @@ class InfoCog(commands.Cog):
                     mute_config["description"], mute_config["name"]
                 )
                 active_mutes.append(display_name)
+
+        return active_mutes, has_any_mute
+
+    async def _create_profile_embed(self, member: discord.Member, profile_data: dict, 
+                                   active_mutes: list, has_any_mute: bool, ctx: commands.Context) -> discord.Embed:
+        """Create the main profile embed."""
+        current_time = datetime.now(timezone.utc)
+        db_member = profile_data['db_member']
+        bypass_until = profile_data['bypass_until']
+        invite_count = profile_data['invite_count']
 
         embed = discord.Embed(
             title=f"{member}",
@@ -287,10 +264,52 @@ class InfoCog(commands.Cog):
         # Add invite count
         embed.add_field(name="Zaproszenia:", value=f"{invite_count}", inline=True)
 
+        return embed
+
+    @commands.hybrid_command(
+        name="profile", aliases=["p"], description="Wyświetla profil użytkownika."
+    )
+    async def profile(
+        self, ctx: commands.Context, member: Optional[discord.Member] = None
+    ):
+        """Sends user profile when profile is used as a command."""
+        if not member:
+            member = ctx.author
+
+        if not isinstance(member, discord.Member):
+            member = self.bot.guild.get_member(member.id)
+            if not member:
+                raise commands.UserInputError(
+                    "Nie można znaleźć członka na tym serwerze."
+                )
+
+        roles = [role for role in member.roles if role.name != "@everyone"]
+
+        async with self.bot.get_db() as session:
+            # Get all profile data using helper method
+            profile_data = await self._get_profile_data(member, session, ctx)
+            all_member_premium_roles = profile_data['all_member_premium_roles']
+
+        # Get active mutes using helper method
+        active_mutes, has_any_mute = await self._get_active_mutes(member, ctx)
+        
+        # Create main profile embed using helper method
+        embed = await self._create_profile_embed(member, profile_data, active_mutes, has_any_mute, ctx)
+        
+        # Process premium roles
+        current_time = datetime.now(timezone.utc)
+        active_premium_roles = []
+        if all_member_premium_roles:
+            active_premium_roles = [
+                role_data for role_data in all_member_premium_roles
+                if not role_data.get("expiry_time") or role_data.get("expiry_time") > current_time
+            ]
+
         # Add activity statistics using new service architecture
         try:
-            activity_service = await self.bot.get_service(IActivityService, session)
-            activity_summary = await activity_service.get_member_activity_summary(member.id, days=30)
+            async with self.bot.get_db() as activity_session:
+                activity_service = await self.bot.get_service(IActivityService, activity_session)
+                activity_summary = await activity_service.get_member_activity_summary(member.id, days=30)
             
             if activity_summary:
                 total_points = activity_summary.get("total_points", 0)
@@ -332,6 +351,9 @@ class InfoCog(commands.Cog):
             )  # Przekaż listę aktywnych ról
 
         # Add team ownership information right after premium roles
+        owned_teams = profile_data['owned_teams']
+        db_member = profile_data['db_member']
+        
         if owned_teams:
             team_roles = []
             for team in owned_teams:

@@ -1,5 +1,6 @@
 """Member management service implementations."""
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -17,6 +18,8 @@ from core.interfaces.member_interfaces import (
 )
 from core.services.base_service import BaseService
 from datasources.models import Activity, Invite, Member, ModerationLog
+
+logger = logging.getLogger(__name__)
 
 
 class MemberService(BaseService, IMemberService):
@@ -895,6 +898,7 @@ class InviteService(BaseService, IInviteService):
     async def sync_server_invites(self, guild: discord.Guild) -> dict[str, Invite]:
         """Synchronize server invites with database."""
         try:
+            logger.info(f"NEW InviteService.sync_server_invites called for guild {guild.id}")
             discord_invites = await guild.invites()
             synced_invites = {}
 
@@ -903,19 +907,38 @@ class InviteService(BaseService, IInviteService):
                 db_invite = await self.invite_repository.get_by_code(discord_invite.code)
                 
                 if not db_invite:
-                    # Create new invite
+                    # Ensure creator exists in members table before creating invite
+                    creator_id = 0  # Default fallback
+                    if discord_invite.inviter:
+                        try:
+                            # Get or create the creator member first
+                            creator_member = await self.member_repository.get_by_discord_id(discord_invite.inviter.id)
+                            if not creator_member:
+                                # Create member if doesn't exist (might be a user who left the server)
+                                creator_member = await self.member_repository.create_member(
+                                    discord_id=discord_invite.inviter.id,
+                                    joined_at=None  # We don't have join date for invite creators
+                                )
+                            creator_id = creator_member.id
+                        except Exception as e:
+                            # If we can't create the member for any reason, use fallback
+                            self._log_error("sync_server_invites_creator", e, discord_id=discord_invite.inviter.id)
+                            creator_id = 0
+                    
+                    # Create new invite with proper creator_id
                     db_invite = await self.invite_repository.create_invite(
                         invite_code=discord_invite.code,
-                        creator_id=discord_invite.inviter.id if discord_invite.inviter else 0,
-                        uses=discord_invite.uses,
+                        creator_id=creator_id,
+                        uses=discord_invite.uses or 0,  # Handle None values
                         created_at=discord_invite.created_at,
                     )
                 else:
                     # Update usage if changed
-                    if db_invite.uses != discord_invite.uses:
+                    current_uses = discord_invite.uses or 0
+                    if db_invite.uses != current_uses:
                         await self.invite_repository.update_invite_usage(
                             discord_invite.code,
-                            discord_invite.uses,
+                            current_uses,
                         )
 
                 synced_invites[discord_invite.code] = db_invite

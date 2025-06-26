@@ -579,8 +579,10 @@ class OnMemberJoinEvent(commands.Cog):
     async def sync_invites(self):
         """Synchronize server invites with database using invite service."""
         try:
+            logger.info("SYNC_INVITES: Starting sync_invites method")
             async with self.bot.get_db() as session:
                 invite_service = await self.bot.get_service(IInviteService, session)
+                logger.info(f"SYNC_INVITES: Got invite service: {type(invite_service)}")
                 
                 # Use the invite service's sync method
                 synced_invites = await invite_service.sync_server_invites(self.guild)
