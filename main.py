@@ -26,12 +26,21 @@ from core.interfaces.messaging_interfaces import (
     IMessageSender,
     INotificationService,
 )
+from core.interfaces.premium_interfaces import (
+    IPaymentProcessor,
+    IPremiumChecker,
+    IPremiumRoleManager,
+    IPremiumService,
+)
 from core.interfaces.role_interfaces import IRoleRepository, IRoleService
+from core.repositories.premium_repository import PaymentRepository, PremiumRepository
 from core.repositories.role_repository import RoleRepository
 from core.services.embed_builder_service import EmbedBuilderService
 from core.services.message_formatter_service import MessageFormatterService
 from core.services.message_sender_service import MessageSenderService
 from core.services.notification_service import NotificationService
+from core.services.payment_processor_service import PaymentProcessorService
+from core.services.premium_service import PremiumService
 from core.services.role_service import RoleService
 from datasources.models import Base
 from utils.premium import PaymentData
@@ -215,6 +224,43 @@ class Zagadka(commands.Bot):
                 message_sender=message_sender,
                 unit_of_work=unit_of_work,
             )
+
+        elif service_type == IPremiumService:
+            # Create repositories
+            premium_repository = PremiumRepository(session)
+            payment_repository = PaymentRepository(session)
+            unit_of_work = self.service_container.create_unit_of_work(session)
+
+            # Create premium service
+            premium_service = PremiumService(
+                premium_repository=premium_repository,
+                payment_repository=payment_repository,
+                bot=self,
+                unit_of_work=unit_of_work,
+            )
+
+            # Set guild if available
+            if self.guild:
+                premium_service.set_guild(self.guild)
+
+            return premium_service
+
+        elif service_type == IPaymentProcessor:
+            # Create dependencies
+            payment_repository = PaymentRepository(session)
+            unit_of_work = self.service_container.create_unit_of_work(session)
+
+            # Create payment processor
+            payment_processor = PaymentProcessorService(
+                payment_repository=payment_repository,
+                unit_of_work=unit_of_work,
+            )
+
+            # Set premium service to avoid circular dependency
+            premium_service = await self.get_service(IPremiumService, session)
+            payment_processor.set_premium_service(premium_service)
+
+            return payment_processor
 
         # For other services, use the container
         return self.service_container.get_service(service_type)
