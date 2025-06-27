@@ -3,6 +3,14 @@
 .env
 .gitignore
 .gitlab-ci.yml
+.github/
+CODEX_TASKS.md
+MODERATION_LOG_IMPLEMENTATION.md
+SHOP_REFACTOR_ANALYSIS.md
+OPTIMAL_POINT_SYSTEM.md
+debug_roles.py
+run_checks.sh
+run_linters.sh
 .pytest_cache
 pg_log/
 .git/
