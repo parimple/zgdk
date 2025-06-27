@@ -1,6 +1,7 @@
 """Message sender utility for sending formatted messages."""
 
 from datetime import datetime, timezone
+from typing import Optional
 
 import discord
 from discord import AllowedMentions
@@ -20,7 +21,7 @@ class MessageSender:
         "warning": discord.Color.orange(),
     }
 
-    def __init__(self, bot=None):
+    def __init__(self, bot=None) -> None:
         self.bot = bot
 
     #
@@ -92,7 +93,7 @@ class MessageSender:
         reply: bool = False,
         allowed_mentions: AllowedMentions = None,
         view=None,
-    ):
+    ) -> discord.Message:
         """
         Sends an embed with consistent settings.
         """
@@ -132,7 +133,7 @@ class MessageSender:
         fields: list = None,
         channel=None,
         reply: bool = False,
-    ):
+    ) -> discord.Message:
         """
         Creates final description with build_description, then builds embed + sends it.
         You can optionally pass 'fields' if needed,
@@ -152,7 +153,12 @@ class MessageSender:
         return await MessageSender._send_embed(ctx, embed, reply=reply)
 
     @staticmethod
-    async def send_permission_update(ctx, target, permission_flag, new_value):
+    async def send_permission_update(
+        ctx,
+        target: discord.Member | discord.Role | None,
+        permission_flag: str,
+        new_value: bool,
+    ) -> None:
         """Sends a message about permission update."""
         mention_str = (
             target.mention if isinstance(target, discord.Member) else "wszystkich"
@@ -173,7 +179,7 @@ class MessageSender:
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
-    async def send_user_not_found(ctx):
+    async def send_user_not_found(ctx) -> None:
         """Sends a message when user is not found."""
         base_text = "Nie znaleziono użytkownika."
         channel = ctx.author.voice.channel if (ctx.author.voice) else None
@@ -185,7 +191,9 @@ class MessageSender:
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
-    async def send_not_in_voice_channel(ctx, target=None):
+    async def send_not_in_voice_channel(
+        ctx, target: Optional[discord.Member] = None
+    ) -> None:
         """Sends a message when user is not in a voice channel."""
         if target:
             base_text = f"{target.mention} nie jest na żadnym kanale głosowym!"
@@ -207,7 +215,7 @@ class MessageSender:
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
-    async def send_invalid_member_limit(ctx):
+    async def send_invalid_member_limit(ctx) -> None:
         """Sends a message when member limit is invalid."""
         base_text = "Podaj liczbę członków od 1 do 99."
         channel = ctx.author.voice.channel if ctx.author.voice else None
@@ -219,7 +227,7 @@ class MessageSender:
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
-    async def send_no_mod_permission(ctx):
+    async def send_no_mod_permission(ctx) -> None:
         """Sends a message when user doesn't have mod permission."""
         base_text = "Nie masz uprawnień do nadawania channel moda!"
         channel = ctx.author.voice.channel if ctx.author.voice else None
@@ -231,7 +239,7 @@ class MessageSender:
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
-    async def send_cant_remove_self_mod(ctx):
+    async def send_cant_remove_self_mod(ctx) -> None:
         """Sends a message when user tries to remove their own mod permissions."""
         base_text = "Nie możesz odebrać sobie uprawnień do zarządzania kanałem!"
         channel = ctx.author.voice.channel if ctx.author.voice else None
@@ -243,7 +251,9 @@ class MessageSender:
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
-    async def send_mod_limit_exceeded(ctx, mod_limit, current_mods):
+    async def send_mod_limit_exceeded(
+        ctx, mod_limit: int, current_mods: list[discord.Member]
+    ) -> None:
         """Sends a message when the mod limit is exceeded."""
         channel = ctx.author.voice.channel if ctx.author.voice else None
         embed = MessageSender._create_embed(ctx=ctx, add_author=False)

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class AutoKickManager:
     """Manages autokick functionality for voice channels."""
 
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         self.bot = bot
         self.message_sender = MessageSender()
         # Cache structure: {target_id: set(owner_ids)}
@@ -71,7 +71,7 @@ class AutoKickManager:
                     max_autokicks = max(max_autokicks, role_config["auto_kick"])
         return max_autokicks
 
-    async def add_autokick(self, ctx, target: discord.Member):
+    async def add_autokick(self, ctx, target: discord.Member) -> None:
         """Add a member to autokick list."""
         try:
             await self._initialize_cache()
@@ -119,7 +119,7 @@ class AutoKickManager:
             await self._reset_cache()
             raise
 
-    async def remove_autokick(self, ctx, target: discord.Member):
+    async def remove_autokick(self, ctx, target: discord.Member) -> None:
         """Remove a member from autokick list."""
         try:
             await self._initialize_cache()
@@ -149,7 +149,7 @@ class AutoKickManager:
             await self._reset_cache()
             raise
 
-    async def list_autokicks(self, ctx):
+    async def list_autokicks(self, ctx) -> None:
         """Show autokick list."""
         await self._initialize_cache()
 
