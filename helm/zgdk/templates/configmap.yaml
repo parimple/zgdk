@@ -5,6 +5,9 @@ metadata:
   labels:
     app: {{ .Release.Name }}
 data:
+  config.yml: |
+{{ .Files.Get "files/config.yml" | indent 4 }}
+  
   agents-config.yaml: |
     # Support Agents Configuration
     agents:

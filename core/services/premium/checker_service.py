@@ -102,8 +102,8 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
                 session, member.id, wallet_balance=0, joined_at=member.joined_at
             )
 
-            if db_member.bypass_expiry:
-                return db_member.bypass_expiry > datetime.now(timezone.utc)
+            if db_member.voice_bypass_until:
+                return db_member.voice_bypass_until > datetime.now(timezone.utc)
 
         return False
 

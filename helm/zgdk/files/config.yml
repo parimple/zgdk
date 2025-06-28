@@ -1,0 +1,31 @@
+guild_id: 960665311701528596  # Podmień na ID swojego serwera Discord
+prefix: ","
+donate_url: "https://example.com/donate"  # Opcjonalne
+
+channels:
+  # Podmień na ID kanałów z twojego serwera
+  tickets_category: 123456789012345678
+  admin_tickets: 123456789012345678
+  payment_logs: 123456789012345678
+  notification_channel: 123456789012345678
+  join_log: 123456789012345678
+  leave_log: 123456789012345678
+  private_channel_category: 123456789012345678
+  ideas: 123456789012345678
+  partnerships: 123456789012345678
+  instagram: 123456789012345678
+  youtube: 123456789012345678
+  tiktok: 123456789012345678
+  
+# Opcje funkcjonalne
+force_channel_notifications: true
+enable_interpretability: true
+enable_ai_moderation: true
+
+# Limity i cooldowny
+daily_bonus: 50
+bump_reward: 25
+activity_multiplier: 1.5
+cooldowns:
+  daily: 86400  # 24h w sekundach
+  bump: 7200    # 2h w sekundach

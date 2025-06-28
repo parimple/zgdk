@@ -118,9 +118,9 @@ class PremiumMaintenanceService(BaseService):
                 current_time = datetime.now(timezone.utc)
 
                 for db_member in members:
-                    if db_member.bypass_expiry and db_member.bypass_expiry <= current_time:
+                    if db_member.voice_bypass_until and db_member.voice_bypass_until <= current_time:
                         # Clear expired bypass
-                        db_member.bypass_expiry = None
+                        db_member.voice_bypass_until = None
                         count += 1
 
                         # Notify member if they're in the guild
@@ -250,7 +250,7 @@ class PremiumMaintenanceService(BaseService):
                 current_time = datetime.now(timezone.utc)
 
                 for db_member in members:
-                    if db_member.bypass_expiry and db_member.bypass_expiry > current_time:
+                    if db_member.voice_bypass_until and db_member.voice_bypass_until > current_time:
                         report["total_bypass_active"] += 1
 
             self._log_operation("generate_premium_report")

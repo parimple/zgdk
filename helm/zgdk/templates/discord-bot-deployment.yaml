@@ -50,7 +50,8 @@ spec:
               key: {{ .Values.gemini.apiKeyKey }}
         volumeMounts:
         - name: config
-          mountPath: /app/config
+          mountPath: /app/config.yml
+          subPath: config.yml
           readOnly: true
         resources:
           requests:

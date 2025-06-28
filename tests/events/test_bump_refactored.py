@@ -39,15 +39,15 @@ class TestBumpHandlers:
 
         # Mock member
         member = MagicMock()
-        member.bypass_expiry = None
+        member.voice_bypass_until = None
         member.bump_count = 0
 
         # Test adding bypass time
         await handler.add_bypass_time(member, BYPASS_DURATIONS["disboard"], "disboard")
 
         # Check that bypass expiry was set
-        assert member.bypass_expiry is not None
-        assert isinstance(member.bypass_expiry, datetime)
+        assert member.voice_bypass_until is not None
+        assert isinstance(member.voice_bypass_until, datetime)
 
     @pytest.mark.asyncio
     async def test_cooldown_check(self, mock_bot, mock_message_sender):

@@ -115,20 +115,20 @@ class MemberRepository(BaseRepository):
             self._log_error("update_wallet_balance", e, member_id=member_id)
             return False
 
-    async def update_voice_bypass(self, member_id: int, bypass_expiry: Optional[datetime]) -> bool:
+    async def update_voice_bypass(self, member_id: int, voice_bypass_until: Optional[datetime]) -> bool:
         """Update member's voice bypass expiration."""
         try:
             member = await self.get_by_id(member_id)
             if not member:
                 return False
 
-            member.bypass_expiry = bypass_expiry
+            member.voice_bypass_until = voice_bypass_until
             await self.session.flush()
 
             self._log_operation(
                 "update_voice_bypass",
                 member_id=member_id,
-                bypass_expiry=bypass_expiry,
+                voice_bypass_until=voice_bypass_until,
             )
 
             return True
