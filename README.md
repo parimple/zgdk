@@ -2,6 +2,10 @@
 [![Code style: Prettier](https://img.shields.io/badge/code_style-Prettier-ff69b4.svg)](https://github.com/prettier/prettier)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python version](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+[![System Status](https://img.shields.io/badge/system_status-operational-brightgreen.svg)](monitoring/status.html)
+[![Build Status](https://github.com/your-github-username/zgdk/actions/workflows/ci.yml/badge.svg)](https://github.com/your-github-username/zgdk/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/your-github-username/zgdk/actions/workflows/docker-build.yml/badge.svg)](https://github.com/your-github-username/zgdk/actions/workflows/docker-build.yml)
+[![Monitoring](https://github.com/your-github-username/zgdk/actions/workflows/monitoring.yml/badge.svg)](https://github.com/your-github-username/zgdk/actions/workflows/monitoring.yml)
 
 # zgdk
 
@@ -94,3 +98,57 @@ System automatycznie przywraca uprawnienia użytkowników po ponownym dołączen
 ### Diagnostyczne komendy
 - **voice_stats** - Statystyki systemu voice (tylko admini)
 - **debug_permissions** - Sprawdzanie uprawnień w bazie danych (tylko admini)
+## System Monitoring
+
+The ZGDK project includes an automated monitoring system that tracks:
+
+### Monitored Components
+- **GitHub Actions** - CI/CD pipeline status
+- **Docker Containers** - Health and status of app, database, and Redis containers
+- **ArgoCD Deployments** - Kubernetes deployment status (when enabled)
+
+### Monitoring Features
+- **Automated Health Checks** - Runs every 5 minutes
+- **Status Dashboard** - HTML dashboard with real-time status
+- **JSON API** - Machine-readable status endpoint
+- **Notifications** - Webhook notifications for failures
+- **GitHub Actions Integration** - Automated monitoring workflow
+
+### Running the Monitor
+
+#### Local Monitoring
+```bash
+# Start the monitoring system
+./monitoring/start_monitor.sh
+
+# View status dashboard
+open monitoring/status.html
+
+# Check monitoring logs
+tail -f monitoring/logs/monitor.log
+```
+
+#### Status Server
+```bash
+# Start the status web server
+python monitoring/status_server.py 8888
+
+# Access dashboard: http://localhost:8888
+# API endpoint: http://localhost:8888/api/status
+```
+
+### Configuration
+Edit `monitoring/config.yml` to:
+- Set GitHub repository details
+- Configure Docker container names
+- Add webhook URLs for notifications
+- Enable ArgoCD monitoring
+- Adjust check intervals
+
+### Status Badge
+The system status badge in this README shows the overall health of the system:
+- 🟢 **Operational** - All services healthy
+- 🟡 **Degraded** - Some services degraded but functional
+- 🔴 **Down** - Critical services are down
+
+# Pipeline Test Sat 28 Jun 2025 07:51:53 PM UTC

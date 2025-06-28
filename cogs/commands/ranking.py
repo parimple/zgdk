@@ -219,7 +219,7 @@ class RankingCommands(commands.Cog):
             )
 
     @commands.hybrid_command(
-        name="top", description="Pokaż TOP użytkowników w różnych kategoriach"
+        name="topusers", description="Pokaż TOP użytkowników w różnych kategoriach"
     )
     @app_commands.describe(
         category="Kategoria rankingu", days="Liczba dni wstecz (domyślnie 7)"

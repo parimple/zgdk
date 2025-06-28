@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import discord
 from discord.ext import commands
 
-from datasources.queries import ModerationLogQueries
+from core.repositories import ModerationRepository
 from utils.permissions import is_mod_or_admin, is_owner_or_admin
 from core.interfaces.member_interfaces import IModerationService
 from .utils import parse_duration
@@ -149,8 +149,9 @@ class TimeoutCommands(commands.Cog):
         try:
             async with self.bot.get_db() as session:
                 # Get mute history
-                history = await ModerationLogQueries.get_user_mute_history(
-                    session, user.id, limit
+                moderation_repo = ModerationRepository(session)
+                history = await moderation_repo.get_user_mute_history(
+                    user.id, limit
                 )
                 
                 if not history:
@@ -228,7 +229,8 @@ class TimeoutCommands(commands.Cog):
         
         try:
             async with self.bot.get_db() as session:
-                stats = await ModerationLogQueries.get_mute_statistics(session, days)
+                moderation_repo = ModerationRepository(session)
+                stats = await moderation_repo.get_mute_statistics(days)
                 
                 # Create embed with statistics
                 embed = discord.Embed(

@@ -232,6 +232,7 @@ class PermissionChecker:
         self.message_sender = MessageSender()
         self.logger = logging.getLogger(__name__)
 
+    @staticmethod
     def voice_command(requires_owner: bool = False):
         """
         Decorator for voice commands that enforces channel permission requirements.

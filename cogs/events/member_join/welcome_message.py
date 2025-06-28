@@ -36,160 +36,147 @@ class WelcomeMessageSender:
         member: discord.Member, 
         inviter: Optional[discord.User] = None,
         restored_roles: int = 0,
-        is_returning: bool = False
+        is_returning: bool = False,
+        mute_info: Optional[dict] = None
     ) -> bool:
-        """Send welcome message to new or returning member."""
+        """Send member join log to the log channel."""
         try:
-            # Create welcome embed
-            embed = self._create_welcome_embed(member, inviter, restored_roles, is_returning)
+            # Create log embed
+            embed = self._create_log_embed(member, inviter, restored_roles, is_returning, mute_info)
             
-            # Always send to welcome channel
+            # Always send to log channel
             if self.welcome_channel:
-                await self._send_welcome_channel(member, embed, inviter)
+                await self._send_log_message(member, embed, inviter)
                 return True
             else:
-                logger.warning("No welcome channel configured")
+                logger.warning("No log channel configured")
                 return False
                 
         except Exception as e:
-            logger.error(f"Error sending welcome message: {e}")
+            logger.error(f"Error sending join log: {e}")
             return False
     
-    def _create_welcome_embed(
+    def _create_log_embed(
         self,
         member: discord.Member,
         inviter: Optional[discord.User],
         restored_roles: int,
-        is_returning: bool
+        is_returning: bool,
+        mute_info: Optional[dict]
     ) -> discord.Embed:
-        """Create welcome embed based on member status."""
+        """Create technical log embed for member join."""
+        # Determine join type and color
         if is_returning:
-            title = f"🔄 Witaj ponownie, {member.display_name}!"
-            description = f"Cieszymy się, że wróciłeś/aś na serwer **{self.guild.name}**!"
-            color = discord.Color.green()
+            title = f"[REJOIN] {member} ({member.id})"
+            color = discord.Color.yellow()
         else:
-            title = f"👋 Witaj, {member.display_name}!"
-            description = f"Witamy Cię na serwerze **{self.guild.name}**!"
-            color = discord.Color.blue()
+            title = f"[JOIN] {member} ({member.id})"
+            color = discord.Color.green()
         
         embed = discord.Embed(
             title=title,
-            description=description,
             color=color,
             timestamp=datetime.now(timezone.utc)
         )
         
-        # Add member info
+        # Basic account info
+        account_age = (datetime.now(timezone.utc) - member.created_at.replace(tzinfo=timezone.utc)).days
         embed.add_field(
-            name="📊 Informacje",
+            name="Account Info",
             value=(
-                f"**Członek #{member.guild.member_count}**\n"
-                f"**Konto utworzone:** {discord.utils.format_dt(member.created_at, 'R')}"
+                f"**Created:** {discord.utils.format_dt(member.created_at, 'f')}\n"
+                f"**Age:** {account_age} days\n"
+                f"**Member #** {member.guild.member_count}"
             ),
             inline=True
         )
         
-        # Add inviter info
-        if inviter and inviter.id != self.guild.id:
-            embed.add_field(
-                name="🎟️ Zaproszony przez",
-                value=f"{inviter.mention}\n({inviter})",
-                inline=True
-            )
+        # Inviter info
+        if inviter:
+            if inviter.id == self.guild.id:
+                invite_info = "**Inviter:** Vanity URL"
+            else:
+                invite_info = f"**Inviter:** {inviter} ({inviter.id})"
+        else:
+            invite_info = "**Inviter:** Unknown"
         
-        # Add restored roles info for returning members
-        if is_returning and restored_roles > 0:
-            embed.add_field(
-                name="🔄 Przywrócone role",
-                value=f"Przywrócono **{restored_roles}** ról",
-                inline=True
-            )
+        embed.add_field(
+            name="Invite Info",
+            value=invite_info,
+            inline=True
+        )
         
-        # Add tips for new members
-        if not is_returning:
-            tips = [
-                "📜 Przeczytaj regulamin w <#960665312624246864>",
-                "🎭 Wybierz role w <#960665316109713421>",
-                "💬 Przedstaw się na <#960665312624246865>",
-                "❓ Potrzebujesz pomocy? Zapytaj na <#960665312624246866>"
-            ]
+        # Status info
+        status_info = []
+        if is_returning:
+            status_info.append("✅ Returning member")
+            if restored_roles > 0:
+                status_info.append(f"✅ Restored {restored_roles} roles")
+        else:
+            status_info.append("🆕 New member")
+        
+        # Mute info
+        if mute_info:
+            active_mutes = mute_info.get('active_mutes', [])
+            mute_history = mute_info.get('total_mutes', 0)
+            
+            if active_mutes:
+                mute_types = [m.get('type', 'unknown') for m in active_mutes]
+                status_info.append(f"⚠️ Active mutes: {', '.join(mute_types)}")
+            
+            if mute_history > 0:
+                status_info.append(f"📊 Mute history: {mute_history} total")
+        
+        embed.add_field(
+            name="Status",
+            value="\n".join(status_info) if status_info else "No special status",
+            inline=True
+        )
+        
+        # Risk assessment
+        risk_factors = []
+        if account_age < 7:
+            risk_factors.append("🔴 Account < 7 days old")
+        elif account_age < 30:
+            risk_factors.append("🟡 Account < 30 days old")
+        
+        if mute_info and mute_info.get('total_mutes', 0) > 3:
+            risk_factors.append("🔴 Multiple mute history")
+        elif mute_info and mute_info.get('total_mutes', 0) > 0:
+            risk_factors.append("🟡 Has mute history")
+        
+        if not member.avatar:
+            risk_factors.append("🟡 No avatar")
+        
+        if risk_factors:
             embed.add_field(
-                name="💡 Pierwsze kroki",
-                value="\n".join(tips),
+                name="Risk Factors",
+                value="\n".join(risk_factors),
                 inline=False
             )
         
-        # Set thumbnail and footer
+        # Set thumbnail
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.set_footer(
-            text=f"ID: {member.id} | Serwer: {self.guild.name}",
-            icon_url=self.guild.icon.url if self.guild.icon else None
-        )
         
         return embed
     
-    async def _send_welcome_dm(
-        self,
-        member: discord.Member,
-        embed: discord.Embed,
-        inviter: Optional[discord.User]
-    ) -> bool:
-        """Try to send welcome message via DM."""
-        try:
-            # Add server invite link to DM
-            invite_link = "https://discord.gg/your-server"  # Replace with actual invite
-            
-            dm_embed = embed.copy()
-            dm_embed.add_field(
-                name="🔗 Link do serwera",
-                value=f"[Kliknij tutaj]({invite_link})",
-                inline=False
-            )
-            
-            await member.send(embed=dm_embed)
-            logger.info(f"Sent welcome DM to {member}")
-            
-            # Notify in welcome channel that DM was sent
-            if self.welcome_channel:
-                notify_msg = f"📨 Wysłano wiadomość powitalną do {member.mention}"
-                if inviter and inviter.id != self.guild.id:
-                    notify_msg += f" (zaproszony przez {inviter.mention})"
-                
-                await self.welcome_channel.send(
-                    notify_msg,
-                    allowed_mentions=AllowedMentions(users=[member])
-                )
-            
-            return True
-            
-        except discord.Forbidden:
-            logger.info(f"Cannot send DM to {member}, will use channel instead")
-            return False
-        except Exception as e:
-            logger.error(f"Error sending welcome DM: {e}")
-            return False
     
-    async def _send_welcome_channel(
+    async def _send_log_message(
         self,
         member: discord.Member,
         embed: discord.Embed,
         inviter: Optional[discord.User]
     ) -> None:
-        """Send welcome message to the welcome channel."""
+        """Send join log to the log channel."""
         if not self.welcome_channel:
             return
         
-        # Create mention message
-        content = f"Witaj {member.mention}!"
-        if inviter and inviter.id != self.guild.id:
-            content += f" Dziękujemy {inviter.mention} za zaproszenie!"
-        
+        # No mentions in log channel - just pure log
         await self.welcome_channel.send(
-            content=content,
             embed=embed,
-            allowed_mentions=AllowedMentions(users=[member])
+            allowed_mentions=AllowedMentions.none()
         )
-        logger.info(f"Sent welcome message to channel for {member}")
+        logger.info(f"Logged member join for {member}")
     
     async def send_error_notification(
         self,

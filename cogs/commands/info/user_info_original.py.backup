@@ -1,0 +1,577 @@
+"""User info commands cog."""
+
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+from datasources.queries import (
+    ChannelPermissionQueries,
+    InviteQueries,
+    MemberQueries,
+    RoleQueries,
+)
+from core.interfaces.member_interfaces import (
+    IActivityService,
+    IMemberService,
+)
+from core.interfaces.premium_interfaces import IPremiumService
+from core.services.currency_service import CurrencyService
+from utils.message_sender import MessageSender
+from utils.permissions import is_admin
+from utils.refund import calculate_refund
+from utils.team_manager import TeamManager
+from .admin_info import remove_premium_role_mod_permissions
+
+
+# Currency constant
+CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
+logger = logging.getLogger(__name__)
+
+
+class UserInfoCog(commands.Cog):
+    """User info commands cog."""
+
+    def __init__(self, bot):
+        """Initialize user info cog."""
+        self.bot = bot
+        # Get team symbol from config
+        team_config = self.bot.config.get("team", {})
+        self.team_symbol = team_config.get("symbol", "☫")
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Event listener which is called when the bot goes online."""
+        logger.info("Cog: user_info.py Loaded")
+
+    async def _get_profile_data(self, member: discord.Member, session, ctx: commands.Context) -> dict:
+        """Get all necessary data for member profile."""
+        # Get member data from database
+        db_member = await MemberQueries.get_or_add_member(
+            session, member.id, wallet_balance=0, joined_at=member.joined_at
+        )
+        
+        # Get services
+        member_service = await self.bot.get_service(IMemberService, session)
+        activity_service = await self.bot.get_service(IActivityService, session)
+        premium_service = await self.bot.get_service(IPremiumService, session)
+        
+        # Get basic data
+        invites = await InviteQueries.get_member_invite_count(session, member.id)
+        teams = TeamManager.count_member_teams(ctx.guild, member, self.team_symbol)
+        
+        # Get activity data
+        activity_summary = None
+        if activity_service:
+            activity_summary = await activity_service.get_member_activity_summary(member.id)
+        
+        # Get premium roles
+        premium_roles = []
+        if premium_service:
+            roles_data = await premium_service.get_member_premium_roles(member.id)
+            for role_data in roles_data:
+                premium_roles.append({
+                    'name': role_data['role_name'],
+                    'expiration': role_data['expiration_date']
+                })
+        
+        # Get voice moderator permissions
+        voice_mods = []
+        try:
+            permissions = await ChannelPermissionQueries.get_permissions_for_member(session, member.id)
+            for perm in permissions:
+                # Check if permission includes manage_messages (moderator permission)
+                if perm.allow_permissions_value & 0x00002000:  # manage_messages bit
+                    # Find the channel name from target_id
+                    channel = ctx.guild.get_channel(perm.target_id)
+                    if channel and isinstance(channel, discord.VoiceChannel):
+                        voice_mods.append(channel.name)
+        except Exception as e:
+            logger.warning(f"Error getting voice mod permissions: {e}")
+        
+        return {
+            'db_member': db_member,
+            'invites': invites,
+            'teams': teams,
+            'activity_summary': activity_summary,
+            'premium_roles': premium_roles,
+            'owned_teams': TeamManager.get_owned_teams(ctx.guild, member, self.team_symbol),
+            'voice_mods': voice_mods
+        }
+
+    async def _get_active_mutes(self, member: discord.Member, ctx: commands.Context) -> tuple[list, bool]:
+        """Get active mute roles for a member."""
+        mute_roles = {
+            "mutedimg": "🖼️ Wyciszenie obrazków",
+            "mutedtxt": "💬 Wyciszenie tekstu", 
+            "mutednick": "📝 Blokada zmiany nicku",
+            "mutedlive": "🎥 Blokada transmisji",
+            "mutedvc": "🔇 Wyciszenie głosowe",
+        }
+        
+        active_mutes = []
+        is_voice_muted = False
+        
+        for role_name, description in mute_roles.items():
+            role = discord.utils.get(ctx.guild.roles, name=role_name)
+            if role and role in member.roles:
+                active_mutes.append(description)
+                if role_name == "mutedvc":
+                    is_voice_muted = True
+        
+        return active_mutes, is_voice_muted
+
+    async def _create_profile_embed(self, member: discord.Member, profile_data: dict, 
+                                  active_mutes: list, is_voice_muted: bool) -> discord.Embed:
+        """Create profile embed with all member information."""
+        # Create embed directly
+        embed = discord.Embed(
+            title=f"Profil użytkownika {member.display_name}",
+            color=member.color if member.color.value != 0 else discord.Color.blue(),
+            timestamp=datetime.now(timezone.utc)
+        )
+        
+        embed.set_thumbnail(url=member.display_avatar.url)
+        
+        # Basic info
+        embed.add_field(
+            name="👤 Podstawowe informacje",
+            value=f"ID: {member.id}\n"
+                  f"Dołączył: {member.joined_at.strftime('%Y-%m-%d') if member.joined_at else 'Nieznane'}",
+            inline=False
+        )
+        
+        # Wallet balance
+        embed.add_field(
+            name="💰 Portfel",
+            value=f"{profile_data['db_member'].wallet_balance}{CURRENCY_UNIT}",
+            inline=True
+        )
+        
+        # Invites
+        embed.add_field(
+            name="📨 Zaproszenia",
+            value=str(profile_data['invites']),
+            inline=True
+        )
+        
+        # Teams
+        embed.add_field(
+            name="👥 Teamy",
+            value=str(profile_data['teams']),
+            inline=True
+        )
+        
+        # Activity summary
+        if profile_data['activity_summary']:
+            activity = profile_data['activity_summary']
+            embed.add_field(
+                name="📊 Aktywność",
+                value=f"Punkty: {activity.get('total_points', 0)}\n"
+                      f"Pozycja: #{activity.get('position', 'N/A')}",
+                inline=False
+            )
+        
+        # Premium roles
+        if profile_data['premium_roles']:
+            roles_text = []
+            for role in profile_data['premium_roles']:
+                expiry = role['expiration'].strftime('%Y-%m-%d %H:%M') if role['expiration'] else "Nigdy"
+                roles_text.append(f"{role['name']} (do: {expiry})")
+            embed.add_field(
+                name="⭐ Role Premium",
+                value="\n".join(roles_text),
+                inline=False
+            )
+        
+        # Owned teams
+        if profile_data['owned_teams']:
+            embed.add_field(
+                name="👑 Własne teamy",
+                value=", ".join(profile_data['owned_teams']),
+                inline=False
+            )
+        
+        # Active mutes
+        if active_mutes:
+            embed.add_field(
+                name="🔇 Aktywne kary",
+                value="\n".join(active_mutes),
+                inline=False
+            )
+        
+        # Add additional fields if needed
+        if profile_data.get('db_member').voice_bypass_until:
+            bypass_until = profile_data['db_member'].voice_bypass_until
+            if bypass_until > datetime.now(timezone.utc):
+                time_left = bypass_until - datetime.now(timezone.utc)
+                hours_left = int(time_left.total_seconds() // 3600)
+                embed.add_field(
+                    name="⏰ Bypass Głosowy",
+                    value=f"Aktywny przez {hours_left}h",
+                    inline=True
+                )
+        
+        return embed
+
+    @commands.hybrid_command(
+        name="profile", aliases=["p"], description="Wyświetla profil użytkownika."
+    )
+    async def profile(
+        self, ctx: commands.Context, member: Optional[discord.Member] = None
+    ):
+        """Wyświetla profil użytkownika z informacjami o aktywności i zakupach."""
+        if member is None:
+            member = ctx.author
+
+        logger.info(f"User {ctx.author} requested profile for {member}")
+
+        async with self.bot.get_db() as session:
+            try:
+                # Get all profile data
+                profile_data = await self._get_profile_data(member, session, ctx)
+                
+                # Get active mutes
+                active_mutes, is_voice_muted = await self._get_active_mutes(member, ctx)
+                
+                # Create embed
+                embed = await self._create_profile_embed(member, profile_data, active_mutes, is_voice_muted)
+                
+                # Create view with buttons
+                view = ProfileView(ctx, member, self.bot)
+                
+                # Show buy/sell buttons only for own profile
+                if member == ctx.author:
+                    view.add_item(BuyRoleButton())
+                    
+                    # Add sell button only if user has premium roles
+                    if profile_data['premium_roles']:
+                        view.add_item(SellRoleButton(self.bot))
+                
+                await ctx.send(embed=embed, view=view)
+                
+            except Exception as e:
+                logger.error(f"Error getting profile for {member}: {e}")
+                await ctx.send(
+                    embed=discord.Embed(
+                        title="❌ Błąd",
+                        description="Wystąpił błąd podczas pobierania profilu.",
+                        color=discord.Color.red()
+                    )
+                )
+
+    @commands.hybrid_command(
+        name="bypass", description="Zarządzaj czasem obejścia (T) dla użytkowników."
+    )
+    @is_admin()
+    async def bypass(
+        self,
+        ctx: commands.Context,
+        action: str,
+        member: discord.Member,
+        hours: Optional[int] = None,
+    ):
+        """Zarządzaj czasem obejścia (T) dla użytkowników."""
+        async with self.bot.get_db() as session:
+            if action == "add":
+                if hours is None or hours <= 0:
+                    await ctx.send("Musisz podać liczbę godzin większą od 0.")
+                    return
+
+                updated_member = await MemberQueries.add_bypass_time(
+                    session, member.id, hours
+                )
+                await session.commit()
+                await ctx.send(
+                    f"✅ Dodano {hours} godzin czasu T dla {member.mention}. Wygasa: {updated_member.voice_bypass_until}"
+                )
+
+            elif action == "check":
+                bypass_until = await MemberQueries.get_voice_bypass_status(
+                    session, member.id
+                )
+                if bypass_until:
+                    await ctx.send(f"⏰ {member.mention} ma czas T do: {bypass_until}")
+                else:
+                    await ctx.send(f"❌ {member.mention} nie ma aktywnego czasu T.")
+
+
+class ProfileView(discord.ui.View):
+    """View for profile command."""
+    
+    def __init__(self, ctx, member, bot):
+        super().__init__(timeout=300)
+        self.ctx = ctx
+        self.member = member
+        self.bot = bot
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only allow the command author to interact."""
+        return interaction.user == self.ctx.author
+
+
+class BuyRoleButton(discord.ui.Button):
+    """Button to open shop for buying roles."""
+    
+    def __init__(self):
+        super().__init__(
+            label="🛒 Kup Rolę",
+            style=discord.ButtonStyle.primary,
+            custom_id="buy_role"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        """Open shop when clicked."""
+        # Import here to avoid circular imports
+        from cogs.commands.shop import ShopCog
+        
+        shop_cog = interaction.client.get_cog("ShopCog")
+        if shop_cog:
+            await interaction.response.defer()
+            # Trigger shop command
+            ctx = await interaction.client.get_context(interaction.message)
+            ctx.author = interaction.user
+            await shop_cog.shop(ctx)
+        else:
+            await interaction.response.send_message(
+                "❌ Sklep jest obecnie niedostępny.",
+                ephemeral=True
+            )
+
+
+class SellRoleButton(discord.ui.Button):
+    """Button to sell premium roles."""
+    
+    def __init__(self, bot):
+        super().__init__(
+            label="💰 Sprzedaj Rolę",
+            style=discord.ButtonStyle.danger,
+            custom_id="sell_role"
+        )
+        self.bot = bot
+    
+    async def callback(self, interaction: discord.Interaction):
+        """Show sell role interface."""
+        async with self.bot.get_db() as session:
+            # Get user's premium roles
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            if not premium_service:
+                await interaction.response.send_message(
+                    "❌ Usługa premium jest niedostępna.",
+                    ephemeral=True
+                )
+                return
+            
+            roles_data = await premium_service.get_member_premium_roles(interaction.user.id)
+            
+            if not roles_data:
+                await interaction.response.send_message(
+                    "❌ Nie posiadasz żadnych ról premium do sprzedania.",
+                    ephemeral=True
+                )
+                return
+            
+            # Create embed with roles to sell
+            embed = discord.Embed(
+                title="💰 Sprzedaj Rolę Premium",
+                description="Wybierz rolę, którą chcesz sprzedać. Otrzymasz zwrot proporcjonalny do pozostałego czasu.",
+                color=discord.Color.gold()
+            )
+            
+            refund_info = []
+            for role_data in roles_data:
+                if role_data['expiration_date']:
+                    refund = await calculate_refund(
+                        role_data['role_name'],
+                        role_data['expiration_date'],
+                        self.bot.config
+                    )
+                    
+                    time_left = role_data['expiration_date'] - datetime.now(timezone.utc)
+                    days_left = time_left.days
+                    hours_left = time_left.seconds // 3600
+                    
+                    refund_info.append({
+                        'role_data': role_data,
+                        'refund': refund,
+                        'time_left': f"{days_left}d {hours_left}h"
+                    })
+                    
+                    embed.add_field(
+                        name=f"{role_data['role_name']}",
+                        value=f"Pozostało: {days_left}d {hours_left}h\n"
+                              f"Zwrot: {refund}{CURRENCY_UNIT}",
+                        inline=True
+                    )
+            
+            # Create view with confirmation
+            view = ConfirmSaleView(interaction.user, refund_info, self.bot)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    class ConfirmSaleView(discord.ui.View):
+        """Nested view for confirming role sale."""
+        
+        def __init__(self, user, refund_info, bot):
+            super().__init__(timeout=60)
+            self.user = user
+            self.refund_info = refund_info
+            self.bot = bot
+            
+            # Create select menu with roles
+            options = []
+            for info in refund_info:
+                options.append(
+                    discord.SelectOption(
+                        label=info['role_data']['role_name'],
+                        value=str(info['role_data']['role_id']),
+                        description=f"Zwrot: {info['refund']}{CURRENCY_UNIT} (pozostało {info['time_left']})"
+                    )
+                )
+            
+            self.select = discord.ui.Select(
+                placeholder="Wybierz rolę do sprzedania...",
+                options=options,
+                row=0
+            )
+            self.select.callback = self.select_callback
+            self.add_item(self.select)
+        
+        async def select_callback(self, interaction: discord.Interaction):
+            """Handle role selection."""
+            selected_role_id = int(self.select.values[0])
+            
+            # Find the selected role info
+            selected_info = None
+            for info in self.refund_info:
+                if info['role_data']['role_id'] == selected_role_id:
+                    selected_info = info
+                    break
+            
+            if not selected_info:
+                await interaction.response.send_message(
+                    "❌ Nie znaleziono wybranej roli.",
+                    ephemeral=True
+                )
+                return
+            
+            # Create confirmation embed
+            embed = discord.Embed(
+                title="⚠️ Potwierdź Sprzedaż",
+                description=f"Czy na pewno chcesz sprzedać rolę **{selected_info['role_data']['role_name']}**?",
+                color=discord.Color.orange()
+            )
+            embed.add_field(
+                name="Otrzymasz",
+                value=f"{selected_info['refund']}{CURRENCY_UNIT}",
+                inline=True
+            )
+            embed.add_field(
+                name="Pozostały czas",
+                value=selected_info['time_left'],
+                inline=True
+            )
+            
+            # Create final confirmation buttons
+            confirm_view = discord.ui.View(timeout=30)
+            
+            async def confirm(i: discord.Interaction):
+                """Process the sale."""
+                if i.user != self.user:
+                    await i.response.send_message("To nie twoja transakcja!", ephemeral=True)
+                    return
+                
+                async with self.bot.get_db() as session:
+                    try:
+                        # Remove role from Discord
+                        role_name = selected_info['role_data']['role_name']
+                        discord_role = discord.utils.get(i.guild.roles, name=role_name)
+                        if discord_role and discord_role in i.user.roles:
+                            await i.user.remove_roles(discord_role, reason="Sprzedaż roli premium")
+                        
+                        # Remove from database
+                        await RoleQueries.delete_member_role(
+                            session, i.user.id, selected_role_id
+                        )
+                        
+                        # Add refund to wallet
+                        await MemberQueries.add_to_wallet_balance(
+                            session, i.user.id, selected_info['refund']
+                        )
+                        
+                        # Remove premium permissions
+                        await remove_premium_role_mod_permissions(
+                            session, self.bot, i.user.id
+                        )
+                        
+                        await session.commit()
+                        
+                        # Send success message
+                        success_embed = discord.Embed(
+                            title="✅ Rola Sprzedana",
+                            description=f"Pomyślnie sprzedano rolę **{role_name}**",
+                            color=discord.Color.green()
+                        )
+                        success_embed.add_field(
+                            name="Otrzymano",
+                            value=f"{selected_info['refund']}{CURRENCY_UNIT}",
+                            inline=True
+                        )
+                        
+                        await i.response.edit_message(embed=success_embed, view=None)
+                        
+                        # Log the transaction
+                        logger.info(
+                            f"User {i.user.id} sold premium role {role_name} for {selected_info['refund']}{CURRENCY_UNIT}"
+                        )
+                        
+                    except Exception as e:
+                        logger.error(f"Error selling premium role: {e}")
+                        await i.response.send_message(
+                            "❌ Wystąpił błąd podczas sprzedaży roli.",
+                            ephemeral=True
+                        )
+            
+            async def cancel(i: discord.Interaction):
+                """Cancel the sale."""
+                if i.user != self.user:
+                    await i.response.send_message("To nie twoja transakcja!", ephemeral=True)
+                    return
+                
+                await i.response.edit_message(
+                    embed=discord.Embed(
+                        title="❌ Anulowano",
+                        description="Sprzedaż roli została anulowana.",
+                        color=discord.Color.red()
+                    ),
+                    view=None
+                )
+            
+            confirm_btn = discord.ui.Button(
+                label="✅ Potwierdź",
+                style=discord.ButtonStyle.success
+            )
+            confirm_btn.callback = confirm
+            
+            cancel_btn = discord.ui.Button(
+                label="❌ Anuluj",
+                style=discord.ButtonStyle.danger
+            )
+            cancel_btn.callback = cancel
+            
+            confirm_view.add_item(confirm_btn)
+            confirm_view.add_item(cancel_btn)
+            
+            await interaction.response.edit_message(embed=embed, view=confirm_view)
+        
+        async def on_timeout(self):
+            """Disable all items on timeout."""
+            for item in self.children:
+                item.disabled = True
+
+
+async def setup(bot: commands.Bot):
+    """Setup function to add cog to bot."""
+    await bot.add_cog(UserInfoCog(bot))

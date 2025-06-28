@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from core.interfaces.premium_interfaces import IPremiumService, PaymentData
 from core.repositories.premium_repository import PaymentRepository
 from core.services.base_service import BaseService
-from datasources.queries import HandledPaymentQueries
+# HandledPaymentQueries replaced by PaymentRepository usage
 
 logger = logging.getLogger(__name__)
 
@@ -125,8 +125,9 @@ class PremiumPaymentService(BaseService, IPremiumService):
         """Process payment data and store in database."""
         try:
             # Check if already processed
-            existing = await HandledPaymentQueries.get_payment_by_name_and_amount(
-                session, payment_data.name, payment_data.amount
+            payment_repo = PaymentRepository(session)
+            existing = await payment_repo.get_payment_by_name_and_amount(
+                payment_data.name, payment_data.amount
             )
             
             if existing:
@@ -138,8 +139,7 @@ class PremiumPaymentService(BaseService, IPremiumService):
             member_id = member.id if member else None
             
             # Create payment record
-            await HandledPaymentQueries.add_payment(
-                session,
+            await payment_repo.add_payment(
                 member_id=member_id,
                 name=payment_data.name,
                 amount=payment_data.amount,

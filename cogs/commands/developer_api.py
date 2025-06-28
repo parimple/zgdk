@@ -47,7 +47,7 @@ class DeveloperAPICog(commands.Cog):
         try:
             self.runner = web.AppRunner(self.app)
             await self.runner.setup()
-            self.site = web.TCPSite(self.runner, 'localhost', self.port)
+            self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
             await self.site.start()
             logger.info(f"Developer API started on http://localhost:{self.port}")
         except Exception as e:
@@ -260,7 +260,10 @@ class DeveloperAPICog(commands.Cog):
                 response_data = {
                     "content": response_msg.content,
                     "embeds": [embed.to_dict() for embed in response_msg.embeds],
-                    "components": []  # TODO: Extract components if needed
+                    "components": [
+                        {"type": comp.type, "custom_id": getattr(comp, "custom_id", None)}
+                        for comp in response_msg.components
+                    ] if response_msg.components else []
                 }
                 
                 return {

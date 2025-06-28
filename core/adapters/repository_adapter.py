@@ -40,6 +40,7 @@ class RepositoryAdapter:
         "ModerationQueries": ModerationRepository,
         "NotificationLogQueries": NotificationRepository,
         "PaymentQueries": PaymentRepository,
+        "HandledPaymentQueries": PaymentRepository,
         "RoleQueries": RoleRepository,
     }
     
@@ -95,6 +96,10 @@ class RepositoryAdapter:
             cls._add_role_query_methods(QueryAdapter)
         elif query_class_name == "PaymentQueries":
             cls._add_payment_query_methods(QueryAdapter)
+        elif query_class_name == "HandledPaymentQueries":
+            cls._add_handled_payment_query_methods(QueryAdapter)
+        elif query_class_name == "MessageQueries":
+            cls._add_message_query_methods(QueryAdapter)
         # Add more as needed
         
         return QueryAdapter
@@ -230,6 +235,102 @@ class RepositoryAdapter:
         adapter_class.get_payment_by_id = get_payment_by_id
         adapter_class.assign_payment_to_user = assign_payment_to_user
         adapter_class.get_last_payments = get_last_payments
+    
+    @staticmethod
+    def _add_message_query_methods(adapter_class):
+        """Add MessageQueries compatible methods."""
+        
+        @staticmethod
+        async def save_message(
+            session: AsyncSession,
+            message_id: int,
+            author_id: int,
+            content: str,
+            timestamp,
+            channel_id: int,
+            reply_to_message_id=None,
+        ):
+            repo = MessageRepository(session)
+            return await repo.save_message(
+                message_id=message_id,
+                author_id=author_id,
+                content=content,
+                timestamp=timestamp,
+                channel_id=channel_id,
+                reply_to_message_id=reply_to_message_id
+            )
+        
+        # Add methods to adapter class
+        adapter_class.save_message = save_message
+    
+    @staticmethod
+    def _add_handled_payment_query_methods(adapter_class):
+        """Add HandledPaymentQueries compatible methods."""
+        
+        @staticmethod
+        async def add_payment(
+            session: AsyncSession,
+            member_id,
+            name: str,
+            amount: int,
+            paid_at,
+            payment_type: str,
+        ):
+            repo = PaymentRepository(session)
+            return await repo.add_payment(
+                member_id=member_id,
+                name=name,
+                amount=amount,
+                paid_at=paid_at,
+                payment_type=payment_type
+            )
+        
+        @staticmethod
+        async def get_last_payments(
+            session: AsyncSession,
+            offset: int = 0,
+            limit: int = 10,
+            payment_type=None,
+        ):
+            repo = PaymentRepository(session)
+            return await repo.get_last_payments(
+                offset=offset,
+                limit=limit,
+                payment_type=payment_type
+            )
+        
+        @staticmethod
+        async def add_member_id_to_payment(
+            session: AsyncSession,
+            payment_id: int,
+            member_id: int
+        ):
+            repo = PaymentRepository(session)
+            return await repo.add_member_id_to_payment(payment_id, member_id)
+        
+        @staticmethod
+        async def get_payment_by_id(
+            session: AsyncSession,
+            payment_id: int
+        ):
+            repo = PaymentRepository(session)
+            return await repo.get_payment_by_id(payment_id)
+        
+        @staticmethod
+        async def get_payment_by_name_and_amount(
+            session: AsyncSession,
+            name: str,
+            amount: int
+        ):
+            repo = PaymentRepository(session)
+            return await repo.get_payment_by_name_and_amount(name, amount)
+        
+        # Add methods to adapter class
+        adapter_class.add_payment = add_payment
+        adapter_class.get_last_payments = get_last_payments
+        adapter_class.add_member_id_to_payment = add_member_id_to_payment
+        adapter_class.get_payment_by_id = get_payment_by_id
+        adapter_class.get_payment_by_name_and_amount = get_payment_by_name_and_amount
 
 
 # Example usage in migration:

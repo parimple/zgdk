@@ -3,10 +3,12 @@ AI-powered command intent classification using PydanticAI.
 """
 
 from enum import Enum
+import time
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
+from utils.ai.interpretability import log_and_explain, FeatureExtractor
 
 
 class CommandCategory(str, Enum):
@@ -166,15 +168,15 @@ class CommandIntentClassifier:
                 }"""
             
             if gemini_key:
+                os.environ['GOOGLE_API_KEY'] = gemini_key
                 self.agent = Agent(
-                    'google-generativeai:gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
-                    api_key=gemini_key,
+                    'gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
                     system_prompt=system_prompt
                 )
             elif openai_key:
+                os.environ['OPENAI_API_KEY'] = openai_key
                 self.agent = Agent(
                     'openai:gpt-3.5-turbo',
-                    api_key=openai_key,
                     system_prompt=system_prompt
                 )
             else:
@@ -182,16 +184,35 @@ class CommandIntentClassifier:
     
     async def classify(self, message: str, context: Optional[Dict] = None) -> CommandIntent:
         """Classify user message intent."""
-        message = message.strip().lower()
+        start_time = time.time()
+        message_lower = message.strip().lower()
+        
+        # Extract features for interpretability
+        command_name = context.get('command_name', 'unknown') if context else 'unknown'
+        features = await FeatureExtractor.extract_intent_features(message, command_name)
         
         # First try keyword-based classification
-        keyword_result = self._classify_by_keywords(message)
+        keyword_result = self._classify_by_keywords(message_lower)
+        
+        # Log keyword classification
+        execution_time = (time.time() - start_time) * 1000
+        await log_and_explain(
+            module="intent_classifier",
+            input_data={"text": message, "command": command_name, "context": context},
+            features=features,
+            output=keyword_result.category.value,
+            decision=keyword_result.category.value,
+            confidence=keyword_result.confidence,
+            reasoning=keyword_result.interpretation,
+            execution_time_ms=execution_time
+        )
+        
         if keyword_result.confidence >= 0.8:
             return keyword_result
         
         # If AI is enabled and keyword confidence is low, use AI
         if self.use_ai:
-            ai_result = await self._classify_with_ai(message, context)
+            ai_result = await self._classify_with_ai(message, context, features, start_time)
             # Combine results if keyword had some confidence
             if keyword_result.confidence > 0.3:
                 return self._combine_results(keyword_result, ai_result)
@@ -256,8 +277,14 @@ class CommandIntentClassifier:
             parameters={}
         )
     
-    async def _classify_with_ai(self, message: str, context: Optional[Dict] = None) -> CommandIntent:
+    async def _classify_with_ai(self, message: str, context: Optional[Dict] = None, features: Optional[dict] = None, start_time: Optional[float] = None) -> CommandIntent:
         """Classify using AI."""
+        if start_time is None:
+            start_time = time.time()
+        if features is None:
+            command_name = context.get('command_name', 'unknown') if context else 'unknown'
+            features = await FeatureExtractor.extract_intent_features(message, command_name)
+        
         try:
             # Prepare context
             ai_context = {"message": message}
@@ -273,16 +300,45 @@ class CommandIntentClassifier:
             # Parse AI response
             ai_data = result.data
             
+            # Log AI decision
+            execution_time = (time.time() - start_time) * 1000
+            category_value = ai_data.get("category", "unknown")
+            confidence = float(ai_data.get("confidence", 0.7))
+            
+            await log_and_explain(
+                module="intent_classifier",
+                input_data={"text": message, "context": context},
+                features=features,
+                output=ai_data,
+                decision=category_value,
+                confidence=confidence,
+                reasoning=ai_data.get("interpretation", "AI classified"),
+                execution_time_ms=execution_time
+            )
+            
             return CommandIntent(
                 raw_message=message,
-                category=CommandCategory(ai_data.get("category", "unknown")),
-                confidence=float(ai_data.get("confidence", 0.7)),
+                category=CommandCategory(category_value),
+                confidence=confidence,
                 suggested_command=ai_data.get("suggested_command"),
                 parameters=ai_data.get("parameters", {}),
                 interpretation=ai_data.get("interpretation", "AI classified")
             )
             
         except Exception as e:
+            # Log failed classification
+            execution_time = (time.time() - start_time) * 1000
+            await log_and_explain(
+                module="intent_classifier",
+                input_data={"text": message, "context": context},
+                features=features,
+                output=str(e),
+                decision=CommandCategory.UNKNOWN.value,
+                confidence=0.0,
+                reasoning=f"AI classification failed: {str(e)}",
+                execution_time_ms=execution_time
+            )
+            
             # Fallback on AI error
             return CommandIntent(
                 raw_message=message,

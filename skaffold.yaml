@@ -1,0 +1,59 @@
+apiVersion: skaffold/v4beta6
+kind: Config
+metadata:
+  name: zgdk
+build:
+  artifacts:
+  - image: zgdk/bot
+    context: .
+    docker:
+      dockerfile: docker/app/Dockerfile
+    sync:
+      manual:
+      - src: "cogs/**/*.py"
+        dest: /app/cogs
+      - src: "utils/**/*.py"
+        dest: /app/utils
+      - src: "core/**/*.py"
+        dest: /app/core
+  - image: zgdk/ai-agent
+    context: .
+    docker:
+      dockerfile: docker/ai-agent/Dockerfile
+  local:
+    push: false
+deploy:
+  kubectl: {}
+  kustomize:
+    paths:
+    - k8s/overlays/dev
+portForward:
+- resourceType: deployment
+  resourceName: zgdk-bot
+  port: 8089
+  localPort: 8089
+- resourceType: service
+  resourceName: postgres-service
+  port: 5432
+  localPort: 5432
+profiles:
+- name: dev
+  activation:
+  - command: dev
+  build:
+    tagPolicy:
+      gitCommit: {}
+  deploy:
+    kustomize:
+      paths:
+      - k8s/overlays/dev
+- name: staging
+  deploy:
+    kustomize:
+      paths:
+      - k8s/overlays/staging
+- name: production
+  deploy:
+    kustomize:
+      paths:
+      - k8s/overlays/production

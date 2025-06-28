@@ -1,0 +1,20 @@
+[Unit]
+Description=ZGDK Monitoring System
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Projects/zgdk
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+ExecStartPre=/bin/bash -c 'if [ ! -d "venv" ]; then python3 -m venv venv; fi'
+ExecStartPre=/bin/bash -c 'source venv/bin/activate && pip install -q aiohttp pyyaml'
+ExecStart=/bin/bash -c 'source venv/bin/activate && python monitoring/monitor.py'
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/ubuntu/Projects/zgdk/monitoring/logs/monitor.log
+StandardError=append:/home/ubuntu/Projects/zgdk/monitoring/logs/monitor_error.log
+
+[Install]
+WantedBy=multi-user.target

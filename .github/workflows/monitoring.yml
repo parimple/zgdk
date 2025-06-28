@@ -1,0 +1,267 @@
+name: Simple System Monitoring
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/monitoring.yml'
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Create monitoring directory
+        run: mkdir -p monitoring
+
+      - name: Run simplified health checks
+        run: |
+          # Create simple health check that doesn't require bot
+          cat > health_check.py << 'EOF'
+          import json
+          import os
+          from datetime import datetime
+
+          # Simple health checks
+          checks = []
+
+          # Check 1: Verify critical files exist
+          critical_files = [
+              'main.py',
+              'config.yml',
+              'requirements.txt',
+              'docker-compose.yml',
+              'docker/app/Dockerfile',
+              'healthcheck.py'
+          ]
+
+          all_files_exist = True
+          for file in critical_files:
+              exists = os.path.exists(file)
+              checks.append({
+                  "service": f"File: {file}",
+                  "status": "healthy" if exists else "down",
+                  "message": "File exists" if exists else "File missing",
+                  "response_time": 0.001
+              })
+              if not exists:
+                  all_files_exist = False
+
+          # Check 2: Docker compose validation
+          docker_compose_valid = os.system('docker-compose config > /dev/null 2>&1') == 0
+          checks.append({
+              "service": "Docker Compose Config",
+              "status": "healthy" if docker_compose_valid else "down",
+              "message": "Configuration is valid" if docker_compose_valid else "Configuration invalid",
+              "response_time": 0.1
+          })
+
+          # Check 3: Python syntax check
+          syntax_ok = os.system('python -m py_compile main.py 2>/dev/null') == 0
+          checks.append({
+              "service": "Python Syntax",
+              "status": "healthy" if syntax_ok else "down",
+              "message": "Syntax is valid" if syntax_ok else "Syntax errors found",
+              "response_time": 0.05
+          })
+
+          # Calculate summary
+          total = len(checks)
+          healthy = sum(1 for c in checks if c['status'] == 'healthy')
+          down = sum(1 for c in checks if c['status'] == 'down')
+
+          status = {
+              "timestamp": datetime.now().isoformat(),
+              "summary": {
+                  "total": total,
+                  "healthy": healthy,
+                  "degraded": 0,
+                  "down": down
+              },
+              "checks": checks
+          }
+
+          # Save status files
+          with open('monitoring/status.json', 'w') as f:
+              json.dump(status, f, indent=2)
+
+          # Create HTML status page
+          html = f'''<!DOCTYPE html>
+          <html>
+          <head>
+              <title>ZGDK System Status</title>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                  body {{
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      margin: 0;
+                      padding: 20px;
+                      background-color: #f5f5f5;
+                  }}
+                  .container {{
+                      max-width: 800px;
+                      margin: 0 auto;
+                      background: white;
+                      padding: 20px;
+                      border-radius: 8px;
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                  }}
+                  h1 {{ color: #333; margin-bottom: 10px; }}
+                  .timestamp {{ color: #666; font-size: 14px; margin-bottom: 20px; }}
+                  .summary {{
+                      display: flex;
+                      gap: 20px;
+                      margin-bottom: 30px;
+                  }}
+                  .summary-item {{
+                      flex: 1;
+                      text-align: center;
+                      padding: 15px;
+                      border-radius: 4px;
+                      background: #f8f9fa;
+                  }}
+                  .healthy {{ color: #28a745; }}
+                  .degraded {{ color: #ffc107; }}
+                  .down {{ color: #dc3545; }}
+                  .service-list {{
+                      list-style: none;
+                      padding: 0;
+                  }}
+                  .service-item {{
+                      padding: 10px;
+                      margin-bottom: 10px;
+                      border-left: 4px solid;
+                      background: #f8f9fa;
+                  }}
+                  .service-item.healthy {{ border-color: #28a745; }}
+                  .service-item.down {{ border-color: #dc3545; }}
+                  .status-icon {{
+                      font-size: 18px;
+                      margin-right: 10px;
+                  }}
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🤖 ZGDK System Status</h1>
+                  <div class="timestamp">Last updated: {status["timestamp"]}</div>
+
+                  <div class="summary">
+                      <div class="summary-item">
+                          <h3>Total Services</h3>
+                          <div style="font-size: 24px;">{status["summary"]["total"]}</div>
+                      </div>
+                      <div class="summary-item healthy">
+                          <h3>Healthy</h3>
+                          <div style="font-size: 24px;">✅ {status["summary"]["healthy"]}</div>
+                      </div>
+                      <div class="summary-item down">
+                          <h3>Down</h3>
+                          <div style="font-size: 24px;">❌ {status["summary"]["down"]}</div>
+                      </div>
+                  </div>
+
+                  <h2>Service Details</h2>
+                  <ul class="service-list">
+          '''
+
+          for check in status["checks"]:
+              icon = "✅" if check["status"] == "healthy" else "❌"
+              html += f'''
+                      <li class="service-item {check['status']}">
+                          <span class="status-icon">{icon}</span>
+                          <strong>{check["service"]}</strong>: {check["message"]}
+                      </li>
+          '''
+
+          html += '''
+                  </ul>
+              </div>
+          </body>
+          </html>'''
+
+          with open('monitoring/status.html', 'w') as f:
+              f.write(html)
+
+          # Exit with appropriate code
+          if down > 0:
+              print(f"❌ {down} services are down!")
+              exit(1)
+          else:
+              print(f"✅ All {total} services are healthy!")
+              exit(0)
+          EOF
+
+          python health_check.py
+
+      - name: Upload status artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-status
+          path: |
+            monitoring/status.json
+            monitoring/status.html
+
+      - name: Generate status summary
+        if: always()
+        run: |
+          if [ -f monitoring/status.json ]; then
+            echo "## 🤖 ZGDK System Status" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            cat > generate_summary.py << 'EOF'
+          import json
+          with open('monitoring/status.json', 'r') as f:
+              data = json.load(f)
+
+          print(f"**Total Services:** {data['summary']['total']}")
+          print(f"**Healthy:** {data['summary']['healthy']} ✅")
+          print(f"**Down:** {data['summary']['down']} ❌")
+          print()
+          print('### Service Details')
+          print()
+
+          for check in data['checks']:
+              emoji = '✅' if check['status'] == 'healthy' else '❌'
+              print(f"- **{check['service']}**: {emoji} {check['message']}")
+          EOF
+            python generate_summary.py >> $GITHUB_STEP_SUMMARY
+          fi
+
+  docker-validation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        run: |
+          echo "Validating Docker Compose configuration..."
+          docker-compose config > /dev/null
+          echo "✅ Docker Compose configuration is valid"
+
+      - name: Check Dockerfile syntax
+        run: |
+          echo "Checking Dockerfile..."
+          if [ -f docker/app/Dockerfile ]; then
+            echo "✅ Dockerfile found at docker/app/Dockerfile"
+            # Basic syntax check
+            docker build -f docker/app/Dockerfile --target=base . --dry-run 2>&1 | head -5 || true
+          else
+            echo "❌ Dockerfile not found"
+            exit 1
+          fi

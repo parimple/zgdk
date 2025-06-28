@@ -18,6 +18,12 @@ def create_profile_embed(
     is_voice_muted: bool
 ) -> discord.Embed:
     """Create profile embed with all member information."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Creating profile embed for {member.display_name}")
+    logger.info(f"Profile data keys: {list(profile_data.keys())}")
+    
     # Create embed directly
     embed = discord.Embed(
         title=f"Profil użytkownika {member.display_name}",
@@ -95,7 +101,7 @@ def create_profile_embed(
         )
     
     # Add additional fields if needed
-    if profile_data.get('db_member').voice_bypass_until:
+    if profile_data.get('db_member') and profile_data['db_member'].voice_bypass_until:
         bypass_until = profile_data['db_member'].voice_bypass_until
         if bypass_until > datetime.now(timezone.utc):
             time_left = bypass_until - datetime.now(timezone.utc)
@@ -106,6 +112,7 @@ def create_profile_embed(
                 inline=True
             )
     
+    logger.info(f"Embed created with {len(embed.fields)} fields")
     return embed
 
 

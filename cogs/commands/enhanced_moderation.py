@@ -12,7 +12,7 @@ from core.ai.duration_parser import DurationParser
 from core.ai.moderation_assistant import ModerationAssistant, UserContext
 from core.models.moderation import TimeoutRequest, ModerationAction, ModerationType
 from core.interfaces.member_interfaces import IModerationService
-from utils.permissions import has_mod_permissions
+from utils.permissions import is_mod_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class EnhancedModerationCommands(commands.Cog):
         description="Wycisz członka używając naturalnego języka"
     )
     @commands.guild_only()
-    @commands.check(has_mod_permissions)
+    @is_mod_or_admin()
     async def timeout_ai(
         self,
         ctx: commands.Context,
@@ -121,7 +121,7 @@ class EnhancedModerationCommands(commands.Cog):
         description="Analizuj wiadomość pod kątem naruszeń (tylko Mod)"
     )
     @commands.guild_only()
-    @commands.check(has_mod_permissions)
+    @is_mod_or_admin()
     async def analyze_message(
         self,
         ctx: commands.Context,

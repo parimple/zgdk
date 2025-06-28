@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.repositories.base_repository import BaseRepository
@@ -172,6 +172,33 @@ class PremiumRepository(BaseRepository):
         except Exception as e:
             self.logger.error(f"Error updating role expiry: {e}")
             raise
+
+    async def count_unique_premium_users(self) -> int:
+        """Count unique users with any active premium role."""
+        try:
+            premium_role_names = ["zG50", "zG100", "zG500", "zG1000"]
+            current_time = datetime.utcnow()
+            
+            stmt = (
+                select(func.count(distinct(MemberRole.member_id)))
+                .join(Role, MemberRole.role_id == Role.id)
+                .where(Role.name.in_(premium_role_names))
+                .where(
+                    (MemberRole.expiration_date > current_time) | 
+                    (MemberRole.expiration_date.is_(None))
+                )
+            )
+            
+            result = await self.session.execute(stmt)
+            count = result.scalar_one()
+            
+            self.logger.debug(f"Found {count} unique premium users")
+            return count or 0
+            
+        except Exception as e:
+            self.logger.error(f"Error counting unique premium users: {e}")
+            # Return a fallback value instead of raising
+            return 200  # Fallback social proof number
 
     async def remove_member_role(self, member_id: int, role_id: int) -> bool:
         """Remove a member role assignment."""

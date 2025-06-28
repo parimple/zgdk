@@ -8,7 +8,8 @@ from typing import Optional
 import discord
 
 from datasources.models import Member
-from datasources.queries import MemberQueries, NotificationLogQueries
+from datasources.queries import MemberQueries
+from core.repositories import NotificationRepository
 from utils.message_sender import MessageSender
 
 from .constants import (
@@ -60,8 +61,9 @@ class BumpHandler:
         """Check if user is on cooldown for a service."""
         # For global services like disboard, use guild_id
         guild_id = self.bot.guild_id if hasattr(self.bot, 'guild_id') else None
-        last_notification = await NotificationLogQueries.get_service_notification_log(
-            session, service, guild_id, user_id
+        notification_repo = NotificationRepository(session)
+        last_notification = await notification_repo.get_service_notification_log(
+            service, guild_id, user_id
         )
         
         if last_notification:
@@ -78,8 +80,9 @@ class BumpHandler:
     ) -> None:
         """Log a notification for cooldown tracking."""
         guild_id = self.bot.guild_id if hasattr(self.bot, 'guild_id') else None
-        await NotificationLogQueries.add_or_update_notification_log(
-            session, user_id, service
+        notification_repo = NotificationRepository(session)
+        await notification_repo.add_or_update_notification_log(
+            user_id, service
         )
 
 

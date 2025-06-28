@@ -1,4 +1,4 @@
-FROM python:3.10-slim-buster
+FROM python:3.10-slim-buster as base
 
 RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
@@ -22,7 +22,11 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     libasound2 \
     libatk-bridge2.0-0 \
-    libgtk-3-0
+    libgtk-3-0 \
+    dumb-init \
+    procps \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Check the architecture
 RUN uname -a
@@ -44,8 +48,14 @@ RUN ls -la $(which python)
 # Copy the source code
 COPY . .
 
+# Ensure healthcheck script is present
+COPY healthcheck.py /app/healthcheck.py
+
 # Check the executable permission of main.py
 RUN ls -la main.py
+
+# Use dumb-init to handle signals and prevent zombies
+ENTRYPOINT ["dumb-init", "--"]
 
 # Run the bot
 CMD ["python", "main.py"]

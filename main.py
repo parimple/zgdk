@@ -62,6 +62,7 @@ from core.services.permission_service import PermissionService
 from core.services.team_management_service import TeamManagementService
 from datasources.models import Base
 from utils.premium import PaymentData
+from utils.health_check import HealthCheckServer
 
 intents = discord.Intents.all()
 
@@ -150,6 +151,9 @@ class Zagadka(commands.Bot):
         
         # Create service manager interface for cogs
         self.service_manager = self
+        
+        # Initialize health check server
+        self.health_server = HealthCheckServer(self)
 
         prefix = config.get("prefix")
         if prefix is None:
@@ -375,6 +379,12 @@ class Zagadka(commands.Bot):
         return self.service_container.get_service(service_type)
 
     async def close(self) -> None:
+        # Stop health check server
+        try:
+            await self.health_server.stop()
+        except Exception as e:
+            logging.error(f"Error stopping health check server: {e}")
+        
         await self.engine.dispose()
         await super().close()
 
@@ -431,7 +441,28 @@ class Zagadka(commands.Bot):
         """Setup hook."""
         if not self.test:
             await self.load_cogs()
+            
+            # Start health check server
+            try:
+                await self.health_server.start()
+            except Exception as e:
+                logging.error(f"Failed to start health check server: {e}")
+            
+            # Setup hot reload in development
+            if os.getenv('DEV_MODE', 'false').lower() == 'true':
+                try:
+                    from utils.hot_reload import setup_hot_reload
+                    await setup_hot_reload(self)
+                except Exception as e:
+                    logging.error(f"Failed to setup hot reload: {e}")
 
+    async def _run_mcp_server(self):
+        """Run MCP server in background."""
+        try:
+            await self.mcp_server.run()
+        except Exception as e:
+            logging.error(f"MCP server error: {e}")
+    
     async def on_ready(self) -> None:
         """On ready event"""
         logging.info("Event on_ready started")
@@ -450,6 +481,16 @@ class Zagadka(commands.Bot):
             )
         )
         logging.info("Event change_presence completed")
+        
+        # Start MCP server if enabled
+        if os.getenv("ENABLE_MCP", "false").lower() == "true":
+            try:
+                from mcp.zgdk_mcp_server import connect_to_bot
+                self.mcp_server = connect_to_bot(self)
+                asyncio.create_task(self._run_mcp_server())
+                logging.info("MCP server started for bot communication")
+            except Exception as e:
+                logging.error(f"Failed to start MCP server: {e}")
 
         if self.guild is None:
             # Get the guild object and assign it to self.guild

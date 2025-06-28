@@ -79,10 +79,11 @@ class BumpChecker:
         async with self.bot.get_db() as session:
             # For global services, use guild_id instead of user ID
             check_id = self.bot.guild_id if service in self.GLOBAL_SERVICES else user_id
-            from datasources.queries import NotificationLogQueries
+            from core.repositories import NotificationRepository
 
-            log = await NotificationLogQueries.get_notification_log(
-                session, check_id, service
+            notification_repo = NotificationRepository(session)
+            log = await notification_repo.get_notification_log(
+                check_id, service
             )
 
             if not log or now - log.sent_at > timedelta(hours=cooldown):

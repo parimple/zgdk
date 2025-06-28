@@ -8,7 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from datasources.queries import MemberQueries, NotificationLogQueries
+from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 
 from .constants import (
@@ -122,6 +122,16 @@ class OnBumpEvent(commands.Cog):
         # Skip if no guild
         if not message.guild:
             return
+        
+        # Debug logging for DISBOARD
+        if message.author.id == DISBOARD["id"]:
+            logger.info(f"[BUMP DEBUG] DISBOARD message detected!")
+            logger.info(f"[BUMP DEBUG] Channel: {message.channel.name} ({message.channel.id})")
+            logger.info(f"[BUMP DEBUG] Content: {message.content[:200] if message.content else 'No content'}")
+            if message.embeds:
+                logger.info(f"[BUMP DEBUG] Embeds: {len(message.embeds)}")
+                for i, embed in enumerate(message.embeds):
+                    logger.info(f"[BUMP DEBUG] Embed {i}: Title={embed.title}, Description={embed.description[:100] if embed.description else 'None'}")
             
         # Log all bot messages on bump channel - check if channel exists
         if message.channel and hasattr(message.channel, 'id'):

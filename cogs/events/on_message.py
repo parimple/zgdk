@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from discord import Message
 from discord.ext import commands
 
-from datasources.queries import MessageQueries
+from core.repositories import MessageRepository
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,8 @@ class OnMessageEvent(commands.Cog):
         )
 
         async with self.bot.get_db() as session:
-            await MessageQueries.save_message(
-                session,
+            message_repo = MessageRepository(session)
+            await message_repo.save_message(
                 message_id=message.id,
                 author_id=message.author.id,
                 content=message.content,

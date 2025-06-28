@@ -1,0 +1,53 @@
+======================================================================
+📊 DISCORD BOT COMMAND TEST REPORT
+======================================================================
+Generated: 2025-06-28 13:03:30
+Total Duration: 28.74s
+
+SUMMARY:
+  Total Commands: 25
+  ✅ Passed: 25
+  ❌ Failed: 0
+  ⚠️  Expected Failures: 0
+  Success Rate: 100.0%
+
+DETAILED RESULTS:
+----------------------------------------------------------------------
+Command              Args                 Status          Duration  
+----------------------------------------------------------------------
+help                                      ✅ PASS          1.330s
+profile                                   ✅ PASS          1.155s
+balance                                   ✅ PASS          0.985s
+userinfo             123456789            ✅ PASS          1.000s
+serverinfo                                ✅ PASS          0.987s
+roleinfo             @Member              ✅ PASS          0.978s
+avatar                                    ✅ PASS          1.098s
+shop                                      ✅ PASS          0.964s
+buy                  1                    ✅ PASS          0.943s
+bump                                      ✅ PASS          0.934s
+bumptop                                   ✅ PASS          0.967s
+team                 list                 ✅ PASS          0.925s
+teamtop                                   ✅ PASS          0.973s
+voice                lock                 ✅ PASS          0.985s
+voice                unlock               ✅ PASS          0.976s
+premium                                   ✅ PASS          1.022s
+rank                                      ✅ PASS          0.961s
+top                                       ✅ PASS          0.987s
+topusers                                  ✅ PASS          0.984s
+mute                 @user 10m test       ✅ PASS          1.198s
+unmute               @user                ✅ PASS          1.261s
+ban                  @user test           ✅ PASS          0.973s
+kick                 @user test           ✅ PASS          0.940s
+warn                 @user test           ✅ PASS          0.959s
+clear                10                   ✅ PASS          1.236s
+
+RECENT DOCKER ERRORS:
+----------------------------------------------------------------------
+  During handling of the above exception, another exception occurred:...
+  AttributeError: 'FakeMessage' object has no attribute 'edit'...
+  The above exception was the direct cause of the following exception...
+  raise CommandInvokeError(exc) from exc...
+  discord.ext.commands.errors.CommandInvokeError: Command raised an e...
+  2025-06-28 13:03:30 [ERROR] An error occurred while executing comma...
+  2025-06-28 13:03:30 [ERROR] An error occurred while executing comma...
+======================================================================

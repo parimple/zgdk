@@ -210,3 +210,8 @@ class IPremiumService(ABC):
     ) -> Optional[int]:
         """Calculate the value of a premium role for pricing."""
         pass
+
+    @abstractmethod
+    async def count_unique_premium_users(self) -> int:
+        """Count unique users with any active premium role."""
+        pass

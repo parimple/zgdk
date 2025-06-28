@@ -5,6 +5,7 @@ AI-enhanced duration parsing using PydanticAI.
 import asyncio
 import re
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
 from ..models.moderation import DurationInput
+from utils.ai.interpretability import log_and_explain, FeatureExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -69,16 +71,16 @@ class DurationParser:
                 Kontekst aktualnego czasu może być podany."""
             
             if gemini_key:
+                os.environ['GOOGLE_API_KEY'] = gemini_key
                 self.agent = Agent(
-                    'google-generativeai:gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
-                    api_key=gemini_key,
+                    'gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
                     system_prompt=system_prompt
                 )
                 logger.info("Using Google Gemini for AI parsing (free tier)")
             elif openai_key:
+                os.environ['OPENAI_API_KEY'] = openai_key
                 self.agent = Agent(
                     'openai:gpt-3.5-turbo',
-                    api_key=openai_key,
                     system_prompt=system_prompt
                 )
                 logger.info("Using OpenAI for AI parsing")
@@ -88,10 +90,28 @@ class DurationParser:
     
     async def parse(self, duration_str: str, context: Optional[dict] = None) -> EnhancedDurationInput:
         """Parse duration string with AI enhancement."""
+        start_time = time.time()
+        
+        # Extract features for interpretability
+        features = await FeatureExtractor.extract_duration_features(duration_str)
+        
         # First try traditional parsing
         try:
             basic_duration = self._parse_traditional(duration_str)
             if basic_duration:
+                # Log successful traditional parsing
+                execution_time = (time.time() - start_time) * 1000
+                await log_and_explain(
+                    module="duration_parser",
+                    input_data={"text": duration_str, "context": context},
+                    features=features,
+                    output=basic_duration.seconds,
+                    decision=basic_duration.seconds,
+                    confidence=1.0,
+                    reasoning="Standard format regex match",
+                    execution_time_ms=execution_time
+                )
+                
                 return EnhancedDurationInput.from_duration_input(
                     basic_duration,
                     interpretation="Parsed using standard format",
@@ -102,7 +122,7 @@ class DurationParser:
         
         # If traditional parsing fails and AI is enabled, use AI
         if self.use_ai:
-            return await self._parse_with_ai(duration_str, context)
+            return await self._parse_with_ai(duration_str, context, features, start_time)
         else:
             raise ValueError(f"Cannot parse duration: {duration_str}")
     
@@ -153,8 +173,13 @@ class DurationParser:
         
         return None
     
-    async def _parse_with_ai(self, duration_str: str, context: Optional[dict] = None) -> EnhancedDurationInput:
+    async def _parse_with_ai(self, duration_str: str, context: Optional[dict] = None, features: Optional[dict] = None, start_time: Optional[float] = None) -> EnhancedDurationInput:
         """Parse using AI for natural language understanding."""
+        if start_time is None:
+            start_time = time.time()
+        if features is None:
+            features = await FeatureExtractor.extract_duration_features(duration_str)
+        
         # Prepare context
         ai_context = {
             "current_time": datetime.utcnow().isoformat(),
@@ -179,6 +204,19 @@ class DurationParser:
             # Generate human-readable format
             human_readable = self._seconds_to_human(seconds)
             
+            # Log AI decision
+            execution_time = (time.time() - start_time) * 1000
+            await log_and_explain(
+                module="duration_parser",
+                input_data={"text": duration_str, "context": context},
+                features=features,
+                output=result.data,
+                decision=seconds,
+                confidence=0.9,
+                reasoning=f"AI interpreted as {seconds} seconds",
+                execution_time_ms=execution_time
+            )
+            
             return EnhancedDurationInput(
                 raw_input=duration_str,
                 seconds=seconds,
@@ -189,6 +227,18 @@ class DurationParser:
             )
             
         except Exception as e:
+            # Log failed parsing
+            execution_time = (time.time() - start_time) * 1000
+            await log_and_explain(
+                module="duration_parser",
+                input_data={"text": duration_str, "context": context},
+                features=features,
+                output=str(e),
+                decision=None,
+                confidence=0.0,
+                reasoning=f"Parsing failed: {str(e)}",
+                execution_time_ms=execution_time
+            )
             # Fallback to error
             raise ValueError(f"AI parsing failed: {str(e)}")
     

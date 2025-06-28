@@ -93,42 +93,56 @@ class ModerationAssistant:
             gemini_key = os.getenv('GEMINI_API_KEY')
             openai_key = os.getenv('OPENAI_API_KEY')
             
-            system_prompt = """You are a Discord moderation assistant.
-                Analyze messages and user behavior to suggest appropriate moderation actions.
+            system_prompt = """Jesteś asystentem moderacji Discord. Analizuj wiadomości w języku polskim i angielskim.
                 
-                Consider:
-                - Message content and context
-                - User history and patterns
-                - Severity of violations
-                - Server rules and culture
+                Odpowiadaj TYLKO w formacie czystego JSON:
+                {
+                    "threat_level": "none|low|medium|high|critical",
+                    "violations": ["spam", "toxicity", "harassment", "nsfw", "advertising"],
+                    "action": "warn|timeout|mute|kick|ban",
+                    "duration": null lub liczba sekund,
+                    "reason": "Krótkie wyjaśnienie po polsku",
+                    "confidence": 0.0 do 1.0,
+                    "context": ["Lista czynników które wzięto pod uwagę"],
+                    "evidence": ["Konkretne cytaty lub dowody"]
+                }
                 
-                Violation types:
-                - spam: repeated messages, flood
-                - toxicity: hate speech, slurs
-                - harassment: targeting users
-                - nsfw: inappropriate content
-                - advertising: unwanted promotions
-                - raid: coordinated attacks
-                - impersonation: pretending to be others
-                - doxxing: sharing private info
+                Typy naruszeń:
+                - spam: powtarzające się wiadomości, flood, spam znaków
+                - toxicity: obraźliwe słowa, wulgaryzmy, hate speech
+                - harassment: nękanie, groźby, ataki personalne
+                - nsfw: treści nieodpowiednie
+                - advertising: niechciane reklamy, linki do serwerów
                 
-                Suggest proportional responses:
-                - First offense: warning or short mute
-                - Repeat offense: longer mute or timeout
-                - Severe/dangerous: immediate ban
+                Poziomy zagrożenia:
+                - none: brak naruszenia
+                - low: drobne naruszenie
+                - medium: wyraźne naruszenie zasad
+                - high: poważne naruszenie
+                - critical: natychmiastowe zagrożenie
                 
-                Always explain your reasoning clearly."""
+                Sugerowane akcje:
+                - warn: pierwsze naruszenie lub drobne
+                - timeout: powtarzające się lub średnie naruszenia (300-3600 sekund)
+                - mute: poważne naruszenia (3600-86400 sekund)
+                - kick: bardzo poważne naruszenia
+                - ban: krytyczne zagrożenia lub wielokrotni recydywiści"""
             
             if gemini_key:
+                # Set API key in environment for pydantic-ai
+                import os
+                os.environ['GOOGLE_API_KEY'] = gemini_key
                 self.agent = Agent(
-                    'google-generativeai:gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
-                    api_key=gemini_key,
-                    system_prompt=system_prompt
+                    'gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
+                    system_prompt=system_prompt,
+                    result_type=str  # Force string output
                 )
             elif openai_key:
+                # Set API key in environment for pydantic-ai
+                import os
+                os.environ['OPENAI_API_KEY'] = openai_key
                 self.agent = Agent(
                     'openai:gpt-4',  # Use GPT-4 for better moderation
-                    api_key=openai_key,
                     system_prompt=system_prompt
                 )
             else:
@@ -280,24 +294,45 @@ class ModerationAssistant:
             
             # Get AI analysis
             result = await self.agent.run(
-                f"Analyze this Discord message for violations:\n{context}",
-                result_type=Dict
+                f"Analyze this Discord message for violations:\n{context}"
             )
             
-            ai_data = result.data
+            # Parse JSON response
+            import json
+            try:
+                ai_data = json.loads(result.data)
+            except:
+                # Try to extract JSON from response
+                import re
+                json_match = re.search(r'\{.*\}', result.data, re.DOTALL)
+                if json_match:
+                    ai_data = json.loads(json_match.group(0))
+                else:
+                    raise ValueError("Could not parse AI response")
             
             # Parse AI response
-            violations = [
-                ViolationType(v) for v in ai_data.get("violations", [])
-                if v in ViolationType.__members__.values()
-            ]
+            violations = []
+            for v in ai_data.get("violations", []):
+                try:
+                    violations.append(ViolationType(v))
+                except:
+                    pass
+            
+            # Map actions to our enums
+            action_map = {
+                "warn": ModerationType.WARN,
+                "timeout": ModerationType.TIMEOUT,
+                "mute": ModerationType.MUTE,
+                "kick": ModerationType.KICK,
+                "ban": ModerationType.BAN
+            }
             
             return ModerationSuggestion(
                 threat_level=ThreatLevel(ai_data.get("threat_level", "none")),
                 violations=violations,
-                suggested_action=ModerationType(ai_data.get("action", "warn")),
+                suggested_action=action_map.get(ai_data.get("action", "warn"), ModerationType.WARN),
                 suggested_duration=ai_data.get("duration"),
-                reason=ai_data.get("reason", "AI detected violation"),
+                reason=ai_data.get("reason", "AI analysis"),
                 confidence=float(ai_data.get("confidence", 0.7)),
                 context_considered=ai_data.get("context", []),
                 evidence=ai_data.get("evidence", [])

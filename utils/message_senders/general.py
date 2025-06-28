@@ -204,9 +204,14 @@ class GeneralMessageSender(BaseMessageSender):
                 ephemeral=ephemeral,
             )
         
-        # For now, just show first page
-        # TODO: Add pagination support
-        page_items = items[:items_per_page]
+        # Calculate pagination
+        total_pages = (len(items) + items_per_page - 1) // items_per_page
+        current_page = 1
+        
+        # Get items for first page
+        start_idx = (current_page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        page_items = items[start_idx:end_idx]
         
         embed = self._create_embed(
             title=title,
@@ -217,14 +222,14 @@ class GeneralMessageSender(BaseMessageSender):
         # Add items
         items_text = "\n".join(page_items)
         embed.add_field(
-            name=f"Lista ({len(page_items)}/{len(items)})",
+            name=f"Lista (Strona {current_page}/{total_pages})",
             value=items_text,
             inline=False,
         )
         
-        if len(items) > items_per_page:
+        if total_pages > 1:
             embed.set_footer(
-                text=f"Pokazano {items_per_page} z {len(items)} elementów"
+                text=f"Strona {current_page}/{total_pages} • Pokazano {len(page_items)} z {len(items)} elementów"
             )
         
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
