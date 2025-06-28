@@ -77,3 +77,10 @@ discord:
 # Network policies
 networkPolicy:
   enabled: false  # Enable in production
+
+# Dependencies
+postgresql:
+  enabled: false  # Use external PostgreSQL
+  
+redis:
+  enabled: false  # Use external Redis
