@@ -37,7 +37,9 @@ class ProfileCommands(commands.Cog):
         async with self.bot.get_db() as session:
             try:
                 # Get all profile data
+                logger.info(f"Getting profile data for {member.id}")
                 profile_data = await get_profile_data(member, session, ctx, self.bot, self.team_symbol)
+                logger.info(f"Profile data retrieved: {bool(profile_data)}")
 
                 # Get active mutes
                 active_mutes, is_voice_muted = await get_active_mutes(member, ctx)

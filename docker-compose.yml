@@ -16,6 +16,7 @@ services:
       - TIPO_API_TOKEN=${TIPO_API_TOKEN}
     ports:
       - 8000:8000
+      - 8089:8089
       - 8090:8090
       - 8091:8091
     platform: linux/arm64
@@ -38,8 +39,16 @@ services:
       - "5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
-      - ./pg_log:/var/lib/postgresql/data/pg_log
-    command: ["postgres", "-c", "logging_collector=on", "-c", "log_min_messages=warning", "-c", "log_directory=pg_log", "-c", "log_filename=postgresql-%Y-%m-%d.log"]
+    # Temporarily disabled pg_log mount due to permission issues
+    # - ./pg_log:/var/lib/postgresql/data/pg_log
+    # command: ["postgres", "-c", "logging_collector=on", "-c", "log_min_messages=warning", "-c", "log_directory=pg_log", "-c", "log_filename=postgresql-%Y-%m-%d.log"]
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    depends_on:
+      - app
 
 volumes:
   db-data:

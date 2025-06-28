@@ -165,9 +165,9 @@ class UserInfoCog(commands.Cog):
 
         return embed
 
-    @commands.hybrid_command(name="profile", aliases=["p"], description="Wyświetla profil użytkownika.")
-    async def profile(self, ctx: commands.Context, member: Optional[discord.Member] = None):
-        """Wyświetla profil użytkownika z informacjami o aktywności i zakupach."""
+    # @commands.hybrid_command(name="profile", aliases=["p"], description="Wyświetla profil użytkownika.")  # Moved to profile_commands.py
+    # async def profile(self, ctx: commands.Context, member: Optional[discord.Member] = None):  # Moved to profile_commands.py
+    #     """Wyświetla profil użytkownika z informacjami o aktywności i zakupach."""  # Moved
         if member is None:
             member = ctx.author
 

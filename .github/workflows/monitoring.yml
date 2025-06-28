@@ -25,6 +25,12 @@ jobs:
       - name: Create monitoring directory
         run: mkdir -p monitoring
 
+      - name: Install Docker Compose
+        run: |
+          # Ensure docker compose is available
+          docker --version
+          docker compose version || true
+          
       - name: Run simplified health checks
         run: |
           # Create simple health check that doesn't require bot
@@ -59,7 +65,18 @@ jobs:
                   all_files_exist = False
 
           # Check 2: Docker compose validation
-          docker_compose_valid = os.system('docker-compose config > /dev/null 2>&1') == 0
+          # Try both docker compose and docker-compose commands
+          docker_compose_valid = False
+          try:
+              # Try new syntax first
+              if os.system('docker compose config > /dev/null 2>&1') == 0:
+                  docker_compose_valid = True
+              # Fall back to old syntax
+              elif os.system('docker-compose config > /dev/null 2>&1') == 0:
+                  docker_compose_valid = True
+          except:
+              docker_compose_valid = False
+              
           checks.append({
               "service": "Docker Compose Config",
               "status": "healthy" if docker_compose_valid else "down",

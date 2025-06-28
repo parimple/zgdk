@@ -19,6 +19,9 @@ class UserInfoCog(ProfileCommands, BypassCommands):
         # Get team symbol from config
         team_config = self.bot.config.get("team", {})
         self.team_symbol = team_config.get("symbol", "☫")
+        # Initialize parent classes
+        ProfileCommands.__init__(self, bot)
+        BypassCommands.__init__(self, bot)
 
     @commands.Cog.listener()
     async def on_ready(self):
