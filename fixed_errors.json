@@ -1,0 +1,7 @@
+{
+  "fixed_errors": [
+    "on_member_join.py:|Cog named 'OnMemberJoinEvent' already loaded",
+    "member_join_event.py|AttributeError: 'NoneType' object has no attribute 'id'",
+    "invite_manager.py|'Invite' object has no attribute 'max_age_seconds'"
+  ]
+}

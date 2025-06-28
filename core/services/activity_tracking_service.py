@@ -43,8 +43,10 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
     NIGHT_OWL_BONUS = 1  # Extra point for activity 22:00-06:00
     EARLY_BIRD_BONUS = 1  # Extra point for activity 06:00-10:00
 
-    def __init__(self, guild: discord.Guild = None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, activity_repository, member_repository, unit_of_work, guild: discord.Guild = None, **kwargs):
+        super().__init__(unit_of_work=unit_of_work)
+        self.activity_repository = activity_repository
+        self.member_repository = member_repository
         self.guild = guild
         self.promotion_keywords = ["zagadka", ".gg/zagadka", "discord.gg/zagadka"]
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -358,6 +360,49 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
             self._log_error("check_member_antipromo_status", e, member_id=member.id)
             return False
 
+    async def track_message_activity(
+        self, member_id: int, content: str, channel_id: int
+    ) -> None:
+        """Track message activity for points."""
+        try:
+            # Get session from unit of work
+            if not self.unit_of_work:
+                self._log_error(
+                    "track_message_activity",
+                    ValueError("No unit of work available"),
+                    member_id=member_id
+                )
+                return
+                
+            async with self.unit_of_work as uow:
+                # Use the existing add_text_activity method
+                await self.add_text_activity(
+                    uow.session,
+                    member_id,
+                    content
+                )
+                await uow.commit()
+                
+                # Log the operation
+                word_count = len(content.split())
+                points = min(word_count * self.TEXT_MESSAGE, self.MAX_MESSAGE_POINTS)
+                
+                self._log_operation(
+                    "track_message_activity",
+                    member_id=member_id,
+                    points=points,
+                    word_count=word_count,
+                    channel_id=channel_id
+                )
+                
+        except Exception as e:
+            self._log_error(
+                "track_message_activity",
+                e,
+                member_id=member_id,
+                channel_id=channel_id
+            )
+
     def format_leaderboard_embed(
         self,
         leaderboard: List[Tuple[int, int, int]],
@@ -670,3 +715,120 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
         except Exception as e:
             self._log_error("get_time_bonus", e)
             return 0
+
+    async def track_voice_activity(
+        self, member_id: int, channel_id: int, is_with_others: bool = True
+    ) -> None:
+        """Track voice activity for a member in a specific channel."""
+        try:
+            # Get session from unit of work
+            if not self.unit_of_work:
+                self._log_error(
+                    "track_voice_activity",
+                    ValueError("No unit of work available"),
+                    member_id=member_id,
+                    channel_id=channel_id
+                )
+                return
+                
+            async with self.unit_of_work as uow:
+                # Use the existing add_voice_activity method
+                await self.add_voice_activity(
+                    uow.session,
+                    member_id,
+                    is_with_others
+                )
+                await uow.commit()
+                
+                self._log_operation(
+                    "track_voice_activity",
+                    member_id=member_id,
+                    channel_id=channel_id,
+                    is_with_others=is_with_others
+                )
+                
+        except Exception as e:
+            self._log_error(
+                "track_voice_activity",
+                e,
+                member_id=member_id,
+                channel_id=channel_id
+            )
+
+    async def track_promotion_activity(self, member_id: int) -> None:
+        """Track promotion activity for a member."""
+        try:
+            # Get session from unit of work
+            if not self.unit_of_work:
+                self._log_error(
+                    "track_promotion_activity",
+                    ValueError("No unit of work available"),
+                    member_id=member_id
+                )
+                return
+                
+            async with self.unit_of_work as uow:
+                # Use the existing add_promotion_activity method
+                await self.add_promotion_activity(
+                    uow.session,
+                    member_id
+                )
+                await uow.commit()
+                
+                self._log_operation(
+                    "track_promotion_activity",
+                    member_id=member_id,
+                    points=self.PROMOTION_STATUS
+                )
+                
+        except Exception as e:
+            self._log_error(
+                "track_promotion_activity",
+                e,
+                member_id=member_id
+            )
+
+    async def get_member_activity_summary(
+        self, member_id: int, days_back: int = 7
+    ) -> Dict[str, any]:
+        """Get a summary of member's activity for profile display."""
+        try:
+            # Get session from unit of work
+            if not self.unit_of_work:
+                self._log_error(
+                    "get_member_activity_summary",
+                    ValueError("No unit of work available"),
+                    member_id=member_id
+                )
+                return None
+                
+            async with self.unit_of_work as uow:
+                # Use get_member_stats method
+                stats = await self.get_member_stats(uow.session, member_id, days_back)
+                
+                # Format for profile display
+                summary = {
+                    'total_points': stats.get('total_points', 0),
+                    'ranking_position': stats.get('position', 0),
+                    'tier': stats.get('tier', 'No Rank'),
+                    'days_included': days_back,
+                    'breakdown': stats.get('breakdown', {})
+                }
+                
+                self._log_operation(
+                    "get_member_activity_summary",
+                    member_id=member_id,
+                    days_back=days_back,
+                    total_points=summary['total_points']
+                )
+                
+                return summary
+                
+        except Exception as e:
+            self._log_error(
+                "get_member_activity_summary",
+                e,
+                member_id=member_id,
+                days_back=days_back
+            )
+            return None

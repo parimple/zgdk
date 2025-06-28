@@ -13,10 +13,13 @@ from discord.ext import commands, tasks
 from cogs.views.shop_views import BuyRoleButton
 from core.interfaces.member_interfaces import IMemberService
 from datasources.queries import HandledPaymentQueries
-from utils.currency import CURRENCY_UNIT
+from core.services.currency_service import CurrencyService
 from utils.premium import PremiumManager, TipplyDataProvider
 from utils.premium_logic import PREMIUM_PRIORITY, PremiumRoleManager
 
+
+# Currency constant
+CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TIPO_API_TOKEN")
@@ -198,6 +201,45 @@ class OnPaymentEvent(commands.Cog):
 
         if member is None:
             logger.error("Member not found: %s", payment_data.name)
+            
+            # Check if user is banned (try with stripped name too)
+            banned_user = await self.premium_manager.get_banned_member(payment_data.name)
+            if not banned_user and payment_data.name.strip() != payment_data.name:
+                # Try with stripped name if original has spaces
+                banned_user = await self.premium_manager.get_banned_member(payment_data.name.strip())
+            
+            if banned_user:
+                logger.info("Found banned user %s for payment %s", banned_user, payment_data.name)
+                # Unban the user
+                await self.guild.unban(banned_user)
+                await self.premium_manager.notify_unban(banned_user)
+                
+                # Update payment record with user ID
+                payment_record = await HandledPaymentQueries.get_payment_by_name_and_amount(
+                    session, payment_data.name, payment_data.amount
+                )
+                if payment_record:
+                    payment_record.member_id = banned_user.id
+                    await session.commit()
+                
+                # Send notification
+                channel_id = self.bot.config["channels"]["donation"]
+                channel = self.bot.get_channel(channel_id)
+                if channel:
+                    embed = discord.Embed(
+                        title="✅ Użytkownik został odbanowany",
+                        description=(
+                            f"Użytkownik **{banned_user}** został odbanowany.\n"
+                            f"Wpłata **{payment_data.amount} {CURRENCY_UNIT}** została wykorzystana na odbanowanie."
+                        ),
+                        color=discord.Color.green(),
+                    )
+                    embed.set_footer(text=f"ID Wpłaty: {payment_record.id} | ID Użytkownika: {banned_user.id}")
+                    embed.timestamp = payment_data.paid_at
+                    await channel.send(embed=embed)
+                return
+            
+            # If not banned either, show the original error message
             # Try to find the payment record to get its ID for the admin command
             payment_record = await HandledPaymentQueries.get_payment_by_name_and_amount(
                 session, payment_data.name, payment_data.amount
@@ -224,7 +266,7 @@ class OnPaymentEvent(commands.Cog):
                 embed.set_footer(text=f"ID Wpłaty: {payment_record.id}")
                 embed.timestamp = payment_data.paid_at
                 await channel.send(embed=embed)
-            return
+                return
 
         # Ensure member exists in database before proceeding
         try:

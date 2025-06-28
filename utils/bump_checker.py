@@ -14,17 +14,20 @@ class BumpChecker:
     def __init__(self, bot):
         self.bot = bot
 
-    @staticmethod
-    def get_service_emoji(service: str) -> str:
-        """Get emoji for a service"""
-        emojis = {
-            "disboard": "<:botDisboard:1336275527241044069>",
-            "dzik": "<:botDzik:1336275532991565824>",
-            "discadia": "<:botDiscadia:1336275880703561758>",
-            "discordservers": "<:botDiscordServers:1336322514170806383>",
-            "dsme": "<:botDSME:1336311501765476352>",
+    def get_service_emoji(self, service: str) -> str:
+        """Get emoji for a service from config"""
+        emojis = self.bot.config.get("emojis", {})
+        
+        # Fallback to unicode if custom emoji not found
+        fallbacks = {
+            "disboard": "🇩",
+            "dzik": "🐗",
+            "discadia": "🌟",
+            "discordservers": "📊",
+            "dsme": "📈",
         }
-        return emojis.get(service, "")
+        
+        return emojis.get(service, fallbacks.get(service, ""))
 
     @staticmethod
     def get_service_details(service: str) -> dict:

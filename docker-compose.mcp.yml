@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: zgdk-mcp-1
+    ports:
+      - "3000:3000"  # MCP stdio port
+    environment:
+      - PYTHONPATH=/app
+      - API_BASE_URL=http://app:8089
+    volumes:
+      - ./mcp_bot_server.py:/app/mcp_bot_server.py
+      - ./core:/app/core
+      - ./config.json:/app/config.json
+    networks:
+      - zgdk_default
+    depends_on:
+      - app
+    stdin_open: true
+    tty: true
+    command: python mcp_bot_server.py
+
+networks:
+  zgdk_default:
+    external: true

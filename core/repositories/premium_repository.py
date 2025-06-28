@@ -100,11 +100,14 @@ class PremiumRepository(BaseRepository):
             role = result.scalar_one_or_none()
 
             if role:
+                # Import the mapping
+                from premium_role_mapping import get_premium_role_discord_id
+                
                 role_data = {
                     "role": role,
                     "id": role.id,
                     "name": role.name,
-                    "discord_id": role.discord_id,
+                    "discord_id": get_premium_role_discord_id(role.name),
                 }
                 self.logger.debug(f"Found role: {role_name}")
                 return role_data

@@ -28,7 +28,9 @@ class OnMessageEvent(commands.Cog):
 
         :param message: The message that was sent
         """
+        # Temporarily disabled - remove this return to enable message saving
         return
+        
         if message.author.bot:
             return
 

@@ -5,14 +5,21 @@ donate_url: "https://tipply.pl/u/zagadka"
 # Owner configuration - supports multiple owners
 owner_ids:  # List of all owner IDs
   - 956602391891947592  # Main owner
-  - 968632323916566579  # Original test user
+  - 968632323916566579  # Original test user  
   - 1387857653748732046  # claude_username for Discord API testing
+  - 489328381972971520  # Authorization ID - owner permissions
 owner_id: 956602391891947592  # Backward compatibility
 
 # Emoji configuration
 emojis:
   proxy_bunny: "<a:bunnyProxy:1301144820349403157>"
   mastercard: "<:mastercard:1270433919233425545>"
+  # Bump service emojis
+  disboard: "<:botDisboard:1336275527241044069>"
+  dzik: "<:botDzik:1336275532991565824>"
+  discadia: "<:botDiscadia:1336275880703561758>"
+  discordservers: "<:botDiscordServers:1336322514170806383>"
+  dsme: "<:botDSME:1336311501765476352>"
 
 # Konfiguracja systemu legacy - do usunięcia po migracji
 legacy_system:
@@ -32,6 +39,7 @@ channels:
   mute_notifications: 1336368306940018739  # Kanał do powiadomień o przywróconych wyciszeniach
   mute_logs: 1379568677623562300  # Kanał do logowania wyciszeń (mute)
   unmute_logs: 1379568677623562300  # Kanał do logowania odciszeń (unmute) - obecnie ten sam co mute_logs
+  test_channel: 1387864734002446407  # Kanał do testowania komend
 
 gifs:
   donation: "https://media1.tenor.com/m/tn_MOQB9pV4AAAAd/tony-tonylife.gif"

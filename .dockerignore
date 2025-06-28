@@ -10,5 +10,6 @@ pg_log/
 __pycache__/
 .pytest_cache/
 tests/
+!tests/mcp/utils/mcp_bot_server.py
 *.pyc
 .coverage

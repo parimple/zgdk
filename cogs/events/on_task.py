@@ -10,7 +10,7 @@ from typing import Optional
 import discord
 from discord.ext import commands, tasks
 
-from cogs.commands.info import remove_premium_role_mod_permissions
+from cogs.commands.info.admin_info import remove_premium_role_mod_permissions
 from datasources.queries import (
     ModerationLogQueries,
     NotificationLogQueries,
@@ -20,9 +20,12 @@ from core.interfaces.member_interfaces import (
     IMemberService,
     IModerationService,
 )
-from utils.currency import CURRENCY_UNIT, g_to_pln
+from core.services.currency_service import CurrencyService
 from utils.role_manager import RoleManager
 
+
+# Currency constant
+CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +36,7 @@ class OnTaskEvent(commands.Cog):
         self.bot = bot
         self.role_manager = RoleManager(bot)
         self.check_roles_expiry.start()  # pylint: disable=no-member
+        self.check_bump_cooldowns.start()  # pylint: disable=no-member
         self.notification_channel_id = 1336368306940018739
         # Set default channel notifications to True
         self.bot.force_channel_notifications = True
@@ -180,7 +184,7 @@ class OnTaskEvent(commands.Cog):
                 )
                 if role_price_info and "price" in role_price_info:
                     price = role_price_info["price"]
-                    price_pln = g_to_pln(price)
+                    price_pln = CurrencyService().g_to_pln(price)
                     full_message += f"\nAby ją {renewal_action_verb}, potrzebujesz {price}{CURRENCY_UNIT} ({price_pln} PLN)."
                     full_message += f"\nZasil swoje konto{renewal_payment_action_prefix}: {self.bot.config['donate_url']}"
                     full_message += "\nWpisując **TYLKO** swoje id w polu - Twój nick."

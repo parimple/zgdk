@@ -27,6 +27,7 @@ class GenderManager:
         """
         self.bot = bot
         self.config = bot.config
+        self.message_sender = MessageSender(bot)
 
     async def assign_gender_role(
         self, ctx: commands.Context, user: discord.Member, gender_type_name: str
@@ -169,7 +170,7 @@ class GenderManager:
                     await session.commit()
 
             # Add premium info to message
-            _, premium_text = MessageSender._get_premium_text(ctx)
+            _, premium_text = self.message_sender._get_premium_text(ctx)
             if premium_text:
                 message = f"{message}\n{premium_text}"
 

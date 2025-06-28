@@ -40,6 +40,7 @@ from core.interfaces.team_interfaces import ITeamManagementService
 from core.repositories.activity_repository import ActivityRepository
 from core.repositories.invite_repository import InviteRepository
 from core.repositories.member_repository import MemberRepository
+from core.repositories.moderation_repository import ModerationRepository
 from core.repositories.premium_repository import PaymentRepository, PremiumRepository
 from core.repositories.role_repository import RoleRepository
 from core.services.embed_builder_service import EmbedBuilderService
@@ -305,7 +306,6 @@ class Zagadka(commands.Bot):
 
             return MemberService(
                 member_repository=member_repository,
-                activity_repository=activity_repository,
                 invite_repository=invite_repository,
                 unit_of_work=unit_of_work,
             )
@@ -316,7 +316,7 @@ class Zagadka(commands.Bot):
             member_repository = MemberRepository(session)
             unit_of_work = self.service_container.create_unit_of_work(session)
 
-            return ActivityService(
+            return ActivityTrackingService(
                 activity_repository=activity_repository,
                 member_repository=member_repository,
                 unit_of_work=unit_of_work,
@@ -349,8 +349,13 @@ class Zagadka(commands.Bot):
         elif service_type == IActivityTrackingService:
             # Create unit of work
             unit_of_work = self.service_container.create_unit_of_work(session)
+            # Create repositories
+            activity_repository = ActivityRepository(session)
+            member_repository = MemberRepository(session)
             # Create activity tracking service
             activity_service = ActivityTrackingService(
+                activity_repository=activity_repository,
+                member_repository=member_repository,
                 guild=self.guild if hasattr(self, 'guild') else None,
                 unit_of_work=unit_of_work
             )
@@ -378,23 +383,49 @@ class Zagadka(commands.Bot):
         logging.info("Loading cogs...")
         for folder in ("cogs/commands", "cogs/events"):
             path = os.path.join(os.getcwd(), folder)
-            for cog in os.listdir(path):
-                if cog.endswith(".py") and cog != "__init__.py":
+            for item in os.listdir(path):
+                item_path = os.path.join(path, item)
+                
+                # Skip the old info.py file if the info module exists
+                if item == "info.py" and os.path.isdir(os.path.join(path, "info")):
+                    logging.info("Skipping info.py in favor of info module")
+                    continue
+                
+                # Load .py files
+                if item.endswith(".py") and item != "__init__.py":
                     try:
                         await self.load_extension(
-                            f"{folder.replace('/', '.')}.{cog[:-3]}"
+                            f"{folder.replace('/', '.')}.{item[:-3]}"
                         )
-                        logging.info("Loaded cog: %s", cog)
+                        logging.info("Loaded cog: %s", item)
                     except commands.ExtensionAlreadyLoaded:
-                        logging.warning("Cog %s is already loaded", cog)
+                        logging.warning("Cog %s is already loaded", item)
                     except commands.ExtensionNotFound:
-                        logging.error("Cog %s not found", cog)
+                        logging.error("Cog %s not found", item)
                     except commands.NoEntryPointError:
-                        logging.error("Cog %s has no setup function", cog)
+                        logging.error("Cog %s has no setup function", item)
                     except commands.ExtensionFailed as error:
-                        logging.error("Failed to load cog %s: %s", cog, error)
+                        logging.error("Failed to load cog %s: %s", item, error)
                     except Exception as error:
-                        logging.error("Unexpected error loading cog %s: %s", cog, error)
+                        logging.error("Unexpected error loading cog %s: %s", item, error)
+                
+                # Load modules (directories with __init__.py)
+                elif os.path.isdir(item_path) and os.path.exists(os.path.join(item_path, "__init__.py")):
+                    try:
+                        await self.load_extension(
+                            f"{folder.replace('/', '.')}.{item}"
+                        )
+                        logging.info("Loaded cog module: %s", item)
+                    except commands.ExtensionAlreadyLoaded:
+                        logging.warning("Cog module %s is already loaded", item)
+                    except commands.ExtensionNotFound:
+                        logging.error("Cog module %s not found", item)
+                    except commands.NoEntryPointError:
+                        logging.error("Cog module %s has no setup function", item)
+                    except commands.ExtensionFailed as error:
+                        logging.error("Failed to load cog module %s: %s", item, error)
+                    except Exception as error:
+                        logging.error("Unexpected error loading cog module %s: %s", item, error)
 
     async def setup_hook(self) -> None:
         """Setup hook."""

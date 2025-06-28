@@ -601,7 +601,7 @@ class VoicePermissionManager:
             )
         else:
             await self.message_sender.send_permission_update(
-                ctx, target, permission_flag, new_value
+                ctx, target, permission_flag, new_value, current_channel
             )
 
         if (

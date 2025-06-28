@@ -13,7 +13,9 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from datasources.queries import MemberQueries, ModerationLogQueries, RoleQueries
+from core.repositories.member_repository import MemberRepository
+from core.repositories.moderation_repository import ModerationRepository
+from core.repositories.role_repository import RoleRepository
 from utils.message_sender import MessageSender
 from utils.moderation.mute_type import MuteType
 
@@ -150,7 +152,8 @@ class MuteManager:
                 # Remove role from database
                 async with self.bot.get_db() as session:
                     # Usuwamy rolę z bazy danych
-                    await RoleQueries.delete_member_role(session, user.id, mute_role_id)
+                    role_repo = RoleRepository(session)
+                    await role_repo.delete_member_role(user.id, mute_role_id)
                     await session.commit()
                 logger.info(
                     f"Successfully removed role {mute_role_id} from DB for user {user.id} during unmute {mute_type.type_name}"
@@ -261,8 +264,9 @@ class MuteManager:
                 # Zoptymalizowana obsługa bazy danych - jedna transakcja
                 async with self.bot.get_db() as session:
                     # Sprawdź istniejącą rolę i zapisz nową w jednej transakcji
-                    existing_role = await RoleQueries.get_member_role(
-                        session, user.id, mute_role_id
+                    role_repo = RoleRepository(session)
+                    existing_role = await role_repo.get_member_role(
+                        user.id, mute_role_id
                     )
                     override_info = ""
 
@@ -287,9 +291,10 @@ class MuteManager:
                             override_info = f"\nNadpisano istniejącą blokadę, która wygasłaby {discord_timestamp}."
 
                     # Dodaj użytkownika i rolę w jednej operacji
-                    await MemberQueries.get_or_add_member(session, user.id)
-                    await RoleQueries.add_or_update_role_to_member(
-                        session, user.id, mute_role_id, duration=duration
+                    member_repo = MemberRepository(session)
+                    await member_repo.get_or_create(user.id)
+                    await role_repo.add_or_update_role_to_member(
+                        user.id, mute_role_id, duration=duration
                     )
                     await session.commit()
 
@@ -347,7 +352,7 @@ class MuteManager:
                     )
 
             # Add premium info to message
-            _, premium_text = MessageSender._get_premium_text(ctx)
+            _, premium_text = self.message_sender._get_premium_text(ctx)
             if premium_text:
                 message = f"{message}\n{premium_text}"
 
@@ -587,8 +592,9 @@ class MuteManager:
             try:
                 async with self.bot.get_db() as session:
                     # Upewnij się, że użytkownicy istnieją w bazie
-                    await MemberQueries.get_or_add_member(session, user.id)
-                    await MemberQueries.get_or_add_member(session, ctx.author.id)
+                    member_repo = MemberRepository(session)
+                    await member_repo.get_or_create(user.id)
+                    await member_repo.get_or_create(ctx.author.id)
 
                     # Oblicz czas trwania w sekundach
                     duration_seconds = None
@@ -596,8 +602,8 @@ class MuteManager:
                         duration_seconds = int(duration.total_seconds())
 
                     # Zapisz log akcji
-                    await ModerationLogQueries.log_mute_action(
-                        session=session,
+                    moderation_repo = ModerationRepository(session)
+                    await moderation_repo.log_action(
                         target_user_id=user.id,
                         moderator_id=ctx.author.id,
                         action_type="unmute" if unmute else "mute",

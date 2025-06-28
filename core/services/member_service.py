@@ -28,13 +28,12 @@ class MemberService(BaseService, IMemberService):
     def __init__(
         self,
         member_repository: IMemberRepository,
-        activity_repository: IActivityRepository,
         invite_repository: IInviteRepository,
+        unit_of_work,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        super().__init__(unit_of_work=unit_of_work)
         self.member_repository = member_repository
-        self.activity_repository = activity_repository
         self.invite_repository = invite_repository
 
     async def validate_operation(self, *args, **kwargs) -> bool:
@@ -697,6 +696,11 @@ class ModerationService(BaseService, IModerationService):
     ) -> ModerationLog:
         """Mute member with specified type and duration."""
         try:
+            # Ensure target member exists in database
+            await self.member_repository.get_or_create(target.id)
+            # Ensure moderator exists in database
+            await self.member_repository.get_or_create(moderator.id)
+            
             expires_at = None
             if duration_seconds:
                 expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
@@ -712,7 +716,6 @@ class ModerationService(BaseService, IModerationService):
                 mute_type=mute_type,
                 duration_seconds=duration_seconds,
                 reason=reason,
-                expires_at=expires_at,
             )
 
             self._log_operation(
@@ -739,6 +742,11 @@ class ModerationService(BaseService, IModerationService):
     ) -> ModerationLog:
         """Unmute member for specific mute type."""
         try:
+            # Ensure target member exists in database
+            await self.member_repository.get_or_create(target.id)
+            # Ensure moderator exists in database
+            await self.member_repository.get_or_create(moderator.id)
+            
             if channel_id is None:
                 channel_id = 0  # Default fallback
 
@@ -1025,10 +1033,14 @@ class InviteService(BaseService, IInviteService):
     ) -> Optional[Invite]:
         """Create tracked invite in database."""
         try:
-            # Use add_or_update_invite to handle existing invites
+            # Import InviteQueries to avoid circular imports
             from datasources.queries import InviteQueries
+            
+            # Need to get session from somewhere - use member repository's session
+            session = self.member_repository.session
+            
             db_invite = await InviteQueries.add_or_update_invite(
-                session=self.session,
+                session=session,
                 invite_id=invite.code,
                 creator_id=creator.id,
                 uses=invite.uses,

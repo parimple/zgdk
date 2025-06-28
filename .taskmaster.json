@@ -1,0 +1,20 @@
+{
+  "projectName": "zaGadka Discord Bot",
+  "description": "Bot Discord dla polskiej społeczności gamingowej z moderacją, systemem premium i śledzeniem aktywności",
+  "goals": [
+    "Dokończyć refaktoryzację architektury serwisowej",
+    "Naprawić wszystkie błędy w komendach",
+    "Poprawić organizację kodu i łatwość utrzymania",
+    "Naprawić system powiadomień o bumpach",
+    "Dokładnie przetestować wszystkie komendy"
+  ],
+  "currentPhase": "Refaktoryzacja i testowanie",
+  "techStack": [
+    "Python 3.10",
+    "Discord.py",
+    "SQLAlchemy",
+    "PostgreSQL",
+    "Docker",
+    "AsyncIO"
+  ]
+}

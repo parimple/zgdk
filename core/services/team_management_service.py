@@ -1,7 +1,7 @@
 """Team management service for handling team operations."""
 
 import logging
-from typing import Optional
+from typing import Optional, List
 
 import discord
 from sqlalchemy import select, text
@@ -406,3 +406,60 @@ class TeamManagementService(BaseService, ITeamManagementService):
                 team_id=team_id,
             )
             return None
+
+    @staticmethod
+    def count_member_teams(guild: discord.Guild, member: discord.Member, team_symbol: str = "☫") -> int:
+        """
+        Count how many teams a member belongs to.
+        
+        Args:
+            guild: Discord guild
+            member: Discord member
+            team_symbol: Team role prefix symbol
+            
+        Returns:
+            Number of teams the member belongs to
+        """
+        count = 0
+        for role in member.roles:
+            if role.name.startswith(team_symbol):
+                count += 1
+        return count
+
+    @staticmethod
+    def get_owned_teams(guild: discord.Guild, member: discord.Member, team_symbol: str = "☫") -> List[str]:
+        """
+        Get list of teams owned by the member.
+        
+        Args:
+            guild: Discord guild
+            member: Discord member
+            team_symbol: Team role prefix symbol
+            
+        Returns:
+            List of team names owned by the member
+        """
+        owned_teams = []
+        for role in guild.roles:
+            if role.name.startswith(team_symbol):
+                # Check if user is owner by checking channel topic
+                for channel in guild.channels:
+                    if hasattr(channel, "topic") and channel.topic:
+                        topic_parts = channel.topic.split()
+                        # Check if topic has format owner_id role_id
+                        if (
+                            len(topic_parts) >= 2
+                            and topic_parts[0] == str(member.id)
+                            and topic_parts[1] == str(role.id)
+                        ):
+                            owned_teams.append(role.name)
+                            break
+                        # For compatibility with old format
+                        elif (
+                            "Team Channel" in channel.topic
+                            and str(member.id) in channel.topic
+                            and str(role.id) in channel.topic
+                        ):
+                            owned_teams.append(role.name)
+                            break
+        return owned_teams

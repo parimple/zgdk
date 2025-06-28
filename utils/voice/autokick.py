@@ -6,7 +6,7 @@ import discord
 from sqlalchemy import select
 
 from datasources.models import AutoKick
-from datasources.queries import AutoKickQueries
+from core.repositories import AutoKickRepository
 from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,8 @@ class AutoKickManager:
 
             # Update database
             async with self.bot.get_db() as session:
-                await AutoKickQueries.add_autokick(session, ctx.author.id, target.id)
+                autokick_repo = AutoKickRepository(session)
+                await autokick_repo.add_autokick(ctx.author.id, target.id)
                 self.logger.info(
                     f"Added autokick: owner={ctx.author.id}, target={target.id}"
                 )
@@ -139,7 +140,8 @@ class AutoKickManager:
 
             # Update database
             async with self.bot.get_db() as session:
-                await AutoKickQueries.remove_autokick(session, ctx.author.id, target.id)
+                autokick_repo = AutoKickRepository(session)
+                await autokick_repo.remove_autokick(ctx.author.id, target.id)
                 self.logger.info(
                     f"Removed autokick: owner={ctx.author.id}, target={target.id}"
                 )

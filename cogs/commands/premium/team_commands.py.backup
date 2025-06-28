@@ -1,0 +1,694 @@
+"""Team (clan) commands for premium users."""
+
+import logging
+from typing import Optional, Dict, List, Any
+from datetime import datetime, timezone
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+from sqlalchemy import select
+
+from datasources.models import Role as DBRole
+from datasources.queries import InviteQueries, ChannelPermissionQueries
+from core.interfaces.premium_interfaces import IPremiumService
+from core.interfaces.role_interfaces import IRoleService
+from utils.message_sender import MessageSender
+from utils.permissions import is_admin, is_zagadka_owner
+from utils.team_manager import TeamManager
+from .utils import emoji_validator, emoji_to_icon
+from .color_commands import ColorCommands
+
+logger = logging.getLogger(__name__)
+
+
+class TeamCommands(commands.Cog):
+    """Team-related commands for premium users."""
+    
+    def __init__(self, bot):
+        """Initialize team commands."""
+        self.bot = bot
+        self.message_sender = MessageSender(bot)
+        
+        # Team configuration
+        team_config = self.bot.config.get("team", {})
+        self.team_symbol = team_config.get("symbol", "☫")
+        self.team_base_role_id = team_config.get("base_role_id", 960665311730868240)
+        self.team_category_id = team_config.get("category_id", 1344105013357842522)
+        
+        # Get prefix from bot
+        self.prefix = self.bot.command_prefix[0] if self.bot.command_prefix else ","
+    
+    async def _get_user_team_role(self, member: discord.Member) -> Optional[discord.Role]:
+        """Get user's team role if they have one."""
+        for role in member.roles:
+            if role.name.startswith(f"{self.team_symbol} "):
+                return role
+        return None
+    
+    async def _get_team_info(self, team_role: discord.Role) -> Dict[str, Any]:
+        """Get information about a team."""
+        # Find team channel
+        team_channel = None
+        for channel in team_role.guild.text_channels:
+            if channel.topic and str(team_role.id) in channel.topic:
+                team_channel = channel
+                break
+        
+        # Get team owner from database
+        async with self.bot.get_db() as session:
+            result = await session.execute(
+                select(DBRole).where(
+                    (DBRole.discord_id == team_role.id) & (DBRole.role_type == "team")
+                )
+            )
+            db_role = result.scalar_one_or_none()
+            
+            owner_id = int(db_role.name) if db_role else None
+            owner = team_role.guild.get_member(owner_id) if owner_id else None
+        
+        # Get team members
+        members = [m for m in team_role.guild.members if team_role in m.roles]
+        
+        # Check team tier for max members
+        max_members = 5  # Default
+        if owner:
+            if any(r.name == "zG1000" for r in owner.roles):
+                max_members = 15
+            elif any(r.name == "zG500" for r in owner.roles):
+                max_members = 10
+        
+        return {
+            "owner": owner,
+            "members": members,
+            "channel": team_channel,
+            "max_members": max_members,
+            "role": team_role
+        }
+    
+    def _get_team_commands_description(self) -> str:
+        """Get formatted description of available team commands."""
+        return (
+            f"`{self.prefix}team create <nazwa>` - Tworzy nowy team\n"
+            f"`{self.prefix}team invite <@user>` - Zaprasza gracza do teamu\n"
+            f"`{self.prefix}team kick <@user>` - Wyrzuca gracza z teamu\n"
+            f"`{self.prefix}team leave` - Opuszcza team\n"
+            f"`{self.prefix}team transfer <@user>` - Przekazuje właścicielstwo teamu\n"
+            f"`{self.prefix}team delete` - Usuwa team (tylko właściciel)"
+        )
+    
+    async def _send_premium_embed(self, ctx, description: str, color: int = 0x00FF00, 
+                                  title: str = "Team Management") -> Optional[discord.Message]:
+        """Send an embed message with premium information if applicable."""
+        embed = discord.Embed(
+            title=f"{self.team_symbol} {title}",
+            description=description,
+            color=color
+        )
+        
+        # Add premium information if user doesn't have premium
+        premium_text = ""
+        async with self.bot.get_db() as session:
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            if premium_service and ctx.guild:
+                premium_service.set_guild(ctx.guild)
+                has_premium = await premium_service.has_premium_role(ctx.author)
+                
+                if not has_premium:
+                    premium_text = "\n\n💎 **Funkcja Premium**\nDostępna dla: <@&1027629813788106814>, <@&1027629916951326761>, <@&1027630008227659826>"
+        
+        if premium_text:
+            embed.description = description + premium_text
+        
+        return await ctx.send(embed=embed)
+    
+    @commands.group(invoke_without_command=True)
+    @is_zagadka_owner()
+    async def team(self, ctx):
+        """Team (clan) management."""
+        # Get the owner's team role
+        team_role = await self._get_user_team_role(ctx.author)
+        
+        # List available commands
+        available_commands = (
+            f"**Dostępne komendy:**\n{self._get_team_commands_description()}"
+        )
+        
+        if not team_role:
+            # Create description
+            description = (
+                f"Nie masz teamu. Możesz go utworzyć za pomocą komendy:\n"
+                f"`{self.prefix}team create <nazwa>`\n\n"
+                f"Minimalne wymagania: posiadanie rangi **zG100**.\n\n"
+                f"{available_commands}"
+            )
+            
+            await self._send_premium_embed(ctx, description=description, color=0xFF0000)
+            return
+        
+        # Get team information
+        team_info = await self._get_team_info(team_role)
+        
+        # Prepare description with team info
+        description = (
+            f"**Team**: {self.team_symbol} {team_role.name[2:]}\n\n"
+            f"**Właściciel**: {team_info['owner'].mention if team_info['owner'] else 'Nieznany'}\n"
+            f"**Liczba członków**: {len(team_info['members'])}/{team_info['max_members']}\n"
+            f"**Kanał**: {team_info['channel'].mention if team_info['channel'] else 'Brak'}\n\n"
+            f"**Członkowie**: {' '.join(m.mention for m in team_info['members'])}\n\n"
+            f"{available_commands}"
+        )
+        
+        await self._send_premium_embed(ctx, description=description)
+    
+    @team.command(name="create")
+    @app_commands.describe(
+        name="Nazwa teamu (klanu) - jeśli nie podano, użyta zostanie nazwa użytkownika",
+        color="Kolor teamu (opcjonalne, wymaga rangi zG500+)",
+        emoji="Emoji teamu (opcjonalne, wymaga rangi zG1000)",
+    )
+    async def team_create(
+        self,
+        ctx,
+        name: Optional[str] = None,
+        color: Optional[str] = None,
+        emoji: Optional[str] = None,
+    ):
+        """
+        Create a new team.
+        
+        :param ctx: Command context
+        :param name: Team name (optional, defaults to username)
+        :param color: Team color (optional)
+        :param emoji: Team emoji (optional)
+        """
+        # If no name provided, use username
+        if name is None:
+            name = ctx.author.display_name
+        
+        # Check if user already owns a team
+        async with self.bot.get_db() as session:
+            role_service = await self.bot.get_service(IRoleService, session)
+            premium_service = await self.bot.get_service(IPremiumService, session)
+            
+            # Set guild for premium service
+            premium_service.set_guild(ctx.guild)
+            
+            # Check if user has premium role required for team creation
+            has_premium = await premium_service.has_premium_role(ctx.author)
+            if not has_premium:
+                # Check if user has at least zG100 role
+                has_zg100 = any(role.name in ["zG100", "zG500", "zG1000"] for role in ctx.author.roles)
+                if not has_zg100:
+                    await self._send_premium_embed(
+                        ctx,
+                        description="Aby stworzyć team, potrzebujesz co najmniej rangi zG100.",
+                        color=0xFF0000,
+                    )
+                    return
+            
+            result = await session.execute(
+                select(DBRole).where(
+                    (DBRole.role_type == "team") & (DBRole.name == str(ctx.author.id))
+                )
+            )
+            existing_team = result.scalar_one_or_none()
+            
+            if existing_team:
+                await self._send_premium_embed(
+                    ctx,
+                    description="Posiadasz już team! Nie możesz stworzyć kolejnego.",
+                    color=0xFF0000,
+                )
+                return
+            
+            try:
+                # Create team role
+                team_role = await ctx.guild.create_role(name=name, mentionable=True)
+                
+                # Set role position
+                base_role = ctx.guild.get_role(self.team_base_role_id)
+                if base_role:
+                    await ctx.guild.edit_role_positions(
+                        {team_role: base_role.position + 1}
+                    )
+                else:
+                    # Fallback: set under highest role bot can manage
+                    assignable_roles = [
+                        r
+                        for r in ctx.guild.roles
+                        if r.position < ctx.guild.me.top_role.position
+                    ]
+                    if assignable_roles:
+                        highest_role = max(assignable_roles, key=lambda r: r.position)
+                        await ctx.guild.edit_role_positions(
+                            {team_role: highest_role.position - 1}
+                        )
+                
+                # Assign role to user
+                await ctx.author.add_roles(team_role)
+                
+                # Save team info to database
+                await role_service.create_role(
+                    discord_id=team_role.id,
+                    name=str(ctx.author.id),
+                    role_type="team"
+                )
+                await session.commit()
+                
+                await self.message_sender.send_success(
+                    ctx, f"Pomyślnie utworzono team {team_role.mention}!"
+                )
+                
+            except Exception as e:
+                logger.error(f"Error creating team: {str(e)}")
+                await self.message_sender.send_error(
+                    ctx, f"Wystąpił błąd podczas tworzenia teamu: {str(e)}"
+                )
+                return
+        
+        # Set color if provided and user has zG500+
+        if color:
+            has_color_permission = any(
+                role.name in ["zG500", "zG1000"] for role in ctx.author.roles
+            )
+            if not has_color_permission:
+                await self._send_premium_embed(
+                    ctx,
+                    description="Kolor teamu dostępny tylko dla rang zG500+. Kolor nie został ustawiony.",
+                    color=0xFF0000,
+                )
+            else:
+                try:
+                    # Use ColorCommands parse_color method if available
+                    if hasattr(self, 'parse_color'):
+                        discord_color = await self.parse_color(color)
+                    else:
+                        # Fallback to basic hex parsing
+                        if color.startswith("#"):
+                            color = color[1:]
+                        discord_color = discord.Color(int(color, 16))
+                    
+                    await team_role.edit(color=discord_color)
+                except Exception as e:
+                    await self._send_premium_embed(
+                        ctx, description=f"Błąd parsowania koloru: {str(e)}", color=0xFF0000
+                    )
+        
+        # Set emoji if provided and user has zG1000
+        if emoji:
+            has_emoji_permission = any(
+                role.name == "zG1000" for role in ctx.author.roles
+            )
+            if not has_emoji_permission:
+                await self._send_premium_embed(
+                    ctx,
+                    description="Emoji teamu dostępny tylko dla rang zG1000. Emoji nie zostało ustawione.",
+                    color=0xFF0000,
+                )
+            else:
+                # Check if it's a valid emoji
+                if not emoji_validator(emoji):
+                    await self._send_premium_embed(
+                        ctx,
+                        description=f"`{emoji}` nie jest poprawnym formatem emoji serwera. Aby użyć emoji z serwera, kliknij prawym przyciskiem myszy na emoji i wybierz 'Kopiuj odnośnik do emoji', a następnie wklej go w komendzie.",
+                        color=0xFF0000,
+                    )
+                else:
+                    await team_role.edit(display_icon=await emoji_to_icon(emoji))
+        
+        # Create team channel
+        category = ctx.guild.get_channel(self.team_category_id)
+        if not category:
+            logger.error(f"Team category not found with ID {self.team_category_id}")
+            category = None
+        
+        # Create channel permissions
+        overwrites = {
+            ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            team_role: discord.PermissionOverwrite(
+                read_messages=True,
+                send_messages=True,
+                embed_links=True,
+                attach_files=True,
+                read_message_history=True,
+            ),
+            ctx.author: discord.PermissionOverwrite(
+                read_messages=True,
+                send_messages=True,
+                manage_messages=True,
+                manage_channels=True,
+            ),
+        }
+        
+        # Create text channel
+        channel_name = name.lower().replace(" ", "-")
+        team_channel = await ctx.guild.create_text_channel(
+            name=channel_name,
+            category=category,
+            topic=f"{ctx.author.id} {team_role.id}",
+            overwrites=overwrites,
+            reason=f"Team channel created by {ctx.author.display_name}",
+        )
+        
+        # Add team prefix for better organization
+        channel_name = f"{self.team_symbol}-{channel_name}"
+        
+        logger.info(f"Updating team channel name from {team_channel.name} to {channel_name}")
+        await team_channel.edit(name=channel_name)
+        
+        # Send success message with team info
+        user_team_role = await self._get_user_team_role(ctx.author)
+        additional_info = ""
+        if user_team_role and user_team_role.id != team_role.id:
+            additional_info = f"\n\nJesteś obecnie również członkiem teamu {user_team_role.mention}."
+        
+        description = (
+            f"Utworzono team **{self.team_symbol} {name}**!\n\n"
+            f"• **Kanał**: {team_channel.mention}\n"
+            f"• **Rola**: {team_role.mention}\n"
+            f"• **Właściciel**: {ctx.author.mention}\n\n"
+            f"Możesz zarządzać członkami teamu za pomocą komendy `{self.prefix}team invite <@użytkownik>`."
+            f"{additional_info}"
+        )
+        
+        await self._send_premium_embed(ctx, description=description)
+        
+        # Send and pin team info message in team channel
+        team_info_embed = discord.Embed(
+            title=f"Team **{self.team_symbol} {name}**",
+            description="Witaj w twoim nowym teamie! Oto informacje o nim:",
+            color=team_role.color if team_role.color.value != 0 else discord.Color.blue(),
+        )
+        team_info_embed.add_field(name="Właściciel", value=ctx.author.mention, inline=True)
+        team_info_embed.add_field(name="Rola", value=team_role.mention, inline=True)
+        team_info_embed.add_field(
+            name="Data utworzenia",
+            value=discord.utils.format_dt(datetime.now(timezone.utc), style="f"),
+            inline=True,
+        )
+        team_info_embed.add_field(
+            name="Dostępne komendy",
+            value=self._get_team_commands_description(),
+            inline=False,
+        )
+        
+        # Add team limits based on premium role
+        max_members = 5  # Default
+        if any(r.name == "zG1000" for r in ctx.author.roles):
+            max_members = 15
+        elif any(r.name == "zG500" for r in ctx.author.roles):
+            max_members = 10
+        
+        team_info_embed.add_field(
+            name="Limity teamu",
+            value=f"• Maksymalna liczba członków: **{max_members}**",
+            inline=False,
+        )
+        
+        team_info_message = await team_channel.send(embed=team_info_embed)
+        await team_info_message.pin(reason="Informacje o teamie")
+    
+    async def _check_team_permissions(
+        self, ctx, check_owner: bool = False
+    ) -> tuple[bool, Optional[discord.Role], str]:
+        """Check if user has permission to manage team."""
+        team_role = await self._get_user_team_role(ctx.author)
+        
+        if not team_role:
+            return False, None, "Nie posiadasz teamu."
+        
+        if check_owner:
+            # Check if user is the team owner
+            async with self.bot.get_db() as session:
+                result = await session.execute(
+                    select(DBRole).where(
+                        (DBRole.discord_id == team_role.id) & (DBRole.role_type == "team")
+                    )
+                )
+                db_role = result.scalar_one_or_none()
+                
+                if not db_role or db_role.name != str(ctx.author.id):
+                    return False, team_role, "Nie jesteś właścicielem tego teamu."
+        
+        return True, team_role, ""
+    
+    @team.command(name="invite")
+    @app_commands.describe(member="Użytkownik do zaproszenia do teamu")
+    async def team_invite(self, ctx, member: discord.Member):
+        """Invite a member to your team."""
+        # Check permissions
+        has_perm, team_role, error_msg = await self._check_team_permissions(
+            ctx, check_owner=True
+        )
+        if not has_perm:
+            return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
+        
+        # Check if target is already in the team
+        if team_role in member.roles:
+            return await self._send_premium_embed(
+                ctx,
+                description=f"{member.mention} jest już członkiem twojego teamu!",
+                color=0xFF0000
+            )
+        
+        # Get team info to check member limit
+        team_info = await self._get_team_info(team_role)
+        if len(team_info['members']) >= team_info['max_members']:
+            return await self._send_premium_embed(
+                ctx,
+                description=f"Twój team osiągnął limit członków ({team_info['max_members']}). "
+                           f"Aby zwiększyć limit, ulepsz rangę premium.",
+                color=0xFF0000
+            )
+        
+        # Send invite (simplified - in full implementation would use invite system)
+        await member.add_roles(team_role)
+        await self._send_premium_embed(
+            ctx,
+            description=f"✅ {member.mention} został dodany do teamu {team_role.mention}!"
+        )
+        
+        # Notify in team channel if exists
+        if team_info['channel']:
+            await team_info['channel'].send(
+                f"🎉 {member.mention} dołączył do teamu! Witamy!"
+            )
+    
+    @team.command(name="kick")
+    @app_commands.describe(member="Użytkownik do wyrzucenia z teamu")
+    async def team_kick(self, ctx, member: discord.Member):
+        """Kick a member from your team."""
+        # Check permissions
+        has_perm, team_role, error_msg = await self._check_team_permissions(
+            ctx, check_owner=True
+        )
+        if not has_perm:
+            return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
+        
+        # Check if trying to kick self
+        if member.id == ctx.author.id:
+            return await self._send_premium_embed(
+                ctx,
+                description="Nie możesz wyrzucić siebie z teamu!",
+                color=0xFF0000
+            )
+        
+        # Check if member is in team
+        if team_role not in member.roles:
+            return await self._send_premium_embed(
+                ctx,
+                description=f"{member.mention} nie jest członkiem twojego teamu!",
+                color=0xFF0000
+            )
+        
+        # Remove role
+        await member.remove_roles(team_role)
+        await self._send_premium_embed(
+            ctx,
+            description=f"✅ {member.mention} został wyrzucony z teamu."
+        )
+        
+        # Notify in team channel
+        team_info = await self._get_team_info(team_role)
+        if team_info['channel']:
+            await team_info['channel'].send(
+                f"👋 {member.mention} został wyrzucony z teamu."
+            )
+    
+    @team.command(name="leave")
+    async def team_leave(self, ctx):
+        """Leave your current team."""
+        team_role = await self._get_user_team_role(ctx.author)
+        
+        if not team_role:
+            return await self._send_premium_embed(
+                ctx,
+                description="Nie jesteś członkiem żadnego teamu.",
+                color=0xFF0000
+            )
+        
+        # Check if user is the owner
+        async with self.bot.get_db() as session:
+            result = await session.execute(
+                select(DBRole).where(
+                    (DBRole.discord_id == team_role.id) & (DBRole.role_type == "team")
+                )
+            )
+            db_role = result.scalar_one_or_none()
+            
+            if db_role and db_role.name == str(ctx.author.id):
+                return await self._send_premium_embed(
+                    ctx,
+                    description="Jako właściciel nie możesz opuścić teamu. "
+                               "Użyj `/team transfer @user` aby przekazać własność lub "
+                               "`/team delete` aby usunąć team.",
+                    color=0xFF0000
+                )
+        
+        # Remove role
+        await ctx.author.remove_roles(team_role)
+        await self._send_premium_embed(
+            ctx,
+            description=f"✅ Opuściłeś team {team_role.mention}."
+        )
+        
+        # Notify in team channel
+        team_info = await self._get_team_info(team_role)
+        if team_info['channel']:
+            await team_info['channel'].send(
+                f"👋 {ctx.author.mention} opuścił team."
+            )
+    
+    @team.command(name="transfer")
+    @app_commands.describe(member="Użytkownik, któremu chcesz przekazać własność teamu")
+    async def team_transfer(self, ctx, member: discord.Member):
+        """Transfer team ownership to another member."""
+        # Check permissions
+        has_perm, team_role, error_msg = await self._check_team_permissions(
+            ctx, check_owner=True
+        )
+        if not has_perm:
+            return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
+        
+        # Check if member is in team
+        if team_role not in member.roles:
+            return await self._send_premium_embed(
+                ctx,
+                description=f"{member.mention} musi być członkiem teamu aby przejąć własność!",
+                color=0xFF0000
+            )
+        
+        # Check if member has required premium role
+        if not any(role.name in ["zG100", "zG500", "zG1000"] for role in member.roles):
+            return await self._send_premium_embed(
+                ctx,
+                description=f"{member.mention} potrzebuje rangi premium (zG100+) aby zostać właścicielem teamu.",
+                color=0xFF0000
+            )
+        
+        # Transfer ownership in database
+        async with self.bot.get_db() as session:
+            role_service = await self.bot.get_service(IRoleService, session)
+            
+            result = await session.execute(
+                select(DBRole).where(
+                    (DBRole.discord_id == team_role.id) & (DBRole.role_type == "team")
+                )
+            )
+            db_role = result.scalar_one_or_none()
+            
+            if db_role:
+                db_role.name = str(member.id)
+                await session.commit()
+            
+            # Update channel permissions
+            team_info = await self._get_team_info(team_role)
+            if team_info['channel']:
+                # Remove manage permissions from old owner
+                await team_info['channel'].set_permissions(
+                    ctx.author,
+                    overwrite=None
+                )
+                
+                # Add manage permissions to new owner
+                await team_info['channel'].set_permissions(
+                    member,
+                    read_messages=True,
+                    send_messages=True,
+                    manage_messages=True,
+                    manage_channels=True
+                )
+                
+                # Update channel topic
+                await team_info['channel'].edit(
+                    topic=f"{member.id} {team_role.id}"
+                )
+        
+        await self._send_premium_embed(
+            ctx,
+            description=f"✅ Własność teamu {team_role.mention} została przekazana do {member.mention}!"
+        )
+        
+        # Notify in team channel
+        if team_info['channel']:
+            await team_info['channel'].send(
+                f"👑 {member.mention} jest teraz właścicielem teamu!"
+            )
+    
+    @team.command(name="delete")
+    async def team_delete(self, ctx):
+        """Delete your team (owner only)."""
+        # Check permissions
+        has_perm, team_role, error_msg = await self._check_team_permissions(
+            ctx, check_owner=True
+        )
+        if not has_perm:
+            return await self._send_premium_embed(ctx, description=error_msg, color=0xFF0000)
+        
+        # Confirm deletion
+        confirm_embed = discord.Embed(
+            title="⚠️ Potwierdzenie usunięcia teamu",
+            description=f"Czy na pewno chcesz usunąć team **{team_role.name}**?\n\n"
+                       f"Ta akcja jest nieodwracalna i spowoduje:\n"
+                       f"• Usunięcie roli teamu\n"
+                       f"• Usunięcie kanału teamu\n"
+                       f"• Utratę wszystkich danych teamu\n\n"
+                       f"Wpisz `tak` aby potwierdzić.",
+            color=0xFF0000
+        )
+        await ctx.send(embed=confirm_embed)
+        
+        def check(m):
+            return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() == "tak"
+        
+        try:
+            await self.bot.wait_for("message", check=check, timeout=30.0)
+        except:
+            return await self._send_premium_embed(
+                ctx,
+                description="Usunięcie teamu zostało anulowane.",
+                color=0xFFFF00
+            )
+        
+        # Get team info before deletion
+        team_info = await self._get_team_info(team_role)
+        
+        # Delete from database
+        async with self.bot.get_db() as session:
+            role_service = await self.bot.get_service(IRoleService, session)
+            await role_service.delete_role(team_role.id)
+            await session.commit()
+        
+        # Delete channel
+        if team_info['channel']:
+            await team_info['channel'].delete(reason=f"Team deleted by {ctx.author}")
+        
+        # Delete role
+        await team_role.delete(reason=f"Team deleted by {ctx.author}")
+        
+        await self._send_premium_embed(
+            ctx,
+            description=f"✅ Team został pomyślnie usunięty.",
+            title="Team usunięty"
+        )

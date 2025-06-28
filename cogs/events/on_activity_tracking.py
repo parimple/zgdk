@@ -7,8 +7,8 @@ from typing import Dict, Set
 import discord
 from discord.ext import commands, tasks
 
-from core.interfaces.member_interfaces import IActivityService, IMemberService
-from utils.managers import ActivityManager
+from core.interfaces.member_interfaces import IMemberService
+from core.interfaces.activity_interfaces import IActivityTrackingService
 from utils.permissions import is_zagadka_owner
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,6 @@ class OnActivityTracking(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.activity_manager = ActivityManager()
 
         # Track voice members for point calculation
         self.voice_members: Dict[int, Set[int]] = {}  # channel_id -> set of member_ids
@@ -90,7 +89,7 @@ class OnActivityTracking(commands.Cog):
 
         try:
             async with self.bot.get_db() as session:
-                activity_service = await self.bot.get_service(IActivityService, session)
+                activity_service = await self.bot.get_service(IActivityTrackingService, session)
                 await activity_service.track_message_activity(
                     message.author.id, message.content, message.channel.id
                 )
@@ -152,7 +151,7 @@ class OnActivityTracking(commands.Cog):
                     is_with_others = len(active_members) > 1
 
                     # Use the new activity service
-                    activity_service = await self.bot.get_service(IActivityService, session)
+                    activity_service = await self.bot.get_service(IActivityTrackingService, session)
                     
                     for member_id in active_members:
                         await activity_service.track_voice_activity(
@@ -191,20 +190,20 @@ class OnActivityTracking(commands.Cog):
                     if self._has_points_off_role(member):
                         continue
 
+                    # Get activity service
+                    activity_service = await self.bot.get_service(IActivityTrackingService, session)
+                    if not activity_service:
+                        continue
+                        
                     # Check for promotion
-                    if await self.activity_manager.check_member_promotion_status(
-                        member
-                    ):
+                    if await activity_service.check_member_promotion_status(member):
                         current_promoters.add(member.id)
                         # Only award points every 3 minutes
                         if should_award_points:
-                            activity_service = await self.bot.get_service(IActivityService, session)
                             await activity_service.track_promotion_activity(member.id)
 
                     # Check for anti-promotion (promoting other servers)
-                    if await self.activity_manager.check_member_antipromo_status(
-                        member
-                    ):
+                    if await activity_service.check_member_antipromo_status(member):
                         # Log but don't reset points automatically (as per user request)
                         logger.debug(
                             f"Member {member.display_name} ({member.id}) is promoting other servers"
@@ -230,7 +229,7 @@ class OnActivityTracking(commands.Cog):
         """Wait for bot to be ready before starting voice tracker."""
         await self.bot.wait_until_ready()
         if self.bot.guild:
-            self.activity_manager.set_guild(self.bot.guild)
+            # Activity service will use guild from bot when needed
             logger.info("Activity Manager: Guild set for voice tracker")
         else:
             logger.warning("Activity Manager: No guild set for voice tracker")
@@ -240,7 +239,7 @@ class OnActivityTracking(commands.Cog):
         """Wait for bot to be ready before starting promotion checker."""
         await self.bot.wait_until_ready()
         if self.bot.guild:
-            self.activity_manager.set_guild(self.bot.guild)
+            # Activity service will use guild from bot when needed
             logger.info("Activity Manager: Guild set for promotion checker")
         else:
             logger.warning("Activity Manager: No guild set for promotion checker")
@@ -290,9 +289,9 @@ class OnActivityTracking(commands.Cog):
         """Add bonus points to a member."""
         try:
             async with self.bot.get_db() as session:
-                await self.activity_manager.add_bonus_activity(
-                    session, member.id, points
-                )
+                activity_service = await self.bot.get_service(IActivityTrackingService, session)
+                if activity_service:
+                    await activity_service.add_bonus_activity(member.id, points)
 
             embed = discord.Embed(
                 title="✅ Bonus Points Added",

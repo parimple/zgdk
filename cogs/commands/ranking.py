@@ -8,6 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from core.interfaces import IActivityTrackingService, IPermissionService
+from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
 
@@ -17,28 +18,13 @@ class RankingCommands(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._activity_service: IActivityTrackingService = None
-        self._permission_service: IPermissionService = None
-
-    @property
-    def activity_service(self) -> IActivityTrackingService:
-        """Get activity tracking service."""
-        if self._activity_service is None and hasattr(self.bot, 'service_manager'):
-            self._activity_service = self.bot.service_manager.get_service(IActivityTrackingService)
-        return self._activity_service
-
-    @property
-    def permission_service(self) -> IPermissionService:
-        """Get permission service."""
-        if self._permission_service is None and hasattr(self.bot, 'service_manager'):
-            self._permission_service = self.bot.service_manager.get_service(IPermissionService)
-        return self._permission_service
+        self.message_sender = MessageSender(bot)
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Set guild when bot is ready."""
-        if self.bot.guild and self.activity_service:
-            self.activity_service.set_guild(self.bot.guild)
+        # Activity service will be fetched when needed with session
+        pass
 
     @commands.hybrid_command(
         name="ranking", description="Pokaż ranking aktywności serwera"
@@ -61,28 +47,35 @@ class RankingCommands(commands.Cog):
             return
 
         try:
-            if not self.activity_service:
-                await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
-                return
-
+            logger.info(f"Getting leaderboard for {days} days, limit {limit}")
+            
             async with self.bot.get_db() as session:
-                leaderboard = await self.activity_service.get_leaderboard(
+                # Get activity service with session
+                activity_service = await self.bot.get_service(IActivityTrackingService, session)
+                
+                if not activity_service:
+                    logger.error("Activity service is None")
+                    await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
+                    return
+                
+                leaderboard = await activity_service.get_leaderboard(
                     session, limit, days
                 )
+                logger.info(f"Leaderboard result: {len(leaderboard) if leaderboard else 0} entries")
 
             if not leaderboard:
-                embed = discord.Embed(
+                embed = self.message_sender._create_embed(
                     title="🏆 Ranking Aktywności",
                     description="Brak danych aktywności w tym okresie.",
-                    color=discord.Color.red(),
+                    color="error",
+                    ctx=ctx
                 )
-                await ctx.send(embed=embed)
+                await self.message_sender._send_embed(ctx, embed)
                 return
 
-            embed = self.activity_service.format_leaderboard_embed(
-                leaderboard, ctx.guild, days, ctx.author.color
-            )
-            await ctx.send(embed=embed)
+            # Format leaderboard into embed using MessageSender
+            embed = self._format_leaderboard_embed(leaderboard, ctx, days)
+            await self.message_sender._send_embed(ctx, embed)
 
         except Exception as e:
             logger.error(f"Error in ranking command: {e}")
@@ -111,19 +104,50 @@ class RankingCommands(commands.Cog):
             return
 
         try:
-            if not self.activity_service:
-                await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
-                return
-
             async with self.bot.get_db() as session:
-                stats = await self.activity_service.get_member_stats(
+                # Get activity service with session
+                activity_service = await self.bot.get_service(IActivityTrackingService, session)
+                
+                if not activity_service:
+                    logger.error("Activity service is None")
+                    await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
+                    return
+                    
+                stats = await activity_service.get_member_stats(
                     session, target_member.id, days
                 )
 
-            embed = self.activity_service.format_member_stats_embed(
-                stats, target_member
+            # Format stats like ,vc command - description only
+            if stats["position"] > 0:
+                base_text = f"**Profil:** {target_member.display_name}\n"
+                base_text += f"**🏆 Pozycja:** #{stats['position']} • **🏅 Ranga:** {stats['tier']} • **⭐ Punkty:** {stats['total_points']} pkt"
+                
+                # Add activity breakdown if available
+                activity_lines = []
+                if stats.get("text_points", 0) > 0:
+                    activity_lines.append(f"💬 Wiadomości: {stats['text_points']} pkt")
+                if stats.get("voice_points", 0) > 0:
+                    activity_lines.append(f"🎤 Głosowe: {stats['voice_points']} pkt")
+                if stats.get("promotion_points", 0) > 0:
+                    activity_lines.append(f"📢 Promocja: {stats['promotion_points']} pkt")
+                
+                if activity_lines:
+                    base_text += "\n**📊 Aktywność:** " + " • ".join(activity_lines)
+            else:
+                base_text = f"**Profil:** {target_member.display_name}\nBrak punktów w rankingu w tym okresie."
+            
+            # Create embed with only description
+            embed = self.message_sender._create_embed(
+                description=base_text,
+                ctx=ctx
             )
-            await ctx.send(embed=embed)
+            
+            # Add premium text
+            _, premium_text = self.message_sender._get_premium_text(ctx)
+            if premium_text:
+                embed.description = f"{embed.description}\n{premium_text}"
+            
+            await self.message_sender._send_embed(ctx, embed)
 
         except Exception as e:
             logger.error(f"Error in stats command: {e}")
@@ -145,12 +169,16 @@ class RankingCommands(commands.Cog):
             return
 
         try:
-            if not self.activity_service:
-                await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
-                return
-
             async with self.bot.get_db() as session:
-                stats = await self.activity_service.get_member_stats(
+                # Get activity service with session
+                activity_service = await self.bot.get_service(IActivityTrackingService, session)
+                
+                if not activity_service:
+                    logger.error("Activity service is None")
+                    await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
+                    return
+                    
+                stats = await activity_service.get_member_stats(
                     session, ctx.author.id, days
                 )
 
@@ -161,31 +189,24 @@ class RankingCommands(commands.Cog):
                 else discord.Color.blue()
             )
 
-            embed = discord.Embed(
-                title=f"📊 Twoja pozycja w rankingu zaGadki", color=color
-            )
-
+            # Format my rank like ,vc command - description only
             if stats["position"] > 0:
-                embed.add_field(
-                    name="🏆 Pozycja", value=f"**#{stats['position']}**", inline=True
-                )
-                embed.add_field(
-                    name="🏅 Ranga", value=f"**{stats['tier']}**", inline=True
-                )
-                embed.add_field(
-                    name="⭐ Punkty",
-                    value=f"**{stats['total_points']}** pkt",
-                    inline=True,
-                )
+                base_text = f"**🏆 Pozycja:** #{stats['position']} • **🏅 Ranga:** {stats['tier']}\n**⭐ Punkty:** {stats['total_points']} pkt"
             else:
-                embed.description = "Nie masz jeszcze punktów w rankingu w tym okresie."
-
-            embed.set_thumbnail(url=ctx.author.display_avatar.url)
-            embed.set_footer(
-                text=f"💡 Dane z ostatnich {days} dni | ID: {ctx.author.id}",
-                icon_url=ctx.guild.icon.url if ctx.guild.icon else None,
+                base_text = "Nie masz jeszcze punktów w rankingu w tym okresie."
+            
+            # Create embed with only description, no title
+            embed = self.message_sender._create_embed(
+                description=base_text,
+                ctx=ctx
             )
-            await ctx.send(embed=embed)
+            
+            # Add premium text
+            _, premium_text = self.message_sender._get_premium_text(ctx)
+            if premium_text:
+                embed.description = f"{embed.description}\n{premium_text}"
+            
+            await self.message_sender._send_embed(ctx, embed)
 
         except Exception as e:
             logger.error(f"Error in my_rank command: {e}")
@@ -221,22 +242,27 @@ class RankingCommands(commands.Cog):
         limit = limits.get(category, 100)
 
         try:
-            if not self.activity_service:
-                await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
-                return
-
             async with self.bot.get_db() as session:
-                leaderboard = await self.activity_service.get_leaderboard(
+                # Get activity service with session
+                activity_service = await self.bot.get_service(IActivityTrackingService, session)
+                
+                if not activity_service:
+                    logger.error("Activity service is None")
+                    await ctx.send("❌ Usługa aktywności nie jest dostępna.", ephemeral=True)
+                    return
+                    
+                leaderboard = await activity_service.get_leaderboard(
                     session, limit, days
                 )
 
             if not leaderboard:
-                embed = discord.Embed(
+                embed = self.message_sender._create_embed(
                     title=f"🏆 TOP {category}",
                     description="Brak danych aktywności w tym okresie.",
-                    color=discord.Color.red(),
+                    color="error",
+                    ctx=ctx
                 )
-                await ctx.send(embed=embed)
+                await self.message_sender._send_embed(ctx, embed)
                 return
 
             # Group by tiers
@@ -244,19 +270,9 @@ class RankingCommands(commands.Cog):
             tier_200 = [x for x in leaderboard if 101 <= x[2] <= 200]
             tier_300 = [x for x in leaderboard if 201 <= x[2] <= 300]
 
-            # Use author's color if available, otherwise blue
-            color = (
-                ctx.author.color
-                if ctx.author.color.value != 0
-                else discord.Color.blue()
-            )
-
-            embed = discord.Embed(
-                title=f"🏆 TOP {category} zaGadki",
-                description=f"📌 **Najlepsi użytkownicy z ostatnich {days} dni**",
-                color=color,
-            )
-
+            # Build fields for embed
+            fields = []
+            
             if category == "100" or category == "all":
                 if tier_100:
                     top_10 = tier_100[:10]
@@ -266,7 +282,7 @@ class RankingCommands(commands.Cog):
                             for mid, pts, pos in top_10
                         ]
                     )
-                    embed.add_field(name="🥇 TOP 100", value=text, inline=False)
+                    fields.append(("🥇 TOP 100", text, False))
 
             if category == "200" or category == "all":
                 if tier_200:
@@ -277,9 +293,7 @@ class RankingCommands(commands.Cog):
                             for mid, pts, pos in sample
                         ]
                     )
-                    embed.add_field(
-                        name="🥈 Ranga 200 (101-200)", value=text, inline=False
-                    )
+                    fields.append(("🥈 Ranga 200 (101-200)", text, False))
 
             if category == "300" or category == "all":
                 if tier_300:
@@ -290,25 +304,39 @@ class RankingCommands(commands.Cog):
                             for mid, pts, pos in sample
                         ]
                     )
-                    embed.add_field(
-                        name="🥉 Ranga 300 (201-300)", value=text, inline=False
-                    )
+                    fields.append(("🥉 Ranga 300 (201-300)", text, False))
 
             # Summary
-            embed.add_field(
-                name="📊 Podsumowanie",
-                value=f"🥇 Ranga 100: {len(tier_100)} osób\n"
+            fields.append((
+                "📊 Podsumowanie",
+                f"🥇 Ranga 100: {len(tier_100)} osób\n"
                 f"🥈 Ranga 200: {len(tier_200)} osób\n"
                 f"🥉 Ranga 300: {len(tier_300)} osób\n"
                 f"📊 Łącznie: {len(leaderboard)} osób",
-                inline=False,
-            )
+                False
+            ))
 
-            embed.set_footer(
-                text=f"💡 Aktualizacja: co godzinę | Dane z ostatnich {days} dni",
-                icon_url=ctx.guild.icon.url if ctx.guild.icon else None,
+            # Create embed with MessageSender
+            embed = self.message_sender._create_embed(
+                title=f"🏆 TOP {category} zaGadki",
+                description=f"📌 **Najlepsi użytkownicy z ostatnich {days} dni**",
+                fields=fields,
+                footer=f"💡 Aktualizacja: co godzinę | Dane z ostatnich {days} dni",
+                ctx=ctx
             )
-            await ctx.send(embed=embed)
+            
+            # Add premium text
+            _, premium_text = self.message_sender._get_premium_text(ctx)
+            if premium_text:
+                embed.description = f"{embed.description}\n{premium_text}"
+            
+            if ctx.guild.icon:
+                embed.set_footer(
+                    text=f"💡 Aktualizacja: co godzinę | Dane z ostatnich {days} dni",
+                    icon_url=ctx.guild.icon.url
+                )
+                
+            await self.message_sender._send_embed(ctx, embed)
 
         except Exception as e:
             logger.error(f"Error in top command: {e}")
@@ -363,6 +391,103 @@ class RankingCommands(commands.Cog):
         except Exception as e:
             logger.error(f"Error cleaning up activity data: {e}")
             await ctx.send(f"❌ Error cleaning up data: {e}", ephemeral=True)
+
+
+    def _format_leaderboard_embed(self, leaderboard, ctx, days):
+        """Format leaderboard data into embed using MessageSender."""
+        # Build leaderboard text
+        leaderboard_text = []
+        for i, (member_id, points, position) in enumerate(leaderboard[:10]):
+            member = ctx.guild.get_member(member_id)
+            member_name = member.display_name if member else f"User {member_id}"
+            
+            # Add medal emojis for top 3
+            if position == 1:
+                leaderboard_text.append(f"🥇 {member_name} - **{points}** pkt")
+            elif position == 2:
+                leaderboard_text.append(f"🥈 {member_name} - **{points}** pkt")
+            elif position == 3:
+                leaderboard_text.append(f"🥉 {member_name} - **{points}** pkt")
+            else:
+                leaderboard_text.append(f"**{position}.** {member_name} - **{points}** pkt")
+        
+        # Calculate statistics
+        total_points = sum(points for _, points, _ in leaderboard)
+        avg_points = total_points // len(leaderboard) if leaderboard else 0
+        
+        # Create fields
+        fields = [
+            ("🎯 TOP 10", "\\n".join(leaderboard_text) if leaderboard_text else "Brak danych", False),
+            ("📊 Statystyki", 
+             f"Łącznie aktywnych: **{len(leaderboard)}** osób\\n"
+             f"Średnia punktów: **{avg_points}** pkt\\n"
+             f"Suma wszystkich punktów: **{total_points}** pkt", True),
+            ("🏅 System rang",
+             "🥇 **1-100**: Ranga 100\\n"
+             "🥈 **101-200**: Ranga 200\\n"
+             "🥉 **201-300**: Ranga 300", True)
+        ]
+        
+        # Create embed with MessageSender
+        embed = self.message_sender._create_embed(
+            title="🏆 Ranking Aktywności zaGadki",
+            description=f"📌 **Najaktywniejsi członkowie serwera z ostatnich {days} dni**",
+            fields=fields,
+            footer=f"💡 Aktualizacja: co godzinę | ID: {ctx.author.id}",
+            ctx=ctx
+        )
+        
+        # Add premium text
+        _, premium_text = self.message_sender._get_premium_text(ctx)
+        if premium_text:
+            embed.description = f"{embed.description}\n{premium_text}"
+        
+        # Add guild icon as thumbnail
+        if ctx.guild.icon:
+            embed.set_thumbnail(url=ctx.guild.icon.url)
+            
+        return embed
+
+    def _format_member_stats_embed(self, stats, member, ctx):
+        """Format member stats into embed using MessageSender."""
+        # Build activity breakdown
+        activity_breakdown = []
+        if stats.get("text_points", 0) > 0:
+            activity_breakdown.append(f"💬 Wiadomości tekstowe: **{stats['text_points']}** pkt")
+        if stats.get("voice_points", 0) > 0:
+            activity_breakdown.append(f"🎤 Aktywność głosowa: **{stats['voice_points']}** pkt")
+        if stats.get("promotion_points", 0) > 0:
+            activity_breakdown.append(f"📢 Promocja serwera: **{stats['promotion_points']}** pkt")
+        
+        # Create fields
+        fields = []
+        if stats["position"] > 0:
+            fields.extend([
+                ("🏆 Pozycja w rankingu", f"**#{stats['position']}**", True),
+                ("🏅 Ranga", f"**{stats['tier']}**", True),
+                ("⭐ Łączne punkty", f"**{stats['total_points']}** pkt", True)
+            ])
+        
+        if activity_breakdown:
+            fields.append(("📈 Podział punktów według aktywności", "\\n".join(activity_breakdown), False))
+        
+        # Create embed
+        embed = self.message_sender._create_embed(
+            title="📊 Statystyki aktywności zaGadki",
+            description=f"**Profil użytkownika:** {member.display_name}",
+            fields=fields,
+            ctx=ctx
+        )
+        
+        # Add premium text
+        _, premium_text = self.message_sender._get_premium_text(ctx)
+        if premium_text:
+            embed.description = f"{embed.description}\n{premium_text}"
+        
+        # Add member avatar as thumbnail
+        embed.set_thumbnail(url=member.display_avatar.url)
+        
+        return embed
 
 
 async def setup(bot: commands.Bot):

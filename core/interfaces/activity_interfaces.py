@@ -72,6 +72,13 @@ class IActivityTrackingService(ABC):
         pass
 
     @abstractmethod
+    async def track_message_activity(
+        self, member_id: int, content: str, channel_id: int
+    ) -> None:
+        """Track message activity for points."""
+        pass
+
+    @abstractmethod
     def format_leaderboard_embed(
         self,
         leaderboard: List[Tuple[int, int, int]],
@@ -118,4 +125,23 @@ class IActivityTrackingService(ABC):
     @abstractmethod
     def set_guild(self, guild: discord.Guild) -> None:
         """Set the guild for the activity tracking service."""
+        pass
+
+    @abstractmethod
+    async def track_voice_activity(
+        self, member_id: int, channel_id: int, is_with_others: bool = True
+    ) -> None:
+        """Track voice activity for a member in a specific channel."""
+        pass
+
+    @abstractmethod
+    async def track_promotion_activity(self, member_id: int) -> None:
+        """Track promotion activity for a member."""
+        pass
+
+    @abstractmethod
+    async def get_member_activity_summary(
+        self, member_id: int, days_back: int = 7
+    ) -> Dict[str, any]:
+        """Get a summary of member's activity for profile display."""
         pass

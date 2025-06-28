@@ -153,10 +153,13 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         """Handle the event when a member joins or leaves a voice channel."""
         # Check for autokicks when a member joins a voice channel
         if after.channel and before.channel != after.channel:
+            logger.info(f"Member {member.display_name} joined channel {after.channel.name} (ID: {after.channel.id})")
+            
             if member.id != self.bot.config["owner_id"]:
                 await self.handle_autokicks(member, after.channel)
 
             if after.channel and after.channel.id in self.channels_create:
+                logger.info(f"Channel {after.channel.id} is a create channel, handling creation...")
                 await self.handle_create_channel(member, after)
             elif (
                 after.channel
@@ -383,9 +386,14 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
             # Wyślij informację o zajęciu kanału
             fake_ctx = FakeContext(self.bot, member.guild)
-            await self.message_sender.send_channel_creation_info(
-                existing_channel, fake_ctx, owner=member
-            )
+            try:
+                logger.info(f"Sending channel creation info to existing channel {existing_channel.name}")
+                await self.message_sender.send_channel_creation_info(
+                    fake_ctx, existing_channel
+                )
+                logger.info(f"Successfully sent channel creation info to existing channel")
+            except Exception as e:
+                logger.error(f"Failed to send channel creation info to existing channel: {e}", exc_info=True)
             return
 
         # Utwórz nowy kanał
@@ -404,9 +412,14 @@ class OnVoiceStateUpdateEvent(commands.Cog):
 
         # Send channel creation info
         fake_ctx = FakeContext(self.bot, member.guild)
-        await self.message_sender.send_channel_creation_info(
-            new_channel, fake_ctx, owner=member
-        )
+        try:
+            logger.info(f"Sending channel creation info to {new_channel.name}")
+            await self.message_sender.send_channel_creation_info(
+                fake_ctx, new_channel
+            )
+            logger.info(f"Successfully sent channel creation info")
+        except Exception as e:
+            logger.error(f"Failed to send channel creation info: {e}", exc_info=True)
 
     def cog_unload(self):
         """Cleanup when cog is unloaded"""

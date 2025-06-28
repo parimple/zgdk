@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  app:
+    ports:
+      - "8089:8089"  # Owner Utils API port
+      - "8090:8090"  # Command Tester API port
+    environment:
+      - TEST_WEBHOOK_URL=https://discord.com/api/webhooks/1388092789958508605/DeDpEp0mnXu8P5d6mzQDae80-fbHMBkVBqRL8kXKOodmCp_Nz1s1sRXST4coI6S6Q4cK
+      
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: zgdk-mcp-1
+    environment:
+      - PYTHONPATH=/app
+      - API_BASE_URL=http://app:8090
+    volumes:
+      - ./tests/mcp/utils/mcp_bot_server.py:/app/mcp_bot_server.py
+    networks:
+      - default
+    depends_on:
+      - app
+    stdin_open: true
+    tty: true
+    command: python mcp_bot_server.py

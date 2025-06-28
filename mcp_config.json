@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "discord-bot": {
+      "command": "python",
+      "args": ["/home/ubuntu/Projects/zgdk/mcp_server.py"],
+      "env": {
+        "PYTHONPATH": "/home/ubuntu/Projects/zgdk"
+      }
+    }
+  }
+}

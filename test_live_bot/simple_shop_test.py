@@ -22,7 +22,7 @@ import discord
 TEST_GUILD_ID = 960665311701528596
 TEST_CHANNEL_ID = 1387864734002446407
 TEST_USER_ID = 1387857653748732046  # claude_username ID (test account)
-DELAY_BETWEEN_COMMANDS = 3
+DELAY_BETWEEN_COMMANDS = 6  # Increased delay for better rate limiting
 
 class SimpleShopTester:
     def __init__(self, token: str):
