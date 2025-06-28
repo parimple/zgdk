@@ -4,10 +4,10 @@
 
 Before the CI/CD pipeline can work, you need to add the following secrets to your GitHub repository:
 
-1. **DOCKER_PASSWORD** - Your Docker Hub access token (REQUIRED)
+1. **DOCKERHUB_TOKEN** - Your Docker Hub access token (REQUIRED)
    - Go to GitHub repo → Settings → Secrets and variables → Actions
    - Click "New repository secret"
-   - Name: `DOCKER_PASSWORD`
+   - Name: `DOCKERHUB_TOKEN`
    - Value: Your Docker Hub token (not your password)
 
 2. **CODECOV_TOKEN** - Token for code coverage reports (OPTIONAL)
