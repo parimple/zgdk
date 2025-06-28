@@ -4,7 +4,6 @@ import asyncio
 import logging
 import random
 import re
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Tuple
 
@@ -487,12 +486,12 @@ class ConsolidatedPremiumService(BaseService, IPremiumService, IPremiumChecker, 
         if highest_role_priority > current_role_priority and source == "payment":
             logger.info(
                 f"User {member.display_name} has higher role ({highest_role_name}) than {role_name}. "
-                f"Adding amount to wallet instead."
+                "Adding amount to wallet instead."
             )
             embed = discord.Embed(
                 title="Doładowanie konta",
                 description=f"Posiadasz już wyższą rolę ({highest_role_name}). "
-                f"Kwota została dodana do Twojego portfela.",
+                "Kwota została dodana do Twojego portfela.",
                 color=discord.Color.blue(),
             )
             return embed, None, True  # Add to wallet

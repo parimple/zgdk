@@ -24,7 +24,7 @@ class AutokickMessageSender(BaseMessageSender):
             message=(
                 f"✅ {user.mention} został dodany do listy autokick "
                 f"dla kanału {channel.mention}.\n"
-                f"Zostanie automatycznie wyrzucony przy próbie dołączenia."
+                "Zostanie automatycznie wyrzucony przy próbie dołączenia."
             ),
             title="🚫 Autokick dodany",
             ephemeral=ephemeral,
@@ -43,7 +43,7 @@ class AutokickMessageSender(BaseMessageSender):
             message=(
                 f"✅ {user.mention} został usunięty z listy autokick "
                 f"dla kanału {channel.mention}.\n"
-                f"Może teraz dołączyć do kanału."
+                "Może teraz dołączyć do kanału."
             ),
             title="✅ Autokick usunięty",
             ephemeral=ephemeral,
@@ -197,7 +197,7 @@ class AutokickMessageSender(BaseMessageSender):
                 description=(
                     f"Zostałeś automatycznie wyrzucony z kanału **{channel.name}** "
                     f"na serwerze **{channel.guild.name}**.\n\n"
-                    f"Jesteś na liście autokick tego kanału."
+                    "Jesteś na liście autokick tego kanału."
                 ),
                 color="error",
             )

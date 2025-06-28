@@ -244,7 +244,7 @@ async def test_statistics():
 async def main():
     """Run all tests."""
     print("🚀 Starting AI Interpretability Tests")
-    print(f"📁 Log directory: logs/ai_decisions/")
+    print("📁 Log directory: logs/ai_decisions/")
 
     # Set API key if available
     gemini_key = os.getenv("GEMINI_API_KEY")

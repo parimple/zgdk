@@ -42,13 +42,13 @@ async def test_add_balance_minimal(mock_payment_data, mock_add_payment, mock_bot
     mock_payment_data.amount = 500
     mock_payment_data.paid_at = None
     mock_payment_data.payment_type = "command"
-    
+
     # Create ShopCog
     shop_cog = ShopCog(mock_bot_with_services)
-    
+
     # CRITICAL FIX: Override the bot attribute because commands.Cog is mocked
     shop_cog.bot = mock_bot_with_services
-    
+
     # Try to call add_balance
     try:
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, 500)

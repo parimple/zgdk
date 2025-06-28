@@ -210,7 +210,7 @@ class PremiumPaymentService(BaseService, IPremiumService):
                 title="💰 Otrzymałeś prowizję!",
                 description=(
                     f"Użytkownik {invited.mention}, którego zaprosiłeś, "
-                    f"dokonał zakupu premium!\n\n"
+                    "dokonał zakupu premium!\n\n"
                     f"Twoja prowizja: **{amount} PLN**"
                 ),
                 color=discord.Color.green(),
@@ -262,9 +262,9 @@ class PremiumPaymentService(BaseService, IPremiumService):
                 title="❓ Nie znaleziono użytkownika",
                 description=(
                     f"Otrzymano wpłatę od **{name}**, ale nie można znaleźć "
-                    f"użytkownika na serwerze.\n\n"
-                    f"Sprawdź czy użytkownik jest zbanowany lub użyj komendy "
-                    f"`/przypisz_wplate` aby ręcznie przypisać wpłatę."
+                    "użytkownika na serwerze.\n\n"
+                    "Sprawdź czy użytkownik jest zbanowany lub użyj komendy "
+                    "`/przypisz_wplate` aby ręcznie przypisać wpłatę."
                 ),
                 color=discord.Color.orange(),
             )

@@ -6,14 +6,12 @@ and Redis support for distributed caching.
 """
 
 import asyncio
-import json
 import logging
-import pickle
 import time
 from collections import OrderedDict
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 

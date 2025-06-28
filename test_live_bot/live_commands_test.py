@@ -9,7 +9,7 @@ import json
 import os
 import subprocess
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # Use discord.py-self (which is what's currently installed)
 import discord

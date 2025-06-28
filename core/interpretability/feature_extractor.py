@@ -7,9 +7,7 @@ import json
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
-
-import numpy as np
+from typing import Dict, List, Set, Tuple
 
 from .decision_logger import Decision, DecisionType
 

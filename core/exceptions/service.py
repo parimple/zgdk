@@ -1,6 +1,6 @@
 """Service-specific exceptions."""
 
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from .base import BotError
 

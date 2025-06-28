@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.expression import case
 

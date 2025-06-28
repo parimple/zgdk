@@ -58,8 +58,8 @@ class PremiumChecker:
 
     def get_command_tier(self, command_name: str) -> Optional[CommandTier]:
         """Get the tier level for a given command."""
-        for tier, commands in self.COMMAND_TIERS.items():
-            if command_name in commands:
+        for tier, cmd_list in self.COMMAND_TIERS.items():
+            if command_name in cmd_list:
                 return tier
         return None
 
@@ -165,7 +165,7 @@ class PremiumChecker:
                     activity_info += f", state='{activity.state}'"
                 # Special handling for CustomActivity
                 if isinstance(activity, discord.CustomActivity):
-                    activity_info += f" [CUSTOM STATUS]"
+                    activity_info += " [CUSTOM STATUS]"
                 activities_debug.append(activity_info)
         else:
             activities_debug.append("No activities found")

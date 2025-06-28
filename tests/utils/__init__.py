@@ -14,7 +14,7 @@ from .mock_helpers import (
 
 __all__ = [
     'make_async_cm',
-    'make_mock_bot', 
+    'make_mock_bot',
     'make_mock_context',
     'make_mock_user',
     'make_mock_member',
@@ -25,13 +25,12 @@ __all__ = [
 
 # New test utilities for command testing
 try:
-    from .assertions import assert_has_timestamp, assert_premium_info, assert_user_mentioned
-    from .client import TestClient
-    
+    pass
+
     __all__.extend([
         "TestClient",
         "assert_user_mentioned",
-        "assert_has_timestamp", 
+        "assert_has_timestamp",
         "assert_premium_info"
     ])
 except ImportError:

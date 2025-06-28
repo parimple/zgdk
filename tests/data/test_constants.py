@@ -10,7 +10,7 @@ DESCRIPTION = "Hello, my name is zaGadka"
 
 # Owner IDs (from config.yml)
 MAIN_OWNER_ID = 956602391891947592
-TEST_USER_OWNER_ID = 968632323916566579  
+TEST_USER_OWNER_ID = 968632323916566579
 CLAUDE_USER_ID = 1387857653748732046
 
 # Additional Test User IDs
@@ -86,16 +86,16 @@ EMOJI_STAR = "✪"
 # Role Names
 ROLE_NAMES = {
     "mod": "✪",
-    "admin": "✪", 
+    "admin": "✪",
     "zg50": "zG50",
     "zg100": "zG100",
     "zg500": "zG500",
     "zg1000": "zG1000",
     "blue": "blue",
-    "green": "green", 
+    "green": "green",
     "red": "red",
     "test1": "TestRole1",
-    "test2": "TestRole2", 
+    "test2": "TestRole2",
     "test3": "TestRole3",
     "premium": "Premium",
     "vip": "VIP",
@@ -123,7 +123,7 @@ PREMIUM_ROLES_CONFIG = [
         ]
     },
     {
-        "name": "zG100", 
+        "name": "zG100",
         "premium": "Git Plus",
         "price": 99,
         "usd": 29,
@@ -143,7 +143,7 @@ PREMIUM_ROLES_CONFIG = [
     },
     {
         "name": "zG500",
-        "premium": "Git Pro", 
+        "premium": "Git Pro",
         "price": 499,
         "usd": 149,
         "team_size": 20,
@@ -167,7 +167,7 @@ PREMIUM_ROLES_CONFIG = [
         "name": "zG1000",
         "premium": "Git Ultra",
         "price": 999,
-        "usd": 299, 
+        "usd": 299,
         "team_size": 30,
         "moderator_count": 5,
         "points_multiplier": 400,
@@ -176,7 +176,7 @@ PREMIUM_ROLES_CONFIG = [
         "auto_kick": 3,
         "features": [
             "Moderator na serwerze",
-            "Kanał Git Ultra nad info do tworzenia kanałów głosowych", 
+            "Kanał Git Ultra nad info do tworzenia kanałów głosowych",
             "Drużyna do 50 osób",
             "6 moderatorów kanału głosowego",
             "Wszyscy w drużynie mają kolor klanu na serwerze",
@@ -220,7 +220,7 @@ WALLET_BALANCES = {
     "medium": 1000,
     "high": 5000,
     "zg50_price": 49,
-    "zg100_price": 99, 
+    "zg100_price": 99,
     "zg500_price": 499,
     "zg1000_price": 999,
     "maximum": 999999999
@@ -241,7 +241,7 @@ SAMPLE_PAYMENT_DATA = {
 # Error Messages
 ERROR_MESSAGES = {
     "no_balance": "Brak środków",
-    "no_permission": "Brak uprawnień", 
+    "no_permission": "Brak uprawnień",
     "invalid_amount": "Nieprawidłowa kwota",
     "role_not_found": "Nie znaleziono roli",
     "database_error": "Błąd bazy danych",
@@ -265,7 +265,7 @@ LEGACY_SYSTEM = {
 # Voice Channel Categories (from config.yml)
 VC_CATEGORIES = [
     1325436667359662100,  # git ultra
-    1325436219714441267,  # git pro  
+    1325436219714441267,  # git pro
     1325435639260516442,  # git plus
     960665318475325454,   # git
     1325439014488117278,  # priv

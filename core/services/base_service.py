@@ -7,8 +7,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Callable, Dict, Optional, TypeVar
 
 from core.error_handler import handle_service_errors
-from core.exceptions import PermissionError as PermissionException
-from core.exceptions import ResourceNotFoundException, ServiceException, TransactionException, ValidationException
+from core.exceptions import ResourceNotFoundException, TransactionException, ValidationException
 from core.interfaces.base import IService, IUnitOfWork
 
 T = TypeVar("T")

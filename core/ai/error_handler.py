@@ -5,7 +5,7 @@ Intelligent error handling using PydanticAI.
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from pydantic_ai import Agent
 
 
@@ -92,7 +92,7 @@ class IntelligentErrorHandler:
                 3. Include relevant command examples
                 4. Stay under 100 words
                 5. Use a friendly, helpful tone
-                
+
                 Focus on being helpful rather than technical.
                 If suggesting commands, use Discord slash command format (/command).
                 """,
@@ -154,7 +154,7 @@ class IntelligentErrorHandler:
         """Generate AI-enhanced error response."""
         try:
             # Prepare context for AI
-            error_info = {
+            _error_info = {
                 "error_type": type(error).__name__,
                 "error_message": str(error),
                 "command": command,
@@ -163,9 +163,9 @@ class IntelligentErrorHandler:
             }
 
             # Get AI response
-            prompt = f"""Generate a helpful error message for this Discord bot error:
+            prompt = """Generate a helpful error message for this Discord bot error:
             {error_info}
-            
+
             Return a JSON with:
             - user_message: Simple explanation (required)
             - suggestion: How to fix it (optional)
@@ -233,12 +233,12 @@ class IntelligentErrorHandler:
             return f"Use `/help {command}` for more information."
 
         try:
-            prompt = f"""Generate a brief help message for the Discord command '{command}'.
+            prompt = """Generate a brief help message for the Discord command '{command}'.
             Include:
             1. What the command does
             2. Basic usage syntax
             3. One example
-            
+
             Keep it under 50 words."""
 
             if error:

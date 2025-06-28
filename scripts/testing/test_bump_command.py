@@ -2,7 +2,6 @@
 """Test bump command via MCP."""
 
 import asyncio
-import json
 import subprocess
 
 

@@ -2,7 +2,7 @@
 
 This module contains split info commands organized by functionality:
 - admin_info.py: Admin-only information commands
-- user_info.py: User profile and stats commands  
+- user_info.py: User profile and stats commands
 - server_info.py: Server information commands
 - help_info.py: Help and documentation commands
 """

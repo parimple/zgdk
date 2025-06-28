@@ -145,7 +145,7 @@ class MemberManagementCommands:
 
             try:
                 reaction, user = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
-            except:
+            except Exception:
                 await member.send("❌ Zaproszenie do teamu wygasło.")
                 return
 
@@ -230,7 +230,7 @@ class MemberManagementCommands:
                     await member.send(
                         f"❌ Zostałeś wyrzucony z teamu **{team_role.name[2:]}** przez {ctx.author.mention}."
                     )
-                except:
+                except Exception:
                     pass
 
             except Exception as e:
@@ -283,7 +283,7 @@ class MemberManagementCommands:
                     if owner:
                         try:
                             await owner.send(f"ℹ️ {ctx.author.mention} opuścił team **{team_role.name[2:]}**.")
-                        except:
+                        except Exception:
                             pass
 
             except Exception as e:
@@ -361,7 +361,7 @@ class MemberManagementCommands:
                 # Notify new owner
                 try:
                     await member.send(f"✅ Otrzymałeś własność teamu **{team_role.name[2:]}** od {ctx.author.mention}!")
-                except:
+                except Exception:
                     pass
 
             except Exception as e:

@@ -558,14 +558,14 @@ class MessageSender:
     @staticmethod
     async def send_error(ctx, message: str):
         """Sends an error message."""
-        channel = ctx.author.voice.channel if ctx.author.voice else None
+        _channel = ctx.author.voice.channel if ctx.author.voice else None
         embed = MessageSender._create_embed(description=message, ctx=ctx, color="error")
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
     async def send_success(ctx, message: str):
         """Sends a success message."""
-        channel = ctx.author.voice.channel if ctx.author.voice else None
+        _channel = ctx.author.voice.channel if ctx.author.voice else None
         embed = MessageSender._create_embed(description=message, ctx=ctx, color="success")
         await MessageSender._send_embed(ctx, embed, reply=True)
 
@@ -740,7 +740,7 @@ class MessageSender:
             reason = "wykonania tej akcji!"
 
         base_text = f"Nie masz uprawnień do {reason}"
-        channel = ctx.author.voice.channel if ctx.author.voice else None
+        _channel = ctx.author.voice.channel if ctx.author.voice else None
         embed = MessageSender._create_embed(description=base_text, ctx=ctx)
         await MessageSender._send_embed(ctx, embed, reply=True)
 

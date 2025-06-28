@@ -11,14 +11,7 @@ import discord
 from discord.ext import commands
 
 from core.error_handler import ErrorHandler
-from core.exceptions import (
-    BotError,
-    CooldownException,
-    InsufficientFundsException,
-    PermissionError,
-    ResourceNotFoundException,
-    ValidationException,
-)
+from core.exceptions import BotError, CooldownException, PermissionError, ValidationException
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +136,7 @@ class ErrorHandlerCog(commands.Cog):
                 await interaction.response.send_message(
                     "❌ Wystąpił nieoczekiwany błąd. Spróbuj ponownie później.", ephemeral=True
                 )
-        except:
+        except Exception:
             pass
 
 

@@ -82,7 +82,7 @@ class RoleCommands(commands.Cog):
             timestamp=datetime.now(timezone.utc),
         )
 
-        premium_manager = PremiumManager(self.bot)
+        _premium_manager = PremiumManager(self.bot)
         async with self.bot.get_db() as session:
             # Pobierz role premium użytkownika z bazy
             premium_roles = await RoleQueries.get_member_premium_roles(session, user.id)

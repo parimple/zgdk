@@ -1,17 +1,13 @@
 """Core Agent Builder functionality."""
 
-import asyncio
-import json
 import os
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
 import yaml
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
 
 
 @dataclass
@@ -83,7 +79,7 @@ class AgentBuilder:
 
     def _generate_agent_code(self, name: str, config: AgentConfig) -> Path:
         """Generate Python code for the agent."""
-        template = f'''"""
+        template = '''"""
 {config.name} Agent
 Purpose: {config.purpose}
 Generated: {datetime.now().isoformat()}
@@ -118,11 +114,11 @@ class {name.title().replace("_", "")}Output(BaseModel):
 class {name.title().replace("_", "")}Agent(BaseService):
     """
     {config.purpose}
-    
+
     Workflow:
 {self._format_workflow(config.workflow)}
     """
-    
+
     def __init__(self):
         super().__init__()
         self.name = "{config.name}"
@@ -131,36 +127,36 @@ class {name.title().replace("_", "")}Agent(BaseService):
         self.metrics = {{
 {self._generate_metrics_dict(config.metrics)}
         }}
-        
+
     async def initialize(self):
         """Initialize the agent."""
         # Setup Redis
         self.redis_client = await redis.from_url(
             "redis://redis-service:6379"
         )
-        
+
         # Setup AI agent
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         self.agent = Agent(
             "{config.model}",
             system_prompt="{config.purpose}"
         )
-        
+
         logger.info(f"{{self.name}} initialized")
-        
+
     async def process(self, input_data: {name.title().replace("_", "")}Input) -> {name.title().replace("_", "")}Output:
         """Process input through the agent workflow."""
         start_time = datetime.now()
-        
+
         try:
 {self._generate_workflow_code(config.workflow)}
-            
+
             # Update metrics
             self.metrics["total_processed"] += 1
             self.metrics["last_success"] = datetime.now()
-            
+
             return output
-            
+
         except Exception as e:
             self.metrics["total_errors"] += 1
             logger.error(f"Error in {{self.name}}: {{e}}")
@@ -168,14 +164,14 @@ class {name.title().replace("_", "")}Agent(BaseService):
         finally:
             duration = (datetime.now() - start_time).total_seconds()
             self.metrics["avg_duration"] = (
-                (self.metrics["avg_duration"] * (self.metrics["total_processed"] - 1) + duration) 
+                (self.metrics["avg_duration"] * (self.metrics["total_processed"] - 1) + duration)
                 / self.metrics["total_processed"]
             )
-            
+
     async def get_metrics(self) -> Dict[str, Any]:
         """Get agent metrics."""
         return self.metrics.copy()
-        
+
     async def cleanup(self):
         """Cleanup resources."""
         if self.redis_client:
@@ -196,7 +192,7 @@ async def create_{name}_agent() -> {name.title().replace("_", "")}Agent:
 
     def _generate_tests(self, name: str, config: AgentConfig) -> Path:
         """Generate test code for the agent."""
-        template = f'''"""Tests for {config.name} Agent."""
+        template = '''"""Tests for {config.name} Agent."""
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -214,7 +210,7 @@ async def agent():
     """Create test agent."""
     with patch("redis.asyncio.from_url") as mock_redis:
         mock_redis.return_value = AsyncMock()
-        
+
         agent = {name.title().replace("_", "")}Agent()
         await agent.initialize()
         yield agent
@@ -234,13 +230,13 @@ async def test_{name}_process_success(agent):
     """Test successful processing."""
     # Mock AI response
     agent.agent.run = AsyncMock(return_value=MagicMock(data="test result"))
-    
+
     input_data = {name.title().replace("_", "")}Input(
 {self._generate_test_input(config.inputs)}
     )
-    
+
     output = await agent.process(input_data)
-    
+
     assert isinstance(output, {name.title().replace("_", "")}Output)
     assert agent.metrics["total_processed"] == 1
     assert agent.metrics["total_errors"] == 0
@@ -250,14 +246,14 @@ async def test_{name}_process_success(agent):
 async def test_{name}_process_error(agent):
     """Test error handling."""
     agent.agent.run = AsyncMock(side_effect=Exception("Test error"))
-    
+
     input_data = {name.title().replace("_", "")}Input(
 {self._generate_test_input(config.inputs)}
     )
-    
+
     with pytest.raises(Exception):
         await agent.process(input_data)
-    
+
     assert agent.metrics["total_errors"] == 1
 
 
@@ -265,7 +261,7 @@ async def test_{name}_process_error(agent):
 async def test_{name}_metrics(agent):
     """Test metrics collection."""
     metrics = await agent.get_metrics()
-    
+
     assert "total_processed" in metrics
     assert "total_errors" in metrics
     assert "avg_duration" in metrics
@@ -360,7 +356,7 @@ async def test_{name}_metrics(agent):
 
     def _generate_documentation(self, name: str, config: AgentConfig) -> Path:
         """Generate documentation for the agent."""
-        doc = f"""# {config.name} Agent
+        doc = """# {config.name} Agent
 
 ## Purpose
 {config.purpose}

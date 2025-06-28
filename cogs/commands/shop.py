@@ -111,7 +111,7 @@ class ShopCog(commands.Cog):
                 await session.commit()
 
                 msg1 = "Proszę pamiętać o podawaniu swojego ID " "podczas dokonywania wpłat w przyszłości. Twoje ID to:"
-                msg2 = f"Nie mogłem wysłać DM do {user.mention}. " f"Proszę przekazać mu te informacje ręcznie."
+                msg2 = f"Nie mogłem wysłać DM do {user.mention}. " "Proszę przekazać mu te informacje ręcznie."
 
                 try:
                     await user.send(msg1)

@@ -13,12 +13,12 @@ async def test_ranking():
             "command": "ranking",
             "user_id": "956602391891947592"
         }
-        
+
         async with session.post("http://localhost:8090/execute", json=payload) as resp:
             result = await resp.json()
-            
+
         print(json.dumps(result, indent=2))
-        
+
         if "error" in result:
             print(f"\n❌ Still getting error: {result['error']}")
         elif "responses" in result and result["responses"]:

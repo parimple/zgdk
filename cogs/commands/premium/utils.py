@@ -45,7 +45,7 @@ async def emoji_to_icon(emoji_str: str) -> bytes:
     # Create URL for emoji icon
     # If emoji is animated (format <a:name:id>), use GIF extension
     is_animated = emoji_str.startswith("<a:")
-    extension = "gif" if is_animated else "png"
+    extension = "gi" if is_animated else "png"
     url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{extension}"
 
     # Download icon

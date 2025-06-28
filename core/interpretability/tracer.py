@@ -2,7 +2,6 @@
 Command execution tracer for debugging and monitoring.
 """
 
-import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager

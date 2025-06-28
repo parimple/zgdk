@@ -2,10 +2,9 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import discord
-from discord.ext import commands
 
 from core.interfaces.premium_interfaces import IPremiumService
 from core.services.currency_service import CurrencyService
@@ -44,7 +43,6 @@ class BuyRoleButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         """Open shop when clicked."""
         # Import here to avoid circular imports
-        from cogs.commands.shop import ShopCog
 
         shop_cog = interaction.client.get_cog("ShopCog")
         if shop_cog:

@@ -1,7 +1,6 @@
 """Direct role assignment test to simulate premium purchase."""
 
 import asyncio
-import json
 from datetime import datetime
 
 import aiohttp
@@ -23,7 +22,7 @@ async def test_direct_role_assignment():
         # Step 1: Use owner to assign role directly
         print("STEP 1: Assigning zG500 role directly to test user")
         print("-" * 50)
-        print(f"\n⚠️ NOTE: This simulates what happens when user buys role from shop")
+        print("\n⚠️ NOTE: This simulates what happens when user buys role from shop")
         print(f"Owner ({owner_id}) will assign zG500 to user ({test_user_id})\n")
 
         # In Discord, owner would use a command like: /assign_role @user zG500
@@ -72,7 +71,7 @@ async def test_direct_role_assignment():
                 ) as response:
                     data = await response.json()
                     if data.get("success"):
-                        print(f"   ✅ Color command executed successfully")
+                        print("   ✅ Color command executed successfully")
                         print(f"   ℹ️ User's role color should now be {color_name}")
                     else:
                         print(f"   ❌ Color command failed: {data.get('error')}")
@@ -103,7 +102,7 @@ async def test_direct_role_assignment():
                 ) as response:
                     data = await response.json()
                     if data.get("success"):
-                        print(f"   ✅ Team command executed")
+                        print("   ✅ Team command executed")
                         print(f"   ℹ️ Team '☫ {team_name}' should be created")
                         print("   ℹ️ Member limit: 10 (zG500 perk)")
                     else:

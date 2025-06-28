@@ -137,7 +137,7 @@ class ColorParser:
 
             system_prompt = """Jesteś parserem kolorów dla polskiego bota Discord.
                 Konwertuj naturalne opisy kolorów na kody hex.
-                
+
                 Przykłady:
                 - "ciemny niebieski" -> "#00008B"
                 - "jasny fioletowy" -> "#DDA0DD"
@@ -145,7 +145,7 @@ class ColorParser:
                 - "pomarańczowy zachód słońca" -> "#FD5E53"
                 - "kolor discorda" -> "#5865F2"
                 - "trochę ciemniejszy niż różowy" -> "#FFB6C1"
-                
+
                 Zawsze odpowiadaj tylko kodem hex w formacie #RRGGBB.
                 Dla kolorów marek, używaj ich oficjalnych kolorów.
                 Dla opisowych kolorów, wybierz najbardziej odpowiedni odcień."""
@@ -196,7 +196,7 @@ class ColorParser:
                 return EnhancedColorInput.from_color_input(
                     basic_color, interpretation="Standardowy format", confidence=1.0
                 )
-        except:
+        except Exception:
             pass
 
         # Try named colors
@@ -232,7 +232,7 @@ class ColorParser:
         # Try to parse using the basic ColorInput parser
         try:
             return ColorInput.parse(color_str)
-        except:
+        except Exception:
             return None
 
     async def _parse_with_ai(

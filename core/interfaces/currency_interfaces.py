@@ -9,12 +9,10 @@ class ICurrencyService(ABC):
     @abstractmethod
     def get_currency_unit(self) -> str:
         """Get the currency unit symbol."""
-        pass
 
     @abstractmethod
     def get_pln_to_g_ratio(self) -> float:
         """Get the PLN to G conversion ratio."""
-        pass
 
     @abstractmethod
     def g_to_pln(self, amount_g: int) -> int:
@@ -27,7 +25,6 @@ class ICurrencyService(ABC):
         Returns:
             Amount in PLN with proper rounding
         """
-        pass
 
     @abstractmethod
     def pln_to_g(self, amount_pln: float) -> int:
@@ -40,7 +37,6 @@ class ICurrencyService(ABC):
         Returns:
             Amount in G currency
         """
-        pass
 
     @abstractmethod
     def format_currency(self, amount: int, show_unit: bool = True) -> str:
@@ -54,7 +50,6 @@ class ICurrencyService(ABC):
         Returns:
             Formatted currency string
         """
-        pass
 
     @abstractmethod
     def validate_amount(self, amount: int) -> bool:
@@ -67,4 +62,3 @@ class ICurrencyService(ABC):
         Returns:
             True if amount is valid
         """
-        pass

@@ -77,34 +77,34 @@ async def list_tools() -> List[Tool]:
 @server.call_tool()
 async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
     """Handle tool calls."""
-    
+
     async with aiohttp.ClientSession() as session:
         try:
             if name == "execute_command":
                 command = arguments.get("command", "")
                 args = arguments.get("args", "")
-                
+
                 # Call bot API
                 url = f"{API_BASE_URL}/execute"
                 payload = {"command": command, "args": args}
-                
+
                 async with session.post(url, json=payload) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        
+
                         if data.get("success"):
                             text = f"✅ Command executed: ,{data['command']}\n\n"
-                            
+
                             responses = data.get("responses", [])
                             if responses:
                                 text += f"Bot responses ({len(responses)}):\n"
-                                
+
                                 for i, response in enumerate(responses, 1):
                                     text += f"\n--- Response {i} ---\n"
-                                    
+
                                     if response.get("content"):
                                         text += f"Content: {response['content']}\n"
-                                        
+
                                     if response.get("embeds"):
                                         for embed in response["embeds"]:
                                             text += f"Embed Title: {embed.get('title', 'No title')}\n"
@@ -121,12 +121,12 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
                     else:
                         error_text = await resp.text()
                         text = f"❌ API error (status {resp.status}): {error_text}"
-                        
+
                 return [TextContent(type="text", text=text)]
-                
+
             elif name == "bot_status":
                 url = f"{API_BASE_URL}/status"
-                
+
                 try:
                     async with session.get(url) as resp:
                         if resp.status == 200:
@@ -141,20 +141,20 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
                             text = f"❌ Cannot connect to bot API (status {resp.status})"
                 except aiohttp.ClientConnectorError:
                     text = "❌ Bot API is not running. Make sure the bot is running with owner_utils cog loaded."
-                    
+
                 return [TextContent(type="text", text=text)]
-                
+
             elif name == "last_response":
                 command = arguments.get("command", "")
                 url = f"{API_BASE_URL}/last_response?command={command}"
-                
+
                 async with session.get(url) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         text = f"📝 Last response for command '{command}':\n"
                         text += f"Success: {data.get('success', False)}\n"
                         text += f"Timestamp: {data.get('timestamp', 'N/A')}\n"
-                        
+
                         responses = data.get("responses", [])
                         if responses:
                             text += f"\nResponses ({len(responses)}):\n"
@@ -167,12 +167,12 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
                         text = f"❌ No response found for command '{command}'"
                     else:
                         text = f"❌ Error getting last response (status {resp.status})"
-                        
+
                 return [TextContent(type="text", text=text)]
-                
+
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
-                
+
         except Exception as e:
             return [TextContent(type="text", text=f"❌ Error: {str(e)}")]
 

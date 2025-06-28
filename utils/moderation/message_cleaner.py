@@ -59,7 +59,7 @@ class MessageCleaner:
                     target_member = ctx.guild.get_member(target_id)
 
                     if target_member is None:
-                        logger.info(f"Member not found in cache, trying to fetch from API")
+                        logger.info("Member not found in cache, trying to fetch from API")
                         try:
                             target_member = await ctx.guild.fetch_member(target_id)
                             logger.info(f"Found member from API: {target_member.name} (ID: {target_member.id})")
@@ -511,7 +511,7 @@ class MessageCleaner:
                             pass
                         except discord.Forbidden:
                             pass
-                        except Exception as e:
+                        except Exception:
                             pass
 
                 if channel_deleted > 0:

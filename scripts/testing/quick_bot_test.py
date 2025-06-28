@@ -74,7 +74,7 @@ def test_bot_command(command: str, check_patterns: Optional[List[str]] = None) -
         for error in errors_found[:3]:  # Show first 3 errors
             print(f"   - {error}")
     else:
-        print(f"✅ No errors found")
+        print("✅ No errors found")
 
     if patterns_found:
         print(f"✅ Patterns found: {', '.join(patterns_found)}")

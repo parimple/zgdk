@@ -3,16 +3,14 @@
 import logging
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import discord
 
 from core.repositories import NotificationRepository
-from datasources.models import Member
 from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 
-from .constants import BYPASS_DURATIONS, DISBOARD, DISCADIA, DISCORDSERVERS, DSME, DZIK, SERVICE_COOLDOWNS
+from .constants import BYPASS_DURATIONS, DISCADIA, DISCORDSERVERS, DSME, DZIK, SERVICE_COOLDOWNS
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +63,7 @@ class BumpHandler:
 
     async def log_notification(self, session, user_id: int, service: str) -> None:
         """Log a notification for cooldown tracking."""
-        guild_id = self.bot.guild_id if hasattr(self.bot, "guild_id") else None
+        _guild_id = self.bot.guild_id if hasattr(self.bot, "guild_id") else None
         notification_repo = NotificationRepository(session)
         await notification_repo.add_or_update_notification_log(user_id, service)
 
@@ -162,7 +160,6 @@ class DisboardHandler(BumpHandler):
     async def send_marketing(self, channel: discord.TextChannel, service: str, user: discord.Member) -> None:
         """Send marketing message after bump."""
         # This will be implemented in the main class
-        pass
 
 
 class DzikHandler(BumpHandler):
@@ -204,7 +201,7 @@ class DzikHandler(BumpHandler):
         embed = self.message_sender._create_embed(
             color="success",
             description=(
-                f"Dziękujemy za podbicie serwera na Dziku!\n"
+                "Dziękujemy za podbicie serwera na Dziku!\n"
                 f"Otrzymujesz **{BYPASS_DURATIONS['dzik']}T** czasu bypass."
             ),
         )
@@ -257,7 +254,7 @@ class DiscadiaHandler(BumpHandler):
                 return
 
             # Get or create member
-            member = await MemberQueries.get_or_add_member(session, user.id)
+            _member = await MemberQueries.get_or_add_member(session, user.id)
 
             # Add bypass time
             await self.add_bypass_time(user, BYPASS_DURATIONS["discadia"], "discadia")
@@ -271,7 +268,7 @@ class DiscadiaHandler(BumpHandler):
         embed = self.message_sender._create_embed(
             color="success",
             description=(
-                f"Dziękujemy za głosowanie na Discadia!\n"
+                "Dziękujemy za głosowanie na Discadia!\n"
                 f"Otrzymujesz **{BYPASS_DURATIONS['discadia']}T** czasu bypass."
             ),
         )
@@ -310,7 +307,7 @@ class DiscordServersHandler(BumpHandler):
                 return
 
             # Get or create member
-            member = await MemberQueries.get_or_add_member(session, user.id)
+            _member = await MemberQueries.get_or_add_member(session, user.id)
 
             # Add bypass time
             await self.add_bypass_time(user, BYPASS_DURATIONS["discordservers"], "discordservers")
@@ -324,7 +321,7 @@ class DiscordServersHandler(BumpHandler):
         embed = self.message_sender._create_embed(
             color="success",
             description=(
-                f"Dziękujemy za głosowanie na DiscordServers!\n"
+                "Dziękujemy za głosowanie na DiscordServers!\n"
                 f"Otrzymujesz **{BYPASS_DURATIONS['discordservers']}T** czasu bypass."
             ),
         )
@@ -368,7 +365,7 @@ class DSMEHandler(BumpHandler):
                 return
 
             # Get or create member
-            member = await MemberQueries.get_or_add_member(session, user.id)
+            _member = await MemberQueries.get_or_add_member(session, user.id)
 
             # Add bypass time
             await self.add_bypass_time(user, BYPASS_DURATIONS["dsme"], "dsme")
@@ -382,7 +379,7 @@ class DSMEHandler(BumpHandler):
         embed = self.message_sender._create_embed(
             color="success",
             description=(
-                f"Dziękujemy za głosowanie na DSME!\n" f"Otrzymujesz **{BYPASS_DURATIONS['dsme']}T** czasu bypass."
+                "Dziękujemy za głosowanie na DSME!\n" f"Otrzymujesz **{BYPASS_DURATIONS['dsme']}T** czasu bypass."
             ),
         )
         embed.set_author(name=user.display_name, icon_url=user.display_avatar.url if user.display_avatar else None)

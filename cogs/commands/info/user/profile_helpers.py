@@ -1,15 +1,13 @@
 """Helper functions for user profile commands."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import List, Tuple
 
 import discord
 from discord.ext import commands
 
 from core.interfaces.member_interfaces import IActivityService, IMemberService
 from core.interfaces.premium_interfaces import IPremiumService
-from core.interfaces.team_interfaces import ITeamManagementService
 from core.repositories import InviteRepository
 from core.services.team_management_service import TeamManagementService
 from datasources.queries import MemberQueries
@@ -23,7 +21,7 @@ async def get_profile_data(member: discord.Member, session, ctx: commands.Contex
     db_member = await MemberQueries.get_or_add_member(session, member.id, wallet_balance=0, joined_at=member.joined_at)
 
     # Get services
-    member_service = await bot.get_service(IMemberService, session)
+    _member_service = await bot.get_service(IMemberService, session)
     activity_service = await bot.get_service(IActivityService, session)
     premium_service = await bot.get_service(IPremiumService, session)
 

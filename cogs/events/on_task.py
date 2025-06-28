@@ -11,7 +11,7 @@ import discord
 from discord.ext import commands, tasks
 
 from cogs.commands.info.admin_info import remove_premium_role_mod_permissions
-from core.interfaces.member_interfaces import IMemberService, IModerationService
+from core.interfaces.member_interfaces import IMemberService
 from core.repositories import ModerationRepository, NotificationRepository, RoleRepository
 from core.services.currency_service import CurrencyService
 from utils.role_manager import RoleManager
@@ -263,10 +263,10 @@ class OnTaskEvent(commands.Cog):
                 async with self.bot.get_db() as session:
                     # Mapuj opis roli na typ mute'a
                     mute_type_mapping = {
-                        "stream_off": "live",
-                        "send_messages_off": "txt",
-                        "attach_files_off": "img",  # lub "nick" w zależności od kontekstu
-                        "points_off": "rank",
+                        "stream_of": "live",
+                        "send_messages_of": "txt",
+                        "attach_files_of": "img",  # lub "nick" w zależności od kontekstu
+                        "points_of": "rank",
                     }
                     mute_type = mute_type_mapping.get(role_desc, "unknown")
 
@@ -313,10 +313,10 @@ class OnTaskEvent(commands.Cog):
         # Sprawdź czy powiadomienie zostało już wysłane
         async with self.bot.get_db() as session:
             # Sprawdź różne typy powiadomień - zarówno z normalnego systemu jak i audytu
-            recent_notifications = []
+            _recent_notifications = []
             notification_tags_to_check = [
                 "premium_role_expiry",  # Powiadomienie o wygasaniu
-                f"premium_expired",  # Powiadomienie o usunięciu wygasłej roli
+                "premium_expired",  # Powiadomienie o usunięciu wygasłej roli
                 f"audit_removal_{discord_role.name}",  # Powiadomienie z audytu dla tej konkretnej roli
             ]
 
@@ -690,10 +690,10 @@ class OnTaskEvent(commands.Cog):
 
             # Mapowanie opisów na czytelne nazwy
             mute_type_display_mapping = {
-                "stream_off": "STREAM",
-                "send_messages_off": "WIADOMOŚCI",
-                "attach_files_off": "PLIKI/OBRAZY",
-                "points_off": "RANKING",
+                "stream_of": "STREAM",
+                "send_messages_of": "WIADOMOŚCI",
+                "attach_files_of": "PLIKI/OBRAZY",
+                "points_of": "RANKING",
             }
 
             mute_type_display = mute_type_display_mapping.get(

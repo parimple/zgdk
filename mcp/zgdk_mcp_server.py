@@ -5,7 +5,6 @@ Allows easy communication, testing, and monitoring of the bot.
 """
 
 import asyncio
-import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -13,9 +12,8 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 # Import bot components
-from core.interpretability import DecisionLogger
 from datasources.queries import MemberQueries, RoleQueries
-from mcp.server import Server, Tool
+from mcp.server import Server
 from mcp.server.stdio import stdio_transport
 
 logger = logging.getLogger(__name__)

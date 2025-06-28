@@ -2,11 +2,8 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock
-
-import discord
-from discord.ext import commands
 
 logger = logging.getLogger(__name__)
 

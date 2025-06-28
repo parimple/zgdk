@@ -1,6 +1,6 @@
 """General message senders for various purposes."""
 
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 import discord
 from discord.ext import commands

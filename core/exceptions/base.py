@@ -140,22 +140,14 @@ class ExternalServiceError(BotError):
 class ServiceException(BotError):
     """Raised when a service operation fails."""
 
-    pass
-
 
 class TransactionException(BotError):
     """Raised when a database transaction fails."""
-
-    pass
 
 
 class ValidationException(ValidationError):
     """Alias for ValidationError for backward compatibility."""
 
-    pass
-
 
 class ResourceNotFoundException(NotFoundError):
     """Alias for NotFoundError for backward compatibility."""
-
-    pass

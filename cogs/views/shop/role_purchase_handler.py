@@ -1,18 +1,15 @@
 """Role purchase handling logic for shop views."""
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
 
 import discord
 from discord.ext.commands import Context
 
-from core.interfaces.premium_interfaces import IPremiumService
 from datasources.queries import MemberQueries, RoleQueries
 from utils.message_sender import MessageSender
 from utils.premium_logic import PremiumRoleManager
-from utils.refund import calculate_refund
 
-from .constants import MONTHLY_DURATION, YEARLY_DURATION
+from .constants import MONTHLY_DURATION
 from .embed_helpers import (
     create_cancel_embed,
     create_downgrade_embed,

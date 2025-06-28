@@ -4,7 +4,7 @@ Role Queries for the database.
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from sqlalchemy import and_, delete, select, text
 from sqlalchemy.exc import IntegrityError
@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.functions import func
 
-from ..models import Member, MemberRole, Role
+from ..models import MemberRole, Role
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +186,7 @@ class RoleQueries:
         """Delete a role of a member"""
         try:
             # Bezpośrednie wykonanie SQL DELETE z użyciem text()
-            sql = text(f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
+            sql = text("DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
             await session.execute(sql, {"member_id": member_id, "role_id": role_id})
             logger.info(f"Deleted role {role_id} for member {member_id} using raw SQL")
         except Exception as e:
@@ -291,7 +291,7 @@ class RoleQueries:
                 session.expunge(member_role)
 
                 # Wykonaj surowy SQL DELETE z użyciem text()
-                sql = text(f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
+                sql = text("DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
                 await session.execute(sql, {"member_id": member_id, "role_id": role_id})
 
                 logger.info(f"Safely deleted role {role_id} for member {member_id}")
@@ -311,7 +311,7 @@ class RoleQueries:
         """
         try:
             # Użyj text() do deklaracji surowego SQL
-            sql = text(f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
+            sql = text("DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
             await session.execute(sql, {"member_id": member_id, "role_id": role_id})
             logger.info(f"Raw SQL deletion of role {role_id} for member {member_id} succeeded")
             return True

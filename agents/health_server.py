@@ -73,7 +73,6 @@ class HealthServer:
 # Agent entry point
 async def main():
     """Main entry point for Support Agent."""
-    import sys
 
     import redis.asyncio as redis
     from support_agent import SupportAgentCrew
@@ -94,7 +93,7 @@ async def main():
         db_session = None  # Would be AsyncSession in production
 
         # Create agent crew
-        crew = SupportAgentCrew(redis_client, db_session)
+        _crew = SupportAgentCrew(redis_client, db_session)
 
         # Mark as ready
         health.set_ready(True)

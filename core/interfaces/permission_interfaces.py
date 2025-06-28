@@ -25,37 +25,30 @@ class IPermissionService(ABC):
     @abstractmethod
     def check_permission_level(self, member: discord.Member, level: PermissionLevel) -> bool:
         """Check if a member has the required permission level."""
-        pass
 
     @abstractmethod
     def is_owner(self, member: discord.Member) -> bool:
         """Check if member is the bot owner."""
-        pass
 
     @abstractmethod
     def is_admin(self, member: discord.Member) -> bool:
         """Check if member has admin role."""
-        pass
 
     @abstractmethod
     def is_mod(self, member: discord.Member) -> bool:
         """Check if member has mod role."""
-        pass
 
     @abstractmethod
     def is_mod_or_admin(self, member: discord.Member) -> bool:
         """Check if member has mod or admin role."""
-        pass
 
     @abstractmethod
     def is_owner_or_admin(self, member: discord.Member) -> bool:
         """Check if member is owner or has admin role."""
-        pass
 
     @abstractmethod
     def is_premium(self, member: discord.Member) -> bool:
         """Check if member has any premium role."""
-        pass
 
     @abstractmethod
     def has_permission_levels(
@@ -65,7 +58,6 @@ class IPermissionService(ABC):
         require_all: bool = False,
     ) -> bool:
         """Check if member has required permission level(s)."""
-        pass
 
     @abstractmethod
     def create_permission_check(
@@ -74,4 +66,3 @@ class IPermissionService(ABC):
         require_all: bool = False,
     ):
         """Create a permission check decorator for commands."""
-        pass

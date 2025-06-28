@@ -291,7 +291,7 @@ class PremiumRoleManager:
                 role_to_extend = discord.utils.get(self.guild.roles, name=highest_role_name)
                 if role_to_extend:
                     # Get the role database entry
-                    db_role = await RoleQueries.get_member_role(session, member.id, role_to_extend.id)
+                    _db_role = await RoleQueries.get_member_role(session, member.id, role_to_extend.id)
 
                     # Calculate days to extend based on highest role
                     if highest_role_name == "zG50":
@@ -326,12 +326,12 @@ class PremiumRoleManager:
         if highest_role_priority > current_role_priority and source == "payment":
             logger.info(
                 f"User {member.display_name} has higher role ({highest_role_name}) than {role_name}. "
-                f"Adding amount to wallet instead."
+                "Adding amount to wallet instead."
             )
             embed = discord.Embed(
                 title="Doładowanie konta",
                 description=f"Posiadasz już wyższą rolę ({highest_role_name}). "
-                f"Kwota została dodana do Twojego portfela.",
+                "Kwota została dodana do Twojego portfela.",
                 color=discord.Color.blue(),
             )
             return embed, None, True  # Dodaj do portfela
@@ -359,7 +359,7 @@ class PremiumRoleManager:
                 raise ValueError(f"Failed to update role expiration for {role_name}")
 
         elif extension_type == self.ExtensionType.UPGRADE:
-            upgrade_cost = extension_value
+            _upgrade_cost = extension_value
             new_role = discord.utils.get(self.guild.roles, name=new_role_name)
 
             # Remove old role

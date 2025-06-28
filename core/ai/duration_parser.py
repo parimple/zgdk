@@ -2,7 +2,6 @@
 AI-enhanced duration parsing using PydanticAI.
 """
 
-import asyncio
 import logging
 import re
 import time
@@ -60,7 +59,7 @@ class DurationParser:
 
             system_prompt = """Jesteś parserem czasu dla polskiego bota moderacyjnego na Discordzie.
                 Konwertuj naturalne określenia czasu na sekundy.
-                
+
                 Przykłady:
                 - "1 dzień" -> 86400
                 - "tydzień" -> 604800
@@ -70,7 +69,7 @@ class DurationParser:
                 - "na zawsze" lub "permanentnie" -> -1
                 - "pół godziny" -> 1800
                 - "kwadrans" -> 900
-                
+
                 Zawsze odpowiadaj tylko liczbą sekund, lub -1 dla permanentnego.
                 Dla niejednoznacznych wpisów, wybierz najbardziej rozsądną interpretację.
                 Kontekst aktualnego czasu może być podany."""
@@ -114,7 +113,7 @@ class DurationParser:
                 return EnhancedDurationInput.from_duration_input(
                     basic_duration, interpretation="Parsed using standard format", confidence=1.0
                 )
-        except:
+        except Exception:
             pass
 
         # If traditional parsing fails and AI is enabled, use AI

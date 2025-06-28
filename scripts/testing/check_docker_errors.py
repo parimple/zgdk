@@ -170,14 +170,14 @@ def check_and_log_errors() -> Dict[str, List[Dict]]:
         save_errors(all_errors)
 
     # Print summary
-    print(f"\n📊 Error Summary:")
+    print("\n📊 Error Summary:")
     print(f"   Total errors found: {len(current_errors)}")
     print(f"   New errors: {len(new_errors)}")
     print(f"   Recurring errors: {len(recurring_errors)}")
     print(f"   Fixed errors (skipped): {len(fixed_errors)}")
 
     if new_errors:
-        print(f"\n❌ New Errors Found:")
+        print("\n❌ New Errors Found:")
         for i, error in enumerate(new_errors, 1):
             print(f"\n{i}. {error['line']}")
             if "file" in error:
@@ -188,7 +188,7 @@ def check_and_log_errors() -> Dict[str, List[Dict]]:
                     print(f"      {line}")
 
     if recurring_errors:
-        print(f"\n⚠️  Recurring Errors (need fixing):")
+        print("\n⚠️  Recurring Errors (need fixing):")
         for error in recurring_errors[:5]:  # Show first 5
             print(f"   - {error['line'][:100]}...")
 

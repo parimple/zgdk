@@ -8,7 +8,7 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from core.ai.color_parser import ColorParser, EnhancedColorInput
+from core.ai.color_parser import ColorParser
 from core.interfaces.premium_interfaces import IPremiumService
 from core.models.command import ColorInput
 from utils.message_sender import MessageSender

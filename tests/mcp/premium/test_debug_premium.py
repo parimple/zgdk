@@ -1,7 +1,6 @@
 """Debug premium system configuration."""
 
 import asyncio
-import json
 from datetime import datetime
 
 import aiohttp
@@ -11,16 +10,16 @@ async def test_debug_premium():
     """Debug test to understand premium system."""
     base_url = "http://localhost:8089"
     test_user_id = "489328381972971520"
-    owner_id = "489328381972971520"
+    _owner_id = "489328381972971520"
     channel_id = "1387864734002446407"
-    
+
     async with aiohttp.ClientSession() as session:
         print("🔍 PREMIUM SYSTEM DEBUG TEST")
         print("=" * 60)
         print(f"Test User ID: {test_user_id}")
         print(f"Channel ID: {channel_id}")
         print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        
+
         # Test different scenarios
         test_cases = [
             {
@@ -66,40 +65,40 @@ async def test_debug_premium():
                 "expected": "Should fail - requires premium"
             }
         ]
-        
+
         for test in test_cases:
             print(f"\n{'=' * 60}")
             print(f"🧪 {test['description']}")
             print(f"{'=' * 60}")
             print(f"Command: ,{test['command']} {test['args']}")
             print(f"Expected: {test['expected']}")
-            
+
             command_data = {
                 "command": test["command"],
                 "channel_id": channel_id,
                 "author_id": test["author_id"]
             }
-            
+
             if test["args"]:
                 command_data["args"] = test["args"]
-            
+
             try:
                 async with session.post(
-                    f"{base_url}/execute", 
-                    json=command_data, 
+                    f"{base_url}/execute",
+                    json=command_data,
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     data = await response.json()
                     print(f"Result: {'✅ Command accepted' if data.get('success') else '❌ Command failed'}")
-                    
+
                     if data.get("error"):
                         print(f"Error: {data['error']}")
-                        
+
             except Exception as e:
                 print(f"❌ Exception: {e}")
-            
+
             await asyncio.sleep(0.5)
-        
+
         print("\n" + "=" * 60)
         print("📊 ANALYSIS")
         print("=" * 60)
@@ -110,7 +109,7 @@ async def test_debug_premium():
         print("\nThe issue: API responses are not being captured")
         print("This is because the bot sends messages to the real Discord channel")
         print("But the API wrapper doesn't forward those messages back")
-        
+
         print("\n🔧 RECOMMENDATIONS:")
         print("1. Check Discord channel for actual bot messages")
         print("2. Verify user doesn't have any premium roles")

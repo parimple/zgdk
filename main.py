@@ -33,7 +33,7 @@ from core.repositories.role_repository import RoleRepository
 from core.services.activity_tracking_service import ActivityTrackingService
 from core.services.currency_service import CurrencyService
 from core.services.embed_builder_service import EmbedBuilderService
-from core.services.member_service import ActivityService, InviteService, MemberService, ModerationService
+from core.services.member_service import InviteService, MemberService, ModerationService
 from core.services.message_formatter_service import MessageFormatterService
 from core.services.message_sender_service import MessageSenderService
 from core.services.notification_service import NotificationService
@@ -58,10 +58,10 @@ def cleanup_zombie_processes() -> None:
     """Cleanup zombie processes from previous Playwright sessions"""
     try:
         # Kill all headless_shell processes
-        subprocess.run(["pkill", "-f", "headless_shell"], capture_output=True, timeout=5)
+        subprocess.run(["pkill", "-", "headless_shell"], capture_output=True, timeout=5)
 
         # Kill orphaned Chrome processes
-        subprocess.run(["pkill", "-f", "chrome.*--headless"], capture_output=True, timeout=5)
+        subprocess.run(["pkill", "-", "chrome.*--headless"], capture_output=True, timeout=5)
 
         # Wait a moment for processes to terminate
         import time
@@ -69,8 +69,8 @@ def cleanup_zombie_processes() -> None:
         time.sleep(0.5)
 
         # Force kill if still running
-        subprocess.run(["pkill", "-9", "-f", "headless_shell"], capture_output=True, timeout=3)
-        subprocess.run(["pkill", "-9", "-f", "chrome.*--headless"], capture_output=True, timeout=3)
+        subprocess.run(["pkill", "-9", "-", "headless_shell"], capture_output=True, timeout=3)
+        subprocess.run(["pkill", "-9", "-", "chrome.*--headless"], capture_output=True, timeout=3)
 
         logging.info("Cleaned up zombie browser processes")
     except subprocess.TimeoutExpired:
@@ -146,7 +146,7 @@ class Zagadka(commands.Bot):
         postgres_port: str = os.environ.get("POSTGRES_PORT", "")
 
         return (
-            f"postgresql+asyncpg://" f"{postgres_user}:" f"{postgres_password}@db:" f"{postgres_port}/" f"{postgres_db}"
+            "postgresql+asyncpg://" f"{postgres_user}:" f"{postgres_password}@db:" f"{postgres_port}/" f"{postgres_db}"
         )
 
     @asynccontextmanager

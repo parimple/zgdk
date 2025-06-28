@@ -4,7 +4,7 @@ Command-related Pydantic models for Discord bot commands.
 
 import re
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import Field, validator
 
@@ -91,7 +91,7 @@ class ColorInput(BaseModel):
         if lower_input in color_names:
             return cls.parse(color_names[lower_input])
 
-        raise ValueError(f"Invalid color format: '{color_input}'. " f"Use hex (#RRGGBB), rgb(r,g,b), or color name")
+        raise ValueError(f"Invalid color format: '{color_input}'. " "Use hex (#RRGGBB), rgb(r,g,b), or color name")
 
     @validator("discord_color")
     def validate_discord_color(cls, v: int) -> int:

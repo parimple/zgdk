@@ -17,7 +17,6 @@ sys.modules['datasources.queries'] = MagicMock()
 import types
 
 # Mock utils.premium but allow PaymentData import
-from unittest.mock import MagicMock as MockModule
 
 mock_premium = types.ModuleType('utils.premium')
 
@@ -50,11 +49,11 @@ async def test_addbalance_positive_amount(mock_add_payment, mock_bot_with_servic
     # Arrange
     amount = 500
     mock_session = mock_bot_with_services.get_db.return_value.__aenter__.return_value
-    
+
     # Act
     shop_cog = ShopCog(mock_bot_with_services)
     await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
-    
+
     # Assert payment was added with correct parameters
     call_args = mock_add_payment.call_args
     assert call_args[0][0] == mock_session  # session
@@ -62,9 +61,9 @@ async def test_addbalance_positive_amount(mock_add_payment, mock_bot_with_servic
     assert call_args[0][2] == mock_discord_context.author.display_name  # name
     assert call_args[0][3] == amount  # amount
     assert call_args[0][5] == "command"  # payment_type
-    
+
     mock_discord_context.reply.assert_called_once()
-    
+
     # Check reply message
     reply_message = mock_discord_context.reply.call_args[0][0]
     assert f"Dodano {amount}" in reply_message
@@ -76,16 +75,16 @@ async def test_addbalance_negative_amount(mock_bot_with_services, mock_discord_c
     """Test addbalance command with negative amount (deduction)"""
     # Arrange
     amount = -100
-    
+
     with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
-    
+
     # Assert
     mock_add_payment.assert_called_once()
     mock_discord_context.reply.assert_called_once()
-    
+
     # Check reply message contains negative amount
     reply_message = mock_discord_context.reply.call_args[0][0]
     assert str(amount) in reply_message
@@ -96,12 +95,12 @@ async def test_addbalance_zero_amount(mock_bot_with_services, mock_discord_conte
     """Test addbalance command with zero amount"""
     # Arrange
     amount = 0
-    
+
     with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
-    
+
     # Assert
     mock_add_payment.assert_called_once()
     mock_discord_context.reply.assert_called_once()
@@ -112,12 +111,12 @@ async def test_addbalance_large_amount(mock_bot_with_services, mock_discord_cont
     """Test addbalance command with large amount"""
     # Arrange
     amount = 999999
-    
+
     with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
-    
+
     # Assert
     mock_add_payment.assert_called_once()
     mock_discord_context.reply.assert_called_once()
@@ -128,15 +127,15 @@ async def test_addbalance_payment_data_creation(mock_bot_with_services, mock_dis
     """Test addbalance creates correct PaymentData"""
     # Arrange
     amount = 500
-    
+
     with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
-    
+
     # Assert payment data structure
     call_args = mock_add_payment.call_args[0]
-    
+
     # Check payment parameters
     assert call_args[1] == mock_discord_user.id  # member_id
     assert call_args[2] == mock_discord_context.author.display_name  # name
@@ -149,12 +148,12 @@ async def test_addbalance_member_service_integration(mock_bot_with_services, moc
     """Test addbalance integrates with member service"""
     # Arrange
     amount = 500
-    
+
     with patch('cogs.commands.shop.HandledPaymentQueries.add_payment'):
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
-    
+
     # Assert member service was called
     member_service = mock_bot_with_services.get_service('IMemberService')
     member_service.get_or_create_member.assert_called_once_with(mock_discord_user)
@@ -166,12 +165,12 @@ async def test_addbalance_database_session_usage(mock_bot_with_services, mock_di
     """Test addbalance uses database session correctly"""
     # Arrange
     amount = 500
-    
+
     with patch('cogs.commands.shop.HandledPaymentQueries.add_payment'):
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
-    
+
     # Assert database session was used
     mock_bot_with_services.get_db.assert_called_once()
 
@@ -184,17 +183,17 @@ def test_addbalance_command_signature():
     assert callable(shop_cog.add_balance)
 
 
-@pytest.mark.asyncio  
+@pytest.mark.asyncio
 async def test_addbalance_commit_transaction(mock_bot_with_services, mock_discord_context, mock_discord_user):
     """Test addbalance commits database transaction"""
     # Arrange
     amount = 500
     mock_session = mock_bot_with_services.get_db.return_value.__aenter__.return_value
-    
+
     with patch('cogs.commands.shop.HandledPaymentQueries.add_payment'):
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
-    
+
     # Assert transaction was committed
     mock_session.commit.assert_called_once()

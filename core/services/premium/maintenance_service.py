@@ -1,7 +1,7 @@
 """Premium maintenance service for handling expiration and cleanup."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import discord
@@ -142,7 +142,7 @@ class PremiumMaintenanceService(BaseService):
                 title="⏰ Premium wygasło",
                 description=(
                     f"Twoja ranga premium **{role_name}** właśnie wygasła.\n\n"
-                    f"Aby przedłużyć premium, użyj komendy `/sklep` "
+                    "Aby przedłużyć premium, użyj komendy `/sklep` "
                     f"lub odwiedź {self.bot.config['donate_url']}"
                 ),
                 color=discord.Color.orange(),
@@ -194,7 +194,7 @@ class PremiumMaintenanceService(BaseService):
                     # Member not in guild, remove entry
                     await self.premium_repository.remove_premium_role(premium_role.member_id, premium_role.role_name)
                     cleaned += 1
-                    logger.info(f"Cleaned up premium entry for absent member " f"{premium_role.member_id}")
+                    logger.info("Cleaned up premium entry for absent member " f"{premium_role.member_id}")
 
             self._log_operation("cleanup_invalid_premium_entries", cleaned=cleaned)
             return cleaned

@@ -3,7 +3,6 @@
 Script to help migrate from datasources.queries to core.repositories.
 """
 
-import os
 import re
 from pathlib import Path
 

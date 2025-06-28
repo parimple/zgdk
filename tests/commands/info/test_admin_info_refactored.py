@@ -24,9 +24,9 @@ class TestAdminHelpers:
             "last_used_at": datetime.now(timezone.utc),
             "creator_id": 123456789,
         }
-        
+
         invite = InviteInfo(invite_data)
-        
+
         assert invite.code == "ABC123"
         assert invite.uses == 5
         assert invite.creator_id == 123456789
@@ -38,14 +38,14 @@ class TestAdminHelpers:
         # Mock guild and member
         guild = MagicMock(spec=discord.Guild)
         member = MagicMock(spec=discord.Member)
-        
+
         # Create mock mute roles
         mute_img_role = MagicMock(spec=discord.Role)
         mute_img_role.name = "mutedimg"
-        
+
         mute_txt_role = MagicMock(spec=discord.Role)
         mute_txt_role.name = "mutedtxt"
-        
+
         # Setup guild.get_role
         def get_role(name=None):
             if name == "mutedimg":
@@ -53,16 +53,16 @@ class TestAdminHelpers:
             elif name == "mutedtxt":
                 return mute_txt_role
             return None
-        
+
         guild.roles = [mute_img_role, mute_txt_role]
         discord.utils.get = MagicMock(side_effect=lambda roles, name: get_role(name))
-        
+
         # Member has mutedimg role
         member.roles = [mute_img_role]
-        
+
         # Test
         active_mutes = get_member_active_mutes(guild, member)
-        
+
         assert "mutedimg" in active_mutes
         assert "mutedtxt" not in active_mutes
 
@@ -95,7 +95,7 @@ class TestInviteListView:
     def test_invite_list_view_creation(self, mock_ctx, sample_invites):
         """Test creating invite list view."""
         view = InviteListView(mock_ctx, sample_invites)
-        
+
         assert view.ctx == mock_ctx
         assert len(view.invites) == 15
         assert view.page == 0
@@ -106,9 +106,9 @@ class TestInviteListView:
     def test_invite_sorting(self, mock_ctx, sample_invites):
         """Test invite sorting."""
         view = InviteListView(mock_ctx, sample_invites, sort_by="uses", order="desc")
-        
+
         sorted_invites = view._sort_invites()
-        
+
         # Check that invites are sorted by uses in descending order
         for i in range(len(sorted_invites) - 1):
             assert sorted_invites[i].uses >= sorted_invites[i + 1].uses
@@ -132,7 +132,7 @@ class TestAdminInfoCog:
     def test_cog_initialization(self, admin_cog, mock_bot):
         """Test that cog initializes correctly."""
         assert admin_cog.bot == mock_bot
-        
+
         # Check that it has all command methods
         assert hasattr(admin_cog, "list_invites")
         assert hasattr(admin_cog, "sync")
@@ -148,13 +148,13 @@ class TestAdminInfoCog:
         ctx = MagicMock()
         ctx.bot = mock_bot
         ctx.send = AsyncMock()
-        
+
         # Mock tree sync
         mock_bot.tree.sync = AsyncMock(return_value=[1, 2, 3])  # 3 commands
-        
+
         # Run sync command
         await admin_cog.sync(ctx)
-        
+
         # Check that sync was called and message was sent
         mock_bot.tree.sync.assert_called_once()
         ctx.send.assert_called_once_with("Synced 3 commands globally")
@@ -165,26 +165,26 @@ class TestAdminInfoCog:
         # Mock context and user
         ctx = MagicMock()
         ctx.send = AsyncMock()
-        
+
         user = MagicMock(spec=discord.User)
         user.id = 123456
         user.mention = "<@123456>"
-        
+
         # Mock database session
         mock_session = MagicMock()
         mock_session.commit = AsyncMock()
         mock_bot.get_db.return_value.__aenter__.return_value = mock_session
-        
+
         # Mock member with bypass time
         mock_member = MagicMock()
         mock_member.voice_bypass_until = datetime.now(timezone.utc)
-        
+
         with patch("cogs.commands.info.admin.user_commands.MemberQueries") as mock_queries:
             mock_queries.add_bypass_time = AsyncMock(return_value=mock_member)
-            
+
             # Run command
             await admin_cog.add_t(ctx, user, 5)
-            
+
             # Verify
             mock_queries.add_bypass_time.assert_called_once_with(mock_session, 123456, 5)
             mock_session.commit.assert_called_once()

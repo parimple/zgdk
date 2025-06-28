@@ -1,6 +1,6 @@
 """Main role shop view for purchasing premium roles."""
 import logging
-from typing import Dict, List, Optional
+from typing import Dict
 
 import discord
 from discord.ext.commands import Context
@@ -11,7 +11,6 @@ from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 from utils.premium_logic import PremiumRoleManager
 
-from .constants import MONTHLY_DURATION, YEARLY_DURATION, YEARLY_MONTHS
 from .role_description_view import RoleDescriptionView
 from .role_purchase_handler import RolePurchaseHandler
 from .role_shop_helpers import RoleShopFormatting, RoleShopPricing

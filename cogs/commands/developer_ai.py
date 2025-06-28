@@ -3,8 +3,6 @@ Developer commands for AI interpretability and debugging.
 Provides insights into AI decision-making processes.
 """
 
-import json
-from datetime import datetime
 from typing import Optional
 
 import discord
@@ -13,7 +11,7 @@ from discord.ext import commands
 from core.ai.color_parser import ColorParser
 from core.ai.command_classifier import CommandIntentClassifier
 from core.ai.duration_parser import DurationParser
-from utils.ai.interpretability import DecisionTrace, get_explainer
+from utils.ai.interpretability import get_explainer
 
 
 class DeveloperAI(commands.Cog):
@@ -153,7 +151,7 @@ class DeveloperAI(commands.Cog):
                 name=f"#{i} - {decision.timestamp.strftime('%H:%M:%S')}", value="\n".join(info), inline=False
             )
 
-        embed.set_footer(text=f"Użyj /ai explain {index} aby uzyskać szczegóły")
+        embed.set_footer(text="Użyj /ai explain <numer> aby uzyskać szczegóły")
         await ctx.send(embed=embed)
 
     @ai_group.command(name="stats", description="Show AI usage statistics")

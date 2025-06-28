@@ -129,13 +129,13 @@ class BasePermissionCommand:
             for role_config in mute_roles:
                 role = ctx.guild.get_role(role_config["id"])
                 if role and role in target.roles:
-                    if role_config["description"] == "stream_off" and self.permission_name == "stream":
+                    if role_config["description"] == "stream_of" and self.permission_name == "stream":
                         await cog.message_sender.send_error(
                             ctx,
                             f"Nie można nadać uprawnień do streamowania - użytkownik {target.mention} ma rolę {role.name}!",
                         )
                         return
-                    elif role_config["description"] == "send_messages_off" and self.permission_name == "send_messages":
+                    elif role_config["description"] == "send_messages_of" and self.permission_name == "send_messages":
                         await cog.message_sender.send_error(
                             ctx,
                             f"Nie można nadać uprawnień do pisania - użytkownik {target.mention} ma rolę {role.name}!",
@@ -774,7 +774,7 @@ class VoicePermissionManager:
         for permission in member_permissions:
             # Skip @everyone permissions for clean_perms channels
             if is_clean_perms and permission.target_id == guild.id:
-                self.logger.info(f"Skipping @everyone permissions from DB for clean perms channel")
+                self.logger.info("Skipping @everyone permissions from DB for clean perms channel")
                 continue
 
             allow_permissions = discord.Permissions(permission.allow_permissions_value)

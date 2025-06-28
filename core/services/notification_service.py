@@ -65,7 +65,7 @@ class NotificationService(BaseService, INotificationService):
         try:
             embed = self.embed_builder.create_error_embed(
                 title="Brak uprawnień",
-                description=f"Nie masz wystarczających uprawnień do wykonania tej akcji.\n"
+                description="Nie masz wystarczających uprawnień do wykonania tej akcji.\n"
                 f"Wymagane uprawnienie: **{required_permission}**",
             )
 

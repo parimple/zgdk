@@ -6,11 +6,9 @@ from typing import Any, Optional, Tuple
 
 import discord
 
-from core.interfaces.member_interfaces import IMemberService
 from core.interfaces.premium_interfaces import ExtensionResult, ExtensionType, IPremiumRoleManager, PremiumRoleConfig
 from core.repositories.premium_repository import PremiumRepository
 from core.services.base_service import BaseService
-from datasources.queries import RoleQueries
 
 logger = logging.getLogger(__name__)
 

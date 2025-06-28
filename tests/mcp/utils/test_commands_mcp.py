@@ -10,13 +10,13 @@ import aiohttp
 async def test_command(command, args=""):
     """Test a single command through API."""
     async with aiohttp.ClientSession() as session:
-        async with session.post('http://localhost:8090/execute', 
+        async with session.post('http://localhost:8090/execute',
                               json={'command': command, 'args': args}) as resp:
             result = await resp.json()
             print(f"\n{'='*60}")
             print(f"Command: ,{command} {args}")
             print(f"{'='*60}")
-            
+
             if result.get('success'):
                 for response in result.get('responses', []):
                     if response.get('content'):
@@ -36,9 +36,10 @@ async def test_command(command, args=""):
                             if embed.get('footer'):
                                 print(f"Footer: {embed['footer'].get('text', 'No text')}")
             else:
-                print(f"Error: Command failed")
-            
+                print("Error: Command failed")
+
             return result
+
 
 async def main():
     """Test all ranking commands."""
@@ -55,7 +56,7 @@ async def main():
             ("my_rank", ""),
             ("top", "100"),
         ]
-        
+
         for cmd, args in commands:
             await test_command(cmd, args)
             await asyncio.sleep(1)

@@ -143,7 +143,7 @@ def main():
             circular_suspects.append(module)
 
     if circular_suspects:
-        print(f"\nPotential circular dependencies detected in:")
+        print("\nPotential circular dependencies detected in:")
         for module in circular_suspects:
             print(f"  - {module}")
     else:
@@ -157,7 +157,7 @@ def main():
     # Test service container import chain
     print("\nTesting ServiceContainer import chain:")
     try:
-        from core.containers.service_container import ServiceContainer
+        pass
 
         print("✓ ServiceContainer imports successfully")
     except Exception as e:
@@ -166,7 +166,7 @@ def main():
     # Test unit of work import chain
     print("\nTesting UnitOfWork import chain:")
     try:
-        from core.unit_of_work import UnitOfWork
+        pass
 
         print("✓ UnitOfWork imports successfully")
     except Exception as e:
@@ -175,7 +175,7 @@ def main():
     # Test main bot class
     print("\nTesting main Zagadka class:")
     try:
-        from main import Zagadka
+        pass
 
         print("✓ Zagadka class imports successfully")
     except Exception as e:

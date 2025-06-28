@@ -336,7 +336,6 @@ class FakeMessage:
 
     async def delete(self, *, delay: float = None):
         """Fake delete method."""
-        pass
 
     async def reply(self, content: str = None, **kwargs):
         """Send a reply in the channel."""
@@ -349,7 +348,6 @@ class FakeMessage:
 
     async def add_reaction(self, emoji):
         """Fake add reaction method."""
-        pass
 
 
 async def setup(bot: commands.Bot):

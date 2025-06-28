@@ -11,7 +11,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from core.ai.moderation_assistant import ModerationAssistant, ModerationType, ThreatLevel, UserContext, ViolationType
+from core.ai.moderation_assistant import ModerationAssistant, UserContext
 
 # Test cases for moderation
 TEST_MESSAGES = [
@@ -77,7 +77,7 @@ async def test_pattern_detection():
 
         # Test with new user
         result = await assistant.analyze_message(message, new_user)
-        print(f"\n👤 New User Analysis:")
+        print("\n👤 New User Analysis:")
         print(f"  Threat Level: {result.threat_level.value}")
         print(f"  Violations: {[v.value for v in result.violations]}")
         print(f"  Action: {result.suggested_action.value}")
@@ -86,7 +86,7 @@ async def test_pattern_detection():
 
         # Test with repeat offender
         result_repeat = await assistant.analyze_message(message, repeat_offender)
-        print(f"\n👤 Repeat Offender Analysis:")
+        print("\n👤 Repeat Offender Analysis:")
         print(f"  Threat Level: {result_repeat.threat_level.value}")
         print(f"  Action: {result_repeat.suggested_action.value}")
         print(f"  Duration: {result_repeat.duration_text if result_repeat.suggested_duration else 'N/A'}")
@@ -130,7 +130,7 @@ async def test_ai_moderation():
                 ],
             )
 
-            print(f"✅ Success!")
+            print("✅ Success!")
             print(f"  Threat Level: {result.threat_level.value}")
             print(f"  Violations: {[v.value for v in result.violations]}")
             print(f"  Action: {result.suggested_action.value}")
@@ -201,7 +201,7 @@ async def test_user_behavior_analysis():
 
         result = await assistant.analyze_user_behavior(user)
 
-        print(f"\n📊 Behavior Analysis:")
+        print("\n📊 Behavior Analysis:")
         print(f"  Threat Level: {result.threat_level.value}")
         print(f"  Action: {result.suggested_action.value}")
         print(f"  Reason: {result.reason}")
@@ -257,7 +257,7 @@ async def test_edge_cases():
 
             # Note premium treatment
             if "Premium" in premium_user.roles:
-                print(f"  💎 Premium user - may receive lighter punishment")
+                print("  💎 Premium user - may receive lighter punishment")
 
         except Exception as e:
             print(f"  ❌ Error: {str(e)}")
@@ -283,7 +283,7 @@ async def main():
         decisions = explainer.logger.get_recent_decisions(module="moderation_assistant")
 
         if decisions:
-            print(f"\n📊 Moderation Statistics:")
+            print("\n📊 Moderation Statistics:")
             print(f"  Total decisions: {len(decisions)}")
 
             threat_counts = {}
@@ -298,11 +298,11 @@ async def main():
                     threat_counts[threat] = threat_counts.get(threat, 0) + 1
                     action_counts[action] = action_counts.get(action, 0) + 1
 
-            print(f"\n  Threat Levels:")
+            print("\n  Threat Levels:")
             for threat, count in threat_counts.items():
                 print(f"    {threat}: {count}")
 
-            print(f"\n  Suggested Actions:")
+            print("\n  Suggested Actions:")
             for action, count in action_counts.items():
                 print(f"    {action}: {count}")
 

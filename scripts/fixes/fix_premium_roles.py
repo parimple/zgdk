@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import datetime
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -58,7 +58,7 @@ async def fix_premium_roles():
                     await session.execute(
                         text(
                             """
-                            UPDATE roles 
+                            UPDATE roles
                             SET discord_id = :discord_id,
                                 role_type = 'premium',
                                 updated_at = :updated_at

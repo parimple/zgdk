@@ -5,7 +5,6 @@ import logging
 import textwrap
 import traceback
 from contextlib import redirect_stdout
-from typing import Optional
 
 import discord
 from discord.ext import commands
@@ -42,7 +41,7 @@ class DevCog(commands.Cog, name="Developer"):
     #             try:
     #                 await self.bot.reload_extension(extension)
     #                 success += 1
-    #             except:
+    #             except Exception:
     #                 failed += 1
     #         await ctx.send(f"✅ Reloaded {success} cogs, {failed} failed")
 
@@ -55,7 +54,7 @@ class DevCog(commands.Cog, name="Developer"):
 
         try:
             parsed_args = shlex.split(args) if args else []
-        except:
+        except Exception:
             parsed_args = args.split() if args else []
 
         # Run quick test

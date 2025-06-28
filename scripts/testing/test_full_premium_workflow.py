@@ -1,7 +1,6 @@
 """Full premium workflow test with role purchase simulation."""
 
 import asyncio
-import json
 from datetime import datetime
 
 import aiohttp

@@ -1,5 +1,4 @@
 """Helper functions for creating consistent shop embeds."""
-from typing import Optional
 
 import discord
 
@@ -45,9 +44,9 @@ def create_downgrade_embed(
 
     description = (
         f"Masz rangę `{current_role}`, wybierasz `{new_role}`\n\n"
-        f"💡 Opcje:\n"
+        "💡 Opcje:\n"
         f"• Przedłuż obecną - dodaje {duration_text} do {current_role}\n"
-        f"• Zmień rangę - wymaga sprzedaży obecnej"
+        "• Zmień rangę - wymaga sprzedaży obecnej"
     )
 
     embed = discord.Embed(

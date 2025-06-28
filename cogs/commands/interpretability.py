@@ -37,7 +37,7 @@ class InterpretabilityCog(commands.Cog, name="Interpretability"):
         try:
             explanation_level = ExplanationLevel(level.lower())
         except ValueError:
-            await ctx.send(f"❌ Nieprawidłowy poziom. Dostępne: simple, detailed, technical")
+            await ctx.send("❌ Nieprawidłowy poziom. Dostępne: simple, detailed, technical")
             return
 
         # Get user's last decision

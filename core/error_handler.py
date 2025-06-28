@@ -6,24 +6,24 @@ across services and commands.
 """
 
 import logging
-import traceback
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, TypeVar
 
 import discord
 from discord.ext import commands
 
 from .exceptions import (
     BotError,
-    CooldownError,
-    DatabaseError,
+    CooldownException,
     InsufficientBalanceError,
-    NotFoundError,
     PermissionError,
-    RateLimitError,
+    RateLimitException,
+    ResourceNotFoundException,
     ValidationError,
     ValidationException,
 )
+from .exceptions.database import DatabaseError as DatabaseException
+from .exceptions.base import PermissionError as PermissionException
 
 logger = logging.getLogger(__name__)
 

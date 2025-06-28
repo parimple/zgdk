@@ -5,7 +5,7 @@ This allows gradual migration from queries to repositories without breaking exis
 """
 
 import logging
-from typing import Protocol, Type, TypeVar
+from typing import TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

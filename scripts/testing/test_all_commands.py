@@ -5,13 +5,11 @@ Test all Discord bot commands systematically.
 This script tests all available commands and generates a comprehensive report.
 """
 
-import asyncio
 import json
 import subprocess
-import sys
 import time
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 
 class CommandTester:
@@ -61,7 +59,7 @@ class CommandTester:
 
     def execute_command(self, command: str, args: str = "") -> Dict:
         """Execute a single command via MCP."""
-        script = f"""
+        script = """
 import asyncio
 import json
 from mcp_bot_server import call_tool
@@ -72,12 +70,12 @@ async def main():
             'command': '{command}',
             'args': '{args}'
         }})
-        
+
         output = {{
             'success': True,
             'responses': []
         }}
-        
+
         for r in result:
             if hasattr(r, 'type') and hasattr(r, 'text'):
                 output['responses'].append({{
@@ -86,9 +84,9 @@ async def main():
                 }})
             else:
                 output['responses'].append(str(r)[:200])
-        
+
         print(json.dumps(output))
-        
+
     except Exception as e:
         print(json.dumps({{'success': False, 'error': str(e)}}))
 

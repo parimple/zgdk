@@ -4,7 +4,7 @@ Moderation-related Pydantic models.
 
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field, validator
 

@@ -130,7 +130,7 @@ class OnMemberRoleUpdateEvent(commands.Cog):
                         try:
                             await after.send(
                                 f"⚠️ Twój nick został automatycznie zmieniony na `{default_nick}` z powodu aktywnej kary mutenick. "
-                                f"Aby odzyskać możliwość zmiany nicku, udaj się na kanał premium i zakup dowolną rangę."
+                                "Aby odzyskać możliwość zmiany nicku, udaj się na kanał premium i zakup dowolną rangę."
                             )
                         except discord.Forbidden:
                             # User has DMs disabled, that's fine

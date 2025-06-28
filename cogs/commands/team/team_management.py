@@ -122,9 +122,9 @@ class TeamManagementCommands:
         if not team_role:
             # Create description
             description = (
-                f"Nie masz teamu. Możesz go utworzyć za pomocą komendy:\n"
+                "Nie masz teamu. Możesz go utworzyć za pomocą komendy:\n"
                 f"`{self.prefix}team create <nazwa>`\n\n"
-                f"Minimalne wymagania: posiadanie rangi **zG100**.\n\n"
+                "Minimalne wymagania: posiadanie rangi **zG100**.\n\n"
                 f"{available_commands}"
             )
 
@@ -356,7 +356,7 @@ class TeamManagementCommands:
 
             try:
                 reaction, user = await self.bot.wait_for("reaction_add", timeout=30.0, check=check)
-            except:
+            except Exception:
                 await confirm_msg.delete()
                 await self._send_premium_embed(ctx, description="❌ Czas na potwierdzenie minął.", color=0xFF0000)
                 return
@@ -376,7 +376,7 @@ class TeamManagementCommands:
             if team_info["channel"]:
                 try:
                     await team_info["channel"].delete(reason=f"Team deleted by {ctx.author}")
-                except:
+                except Exception:
                     pass
 
             # Delete role

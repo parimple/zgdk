@@ -9,7 +9,7 @@ import json
 import os
 import subprocess
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # Use discord.py-self (which is what's currently installed)
 import discord
@@ -185,7 +185,7 @@ class ComprehiveShopTester:
                         print(f"      🔸 {result['error']}")
 
             success_rate = (success_count / len(self.test_results) * 100) if self.test_results else 0
-            print(f"\n📈 Shop Test Results:")
+            print("\n📈 Shop Test Results:")
             print(f"   Success Rate: {success_rate:.1f}% ({success_count}/{len(self.test_results)})")
 
             if success_rate >= 90:
@@ -348,7 +348,7 @@ async def main():
     print("🏪 Comprehensive Shop Testing Framework")
     print("=====================================")
     print(f"⏰ Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"🎯 Testing complete shop workflow:")
+    print("🎯 Testing complete shop workflow:")
     print("   • Balance management")
     print("   • Role purchasing (zG50)")
     print("   • Role extension")

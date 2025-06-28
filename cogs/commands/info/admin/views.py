@@ -4,8 +4,6 @@ from datetime import datetime, timezone
 
 import discord
 
-from .helpers import InviteInfo
-
 
 class InviteListView(discord.ui.View):
     """View for displaying and sorting invite lists."""

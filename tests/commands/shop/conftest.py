@@ -44,14 +44,7 @@ permissions_mock.is_zagadka_owner = is_zagadka_owner
 permissions_mock.is_admin = is_admin
 sys.modules['utils.permissions'] = permissions_mock
 
-from tests.data.test_constants import (
-    BOT_CONFIG,
-    GUILD_ID,
-    MAIN_OWNER_ID,
-    TEST_CHANNEL_ID,
-    TEST_USER_1_ID,
-    WALLET_BALANCES,
-)
+from tests.data.test_constants import BOT_CONFIG, GUILD_ID, TEST_CHANNEL_ID, TEST_USER_1_ID, WALLET_BALANCES
 
 
 @pytest.fixture
@@ -102,15 +95,15 @@ def mock_user():
 def mock_member_service():
     """Create member service mock"""
     service = AsyncMock()
-    
+
     # Mock database member
     db_member = MagicMock()
     db_member.wallet_balance = WALLET_BALANCES["medium"]
     db_member.id = TEST_USER_1_ID
-    
+
     service.get_or_create_member.return_value = db_member
     service.update_member_info = AsyncMock()
-    
+
     return service
 
 

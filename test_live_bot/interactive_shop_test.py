@@ -4,12 +4,11 @@ Interactive Shop Testing - Test shop with button interactions
 This test attempts to click shop buttons to test actual purchasing
 """
 import asyncio
-import glob
 import json
 import os
 import subprocess
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # Use discord.py-self (which is what's currently installed)
 import discord
@@ -65,7 +64,7 @@ class InteractiveShopTester:
             print(f"✅ Connected to {guild.name} -> {channel.name}")
 
             # Phase 1: Setup balance
-            print(f"\n🧪 💰 Adding initial balance (3000)")
+            print("\n🧪 💰 Adding initial balance (3000)")
             print(f"📤 Command: ,addbalance <@{TEST_USER_ID}> 3000")
 
             try:
@@ -88,8 +87,8 @@ class InteractiveShopTester:
             await asyncio.sleep(DELAY_BETWEEN_COMMANDS)
 
             # Phase 2: Open shop and store message
-            print(f"\n🧪 🏪 Opening shop for button interaction")
-            print(f"📤 Command: ,shop")
+            print("\n🧪 🏪 Opening shop for button interaction")
+            print("📤 Command: ,shop")
 
             try:
                 before_time = datetime.now(timezone.utc)
@@ -127,7 +126,7 @@ class InteractiveShopTester:
 
             # Phase 3: Try to click a button (if shop message found)
             if self.shop_message and hasattr(self.shop_message, "components"):
-                print(f"\n🧪 🔘 Attempting to click shop button")
+                print("\n🧪 🔘 Attempting to click shop button")
 
                 try:
                     # Try to click the first button in the first row
@@ -187,8 +186,8 @@ class InteractiveShopTester:
             await asyncio.sleep(DELAY_BETWEEN_COMMANDS)
 
             # Phase 4: Check profile after attempts
-            print(f"\n🧪 👤 Checking final profile")
-            print(f"📤 Command: ,profile")
+            print("\n🧪 👤 Checking final profile")
+            print("📤 Command: ,profile")
 
             try:
                 before_time = datetime.now(timezone.utc)
@@ -248,7 +247,7 @@ class InteractiveShopTester:
             total_tests = len(self.test_results)
             success_rate = ((success_count + limitation_count) / total_tests * 100) if total_tests else 0
 
-            print(f"\n📈 Interactive Test Results:")
+            print("\n📈 Interactive Test Results:")
             print(f"   Success Rate: {success_rate:.1f}% ({success_count + limitation_count}/{total_tests})")
             print(f"   Successful: {success_count}")
             print(f"   Expected Limitations: {limitation_count}")
@@ -368,7 +367,7 @@ async def main():
     print("🏪 Interactive Shop Testing Framework")
     print("===================================")
     print(f"⏰ Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"🎯 Testing shop with button interaction attempts:")
+    print("🎯 Testing shop with button interaction attempts:")
     print("   • Balance setup")
     print("   • Shop display with button detection")
     print("   • Button click attempts (limited by Discord)")

@@ -19,7 +19,6 @@ class ITeamManagementService(ABC):
         Returns:
             Number of deleted teams
         """
-        pass
 
     @abstractmethod
     async def delete_user_teams_by_sql(self, session, member_id: int) -> int:
@@ -36,7 +35,6 @@ class ITeamManagementService(ABC):
         Returns:
             Number of deleted teams
         """
-        pass
 
     @abstractmethod
     async def create_team(
@@ -58,7 +56,6 @@ class ITeamManagementService(ABC):
         Returns:
             Team role ID if successful, None otherwise
         """
-        pass
 
     @abstractmethod
     async def get_user_teams(self, session, owner_id: int) -> list:
@@ -72,7 +69,6 @@ class ITeamManagementService(ABC):
         Returns:
             List of team records
         """
-        pass
 
     @abstractmethod
     async def validate_team_ownership(self, session, team_id: int, owner_id: int) -> bool:
@@ -87,4 +83,3 @@ class ITeamManagementService(ABC):
         Returns:
             True if user owns the team
         """
-        pass

@@ -6,9 +6,6 @@ from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands, tasks
-from sqlalchemy import select
-
-from datasources.models import HandledPayment
 
 from .invite_manager import InviteManager
 from .role_restorer import RoleRestorer
@@ -125,21 +122,21 @@ class OnMemberJoinEvent(commands.Cog):
 
             member_service = await self.bot.get_service(IMemberService, session)
             try:
-                db_member = await member_service.get_member(member)
+                _db_member = await member_service.get_member(member)
                 is_returning = True
-            except:
+            except Exception:
                 is_returning = False
 
             # Get mute information
             moderation_repo = ModerationRepository(session)
-            role_repo = RoleRepository(session)
+            _role_repo = RoleRepository(session)
 
             # Get mute history
             mute_history = await moderation_repo.get_user_mute_history(member.id, limit=50)
             total_mutes = len([m for m in mute_history if m.action_type == "mute"])
 
             # Check for active mutes
-            mute_role_ids = [role["id"] for role in self.bot.config.get("mute_roles", [])]
+            _mute_role_ids = [role["id"] for role in self.bot.config.get("mute_roles", [])]
             active_mutes = []
 
             for role_config in self.bot.config.get("mute_roles", []):
@@ -236,7 +233,6 @@ class OnMemberJoinEvent(commands.Cog):
     async def _check_pending_payments(self, member: discord.Member):
         """Check if member has pending payments from when they were banned."""
         # Removed - payment for unban is the unban itself, not premium
-        pass
 
     async def notify_invite_deleted(self, user_id: int, invite_id: str):
         """Notify user that their invite was deleted."""
@@ -247,7 +243,7 @@ class OnMemberJoinEvent(commands.Cog):
                     title="🗑️ Zaproszenie usunięte",
                     description=(
                         f"Twoje zaproszenie **{invite_id}** zostało usunięte, "
-                        f"ponieważ wygasło lub osiągnęło limit użyć."
+                        "ponieważ wygasło lub osiągnęło limit użyć."
                     ),
                     color=discord.Color.orange(),
                     timestamp=datetime.now(timezone.utc),

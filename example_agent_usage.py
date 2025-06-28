@@ -2,7 +2,7 @@
 
 import asyncio
 
-from agent_builder import AgentConfig, AgentFactory
+from agent_builder import AgentFactory
 
 
 async def main():
@@ -14,7 +14,7 @@ async def main():
     # Example 1: Quick creation from template
     print("1. Creating Moderation Agent from template...")
     moderation_agent = await factory.create_moderation_agent()
-    print(f"   ✅ Moderation agent ready!")
+    print("   ✅ Moderation agent ready!")
 
     # Example 2: Custom agent for sentiment analysis
     print("\n2. Creating custom Sentiment Analyzer...")

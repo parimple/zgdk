@@ -367,7 +367,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
             color = author_color if author_color and author_color.value != 0 else discord.Color.blue()
 
             embed = discord.Embed(
-                title=f"🏆 Ranking Aktywności zaGadki",
+                title="🏆 Ranking Aktywności zaGadki",
                 description=f"📌 **Najaktywniejsi członkowie serwera z ostatnich {days_back} dni**",
                 color=color,
             )
@@ -459,7 +459,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
             color = member.color if member.color.value != 0 else discord.Color.blue()
 
             embed = discord.Embed(
-                title=f"📊 Statystyki aktywności zaGadki",
+                title="📊 Statystyki aktywności zaGadki",
                 description=f"**Profil użytkownika:** {member.display_name}",
                 color=color,
             )

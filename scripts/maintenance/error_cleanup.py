@@ -124,7 +124,7 @@ def generate_error_report() -> str:
     # Count total errors
     total_errors = sum(len(session_errors) for session_errors in errors.values())
 
-    report_lines.append(f"\n📊 SUMMARY:")
+    report_lines.append("\n📊 SUMMARY:")
     report_lines.append(f"  Total error sessions: {len(errors)}")
     report_lines.append(f"  Total errors logged: {total_errors}")
     report_lines.append(f"  Fixed errors: {len(fixed_errors)}")
@@ -143,7 +143,7 @@ def generate_error_report() -> str:
     # Fixed errors verification
     verification = verify_fixed_errors()
     if verification:
-        report_lines.append(f"\n✅ FIXED ERRORS VERIFICATION:")
+        report_lines.append("\n✅ FIXED ERRORS VERIFICATION:")
         for error_key, is_fixed in verification.items():
             status = "✓ Fixed" if is_fixed else "✗ Still occurring"
             report_lines.append(f"  {status}: {error_key[:60]}...")

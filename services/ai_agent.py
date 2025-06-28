@@ -1,10 +1,9 @@
 """AI Agent microservice for scalable AI processing."""
 
-import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import google.generativeai as genai
 import redis.asyncio as redis

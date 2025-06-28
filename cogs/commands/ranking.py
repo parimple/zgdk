@@ -1,13 +1,12 @@
 """Ranking commands for the activity/points system."""
 
 import logging
-from typing import Optional
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.interfaces import IActivityTrackingService, IPermissionService
+from core.interfaces import IActivityTrackingService
 from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,6 @@ class RankingCommands(commands.Cog):
     async def on_ready(self):
         """Set guild when bot is ready."""
         # Activity service will be fetched when needed with session
-        pass
 
     @commands.hybrid_command(name="ranking", aliases=["top", "topka"], description="Pokaż ranking aktywności serwera")
     @app_commands.describe(
@@ -164,7 +162,7 @@ class RankingCommands(commands.Cog):
                 stats = await activity_service.get_member_stats(session, ctx.author.id, days)
 
             # Use member's color if available, otherwise blue
-            color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
+            _color = ctx.author.color if ctx.author.color.value != 0 else discord.Color.blue()
 
             # Format my rank like ,vc command - description only
             if stats["position"] > 0:

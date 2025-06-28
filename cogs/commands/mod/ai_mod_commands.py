@@ -15,7 +15,6 @@ from core.ai.moderation_assistant import (
     UserContext,
     ViolationType,
 )
-from utils.ai.interpretability import log_and_explain
 
 
 class AIModerationCommands(commands.Cog):
@@ -47,13 +46,13 @@ class AIModerationCommands(commands.Cog):
             # Search in current channel first
             try:
                 message = await ctx.channel.fetch_message(message_id_int)
-            except:
+            except Exception:
                 # Search in other channels
                 for channel in ctx.guild.text_channels:
                     try:
                         message = await channel.fetch_message(message_id_int)
                         break
-                    except:
+                    except Exception:
                         continue
 
             if not message:
@@ -254,7 +253,7 @@ class AIModerationCommands(commands.Cog):
                 if mod_channel:
                     embed = discord.Embed(
                         title="⚠️ Auto-moderacja AI",
-                        description=f"Wykryto podejrzaną wiadomość",
+                        description="Wykryto podejrzaną wiadomość",
                         color=discord.Color.red(),
                     )
 
@@ -282,10 +281,10 @@ class AIModerationCommands(commands.Cog):
                                 f"{message.author.mention} - Twoja wiadomość została usunięta przez auto-moderację.",
                                 delete_after=10,
                             )
-                        except:
+                        except Exception:
                             pass
 
-        except Exception as e:
+        except Exception:
             # Don't crash on auto-mod errors
             pass
 
@@ -414,7 +413,7 @@ class ModerationActionView(discord.ui.View):
             # Disable delete button
             button.disabled = True
             await interaction.message.edit(view=self)
-        except:
+        except Exception:
             await interaction.followup.send("❌ Nie można usunąć wiadomości")
 
     @discord.ui.button(label="Ignoruj", style=discord.ButtonStyle.secondary, emoji="❌")

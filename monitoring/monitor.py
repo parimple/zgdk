@@ -10,11 +10,11 @@ import logging
 import os
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import aiohttp
 import yaml
@@ -380,7 +380,7 @@ class ZGDKMonitor:
 <body>
     <div class="container">
         <h1>ZGDK Status Dashboard</h1>
-        
+
         <div class="summary">
             <h2>System Overview</h2>
             <div class="summary-stats">
@@ -398,11 +398,11 @@ class ZGDKMonitor:
                 </div>
             </div>
         </div>
-        
+
         <div class="status-grid">
             {status_cards}
         </div>
-        
+
         <div class="last-updated">
             Last updated: {last_updated}
         </div>
@@ -418,7 +418,7 @@ class ZGDKMonitor:
         # Generate status cards
         status_cards = []
         for check in self.health_checks:
-            card = f"""
+            card = """
             <div class="status-card">
                 <div class="status-header">
                     <span class="service-name">{check.service.replace('_', ' ').title()}</span>

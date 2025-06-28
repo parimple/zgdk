@@ -8,7 +8,6 @@ import asyncio
 import logging
 import os
 import signal
-from contextlib import asynccontextmanager
 from typing import Optional
 
 from playwright.async_api import Browser, Page, async_playwright

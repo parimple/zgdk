@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession

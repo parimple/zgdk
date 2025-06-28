@@ -3,20 +3,17 @@ AI interpretability and explainability tools for ZGDK bot.
 Provides decision logging, feature extraction, and explanation generation.
 """
 
-import asyncio
 import json
 import logging
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
 if TYPE_CHECKING:
-    import discord
     from discord.ext import commands
 
 logger = logging.getLogger(__name__)
@@ -203,7 +200,7 @@ class FeatureExtractor:
         features = {
             "length": len(text),
             "starts_with_hash": text.startswith("#"),
-            "has_hex_chars": all(c in "0123456789ABCDEFabcdef" for c in text.strip("#")),
+            "has_hex_chars": all(c in "0123456789ABCDEFabcde" for c in text.strip("#")),
             "has_rgb_pattern": "rgb" in text.lower() or "," in text,
             "has_color_name": any(
                 color in text.lower()
@@ -294,16 +291,16 @@ class ModelExplainer:
     ) -> str:
         """Generate a human-readable explanation for an AI decision."""
         if hasattr(self, "explanation_agent"):
-            prompt = f"""
+            prompt = """
             Explain this AI decision:
             Module: {module}
             Input: "{input_text}"
             Decision: {decision}
             Confidence: {confidence:.2%}
-            
+
             Key features that influenced the decision:
             {json.dumps(features, indent=2, ensure_ascii=False)}
-            
+
             Provide a brief, clear explanation of why this decision was made.
             """
 
@@ -358,7 +355,7 @@ class ModelExplainer:
 
     def _explain_intent(self, input_text: str, decision: Any, features: Dict[str, Any], confidence: float) -> str:
         """Explain intent classification decision."""
-        explanation = f"Analizując intencję komendy:\n"
+        explanation = "Analizując intencję komendy:\n"
 
         if features.get("has_question"):
             explanation += "• Wykryto pytanie\n"

@@ -17,7 +17,7 @@ def mock_bot():
     bot.user = MagicMock()
     bot.user.id = 123456789
     bot.user.name = "TestBot"
-    
+
     # Mock config
     bot.config = {
         "premium_roles": [
@@ -33,13 +33,13 @@ def mock_bot():
         },
         "admin_roles": ["Admin", "Moderator"]
     }
-    
+
     # Mock get_db
     bot.get_db = AsyncMock()
-    
+
     # Mock get_service
     bot.get_service = AsyncMock()
-    
+
     return bot
 
 
@@ -86,12 +86,12 @@ def mock_author():
     author.name = "AdminUser"
     author.display_name = "AdminUser"
     author.mention = "<@956602391891947592>"
-    
+
     # Mock admin role
     admin_role = MagicMock()
     admin_role.name = "Admin"
     author.roles = [admin_role]
-    
+
     return author
 
 
@@ -105,7 +105,7 @@ def mock_ctx(mock_bot, mock_guild, mock_channel, mock_author):
     ctx.author = mock_author
     ctx.send = AsyncMock()
     ctx.reply = AsyncMock()
-    
+
     return ctx
 
 
@@ -123,17 +123,17 @@ def mock_db_session():
 def mock_member_service():
     """Mock member service"""
     service = AsyncMock()
-    
+
     # Mock database member object
     db_member = MagicMock()
     db_member.id = 968632323916566579
     db_member.wallet_balance = 1000
     db_member.total_activity_points = 500
-    
+
     service.get_or_create_member = AsyncMock(return_value=db_member)
     service.add_balance = AsyncMock()
     service.update_balance = AsyncMock()
-    
+
     return service
 
 
@@ -141,21 +141,21 @@ def mock_member_service():
 def mock_premium_service():
     """Mock premium service"""
     service = AsyncMock()
-    
+
     # Mock premium roles data
     premium_roles = [
         {
             "role_id": 123456789,
-            "role_name": "zG50", 
+            "role_name": "zG50",
             "expiration_date": datetime.now(timezone.utc),
             "is_active": True
         }
     ]
-    
+
     service.get_member_premium_roles = AsyncMock(return_value=premium_roles)
     service.assign_role = AsyncMock()
     service.remove_expired_roles = AsyncMock()
-    
+
     return service
 
 
@@ -173,17 +173,17 @@ def mock_moderation_service():
 def mock_activity_service():
     """Mock activity tracking service"""
     service = AsyncMock()
-    
+
     # Mock leaderboard data
     leaderboard = [
         {"member_id": 111, "points": 1000, "rank": 1},
         {"member_id": 222, "points": 800, "rank": 2},
         {"member_id": 333, "points": 600, "rank": 3}
     ]
-    
+
     service.get_leaderboard = AsyncMock(return_value=leaderboard)
     service.get_member_stats = AsyncMock(return_value={"points": 500, "rank": 10})
-    
+
     return service
 
 

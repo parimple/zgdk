@@ -5,7 +5,6 @@ Example MCP Client for testing ZGDK bot.
 
 import asyncio
 import json
-from typing import Any, Dict
 
 from mcp.client import Client
 from mcp.client.stdio import stdio_transport
@@ -40,7 +39,7 @@ class ZGDKTestClient:
 
     async def test_balance_modification(self, user_id: str, amount: int):
         """Test balance modification."""
-        print(f"\n=== Testing Balance Modification ===")
+        print("\n=== Testing Balance Modification ===")
         result = await self.client.call_tool(
             "modify_user_balance", {"user_id": user_id, "amount": amount, "reason": "Testing via MCP"}
         )

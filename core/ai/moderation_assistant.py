@@ -4,12 +4,12 @@ AI-powered moderation assistance using PydanticAI.
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
-from ..models.moderation import ModerationType, MuteType
+from ..models.moderation import ModerationType
 
 
 class ThreatLevel(str, Enum):
@@ -99,7 +99,7 @@ class ModerationAssistant:
             openai_key = os.getenv("OPENAI_API_KEY")
 
             system_prompt = """Jesteś asystentem moderacji Discord. Analizuj wiadomości w języku polskim i angielskim.
-                
+
                 Odpowiadaj TYLKO w formacie czystego JSON:
                 {
                     "threat_level": "none|low|medium|high|critical",
@@ -111,21 +111,21 @@ class ModerationAssistant:
                     "context": ["Lista czynników które wzięto pod uwagę"],
                     "evidence": ["Konkretne cytaty lub dowody"]
                 }
-                
+
                 Typy naruszeń:
                 - spam: powtarzające się wiadomości, flood, spam znaków
                 - toxicity: obraźliwe słowa, wulgaryzmy, hate speech
                 - harassment: nękanie, groźby, ataki personalne
                 - nsfw: treści nieodpowiednie
                 - advertising: niechciane reklamy, linki do serwerów
-                
+
                 Poziomy zagrożenia:
                 - none: brak naruszenia
                 - low: drobne naruszenie
                 - medium: wyraźne naruszenie zasad
                 - high: poważne naruszenie
                 - critical: natychmiastowe zagrożenie
-                
+
                 Sugerowane akcje:
                 - warn: pierwsze naruszenie lub drobne
                 - timeout: powtarzające się lub średnie naruszenia (300-3600 sekund)
@@ -222,7 +222,7 @@ class ModerationAssistant:
         for keyword in self.toxicity_keywords:
             if keyword in lower_message:
                 violations.append(ViolationType.TOXICITY)
-                evidence.append(f"Problematic keyword detected")
+                evidence.append("Problematic keyword detected")
                 break
 
         # Check message flood from user
@@ -294,7 +294,7 @@ class ModerationAssistant:
 
             try:
                 ai_data = json.loads(result.data)
-            except:
+            except Exception:
                 # Try to extract JSON from response
                 import re
 
@@ -309,7 +309,7 @@ class ModerationAssistant:
             for v in ai_data.get("violations", []):
                 try:
                     violations.append(ViolationType(v))
-                except:
+                except Exception:
                     pass
 
             # Map actions to our enums

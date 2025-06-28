@@ -1,9 +1,8 @@
 """Developer API for automated command testing."""
 
 import asyncio
-import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import discord
 from aiohttp import web
@@ -211,7 +210,7 @@ class DeveloperAPICog(commands.Cog):
                 return {"success": False, "error": "Failed to get guild/channel/member"}
 
             # Prepare to capture responses
-            responses = []
+            _responses = []
 
             def check(m):
                 """Check if message is from bot in response to our command."""
@@ -333,7 +332,6 @@ class FakeMessage:
 
     async def delete(self, *, delay: float = None):
         """Fake delete method."""
-        pass
 
     async def reply(self, content: str = None, **kwargs):
         """Send a reply in the channel."""
@@ -346,7 +344,6 @@ class FakeMessage:
 
     async def add_reaction(self, emoji):
         """Fake add reaction method."""
-        pass
 
 
 async def setup(bot: commands.Bot):

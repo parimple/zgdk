@@ -4,7 +4,6 @@ Comprehensive error logging system with full traceback and context.
 
 import datetime
 import logging
-import os
 import traceback
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -57,7 +56,7 @@ class DetailedErrorLogger:
 
         # Build error message
         error_msg = [
-            f"=== ERROR DETAILS ===",
+            "=== ERROR DETAILS ===",
             f"Error Type: {type(error).__name__}",
             f"Error Message: {str(error)}",
             f"Timestamp: {datetime.datetime.now().isoformat()}",

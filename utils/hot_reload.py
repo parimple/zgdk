@@ -4,9 +4,8 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional, Set
 
-from watchdog.events import FileModifiedEvent, FileSystemEventHandler
+from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 logger = logging.getLogger(__name__)

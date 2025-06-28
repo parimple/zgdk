@@ -32,7 +32,7 @@ class RoleRestorer:
                 member_service = await self.bot.get_service(IMemberService, session)
 
                 # Get member's previous roles
-                db_member = await member_service.get_or_create_member(member)
+                _db_member = await member_service.get_or_create_member(member)
                 member_roles = await role_service.get_member_roles(member.id)
 
                 if not member_roles:
@@ -139,7 +139,7 @@ class RoleRestorer:
             embed = discord.Embed(
                 title="🔄 Role przywrócone!",
                 description=(
-                    f"Witaj ponownie na serwerze **{self.guild.name}**!\n" f"Twoje poprzednie role zostały przywrócone."
+                    f"Witaj ponownie na serwerze **{self.guild.name}**!\n" "Twoje poprzednie role zostały przywrócone."
                 ),
                 color=discord.Color.green(),
                 timestamp=datetime.now(timezone.utc),

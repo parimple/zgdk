@@ -68,27 +68,22 @@ class IPremiumChecker(ABC):
     @abstractmethod
     async def has_premium_role(self, member: discord.Member) -> bool:
         """Check if member has any premium role."""
-        pass
 
     @abstractmethod
     async def get_member_premium_level(self, member: discord.Member) -> Optional[str]:
         """Get member's highest premium role level."""
-        pass
 
     @abstractmethod
     async def check_command_access(self, member: discord.Member, command_name: str) -> tuple[bool, str]:
         """Check if member can access a specific command."""
-        pass
 
     @abstractmethod
     async def get_command_tier(self, command_name: str) -> CommandTier:
         """Get the tier requirement for a command."""
-        pass
 
     @abstractmethod
     async def has_bypass_permissions(self, member: discord.Member) -> bool:
         """Check if member has bypass permissions."""
-        pass
 
 
 class IPremiumRoleManager(ABC):
@@ -103,7 +98,6 @@ class IPremiumRoleManager(ABC):
         payment_amount: Optional[int] = None,
     ) -> ExtensionResult:
         """Assign a premium role to a member."""
-        pass
 
     @abstractmethod
     async def extend_premium_role(
@@ -114,29 +108,24 @@ class IPremiumRoleManager(ABC):
         payment_amount: Optional[int] = None,
     ) -> ExtensionResult:
         """Extend an existing premium role."""
-        pass
 
     @abstractmethod
     async def upgrade_premium_role(
         self, member: discord.Member, from_role: str, to_role: str, payment_amount: int
     ) -> ExtensionResult:
         """Upgrade from one premium role to another."""
-        pass
 
     @abstractmethod
     async def remove_premium_role(self, member: discord.Member, role_name: str) -> bool:
         """Remove a premium role from a member."""
-        pass
 
     @abstractmethod
     async def get_premium_role_info(self, member: discord.Member) -> list[dict[str, Any]]:
         """Get premium role information for a member."""
-        pass
 
     @abstractmethod
     async def process_expired_premium_roles(self) -> list[dict[str, Any]]:
         """Process all expired premium roles."""
-        pass
 
 
 class IPaymentProcessor(ABC):
@@ -145,32 +134,26 @@ class IPaymentProcessor(ABC):
     @abstractmethod
     async def fetch_recent_payments(self) -> list[PaymentData]:
         """Fetch recent payments from external service."""
-        pass
 
     @abstractmethod
     async def process_payment(self, payment: PaymentData) -> tuple[bool, str]:
         """Process a single payment and assign premium benefits."""
-        pass
 
     @abstractmethod
     async def is_payment_handled(self, payment: PaymentData) -> bool:
         """Check if payment has already been processed."""
-        pass
 
     @abstractmethod
     async def mark_payment_as_handled(self, payment: PaymentData) -> bool:
         """Mark payment as processed."""
-        pass
 
     @abstractmethod
     def extract_member_id(self, payment_name: str) -> Optional[int]:
         """Extract Discord member ID from payment name."""
-        pass
 
     @abstractmethod
     def calculate_premium_benefits(self, amount: int) -> Optional[tuple[str, int]]:
         """Calculate premium role and duration from payment amount."""
-        pass
 
 
 class IPremiumService(ABC):
@@ -179,29 +162,23 @@ class IPremiumService(ABC):
     @abstractmethod
     async def validate_premium_access(self, member: discord.Member, required_tier: CommandTier) -> tuple[bool, str]:
         """Validate if member has required premium access."""
-        pass
 
     @abstractmethod
     async def handle_premium_payment(self, payment: PaymentData) -> tuple[bool, str, Optional[discord.Member]]:
         """Handle a premium payment end-to-end."""
-        pass
 
     @abstractmethod
     async def get_member_premium_status(self, member: discord.Member) -> dict[str, Any]:
         """Get comprehensive premium status for a member."""
-        pass
 
     @abstractmethod
     async def process_premium_maintenance(self) -> dict[str, int]:
         """Process premium maintenance tasks (expired roles, etc.)."""
-        pass
 
     @abstractmethod
     async def calculate_role_value(self, member: discord.Member, target_role: str) -> Optional[int]:
         """Calculate the value of a premium role for pricing."""
-        pass
 
     @abstractmethod
     async def count_unique_premium_users(self) -> int:
         """Count unique users with any active premium role."""
-        pass

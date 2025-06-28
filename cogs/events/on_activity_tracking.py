@@ -8,7 +8,6 @@ import discord
 from discord.ext import commands, tasks
 
 from core.interfaces.activity_interfaces import IActivityTrackingService
-from core.interfaces.member_interfaces import IMemberService
 from utils.permissions import is_zagadka_owner
 
 logger = logging.getLogger(__name__)

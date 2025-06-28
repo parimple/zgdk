@@ -9,14 +9,13 @@ This runner provides:
 - Performance tracking
 """
 
-import asyncio
 import json
 import logging
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -27,19 +26,19 @@ logger = logging.getLogger(__name__)
 
 class MCPTestRunner:
     """Test runner that uses MCP for real command execution."""
-    
+
     def __init__(self):
         self.container_name = "zgdk-mcp-1"
         self.test_user_id = 123456789
         self.test_channel_id = 987654321
         self.test_guild_id = 960665311701528596
         self.results = []
-    
+
     def execute_mcp_command(self, command: str, args: str = "") -> Dict[str, Any]:
         """Execute a command through MCP and return the result."""
-        
+
         # Create the Python script to run inside the container
-        script = f'''
+        script = '''
 import asyncio
 import json
 import sys
@@ -52,7 +51,7 @@ async def main():
             'command': '{command}',
             'args': '{args}'
         }})
-        
+
         # Format the output
         output = {{
             'success': True,
@@ -60,7 +59,7 @@ async def main():
             'args': '{args}',
             'responses': []
         }}
-        
+
         # Process responses
         for r in result:
             if hasattr(r, '__dict__'):
@@ -74,9 +73,9 @@ async def main():
                     'type': 'text',
                     'text': str(r)
                 }})
-        
+
         print(json.dumps(output))
-        
+
     except Exception as e:
         output = {{
             'success': False,
@@ -90,13 +89,13 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 '''
-        
+
         # Execute the script in the Docker container
         cmd = [
             "docker", "exec", "-i", self.container_name,
             "python", "-c", script
         ]
-        
+
         try:
             result = subprocess.run(
                 cmd,
@@ -105,7 +104,7 @@ if __name__ == "__main__":
                 timeout=30,
                 check=True
             )
-            
+
             # Parse the JSON output
             if result.stdout:
                 return json.loads(result.stdout.strip())
@@ -115,7 +114,7 @@ if __name__ == "__main__":
                     'error': 'No output from command',
                     'stderr': result.stderr
                 }
-                
+
         except subprocess.TimeoutExpired:
             return {
                 'success': False,
@@ -147,14 +146,14 @@ if __name__ == "__main__":
                 'command': command,
                 'args': args
             }
-    
+
     def check_docker_logs(self, lines: int = 50) -> List[str]:
         """Check recent Docker logs for errors."""
         cmd = [
             "docker-compose", "logs", "app",
             f"--tail={lines}"
         ]
-        
+
         try:
             result = subprocess.run(
                 cmd,
@@ -162,37 +161,37 @@ if __name__ == "__main__":
                 text=True,
                 cwd=str(project_root)
             )
-            
+
             # Filter for errors and warnings
             log_lines = result.stdout.split('\n')
             important_lines = []
-            
+
             for line in log_lines:
                 lower_line = line.lower()
                 if any(keyword in lower_line for keyword in ['error', 'failed', 'exception', 'warning']):
                     important_lines.append(line)
-            
+
             return important_lines
-            
+
         except Exception as e:
             logger.error(f"Failed to check logs: {e}")
             return []
-    
+
     def run_test(self, test_name: str, test_func) -> Dict[str, Any]:
         """Run a single test and record results."""
         print(f"\n🧪 Running: {test_name}")
         start_time = datetime.now()
-        
+
         try:
             # Run the test
             result = test_func()
-            
+
             # Check if test passed
             passed = result.get('success', False)
-            
+
             # Calculate duration
             duration = (datetime.now() - start_time).total_seconds()
-            
+
             # Record result
             test_result = {
                 'name': test_name,
@@ -200,17 +199,17 @@ if __name__ == "__main__":
                 'duration': duration,
                 'result': result
             }
-            
+
             if passed:
                 print(f"  ✅ PASSED ({duration:.2f}s)")
             else:
                 print(f"  ❌ FAILED ({duration:.2f}s)")
                 if 'error' in result:
                     print(f"     Error: {result['error']}")
-            
+
             self.results.append(test_result)
             return test_result
-            
+
         except Exception as e:
             duration = (datetime.now() - start_time).total_seconds()
             test_result = {
@@ -222,14 +221,14 @@ if __name__ == "__main__":
             print(f"  ❌ EXCEPTION ({duration:.2f}s): {e}")
             self.results.append(test_result)
             return test_result
-    
+
     def generate_report(self) -> str:
         """Generate a test report."""
         total_tests = len(self.results)
         passed_tests = sum(1 for r in self.results if r['passed'])
         failed_tests = total_tests - passed_tests
         total_duration = sum(r['duration'] for r in self.results)
-        
+
         report = [
             "=" * 60,
             "📊 Test Report",
@@ -242,28 +241,28 @@ if __name__ == "__main__":
             "Detailed Results:",
             "-" * 60
         ]
-        
+
         for result in self.results:
             status = "✅ PASS" if result['passed'] else "❌ FAIL"
             report.append(f"{status} {result['name']} ({result['duration']:.2f}s)")
-            
+
             if not result['passed'] and 'error' in result:
                 report.append(f"     Error: {result['error']}")
-        
+
         report.extend([
             "-" * 60,
             "",
             "Recent Docker Errors:",
             "-" * 60
         ])
-        
+
         # Add recent errors from logs
         errors = self.check_docker_logs()
         if errors:
             report.extend(errors[-10:])  # Last 10 errors
         else:
             report.append("No recent errors found in logs")
-        
+
         return "\n".join(report)
 
 
@@ -316,10 +315,10 @@ def main():
     print("🚀 Starting MCP Command Test Suite")
     print(f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
-    
+
     # Create test runner
     runner = MCPTestRunner()
-    
+
     # Define all tests
     tests = [
         ("Bump Command", lambda: test_bump_command(runner)),
@@ -331,14 +330,14 @@ def main():
         ("Invalid Command", lambda: test_invalid_command(runner)),
         ("Command with Args", lambda: test_command_with_args(runner)),
     ]
-    
+
     # Run all tests
     for test_name, test_func in tests:
         runner.run_test(test_name, test_func)
-    
+
     # Generate and print report
     print("\n" + runner.generate_report())
-    
+
     # Return exit code based on results
     if all(r['passed'] for r in runner.results):
         print("\n✅ All tests passed!")

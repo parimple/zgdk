@@ -340,18 +340,18 @@ class RoleShopView(discord.ui.View):
                             )
 
                             description = (
-                                f"Dostępne opcje:\n"
+                                "Dostępne opcje:\n"
                                 f"1️⃣ **Przedłuż swoją rangę {current_role.name}** o {days_to_add} dni (usuwa wszystkie muty)\n"
                                 f"2️⃣ **Kup nową rangę {role_name}** i otrzymaj **{refund_amount}G** zwrotu za obecną rolę\n"
-                                f"❌ **Anuluj operację**"
+                                "❌ **Anuluj operację**"
                             )
                         else:
                             # Upgrade case
                             days_to_add = 0  # No extension for upgrades
                             description = (
-                                f"Dostępne opcje:\n"
+                                "Dostępne opcje:\n"
                                 f"1️⃣ **Kup nową rangę {role_name}** i otrzymaj **{refund_amount}G** zwrotu za obecną rolę **{current_role.name}**\n"
-                                f"❌ **Anuluj operację**"
+                                "❌ **Anuluj operację**"
                             )
 
                         # Create embed with MessageSender for consistency
@@ -542,7 +542,7 @@ class RoleShopView(discord.ui.View):
                     logger.info(
                         f"[SHOP] Checking role status for {member.display_name}:"
                         f"\n - Role: {role_name}"
-                        f"\n - Has role in Discord: True"
+                        "\n - Has role in Discord: True"
                         f"\n - Has role in DB: {member_role is not None}"
                         f"\n - Current time: {now}"
                         f"\n - Expiration date: {member_role.expiration_date if member_role else 'None'}"

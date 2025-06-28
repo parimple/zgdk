@@ -1,6 +1,5 @@
 """Health check server for Kubernetes probes."""
 
-import asyncio
 import logging
 from typing import Optional
 

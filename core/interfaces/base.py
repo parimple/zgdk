@@ -35,7 +35,6 @@ class IService(ABC):
     @abstractmethod
     async def validate_operation(self, *args: Any, **kwargs: Any) -> bool:
         """Validate if operation can be performed."""
-        pass
 
 
 class IUnitOfWork(ABC):
@@ -44,19 +43,15 @@ class IUnitOfWork(ABC):
     @abstractmethod
     async def __aenter__(self) -> "IUnitOfWork":
         """Enter async context manager."""
-        pass
 
     @abstractmethod
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit async context manager."""
-        pass
 
     @abstractmethod
     async def commit(self) -> None:
         """Commit transaction."""
-        pass
 
     @abstractmethod
     async def rollback(self) -> None:
         """Rollback transaction."""
-        pass

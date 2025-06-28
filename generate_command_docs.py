@@ -5,11 +5,9 @@ Generate documentation for all bot commands by analyzing cogs.
 This helps identify what commands are available for testing.
 """
 
-import ast
-import os
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 
 class CommandDocGenerator:
@@ -57,7 +55,7 @@ class CommandDocGenerator:
                         description = desc_match.group(1) if desc_match else "No description"
 
                         # Find the function definition
-                        func_pattern = rf"def\s+(\w+)\s*\(.*?\):"
+                        func_pattern = r"def\s+(\w+)\s*\(.*?\):"
                         func_matches = list(re.finditer(func_pattern, content[match.end() :]))
                         if func_matches:
                             func_name = func_matches[0].group(1)
@@ -185,7 +183,6 @@ class CommandDocGenerator:
 
 def main():
     """Generate command documentation."""
-    from datetime import datetime
 
     print("📚 Generating command documentation...")
 
@@ -205,7 +202,7 @@ def main():
     print("✅ Generated command_test_list.txt")
 
     # Print summary
-    print(f"\n📊 Summary:")
+    print("\n📊 Summary:")
     print(f"  Total commands: {len(generator.commands)}")
     print(f"  Total cogs: {len(set(cmd['cog'] for cmd in generator.commands))}")
 

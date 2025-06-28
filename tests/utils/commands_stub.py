@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 def install_commands_stub():
     """
     Install user's brilliant lightweight commands stub before importing cogs.
-    
+
     This creates real classes that inherit from a lightweight _Cog instead of MagicMock,
     preserving coroutine nature with pass-through decorators.
     """
@@ -33,7 +33,7 @@ def install_commands_stub():
         discord_mock.Embed = MagicMock
         discord_mock.utils = MagicMock()
         discord_mock.Forbidden = Exception
-        
+
         # Mock discord.ui
         discord_ui_mock = types.ModuleType("discord.ui")
         discord_ui_mock.View = MagicMock
@@ -42,13 +42,13 @@ def install_commands_stub():
         discord_ui_mock.button = lambda **kwargs: lambda func: func
         discord_ui_mock.select = lambda **kwargs: lambda func: func
         discord_mock.ui = discord_ui_mock
-        
+
         sys.modules["discord"] = discord_mock
         sys.modules["discord.ui"] = discord_ui_mock
-        
+
         if "discord.ext" not in sys.modules:
             sys.modules["discord.ext"] = types.ModuleType("discord.ext")
-    
+
     # Ensure discord.ui is available even if discord was already mocked
     if not hasattr(sys.modules["discord"], "ui"):
         discord_ui_mock = types.ModuleType("discord.ui")
@@ -64,7 +64,7 @@ def install_commands_stub():
 
     def passthrough_decorator(*args, **kwargs):
         """Pass-through decorator that preserves coroutine nature"""
-        def wrap(fn): 
+        def wrap(fn):
             return fn
         return wrap
 
@@ -78,7 +78,7 @@ def install_commands_stub():
     commands_stub.Command = type("Command", (), {})
     commands_stub.Bot = MagicMock
     commands_stub.Context = MagicMock
-    
+
     # Pass-through decorators that preserve coroutines
     commands_stub.hybrid_command = passthrough_decorator
     commands_stub.command = passthrough_decorator
@@ -90,9 +90,10 @@ def install_commands_stub():
         permissions_mock.is_zagadka_owner = passthrough_decorator
         permissions_mock.is_admin = passthrough_decorator
         sys.modules['utils.permissions'] = permissions_mock
-    
+
     if 'utils.premium' not in sys.modules:
         premium_mock = MagicMock()
+
         class PaymentData:
             def __init__(self, name, amount, paid_at, payment_type):
                 self.name = name
@@ -101,34 +102,34 @@ def install_commands_stub():
                 self.payment_type = payment_type
         premium_mock.PaymentData = PaymentData
         sys.modules['utils.premium'] = premium_mock
-    
+
     if 'core.interfaces.member_interfaces' not in sys.modules:
         sys.modules['core.interfaces.member_interfaces'] = MagicMock()
-    
+
     if 'core.interfaces.premium_interfaces' not in sys.modules:
         sys.modules['core.interfaces.premium_interfaces'] = MagicMock()
-    
+
     if 'cogs.ui.shop_embeds' not in sys.modules:
         sys.modules['cogs.ui.shop_embeds'] = MagicMock()
-    
+
     if 'cogs.views.shop_views' not in sys.modules:
         views_mock = MagicMock()
         views_mock.PaymentsView = MagicMock
         views_mock.RoleShopView = MagicMock
         sys.modules['cogs.views.shop_views'] = views_mock
-    
+
     if 'datasources.queries' not in sys.modules:
         queries_mock = MagicMock()
         queries_mock.HandledPaymentQueries = MagicMock()
         queries_mock.HandledPaymentQueries.add_payment = AsyncMock()
         sys.modules['datasources.queries'] = queries_mock
-    
+
     # Install the stub
     sys.modules["discord.ext.commands"] = commands_stub
-    
+
     # Reload any modules that might have already imported the old mock
     modules_to_reload = [
-        "cogs.commands.shop", 
+        "cogs.commands.shop",
         "cogs.commands"
     ]
     for module_name in modules_to_reload:
@@ -140,5 +141,5 @@ def install_commands_stub():
             else:
                 # Remove mock module so it gets re-imported fresh
                 del sys.modules[module_name]
-    
+
     return commands_stub

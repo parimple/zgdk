@@ -1,23 +1,22 @@
 """User info commands cog."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 from core.interfaces.member_interfaces import IActivityService, IMemberService
 from core.interfaces.premium_interfaces import IPremiumService
 from core.services.currency_service import CurrencyService
-from datasources.queries import ChannelPermissionQueries, InviteQueries, MemberQueries, RoleQueries
-from utils.message_sender import MessageSender
+from datasources.queries import InviteQueries, MemberQueries, RoleQueries
 from utils.permissions import is_admin
 from utils.refund import calculate_refund
 from utils.team_manager import TeamManager
 
 from .admin_info import remove_premium_role_mod_permissions
+from .user.views import ConfirmSaleView
 
 # Currency constant
 CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
@@ -261,7 +260,6 @@ class BuyRoleButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         """Open shop when clicked."""
         # Import here to avoid circular imports
-        from cogs.commands.shop import ShopCog
 
         shop_cog = interaction.client.get_cog("ShopCog")
         if shop_cog:

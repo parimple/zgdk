@@ -4,7 +4,7 @@ Quick command tester for Discord bot commands via MCP.
 
 Usage:
     python test_command.py <command> [args]
-    
+
 Examples:
     python test_command.py bump
     python test_command.py help
@@ -16,15 +16,13 @@ Examples:
 import argparse
 import json
 import subprocess
-import sys
-from datetime import datetime
 
 
 def test_command(command: str, args: str = "") -> dict:
     """Test a single command via MCP."""
 
     # Create the test script
-    script = f"""
+    script = """
 import asyncio
 import json
 from mcp_bot_server import call_tool
@@ -35,14 +33,14 @@ async def main():
             'command': '{command}',
             'args': '{args}'
         }})
-        
+
         output = {{
             'success': True,
             'command': '{command}',
             'args': '{args}',
             'responses': []
         }}
-        
+
         for r in result:
             if hasattr(r, 'type') and hasattr(r, 'text'):
                 output['responses'].append({{
@@ -51,9 +49,9 @@ async def main():
                 }})
             else:
                 output['responses'].append(str(r))
-        
+
         print(json.dumps(output))
-        
+
     except Exception as e:
         output = {{
             'success': False,

@@ -5,7 +5,6 @@ This example shows how to use the new Unit of Work pattern to perform
 complex database operations with proper transaction management.
 """
 
-from typing import Optional
 
 import discord
 from discord.ext import commands

@@ -2,16 +2,14 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 
-from .constants import DISBOARD, DISCADIA, DISCORDSERVERS, DSME, DZIK, SERVICE_COOLDOWNS
+from .constants import DISBOARD, DISCADIA, DISCORDSERVERS, DSME, DZIK
 from .handlers import DisboardHandler, DiscadiaHandler, DiscordServersHandler, DSMEHandler, DzikHandler
 from .status import BumpStatusHandler
 
@@ -109,7 +107,7 @@ class OnBumpEvent(commands.Cog):
 
         # Debug logging for DISBOARD
         if message.author.id == DISBOARD["id"]:
-            logger.info(f"[BUMP DEBUG] DISBOARD message detected!")
+            logger.info("[BUMP DEBUG] DISBOARD message detected!")
             logger.info(f"[BUMP DEBUG] Channel: {message.channel.name} ({message.channel.id})")
             logger.info(f"[BUMP DEBUG] Content: {message.content[:200] if message.content else 'No content'}")
             if message.embeds:
@@ -287,7 +285,7 @@ class OnBumpEvent(commands.Cog):
             color="success",
             title=f"🎉 Dziękujemy za zostanie {booster_type}!",
             description=(
-                f"Otrzymujesz **{hours}T** czasu bypass!\n" f"Możesz teraz korzystać z komend głosowych bez ograniczeń."
+                f"Otrzymujesz **{hours}T** czasu bypass!\n" "Możesz teraz korzystać z komend głosowych bez ograniczeń."
             ),
         )
         embed.set_author(

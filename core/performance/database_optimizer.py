@@ -15,7 +15,6 @@ from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.pool import NullPool, QueuePool
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ class QueryPerformanceMonitor:
 
     def __init__(self):
         self.query_stats = defaultdict(
-            lambda: {"count": 0, "total_time": 0.0, "min_time": float("inf"), "max_time": 0.0, "last_executed": None}
+            lambda: {"count": 0, "total_time": 0.0, "min_time": float("in"), "max_time": 0.0, "last_executed": None}
         )
         self.slow_query_threshold = 1.0  # seconds
         self.slow_queries = []
@@ -165,7 +164,7 @@ class DatabaseOptimizer:
         # Get table statistics
         table_stats_query = text(
             """
-            SELECT 
+            SELECT
                 schemaname,
                 tablename,
                 n_live_tup as row_count,
@@ -183,7 +182,7 @@ class DatabaseOptimizer:
         # Get index usage
         index_usage_query = text(
             """
-            SELECT 
+            SELECT
                 schemaname,
                 tablename,
                 indexname,
@@ -201,7 +200,7 @@ class DatabaseOptimizer:
         # Get unused indexes
         unused_indexes_query = text(
             """
-            SELECT 
+            SELECT
                 schemaname,
                 tablename,
                 indexname,
@@ -221,7 +220,7 @@ class DatabaseOptimizer:
         """Get slow queries from PostgreSQL."""
         slow_queries_query = text(
             """
-            SELECT 
+            SELECT
                 query,
                 calls,
                 total_time,
@@ -260,7 +259,7 @@ class DatabaseOptimizer:
         # Get tables that need vacuum
         vacuum_query = text(
             """
-            SELECT 
+            SELECT
                 schemaname,
                 tablename,
                 n_dead_tup,

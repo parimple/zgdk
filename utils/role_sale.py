@@ -100,7 +100,7 @@ class RoleSaleManager:
                     # Try to restore role on Discord if something went wrong
                     try:
                         await member.add_roles(role)
-                    except:
+                    except Exception:
                         pass
                     logger.error(f"[ROLE_SALE] Transaction failed: {e}")
                     return False, "Wystąpił błąd podczas sprzedaży roli.", None

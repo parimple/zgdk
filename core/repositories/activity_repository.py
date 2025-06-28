@@ -7,7 +7,6 @@ from typing import Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from core.repositories.base_repository import BaseRepository
 from datasources.models import Activity, Member

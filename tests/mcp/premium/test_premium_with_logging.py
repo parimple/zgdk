@@ -1,7 +1,6 @@
 """Test premium features with detailed logging."""
 
 import asyncio
-import json
 from datetime import datetime
 
 import aiohttp
@@ -11,11 +10,11 @@ def format_embed(embed_data):
     """Format embed data for readable display."""
     if not embed_data:
         return "No embed"
-    
+
     title = embed_data.get("title", "")
     desc = embed_data.get("description", "")
-    color = embed_data.get("color", 0)
-    
+    _color = embed_data.get("color", 0)
+
     # Format output
     output = []
     if title:
@@ -27,7 +26,7 @@ def format_embed(embed_data):
             output.append(f"   {line}")
         if len(lines) > 5:
             output.append(f"   ... ({len(lines) - 5} more lines)")
-    
+
     return "\n".join(output)
 
 
@@ -39,20 +38,20 @@ async def execute_and_log(session, base_url, command_data, description):
     print(f"Command: {command_data.get('command')}")
     print(f"Args: {command_data.get('args', 'none')}")
     print(f"User: {command_data.get('author_id')}")
-    
+
     try:
         async with session.post(
-            f"{base_url}/execute", 
-            json=command_data, 
+            f"{base_url}/execute",
+            json=command_data,
             timeout=aiohttp.ClientTimeout(total=10)
         ) as response:
             data = await response.json()
-            
+
             print(f"\nStatus: {'✅ Success' if data.get('success') else '❌ Failed'}")
-            
+
             if data.get("error"):
                 print(f"Error: {data['error']}")
-            
+
             # Log all responses
             if data.get("responses"):
                 for i, resp in enumerate(data["responses"]):
@@ -66,9 +65,9 @@ async def execute_and_log(session, base_url, command_data, description):
                         print(format_embed(resp["embed"]))
             else:
                 print("\n⚠️ No responses captured")
-                
+
             return data
-            
+
     except Exception as e:
         print(f"\n❌ Exception: {e}")
         return {"success": False, "error": str(e)}
@@ -80,11 +79,11 @@ async def test_premium_workflow():
     base_url = "http://localhost:8089"  # Back to original API
     test_user_id = "489328381972971520"
     channel_id = "1387864734002446407"
-    
+
     async with aiohttp.ClientSession() as session:
         print("🚀 PREMIUM FEATURE TEST WITH DETAILED LOGGING")
         print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        
+
         # Test 1: Color command without premium
         await execute_and_log(
             session, base_url,
@@ -96,9 +95,9 @@ async def test_premium_workflow():
             },
             "Testing COLOR command (expecting premium requirement)"
         )
-        
+
         await asyncio.sleep(1)
-        
+
         # Test 2: Team create without premium
         await execute_and_log(
             session, base_url,
@@ -110,9 +109,9 @@ async def test_premium_workflow():
             },
             "Testing TEAM CREATE command (expecting premium requirement)"
         )
-        
+
         await asyncio.sleep(1)
-        
+
         # Test 3: Check team status
         await execute_and_log(
             session, base_url,
@@ -123,9 +122,9 @@ async def test_premium_workflow():
             },
             "Testing TEAM command (check current status)"
         )
-        
+
         await asyncio.sleep(1)
-        
+
         # Test 4: Shop command
         await execute_and_log(
             session, base_url,
@@ -136,7 +135,7 @@ async def test_premium_workflow():
             },
             "Testing SHOP command"
         )
-        
+
         print("\n" + "=" * 60)
         print("📊 TEST SUMMARY")
         print("=" * 60)

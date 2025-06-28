@@ -2,7 +2,6 @@
 Decision logging system for tracking and explaining bot decisions.
 """
 
-import json
 import logging
 from datetime import datetime
 from enum import Enum
@@ -138,7 +137,7 @@ class DecisionLogger:
             context={"target_user": target_id, "duration_seconds": duration, **kwargs},
             reasoning_steps=[
                 f"Moderator {moderator_id} zainicjował akcję",
-                f"Sprawdzono uprawnienia moderatora",
+                "Sprawdzono uprawnienia moderatora",
                 f"Zweryfikowano cel akcji: {target_id}",
                 f"Wykonano akcję: {action}",
             ],

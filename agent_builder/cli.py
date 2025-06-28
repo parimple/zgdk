@@ -6,14 +6,12 @@ from typing import Optional
 
 import click
 
-from .core import AgentConfig
 from .factory import AgentFactory
 
 
 @click.group()
 def cli():
     """Agent Builder CLI - Create and manage AI agents."""
-    pass
 
 
 @cli.command()
@@ -42,7 +40,7 @@ def create(template: str, name: Optional[str], purpose: Optional[str]):
 
     click.echo(f"✅ Agent '{config.name}' created successfully!")
     click.echo(f"   ID: {agent_id}")
-    click.echo(f"   Files generated:")
+    click.echo("   Files generated:")
     click.echo(f"   - agents/{agent_id}_agent.py")
     click.echo(f"   - tests/agents/test_{agent_id}_agent.py")
     click.echo(f"   - k8s/agents/{agent_id}-*.yaml")
@@ -81,7 +79,7 @@ def start(agent_id: str):
     async def _start():
         factory = AgentFactory()
         try:
-            agent = await factory.create_agent(agent_id)
+            _agent = await factory.create_agent(agent_id)
             click.echo(f"✅ Agent '{agent_id}' started successfully!")
         except Exception as e:
             click.echo(f"❌ Failed to start agent: {e}")
@@ -126,7 +124,7 @@ def test(agent_id: str):
 @click.argument("agent_id")
 def deploy(agent_id: str):
     """Deploy agent to Kubernetes."""
-    k8s_dir = Path(f"k8s/agents")
+    k8s_dir = Path("k8s/agents")
     files = list(k8s_dir.glob(f"{agent_id}-*.yaml"))
 
     if not files:
@@ -173,7 +171,7 @@ def quickstart():
 
     click.echo(f"\n✅ Agent '{name}' created successfully!")
     click.echo(f"   ID: {agent_id}")
-    click.echo(f"\nNext steps:")
+    click.echo("\nNext steps:")
     click.echo(f"1. Edit agents/{agent_id}_agent.py to customize behavior")
     click.echo(f"2. Run tests: agent-builder test {agent_id}")
     click.echo(f"3. Start agent: agent-builder start {agent_id}")

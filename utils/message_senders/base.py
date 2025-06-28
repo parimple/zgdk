@@ -1,7 +1,6 @@
 """Base message sender with common functionality."""
 
-from datetime import datetime, timezone
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import discord
 from discord import AllowedMentions
@@ -98,7 +97,6 @@ class BaseMessageSender:
         Builds a description with premium text if the user doesn't have premium.
         """
         from datasources.queries import MemberQueries
-        from utils.bump_checker import BumpChecker
 
         if ctx is None:
             return base_text
@@ -137,7 +135,7 @@ class BaseMessageSender:
                 return base_text
             else:
                 has_premium = loop.run_until_complete(check_premium())
-        except:
+        except Exception:
             # If we can't check premium, just return base text
             return base_text
 

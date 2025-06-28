@@ -265,7 +265,7 @@ class CommandIntentClassifier:
 
             system_prompt = """Jesteś klasyfikatorem intencji komend dla polskiego bota Discord.
                 Klasyfikuj wiadomości użytkowników w kategorie komend i wydobądź intencję.
-                
+
                 Kategorie:
                 - shop: zakupy, saldo, transakcje, role premium
                 - moderation: wyciszanie, ban, kick, ostrzeżenia, timeout
@@ -276,7 +276,7 @@ class CommandIntentClassifier:
                 - fun: gry, rozrywka
                 - help: pomoc, tutoriale
                 - unknown: niejasna intencja
-                
+
                 Format odpowiedzi:
                 {
                     "category": "nazwa_kategorii",

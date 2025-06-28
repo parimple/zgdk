@@ -1,13 +1,9 @@
 """Voice channel related message senders."""
 
-from datetime import datetime, timezone
 from typing import List, Optional, Union
 
 import discord
 from discord.ext import commands
-
-from datasources.queries import MemberQueries
-from utils.bump_checker import BumpChecker
 
 from .base import BaseMessageSender
 

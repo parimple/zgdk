@@ -15,29 +15,29 @@ def make_async_cm(result):
 def make_mock_bot():
     """Create fully configured mock bot with all async services"""
     bot = MagicMock()
-    
+
     # Database session with async commit (following your checklist)
     session = AsyncMock()
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
     session.close = AsyncMock()
-    
+
     # Database context manager
     bot.get_db = MagicMock(return_value=make_async_cm(session))
-    
+
     # Member service with async methods
     member_service = AsyncMock()
     member_service.get_or_create_member = AsyncMock(
         return_value=AsyncMock(wallet_balance=1000)
     )
     member_service.update_member_info = AsyncMock()
-    
+
     # Premium service with async methods
     premium_service = AsyncMock()
     premium_service.get_member_premium_roles = AsyncMock(return_value=[])
     premium_service.assign_premium_role = AsyncMock()
     premium_service.remove_premium_role = AsyncMock()
-    
+
     # Service mapping
     def get_service_mock(interface, session=None):
         interface_str = str(interface)
@@ -47,9 +47,9 @@ def make_mock_bot():
             return premium_service
         else:
             return AsyncMock()
-    
+
     bot.get_service = AsyncMock(side_effect=get_service_mock)
-    
+
     # Bot config for RoleShopView and other components
     bot.config = {
         "premium_roles": [
@@ -64,7 +64,7 @@ def make_mock_bot():
             "premium_info": 123456789,
         }
     }
-    
+
     return bot
 
 
@@ -75,19 +75,19 @@ def make_mock_context():
     ctx.author.id = 123456789
     ctx.author.display_name = "TestUser"
     ctx.author.mention = "<@123456789>"
-    
+
     ctx.guild = MagicMock()
     ctx.guild.id = 987654321
     ctx.guild.roles = []
-    
+
     ctx.channel = MagicMock()
     ctx.channel.id = 111111111
-    
+
     # Async methods - ensure ctx.reply is AsyncMock
     ctx.reply = AsyncMock()
     ctx.send = AsyncMock()
     ctx.defer = AsyncMock()
-    
+
     return ctx
 
 
@@ -99,7 +99,7 @@ def make_mock_user(user_id=123456789):
     user.display_name = "TestUser"
     user.mention = f"<@{user_id}>"
     user.send = AsyncMock()
-    
+
     return user
 
 
@@ -109,7 +109,7 @@ def make_mock_member(user_id=123456789):
     member.roles = []
     member.add_roles = AsyncMock()
     member.remove_roles = AsyncMock()
-    
+
     return member
 
 
@@ -125,10 +125,10 @@ def patch_shop_queries():
 def create_shop_cog_with_mocks():
     """Create ShopCog with all necessary mocks applied"""
     from cogs.commands.shop import ShopCog
-    
+
     bot = make_mock_bot()
     shop_cog = ShopCog(bot)
     # Override bot to ensure our mock is used
     shop_cog.bot = bot
-    
+
     return shop_cog, bot

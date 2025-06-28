@@ -86,9 +86,9 @@ async def main():
     openai_key = os.getenv("OPENAI_API_KEY")
 
     if gemini_key:
-        print(f"✓ Gemini API key found (using Gemini)")
+        print("✓ Gemini API key found (using Gemini)")
     elif openai_key:
-        print(f"✓ OpenAI API key found (fallback to OpenAI)")
+        print("✓ OpenAI API key found (fallback to OpenAI)")
     else:
         print("✗ No API keys found! Set GEMINI_API_KEY or OPENAI_API_KEY")
         return

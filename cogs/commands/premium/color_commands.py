@@ -67,14 +67,14 @@ class ColorCommands(commands.Cog):
                 # Convert to RGB and then to discord.Color
                 rgb = color_obj.rgb
                 return discord.Color.from_rgb(int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))
-            except:
+            except Exception:
                 # If all else fails, try as hex without #
                 try:
                     return discord.Color(int(color_input, 16))
-                except:
+                except Exception:
                     raise ValueError(
                         f"Invalid color format: '{color_input}'. "
-                        f"Use hex (#RRGGBB), rgb(r,g,b), or color name (e.g., 'red', 'blue')"
+                        "Use hex (#RRGGBB), rgb(r,g,b), or color name (e.g., 'red', 'blue')"
                     )
 
         except ValueError:

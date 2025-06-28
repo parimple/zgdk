@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Enhanced test for gender commands with GenderManager and database tracking."""
 
-import asyncio
 import os
 import sys
 

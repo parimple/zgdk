@@ -12,7 +12,6 @@ from typing import Optional
 
 import discord
 from discord.ext import commands
-from sqlalchemy.ext.asyncio import AsyncSession
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

@@ -1,6 +1,5 @@
 """Pre-defined agent templates for common use cases."""
 
-from typing import Any, Dict
 
 from .core import AgentConfig
 

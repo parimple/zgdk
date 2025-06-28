@@ -1,10 +1,7 @@
 """Factory pattern for agent creation and management."""
 
-import asyncio
 import logging
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List
 
 from .core import AgentBuilder, AgentConfig
 from .monitor import AgentMonitor
@@ -56,7 +53,7 @@ class AgentFactory:
         if agent_id in self._agents:
             return self._agents[agent_id]
 
-        config = self._configs[agent_id]
+        _config = self._configs[agent_id]
 
         # Dynamically import and create agent
         try:

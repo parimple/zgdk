@@ -3,7 +3,7 @@ Giveaway command test fixtures
 Professional test setup with proper separation of concerns
 """
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import discord
 import pytest
@@ -69,13 +69,13 @@ def mock_test_roles():
         ("premium", PREMIUM_ROLE_ID, ROLE_NAMES["premium"]),
         ("vip", VIP_ROLE_ID, ROLE_NAMES["vip"])
     ]
-    
+
     for key, role_id, role_name in role_configs:
         role = MagicMock(spec=discord.Role)
         role.id = role_id
         role.name = role_name
         roles[key] = role
-    
+
     return roles
 
 
@@ -88,7 +88,7 @@ def mock_guild_roles(mock_test_roles, mock_admin_role, mock_star_role):
 
 class MockMemberFactory:
     """Factory for creating mock members with different role configurations"""
-    
+
     @staticmethod
     def create_member(member_id: int, roles: list = None, is_bot: bool = False, name: str = None):
         """Create a mock member with specified configuration"""
@@ -112,35 +112,35 @@ def mock_member_factory():
 def mock_test_members(mock_test_roles, mock_member_factory):
     """Create diverse set of test members with different role combinations"""
     members = {}
-    
+
     # Admin user with test role 1
     members["admin_with_test1"] = mock_member_factory.create_member(
         ADMIN_USER_ID,
         roles=[mock_test_roles["test1"]],
         name="AdminUser"
     )
-    
+
     # Regular user with test roles 1 and 2
     members["user_test1_test2"] = mock_member_factory.create_member(
         TEST_USER_1_ID,
         roles=[mock_test_roles["test1"], mock_test_roles["test2"]],
         name="TestUser1"
     )
-    
+
     # User with test roles 2 and 3
     members["user_test2_test3"] = mock_member_factory.create_member(
         TEST_USER_2_ID,
         roles=[mock_test_roles["test2"], mock_test_roles["test3"]],
         name="TestUser2"
     )
-    
+
     # User with only premium role
     members["user_premium_only"] = mock_member_factory.create_member(
         TEST_USER_3_ID,
         roles=[mock_test_roles["premium"]],
         name="PremiumUser"
     )
-    
+
     # Bot user (should be filtered out)
     members["bot_with_test1"] = mock_member_factory.create_member(
         BOT_USER_ID,
@@ -148,22 +148,22 @@ def mock_test_members(mock_test_roles, mock_member_factory):
         is_bot=True,
         name="BotUser"
     )
-    
+
     # User with no relevant roles
     members["user_no_roles"] = mock_member_factory.create_member(
         TEST_USER_4_ID,
         roles=[],
         name="NoRolesUser"
     )
-    
+
     return members
 
 
 class MockMessageFactory:
     """Factory for creating mock messages with different configurations"""
-    
+
     @staticmethod
-    def create_message(message_id: int, author_id: int, is_bot: bool = False, 
+    def create_message(message_id: int, author_id: int, is_bot: bool = False,
                       webhook_id: str = None, content: str = None):
         """Create a mock message with specified configuration"""
         message = MagicMock(spec=discord.Message)
@@ -172,14 +172,14 @@ class MockMessageFactory:
         message.webhook_id = webhook_id
         message.jump_url = f"https://discord.com/channels/{GUILD_ID}/{CHANNEL_ID}/{message_id}"
         message.created_at = datetime.now(timezone.utc)
-        
+
         # Create author mock
         author = MagicMock(spec=discord.Member)
         author.id = author_id
         author.bot = is_bot
         author.mention = f"<@{author_id}>"
         author.name = f"User{author_id}"
-        
+
         message.author = author
         return message
 
@@ -257,10 +257,10 @@ def mock_channel_with_history(mock_ctx):
         async def async_iter():
             for message in messages:
                 yield message
-        
+
         mock_ctx.channel.history.return_value.__aiter__ = async_iter
         return mock_ctx.channel
-    
+
     return setup_history
 
 
@@ -272,17 +272,17 @@ def mock_guild_with_members(mock_guild_roles, mock_test_members):
     guild.name = "Test Guild"
     guild.roles = mock_guild_roles
     guild.members = list(mock_test_members.values())
-    
+
     # Setup role lookup functionality
     def get_role_by_name(name):
         for role in mock_guild_roles:
             if role.name == name:
                 return role
         return None
-    
+
     # Mock discord.utils.get behavior
     guild.get_role_by_name = get_role_by_name
-    
+
     return guild
 
 
@@ -300,7 +300,7 @@ def mock_regular_context(mock_ctx):
     regular_role = MagicMock(spec=discord.Role)
     regular_role.id = 999999999
     regular_role.name = "Regular"
-    
+
     mock_ctx.author.id = TEST_USER_1_ID
     mock_ctx.author.roles = [regular_role]
     return mock_ctx
@@ -308,7 +308,7 @@ def mock_regular_context(mock_ctx):
 
 class GiveawayTestHelpers:
     """Helper functions for giveaway testing"""
-    
+
     @staticmethod
     def count_eligible_members(members, roles, mode="and"):
         """Count eligible members based on role requirements"""
@@ -316,16 +316,16 @@ class GiveawayTestHelpers:
         for member in members:
             if member.bot:
                 continue
-                
+
             if mode == "or":
                 if any(role in member.roles for role in roles):
                     eligible.append(member)
             else:  # and mode
                 if all(role in member.roles for role in roles):
                     eligible.append(member)
-        
+
         return len(eligible)
-    
+
     @staticmethod
     def get_members_by_role_criteria(members, roles, mode="and"):
         """Get members matching role criteria"""
@@ -333,14 +333,14 @@ class GiveawayTestHelpers:
         for member in members:
             if member.bot:
                 continue
-                
+
             if mode == "or":
                 if any(role in member.roles for role in roles):
                     eligible.append(member)
             else:  # and mode
                 if all(role in member.roles for role in roles):
                     eligible.append(member)
-        
+
         return eligible
 
 

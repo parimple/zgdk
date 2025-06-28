@@ -55,8 +55,8 @@ models_base_mod.Base = MagicMock()
 models_mod.base = models_base_mod
 
 # Mock all model classes
-for model_name in ['Member', 'MemberRole', 'Activity', 'Role', 'HandledPayment', 
-                   'Invite', 'AutoKick', 'ModerationLog', 'ChannelPermission', 
+for model_name in ['Member', 'MemberRole', 'Activity', 'Role', 'HandledPayment',
+                   'Invite', 'AutoKick', 'ModerationLog', 'ChannelPermission',
                    'Message', 'NotificationLog']:
     setattr(models_mod, model_name, MagicMock())
 

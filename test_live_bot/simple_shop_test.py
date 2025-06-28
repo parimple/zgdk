@@ -3,7 +3,7 @@
 Simple Shop Testing - Test shop display and basic functionality
 Since shop uses interactive buttons, this test focuses on:
 1. Shop command execution
-2. Bot response verification  
+2. Bot response verification
 3. Error monitoring
 4. Balance operations
 """
@@ -13,7 +13,7 @@ import json
 import os
 import subprocess
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # Use discord.py-self (which is what's currently installed)
 import discord
@@ -177,11 +177,11 @@ class SimpleShopTester:
                     # Special handling for shop test
                     if "shop" in result["test"].lower() and result.get("has_buttons"):
                         button_tests += 1
-                        print(f"      🔘 Shop displayed with interactive buttons!")
+                        print("      🔘 Shop displayed with interactive buttons!")
                     elif "balance" in result["test"].lower():
-                        print(f"      💰 Balance operation completed")
+                        print("      💰 Balance operation completed")
                     elif "profile" in result["test"].lower():
-                        print(f"      👤 Profile displayed successfully")
+                        print("      👤 Profile displayed successfully")
 
                 else:
                     print(f"{i:2d}. ❌ {result['test']}: {status}")
@@ -189,7 +189,7 @@ class SimpleShopTester:
                         print(f"      🔸 {result['error']}")
 
             success_rate = (success_count / len(self.test_results) * 100) if self.test_results else 0
-            print(f"\n📈 Shop Test Results:")
+            print("\n📈 Shop Test Results:")
             print(f"   Success Rate: {success_rate:.1f}% ({success_count}/{len(self.test_results)})")
             print(f"   Shop UI Tests: {button_tests} shop display(s) with buttons")
 
@@ -349,7 +349,7 @@ async def main():
     print("🏪 Simple Shop Testing Framework")
     print("===============================")
     print(f"⏰ Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"🎯 Testing shop display and basic functionality:")
+    print("🎯 Testing shop display and basic functionality:")
     print("   • Balance management")
     print("   • Profile checking")
     print("   • Shop command execution")

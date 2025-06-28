@@ -14,7 +14,7 @@ async def test_addbalance_ultraclean():
     install_commands_stub()
 
     from cogs.commands.shop import ShopCog
-    
+
     bot = make_mock_bot()
     ctx = make_mock_context()
     user = make_mock_user()
@@ -30,16 +30,16 @@ async def test_addbalance_ultraclean():
 async def test_addbalance_negative_ultraclean():
     """Test negative amount with ultra clean setup"""
     install_commands_stub()
-    
+
     from cogs.commands.shop import ShopCog
-    
+
     bot = make_mock_bot()
     ctx = make_mock_context()
     user = make_mock_user()
-    
+
     shop = ShopCog(bot)
     await shop.add_balance(ctx, user, -100)
-    
+
     ctx.reply.assert_awaited_once()
     reply_call = ctx.reply.call_args[0][0]
     assert "-100" in reply_call
@@ -48,14 +48,14 @@ async def test_addbalance_negative_ultraclean():
 def test_addbalance_signature_ultraclean():
     """Test command signature with ultra clean setup"""
     install_commands_stub()
-    
+
     from cogs.commands.shop import ShopCog
-    
+
     bot = make_mock_bot()
     shop = ShopCog(bot)
     assert hasattr(shop, 'add_balance')
     assert callable(shop.add_balance)
-    
+
     # Bonus: verify it's a real coroutine function
     import inspect
     assert inspect.iscoroutinefunction(shop.add_balance)

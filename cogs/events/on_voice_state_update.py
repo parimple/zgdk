@@ -346,7 +346,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
             try:
                 logger.info(f"Sending channel creation info to existing channel {existing_channel.name}")
                 await self.message_sender.send_channel_creation_info(fake_ctx, existing_channel)
-                logger.info(f"Successfully sent channel creation info to existing channel")
+                logger.info("Successfully sent channel creation info to existing channel")
             except Exception as e:
                 logger.error(f"Failed to send channel creation info to existing channel: {e}", exc_info=True)
             return
@@ -370,7 +370,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         try:
             logger.info(f"Sending channel creation info to {new_channel.name}")
             await self.message_sender.send_channel_creation_info(fake_ctx, new_channel)
-            logger.info(f"Successfully sent channel creation info")
+            logger.info("Successfully sent channel creation info")
         except Exception as e:
             logger.error(f"Failed to send channel creation info: {e}", exc_info=True)
 

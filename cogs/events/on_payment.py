@@ -33,8 +33,8 @@ cleanup_counter = 0
 def cleanup_zombie_browser_processes():
     """Cleanup zombie browser processes"""
     try:
-        subprocess.run(["pkill", "-f", "headless_shell"], capture_output=True, timeout=5)
-        subprocess.run(["pkill", "-f", "chrome.*--headless"], capture_output=True, timeout=5)
+        subprocess.run(["pkill", "-", "headless_shell"], capture_output=True, timeout=5)
+        subprocess.run(["pkill", "-", "chrome.*--headless"], capture_output=True, timeout=5)
         logger.debug("Cleaned up zombie browser processes")
     except Exception as e:
         logger.warning(f"Error during zombie browser cleanup: {e}")
@@ -488,7 +488,7 @@ class OnPaymentEvent(commands.Cog):
                     try:
                         member_service = await self.bot.get_service(IMemberService, session)
                         db_member = await member_service.get_or_create_member(member)
-                        updated_member = await member_service.update_member_info(
+                        _updated_member = await member_service.update_member_info(
                             db_member, wallet_balance=db_member.wallet_balance + amount_to_add
                         )
                         await session.flush()

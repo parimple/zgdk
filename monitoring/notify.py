@@ -5,14 +5,12 @@ Supports multiple notification channels
 """
 
 import asyncio
-import json
 import os
 import smtplib
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import aiohttp
 import yaml
@@ -110,7 +108,7 @@ class NotificationHandler:
         )
 
         # Send email notification
-        html_body = f"""
+        html_body = """
         <html>
             <body style="font-family: Arial, sans-serif;">
                 <h2 style="color: #d32f2f;">ZGDK System Alert</h2>

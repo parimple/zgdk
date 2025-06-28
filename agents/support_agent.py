@@ -3,14 +3,13 @@
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import google.generativeai as genai
 import redis.asyncio as redis
 from crewai import Agent as CrewAgent
 from crewai import Crew, Process, Task
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -115,7 +114,7 @@ class SupportAgentCrew:
             )
 
         # Define tasks for the crew
-        classification_task = Task(
+        _classification_task = Task(
             description=f"Classify this Polish Discord message: '{query.content}'",
             expected_output="One of: FAQ, COMPLAINT, UNCLEAR",
             agent=self.crew.agents[0],  # intake_agent

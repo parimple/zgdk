@@ -31,7 +31,7 @@ TEST_SCENARIOS = {
 COMMANDS_TO_TEST = [
     {
         "name": "addbalance",
-        "type": "owner_only", 
+        "type": "owner_only",
         "description": "Add balance to user wallet",
         "test_params": ["@user", "1000"],
     },
@@ -42,14 +42,14 @@ COMMANDS_TO_TEST = [
         "test_params": [],
     },
     {
-        "name": "shop", 
+        "name": "shop",
         "type": "admin",
         "description": "Display premium shop",
         "test_params": [],
     },
     {
         "name": "ping",
-        "type": "public", 
+        "type": "public",
         "description": "Basic connectivity test",
         "test_params": [],
     },
@@ -65,7 +65,7 @@ ERROR_SCENARIOS = [
     },
     {
         "name": "invalid_role",
-        "description": "Try to buy non-existent role", 
+        "description": "Try to buy non-existent role",
         "expected_error": "role not found",
     },
 ]

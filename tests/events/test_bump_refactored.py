@@ -36,15 +36,15 @@ class TestBumpHandlers:
     async def test_disboard_handler_adds_bypass_time(self, mock_bot, mock_message_sender):
         """Test that Disboard handler adds bypass time correctly."""
         handler = DisboardHandler(mock_bot, mock_message_sender)
-        
+
         # Mock member
         member = MagicMock()
         member.bypass_expiry = None
         member.bump_count = 0
-        
+
         # Test adding bypass time
         await handler.add_bypass_time(member, BYPASS_DURATIONS["disboard"], "disboard")
-        
+
         # Check that bypass expiry was set
         assert member.bypass_expiry is not None
         assert isinstance(member.bypass_expiry, datetime)
@@ -53,10 +53,10 @@ class TestBumpHandlers:
     async def test_cooldown_check(self, mock_bot, mock_message_sender):
         """Test cooldown checking."""
         handler = DzikHandler(mock_bot, mock_message_sender)
-        
+
         # Mock session and notification queries
         mock_session = MagicMock()
-        
+
         with patch("cogs.events.bump.handlers.NotificationLogQueries") as mock_queries:
             # Test no previous notification (not on cooldown)
             mock_queries.get_last_notification.return_value = None
@@ -64,12 +64,12 @@ class TestBumpHandlers:
                 mock_session, 123456, "dzik", SERVICE_COOLDOWNS["dzik"]
             )
             assert not is_on_cooldown
-            
+
             # Test recent notification (on cooldown)
             mock_notification = MagicMock()
             mock_notification.timestamp = datetime.now(timezone.utc) - timedelta(hours=1)
             mock_queries.get_last_notification.return_value = mock_notification
-            
+
             is_on_cooldown = await handler.check_cooldown(
                 mock_session, 123456, "dzik", SERVICE_COOLDOWNS["dzik"]
             )
@@ -95,13 +95,13 @@ class TestBumpEvent:
         message.interaction = MagicMock()
         message.interaction.name = "bump"
         message.interaction.user = MagicMock(spec=discord.Member)
-        
+
         # Mock the handler
         bump_event.disboard_handler.handle = AsyncMock()
-        
+
         # Test handling
         result = await bump_event.handle_slash_command(message)
-        
+
         assert result is True
         bump_event.disboard_handler.handle.assert_called_once_with(message)
 
@@ -111,16 +111,16 @@ class TestBumpEvent:
         # Create mock channel and user
         channel = MagicMock(spec=discord.TextChannel)
         channel.send = AsyncMock()
-        
+
         user = MagicMock(spec=discord.Member)
         user.name = "TestUser"
-        
+
         # Test marketing message
         await bump_event.send_bump_marketing(channel, "disboard", user)
-        
+
         # Check that message was sent
         channel.send.assert_called_once()
-        
+
         # Check embed content
         call_args = channel.send.call_args
         embed = call_args.kwargs.get("embed")

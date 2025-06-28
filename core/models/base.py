@@ -3,7 +3,7 @@ Base Pydantic models and validators used across the application.
 """
 
 from datetime import datetime
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, TypeVar
 
 from pydantic import BaseModel as PydanticBaseModel
 from pydantic import Field, validator

@@ -3,7 +3,6 @@ Enhanced moderation commands with PydanticAI integration.
 """
 
 import logging
-from typing import Optional
 
 import discord
 from discord.ext import commands
@@ -11,7 +10,7 @@ from discord.ext import commands
 from core.ai.duration_parser import DurationParser
 from core.ai.moderation_assistant import ModerationAssistant, UserContext
 from core.interfaces.member_interfaces import IModerationService
-from core.models.moderation import ModerationAction, ModerationType, TimeoutRequest
+from core.models.moderation import ModerationType, TimeoutRequest
 from utils.permissions import is_mod_or_admin
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ class EnhancedModerationCommands(commands.Cog):
             enhanced_duration = await self.duration_parser.parse(duration)
 
             # Create timeout request
-            timeout_req = TimeoutRequest(
+            _timeout_req = TimeoutRequest(
                 target_id=str(member.id),
                 moderator_id=str(ctx.author.id),
                 guild_id=str(ctx.guild.id),
@@ -115,7 +114,7 @@ class EnhancedModerationCommands(commands.Cog):
                 try:
                     message = await channel.fetch_message(int(message_id))
                     break
-                except:
+                except Exception:
                     continue
 
             if not message:

@@ -2,7 +2,6 @@
 """Test various bot commands through MCP."""
 
 import asyncio
-import json
 
 import aiohttp
 
@@ -16,14 +15,14 @@ async def test_command(command: str, params: dict = None):
         }
         if params:
             payload.update(params)
-            
+
         async with session.post("http://localhost:8090/execute", json=payload) as resp:
             result = await resp.json()
-            
+
         print(f"\n{'='*60}")
         print(f"Command: /{command}")
         print(f"{'='*60}")
-        
+
         if "error" in result:
             print(f"❌ Error: {result['error']}")
         elif "responses" in result and result["responses"]:
@@ -39,6 +38,7 @@ async def test_command(command: str, params: dict = None):
         else:
             print("❓ No response")
 
+
 async def main():
     """Test multiple commands."""
     commands = [
@@ -46,23 +46,23 @@ async def main():
         ("help", {}),
         ("ping", {}),
         ("info", {}),
-        
+
         # User info commands
         ("profile", {}),
         ("balance", {}),
         ("top", {}),
-        
-        # Shop commands  
+
+        # Shop commands
         ("shop", {}),
         ("daily", {}),
-        
+
         # Voice commands
         ("voice", {}),
-        
+
         # Team commands
         ("team", {}),
     ]
-    
+
     for cmd, params in commands:
         try:
             await test_command(cmd, params)
