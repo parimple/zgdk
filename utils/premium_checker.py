@@ -10,7 +10,8 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from datasources.queries import InviteQueries, MemberQueries
+from datasources.queries import MemberQueries
+from core.repositories import InviteRepository
 from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
@@ -167,8 +168,9 @@ class PremiumChecker:
 
             # Check invite count (with validation like legacy system)
             async with self.bot.get_db() as session:
-                invite_count = await InviteQueries.get_member_valid_invite_count(
-                    session, ctx.author.id, ctx.guild, min_days=7
+                invite_repo = InviteRepository(session)
+                invite_count = await invite_repo.get_member_valid_invite_count(
+                    ctx.author.id, ctx.guild, min_days=7
                 )
                 logger.debug(f"User {ctx.author.id} has {invite_count} valid invites")
                 return invite_count >= 4
@@ -184,8 +186,9 @@ class PremiumChecker:
         has_status = self.has_discord_invite_in_status(ctx)
 
         async with self.bot.get_db() as session:
-            invite_count = await InviteQueries.get_member_valid_invite_count(
-                session, ctx.author.id, ctx.guild, min_days=7
+            invite_repo = InviteRepository(session)
+            invite_count = await invite_repo.get_member_valid_invite_count(
+                ctx.author.id, ctx.guild, min_days=7
             )
 
         # Debug activities

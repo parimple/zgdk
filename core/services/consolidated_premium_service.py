@@ -25,7 +25,8 @@ from core.interfaces.premium_interfaces import (
 from core.repositories.premium_repository import PaymentRepository, PremiumRepository
 from core.services.base_service import BaseService
 from core.services.cache_service import CacheService
-from datasources.queries import HandledPaymentQueries, InviteQueries, MemberQueries, RoleQueries
+from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
+from core.repositories import InviteRepository
 
 logger = logging.getLogger(__name__)
 
@@ -385,8 +386,9 @@ class ConsolidatedPremiumService(
 
             # Check invite count
             async with self.bot.get_db() as session:
-                invite_count = await InviteQueries.get_member_valid_invite_count(
-                    session, member.id, self.guild, min_days=7
+                invite_repo = InviteRepository(session)
+                invite_count = await invite_repo.get_member_valid_invite_count(
+                    member.id, self.guild, min_days=7
                 )
                 logger.debug(f"User {member.id} has {invite_count} valid invites")
                 return invite_count >= 4

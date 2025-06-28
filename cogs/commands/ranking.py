@@ -27,7 +27,9 @@ class RankingCommands(commands.Cog):
         pass
 
     @commands.hybrid_command(
-        name="ranking", description="Pokaż ranking aktywności serwera"
+        name="ranking",
+        aliases=["top", "topka"],
+        description="Pokaż ranking aktywności serwera"
     )
     @app_commands.describe(
         days="Liczba dni wstecz (domyślnie 7)",
@@ -156,7 +158,9 @@ class RankingCommands(commands.Cog):
             )
 
     @commands.hybrid_command(
-        name="my_rank", description="Pokaż swoją pozycję w rankingu"
+        name="my_rank",
+        aliases=["mojapozcyja", "mojrank"],
+        description="Pokaż swoją pozycję w rankingu"
     )
     @app_commands.describe(days="Liczba dni wstecz (domyślnie 7)")
     async def my_rank(self, ctx: commands.Context, days: int = 7):

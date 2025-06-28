@@ -7,7 +7,8 @@ from typing import Optional, Dict, List, Tuple
 import discord
 from discord.ext import commands
 
-from datasources.queries import InviteQueries, MemberQueries
+from datasources.queries import MemberQueries
+from core.repositories import InviteRepository
 from core.interfaces.member_interfaces import IActivityService, IMemberService
 from core.interfaces.premium_interfaces import IPremiumService
 from core.interfaces.team_interfaces import ITeamManagementService
@@ -35,7 +36,8 @@ async def get_profile_data(
     premium_service = await bot.get_service(IPremiumService, session)
     
     # Get basic data
-    invites = await InviteQueries.get_member_invite_count(session, member.id)
+    invite_repo = InviteRepository(session)
+    invites = await invite_repo.get_member_invite_count(member.id)
     teams = TeamManagementService.count_member_teams(ctx.guild, member, team_symbol)
     
     # Get activity data

@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from datasources.queries import InviteQueries
+from core.repositories import InviteRepository
 from utils.permissions import is_admin
 
 from .helpers import InviteInfo
@@ -53,7 +53,8 @@ class InviteCommands(commands.Cog):
 
         async with self.bot.get_db() as session:
             # Pobierz wszystkie zaproszenia z bazy
-            all_invites = await InviteQueries.get_all_invites(session)
+            invite_repo = InviteRepository(session)
+            all_invites = await invite_repo.get_all_invites()
 
             # Filtruj po użytkowniku jeśli podano
             if target:

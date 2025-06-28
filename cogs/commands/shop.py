@@ -23,7 +23,11 @@ class ShopCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="shop", description="Wyświetla sklep z rolami.")
+    @commands.hybrid_command(
+        name="shop", 
+        aliases=["sklep"],
+        description="Wyświetla sklep z rolami."
+    )
     @is_zagadka_owner()
     async def shop(self, ctx: Context, member: discord.Member = None):
         viewer = ctx.author

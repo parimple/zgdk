@@ -8,7 +8,7 @@ import discord
 from discord.ext import commands
 
 from core.interfaces.member_interfaces import IInviteService, IMemberService
-from datasources.queries import InviteQueries
+from core.repositories import InviteRepository
 
 logger = logging.getLogger(__name__)
 
@@ -89,16 +89,12 @@ class InviteManager:
                     f"{invite.code} with unknown inviter"
                 )
             
-            # Track the invite
-            await invite_service.create_tracked_invite(
-                invite_code=invite.code,
-                inviter_id=inviter_id,
-                guild_id=self.guild.id,
-                created_at=invite.created_at or datetime.now(timezone.utc),
-                uses=invite.uses,
-                max_uses=invite.max_uses,
-                max_age_seconds=invite.max_age
-            )
+            # Track the invite - interface expects invite object and creator member
+            if invite.inviter:
+                await invite_service.create_tracked_invite(
+                    invite=invite,
+                    creator=invite.inviter
+                )
             
             # Update member's inviter information
             if inviter_id:
@@ -146,7 +142,8 @@ class InviteManager:
         async with self.bot.get_db() as session:
             try:
                 # Get all tracked invites
-                all_invites = await InviteQueries.get_all_invites(session)
+                invite_repo = InviteRepository(session)
+                all_invites = await invite_repo.get_all_invites()
                 
                 for db_invite in all_invites:
                     should_delete = False
@@ -174,7 +171,7 @@ class InviteManager:
                     
                     # Delete if needed
                     if should_delete:
-                        await InviteQueries.delete_invite(session, db_invite.code)
+                        await invite_repo.delete_invite(db_invite.code)
                         cleaned_count += 1
                         
                         # Notify if there was an inviter

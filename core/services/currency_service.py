@@ -2,6 +2,7 @@
 
 import logging
 
+from core.exceptions import ValidationError, DomainError
 from core.interfaces.currency_interfaces import ICurrencyService
 from core.services.base_service import BaseService
 
@@ -47,7 +48,18 @@ class CurrencyService(BaseService, ICurrencyService):
             
         Returns:
             Amount in PLN with proper rounding
+            
+        Raises:
+            ValidationError: If amount is invalid
         """
+        if not isinstance(amount_g, (int, float)) or amount_g < 0:
+            raise ValidationError(
+                "Invalid amount for conversion",
+                field="amount_g",
+                value=amount_g,
+                user_message=f"Nieprawidłowa kwota: {amount_g}"
+            )
+        
         try:
             # Convert to PLN
             amount_pln = amount_g / self.PLN_TO_G_RATIO
@@ -74,7 +86,11 @@ class CurrencyService(BaseService, ICurrencyService):
 
         except Exception as e:
             self._log_error("g_to_pln", e, amount_g=amount_g)
-            return 0
+            raise DomainError(
+                f"Failed to convert {amount_g}G to PLN: {str(e)}",
+                domain="currency",
+                user_message="Błąd podczas konwersji waluty"
+            ) from e
 
     def pln_to_g(self, amount_pln: float) -> int:
         """
@@ -129,6 +145,9 @@ class CurrencyService(BaseService, ICurrencyService):
             
         Returns:
             True if amount is valid
+            
+        Raises:
+            ValidationError: If amount is invalid (when strict=True)
         """
         try:
             # Check if amount is a non-negative integer
@@ -139,6 +158,11 @@ class CurrencyService(BaseService, ICurrencyService):
                 amount=amount,
                 is_valid=is_valid,
             )
+            
+            if not is_valid:
+                # Log but don't raise - this method returns bool
+                self.logger.warning(f"Invalid amount: {amount} (type: {type(amount)})")
+            
             return is_valid
 
         except Exception as e:

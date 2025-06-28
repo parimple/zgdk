@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from core.interfaces.premium_interfaces import IPremiumService, PaymentData
 from core.repositories.premium_repository import PaymentRepository
 from core.services.base_service import BaseService
-from datasources.queries import HandledPaymentQueries, InviteQueries
+from datasources.queries import HandledPaymentQueries
 
 logger = logging.getLogger(__name__)
 
