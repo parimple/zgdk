@@ -1,0 +1,79 @@
+# Default values for support-agents
+replicaCount: 2
+
+image:
+  repository: ppyzel/zgdk
+  tag: latest
+  pullPolicy: IfNotPresent
+
+agents:
+  intake:
+    replicas: 2
+    memory: "256Mi"
+    cpu: "100m"
+  faq:
+    replicas: 3
+    memory: "512Mi"
+    cpu: "200m"
+  complaint:
+    replicas: 1
+    memory: "256Mi"
+    cpu: "100m"
+  escalation:
+    replicas: 1
+    memory: "256Mi"
+    cpu: "100m"
+
+service:
+  type: ClusterIP
+  port: 8080
+
+redis:
+  host: redis-service
+  port: 6379
+
+postgresql:
+  host: postgres-service
+  port: 5432
+  database: zagadka
+  user: zagadka
+  passwordSecret: postgres-secrets
+  passwordKey: POSTGRES_PASSWORD
+
+gemini:
+  apiKeySecret: ai-secrets
+  apiKeyKey: GEMINI_API_KEY
+
+# MCP for Claude access through Claude Code
+mcp:
+  enabled: true
+  endpoint: "http://host.docker.internal:3000"  # MCP server endpoint
+
+# Escalation settings
+escalation:
+  webhookUrl: ""  # Set in values-prod.yaml
+
+# Autoscaling defaults (overridden in prod)
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# Discord bot configuration
+bot:
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+discord:
+  tokenSecret: discord-secrets
+  tokenKey: DISCORD_TOKEN
+
+# Network policies
+networkPolicy:
+  enabled: false  # Enable in production

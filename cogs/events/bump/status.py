@@ -6,7 +6,7 @@ from typing import Dict, Optional
 
 import discord
 
-from datasources.queries import NotificationLogQueries
+from core.repositories import NotificationRepository
 from utils.message_sender import MessageSender
 
 from .constants import SERVICE_COOLDOWNS, SERVICE_NAMES
@@ -27,8 +27,9 @@ class BumpStatusHandler:
         async with self.bot.get_db() as session:
             # For global services like disboard, use guild_id
             guild_id = self.bot.guild_id if hasattr(self.bot, 'guild_id') else None
-            last_notification = await NotificationLogQueries.get_service_notification_log(
-                session, service, guild_id, user_id
+            notification_repo = NotificationRepository(session)
+            last_notification = await notification_repo.get_service_notification_log(
+                service, guild_id, user_id
             )
             
             if not last_notification:

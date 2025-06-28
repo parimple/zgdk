@@ -13,9 +13,8 @@ async def get_premium_users_count(ctx: Context) -> int:
             # Use new service architecture
             premium_service = await ctx.bot.get_service(IPremiumService, session)
             
-            # For now, return fallback until we implement the count method
-            # TODO: Add count_unique_premium_users method to premium service
-            return 200  # Fallback social proof number
+            # Get actual count from the premium service
+            return await premium_service.count_unique_premium_users()
     except Exception:
         # Return fallback number if database query fails
         return 200  # Fallback social proof number

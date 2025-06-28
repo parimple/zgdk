@@ -269,20 +269,6 @@ class RoleRepository(BaseRepository):
             self.logger.error(f"Error updating role expiry: {e}")
             raise
 
-    async def get_expired_roles(self, current_time: datetime) -> list[MemberRole]:
-        """Get all expired roles."""
-        try:
-            stmt = select(MemberRole).where(
-                and_(
-                    MemberRole.expiration_date.isnot(None),
-                    MemberRole.expiration_date < current_time
-                )
-            )
-            result = await self.session.execute(stmt)
-            return list(result.scalars().all())
-        except Exception as e:
-            self.logger.error(f"Error getting expired roles: {e}")
-            raise
 
     async def create_role(self, role_id: int, role_name: str, role_type: str = "premium") -> Role:
         """Create a new role."""

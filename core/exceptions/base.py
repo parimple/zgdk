@@ -135,3 +135,23 @@ class ExternalServiceError(BotError):
             details=details,
             user_message=user_message or "Błąd zewnętrznego serwisu.",
         )
+
+
+class ServiceException(BotError):
+    """Raised when a service operation fails."""
+    pass
+
+
+class TransactionException(BotError):
+    """Raised when a database transaction fails."""
+    pass
+
+
+class ValidationException(ValidationError):
+    """Alias for ValidationError for backward compatibility."""
+    pass
+
+
+class ResourceNotFoundException(NotFoundError):
+    """Alias for NotFoundError for backward compatibility."""
+    pass

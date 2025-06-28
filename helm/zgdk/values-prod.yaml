@@ -1,0 +1,32 @@
+# Production overrides
+agents:
+  intake:
+    replicas: 5
+    memory: "512Mi"
+    cpu: "500m"
+  faq:
+    replicas: 10
+    memory: "1Gi"
+    cpu: "1000m"
+  complaint:
+    replicas: 3
+    memory: "512Mi"
+    cpu: "200m"
+  escalation:
+    replicas: 2
+    memory: "512Mi"
+    cpu: "200m"
+
+autoscaling:
+  enabled: true
+  minReplicas: 5
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi

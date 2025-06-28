@@ -29,7 +29,7 @@ class NotificationRepository(BaseRepository):
         Args:
             session: Database session
         """
-        super().__init__(session, NotificationLog)
+        super().__init__(NotificationLog, session)
     
     async def add_or_update_notification_log(
         self,

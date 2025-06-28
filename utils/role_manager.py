@@ -13,7 +13,7 @@ import discord
 from discord import AllowedMentions
 
 from core.interfaces.premium_interfaces import IPremiumService
-from datasources.queries import NotificationLogQueries, RoleQueries
+from core.repositories import NotificationRepository, RoleRepository
 
 logger = logging.getLogger(__name__)
 
@@ -113,10 +113,17 @@ class RoleManager:
             ).get("skipped_member_ids", set())
 
             async with self.bot.get_db() as session:
+                # Create repository instances for this session
+                role_repo = RoleRepository(session)
+                notification_repo = NotificationRepository(session)
+                
                 # Pobierz wygasłe role z bazy danych
-                expired_roles = await RoleQueries.get_expired_roles(
-                    session, now, role_type=role_type, role_ids=role_ids
+                expired_roles_data = await role_repo.get_expired_roles(
+                    now, role_type=role_type, role_ids=role_ids
                 )
+                
+                # Convert dict data to MemberRole objects for compatibility
+                expired_roles = [item['member_role'] for item in expired_roles_data]
 
                 if not expired_roles:
                     # Sprawdź czy poprzednio było coś do zrobienia
@@ -178,8 +185,8 @@ class RoleManager:
                             )
                             stats["non_existent_members"] += 1
                             stats["skipped_member_ids"].add(member_role.member_id)
-                            await RoleQueries.delete_member_role(
-                                session, member_role.member_id, member_role.role_id
+                            await role_repo.delete_member_role(
+                                member_role.member_id, member_role.role_id
                             )
                             removed_count += 1  # Count DB removal as an action
                             stats["removed_count"] += 1
@@ -188,7 +195,7 @@ class RoleManager:
                             # nawet gdy użytkownik opuścił serwer (zombie teams cleanup)
                             if role_type == "premium":
                                 try:
-                                    from cogs.commands.info import (
+                                    from cogs.commands.info.admin.helpers import (
                                         remove_premium_role_mod_permissions,
                                     )
 
@@ -231,8 +238,8 @@ class RoleManager:
                         )
                         stats["non_existent_roles"] += 1
                         stats["skipped_role_ids"].add(member_role.role_id)
-                        await RoleQueries.delete_member_role(
-                            session, member_role.member_id, member_role.role_id
+                        await role_repo.delete_member_role(
+                            member_role.member_id, member_role.role_id
                         )
                         removed_count += 1  # Count DB removal
                         stats["removed_count"] += 1
@@ -243,16 +250,16 @@ class RoleManager:
                             f"Role {role.name} (ID: {role.id}) was in DB for member {member.display_name} (ID: {member.id}) but not assigned on Discord. Cleaning DB and notifying user."
                         )
                         stats["roles_not_assigned"] += 1
-                        await RoleQueries.delete_member_role(
-                            session, member_role.member_id, member_role.role_id
+                        await role_repo.delete_member_role(
+                            member_role.member_id, member_role.role_id
                         )
                         removed_count += 1  # Count DB removal
                         stats["removed_count"] += 1
 
                         # Dodaj powiadomienie do wysłania po commit (tak jak w normalnym przypadku wygaśnięcia)
                         notification_tag = f"{role_type or 'role'}_expired"
-                        await NotificationLogQueries.add_or_update_notification_log(
-                            session, member_role.member_id, notification_tag
+                        await notification_repo.add_or_update_notification_log(
+                            member_role.member_id, notification_tag
                         )
 
                         # Przygotuj powiadomienie do wysłania PO commit
@@ -269,7 +276,7 @@ class RoleManager:
                         # Jeśli to była rola premium, wyczyść również uprawnienia i teamy
                         if role_type == "premium":
                             try:
-                                from cogs.commands.info import (
+                                from cogs.commands.info.admin.helpers import (
                                     remove_premium_role_mod_permissions,
                                 )
 
@@ -331,8 +338,7 @@ class RoleManager:
                         # Krok 2: Jeśli usunięcie na Discordzie się powiodło, usuń z bazy danych i przygotuj powiadomienia
                         for member_role_db_entry, role_obj in role_pairs:
                             try:
-                                await RoleQueries.delete_member_role(
-                                    session,
+                                await role_repo.delete_member_role(
                                     member_role_db_entry.member_id,
                                     member_role_db_entry.role_id
                                 )
@@ -343,8 +349,7 @@ class RoleManager:
                                 )
 
                                 notification_tag = f"{role_type or 'role'}_expired"
-                                await NotificationLogQueries.add_or_update_notification_log(
-                                    session,
+                                await notification_repo.add_or_update_notification_log(
                                     member_role_db_entry.member_id,
                                     notification_tag,
                                 )

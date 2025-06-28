@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  app:
+    build: 
+      context: ..
+      dockerfile: docker/app/Dockerfile
+    command: python main.py
+    env_file:
+      - ../.env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - TIPO_API_TOKEN=${TIPO_API_TOKEN}
+      - ENABLE_MCP=${ENABLE_MCP:-false}
+    ports:
+      - 8000:8000
+      - 8089:8089
+      - 8090:8090
+    platform: linux/arm64
+    depends_on:
+      - db
+    networks:
+      - zgdk-network
+
+  db:
+    image: postgres:15.2
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ../pg_log:/var/lib/postgresql/data/pg_log
+    command: ["postgres", "-c", "logging_collector=on", "-c", "log_min_messages=warning", "-c", "log_directory=pg_log", "-c", "log_filename=postgresql-%Y-%m-%d.log"]
+    networks:
+      - zgdk-network
+
+  mcp:
+    build:
+      context: ..
+      dockerfile: docker/mcp/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DISCORD_BOT_URL=http://app:8089
+    depends_on:
+      - app
+    networks:
+      - zgdk-network
+    profiles:
+      - mcp
+
+networks:
+  zgdk-network:
+    driver: bridge
+
+volumes:
+  db-data:

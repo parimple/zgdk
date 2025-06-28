@@ -78,6 +78,20 @@ class UserInfoCog(commands.Cog):
                     'expiration': role_data['expiration_date']
                 })
         
+        # Get voice moderator permissions
+        voice_mods = []
+        try:
+            permissions = await ChannelPermissionQueries.get_permissions_for_member(session, member.id)
+            for perm in permissions:
+                # Check if permission includes manage_messages (moderator permission)
+                if perm.allow_permissions_value & 0x00002000:  # manage_messages bit
+                    # Find the channel name from target_id
+                    channel = ctx.guild.get_channel(perm.target_id)
+                    if channel and isinstance(channel, discord.VoiceChannel):
+                        voice_mods.append(channel.name)
+        except Exception as e:
+            logger.warning(f"Error getting voice mod permissions: {e}")
+        
         return {
             'db_member': db_member,
             'invites': invites,
@@ -85,7 +99,7 @@ class UserInfoCog(commands.Cog):
             'activity_summary': activity_summary,
             'premium_roles': premium_roles,
             'owned_teams': TeamManager.get_owned_teams(ctx.guild, member, self.team_symbol),
-            'voice_mods': []  # TODO: Fix when ChannelPermissionQueries has proper method
+            'voice_mods': voice_mods
         }
 
     async def _get_active_mutes(self, member: discord.Member, ctx: commands.Context) -> tuple[list, bool]:

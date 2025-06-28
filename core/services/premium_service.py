@@ -681,3 +681,11 @@ class PremiumService(
         # Simple calculation: amount / base_price * base_duration
         multiplier = amount / base_price
         return int(multiplier * base_duration)
+
+    async def count_unique_premium_users(self) -> int:
+        """Count unique users with any active premium role."""
+        try:
+            return await self.premium_repository.count_unique_premium_users()
+        except Exception as e:
+            self._log_error("count_unique_premium_users", e)
+            return 200  # Fallback social proof number

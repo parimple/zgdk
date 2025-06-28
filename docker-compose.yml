@@ -2,7 +2,9 @@ version: "3.9"
 services:
   app:
     # image: ppyzel/zgdk:0.1
-    build: .
+    build: 
+      context: .
+      dockerfile: docker/app/Dockerfile
     command: python main.py
     env_file:
       - .env
@@ -15,6 +17,7 @@ services:
     ports:
       - 8000:8000
       - 8090:8090
+      - 8091:8091
     platform: linux/arm64
     depends_on:
       - db

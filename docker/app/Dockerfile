@@ -22,7 +22,10 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     libasound2 \
     libatk-bridge2.0-0 \
-    libgtk-3-0
+    libgtk-3-0 \
+    dumb-init \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
 
 # Check the architecture
 RUN uname -a
@@ -46,6 +49,9 @@ COPY . .
 
 # Check the executable permission of main.py
 RUN ls -la main.py
+
+# Use dumb-init to handle signals and prevent zombies
+ENTRYPOINT ["dumb-init", "--"]
 
 # Run the bot
 CMD ["python", "main.py"]

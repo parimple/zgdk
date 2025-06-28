@@ -120,15 +120,19 @@ class ModerationAssistant:
                 Always explain your reasoning clearly."""
             
             if gemini_key:
+                # Set API key in environment for pydantic-ai
+                import os
+                os.environ['GOOGLE_API_KEY'] = gemini_key
                 self.agent = Agent(
-                    'google-generativeai:gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
-                    api_key=gemini_key,
+                    'gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
                     system_prompt=system_prompt
                 )
             elif openai_key:
+                # Set API key in environment for pydantic-ai
+                import os
+                os.environ['OPENAI_API_KEY'] = openai_key
                 self.agent = Agent(
                     'openai:gpt-4',  # Use GPT-4 for better moderation
-                    api_key=openai_key,
                     system_prompt=system_prompt
                 )
             else:

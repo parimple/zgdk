@@ -166,15 +166,15 @@ class CommandIntentClassifier:
                 }"""
             
             if gemini_key:
+                os.environ['GOOGLE_API_KEY'] = gemini_key
                 self.agent = Agent(
-                    'google-generativeai:gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
-                    api_key=gemini_key,
+                    'gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
                     system_prompt=system_prompt
                 )
             elif openai_key:
+                os.environ['OPENAI_API_KEY'] = openai_key
                 self.agent = Agent(
                     'openai:gpt-3.5-turbo',
-                    api_key=openai_key,
                     system_prompt=system_prompt
                 )
             else:

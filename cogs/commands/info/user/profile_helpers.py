@@ -62,8 +62,22 @@ async def get_profile_data(
         'activity_summary': activity_summary,
         'premium_roles': premium_roles,
         'owned_teams': TeamManagementService.get_owned_teams(ctx.guild, member, team_symbol),
-        'voice_mods': []  # TODO: Fix when ChannelPermissionQueries has proper method
+        'voice_mods': await _get_moderated_channels(member, ctx)
     }
+
+
+async def _get_moderated_channels(member: discord.Member, ctx: commands.Context) -> List[str]:
+    """Get list of voice channels where member is a moderator."""
+    moderated_channels = []
+    
+    # Check voice channels in the guild
+    for channel in ctx.guild.voice_channels:
+        # Check if member has manage permissions in this channel
+        perms = channel.permissions_for(member)
+        if perms.manage_channels or perms.move_members or perms.mute_members:
+            moderated_channels.append(channel.name)
+    
+    return moderated_channels
 
 
 async def get_active_mutes(member: discord.Member, ctx: commands.Context) -> Tuple[List[str], bool]:

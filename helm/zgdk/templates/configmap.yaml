@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app: {{ .Release.Name }}
+data:
+  agents-config.yaml: |
+    # Support Agents Configuration
+    agents:
+      intake:
+        role: "Dispatcher"
+        goal: "Classify incoming queries and route them appropriately"
+        backstory: "Expert at understanding user intent in Polish Discord messages"
+        max_iter: 3
+        
+      faq:
+        role: "Knowledge Expert"
+        goal: "Provide accurate answers to frequently asked questions"
+        backstory: "Discord server expert with deep knowledge of zaGadka rules"
+        cache_ttl: 3600
+        similarity_threshold: 0.85
+        
+      complaint:
+        role: "Complaint Handler"
+        goal: "Handle user complaints with empathy and professionalism"
+        backstory: "Experienced in de-escalation and conflict resolution in Polish"
+        sentiment_threshold: -0.5
+        escalation_keywords:
+          - "ban"
+          - "skarga"
+          - "moderator"
+          - "admin"
+          - "zgłaszam"
+          
+      escalation:
+        role: "Escalation Manager"
+        goal: "Identify issues requiring human moderator intervention"
+        backstory: "Expert at recognizing serious violations and urgent matters"
+        webhook_url: "{{ .Values.escalation.webhookUrl }}"
+        
+    # Response templates
+    templates:
+      greeting: "Cześć! Jestem botem pomocniczym serwera zaGadka. W czym mogę pomóc?"
+      error: "Przepraszam, wystąpił błąd. Spróbuj ponownie za chwilę."
+      escalated: "Twoja sprawa została przekazana do moderatora. Otrzymasz odpowiedź wkrótce."
+      
+    # Performance settings
+    performance:
+      max_response_time_ms: 2000
+      cache_size: 1000
+      batch_size: 10

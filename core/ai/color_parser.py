@@ -149,16 +149,20 @@ class ColorParser:
                 Dla opisowych kolorów, wybierz najbardziej odpowiedni odcień."""
             
             if gemini_key:
+                # Set API key in environment for pydantic-ai
+                import os
+                os.environ['GOOGLE_API_KEY'] = gemini_key
                 self.agent = Agent(
-                    'google-generativeai:gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
-                    api_key=gemini_key,
+                    'gemini-1.5-flash',  # Darmowy do 1M tokenów/miesiąc!
                     system_prompt=system_prompt
                 )
                 logger.info("Using Google Gemini for AI color parsing (free tier)")
             elif openai_key:
+                # Set API key in environment for pydantic-ai
+                import os
+                os.environ['OPENAI_API_KEY'] = openai_key
                 self.agent = Agent(
                     'openai:gpt-3.5-turbo',
-                    api_key=openai_key,
                     system_prompt=system_prompt
                 )
                 logger.info("Using OpenAI for AI color parsing")

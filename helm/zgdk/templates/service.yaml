@@ -1,0 +1,44 @@
+{{- range $agent, $config := .Values.agents }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $agent }}-agent
+  labels:
+    app: {{ $.Release.Name }}
+    component: {{ $agent }}-agent
+spec:
+  type: {{ $.Values.service.type }}
+  ports:
+  - port: {{ $.Values.service.port }}
+    targetPort: {{ $.Values.service.port }}
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ $.Release.Name }}
+    component: {{ $agent }}-agent
+{{- end }}
+
+---
+# Main intake service for load balancing
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-intake
+  labels:
+    app: {{ .Release.Name }}
+    component: intake
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - port: {{ .Values.service.port }}
+    targetPort: {{ .Values.service.port }}
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Release.Name }}
+    component: intake-agent
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 600

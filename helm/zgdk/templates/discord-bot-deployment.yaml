@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-discord-bot
+  labels:
+    app: {{ .Release.Name }}
+    component: discord-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+      component: discord-bot
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        component: discord-bot
+    spec:
+      containers:
+      - name: bot
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 8091
+          name: health
+        env:
+        - name: DISCORD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.discord.tokenSecret }}
+              key: {{ .Values.discord.tokenKey }}
+        - name: POSTGRES_HOST
+          value: {{ .Values.postgresql.host }}
+        - name: POSTGRES_USER
+          value: {{ .Values.postgresql.user }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.passwordSecret }}
+              key: {{ .Values.postgresql.passwordKey }}
+        - name: POSTGRES_DB
+          value: {{ .Values.postgresql.database }}
+        - name: REDIS_HOST
+          value: {{ .Values.redis.host }}
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.gemini.apiKeySecret }}
+              key: {{ .Values.gemini.apiKeyKey }}
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        resources:
+          requests:
+            memory: {{ .Values.bot.resources.requests.memory }}
+            cpu: {{ .Values.bot.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.bot.resources.limits.memory }}
+            cpu: {{ .Values.bot.resources.limits.cpu }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8091
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8091
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: 8091
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: config
+        configMap:
+          name: {{ .Release.Name }}-config

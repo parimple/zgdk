@@ -116,16 +116,48 @@ class OnMemberJoinEvent(commands.Cog):
 
         logger.info(f"Member joined: {member} (ID: {member.id})")
         
-        # Check if member is returning
+        # Check if member is returning and get mute info
         is_returning = False
+        mute_info = None
         async with self.bot.get_db() as session:
             from core.interfaces.member_interfaces import IMemberService
+            from core.repositories import ModerationRepository, RoleRepository
+            
             member_service = await self.bot.get_service(IMemberService, session)
             try:
                 db_member = await member_service.get_member(member)
                 is_returning = True
             except:
                 is_returning = False
+            
+            # Get mute information
+            moderation_repo = ModerationRepository(session)
+            role_repo = RoleRepository(session)
+            
+            # Get mute history
+            mute_history = await moderation_repo.get_user_mute_history(member.id, limit=50)
+            total_mutes = len([m for m in mute_history if m.action_type == "mute"])
+            
+            # Check for active mutes
+            mute_role_ids = [role["id"] for role in self.bot.config.get("mute_roles", [])]
+            active_mutes = []
+            
+            for role_config in self.bot.config.get("mute_roles", []):
+                role_id = role_config["id"]
+                role_type = role_config.get("description", "unknown")
+                
+                # Check if member has this mute role
+                if member.get_role(role_id):
+                    active_mutes.append({
+                        'type': role_type,
+                        'role_id': role_id
+                    })
+            
+            mute_info = {
+                'total_mutes': total_mutes,
+                'active_mutes': active_mutes,
+                'history': mute_history[:5] if mute_history else []
+            }
         
         # Process invite tracking
         inviter = None
@@ -156,13 +188,14 @@ class OnMemberJoinEvent(commands.Cog):
         if is_returning:
             await self._check_pending_payments(member)
         
-        # Send welcome message
+        # Send join log
         if self.welcome_sender:
             await self.welcome_sender.send_welcome_message(
                 member=member,
                 inviter=inviter,
                 restored_roles=restored_roles_count,
-                is_returning=is_returning
+                is_returning=is_returning,
+                mute_info=mute_info
             )
 
     @commands.Cog.listener()

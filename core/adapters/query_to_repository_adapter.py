@@ -237,6 +237,233 @@ class ActivityQueriesAdapter:
         return len(ranking) + 1
 
 
+class AutoKickQueriesAdapter:
+    """Adapter to make AutoKickRepository compatible with old AutoKickQueries interface."""
+    
+    @staticmethod
+    async def ensure_members_exist(
+        session: AsyncSession, owner_id: int, target_id: int
+    ) -> None:
+        """Ensure both owner and target exist in members table."""
+        from core.repositories import MemberRepository
+        member_repo = MemberRepository(session)
+        await member_repo.get_or_create(owner_id)
+        await member_repo.get_or_create(target_id)
+        await session.commit()
+    
+    @staticmethod
+    async def add_autokick(
+        session: AsyncSession, owner_id: int, target_id: int
+    ) -> None:
+        """Add an autokick entry."""
+        from core.repositories import AutoKickRepository
+        repo = AutoKickRepository(session)
+        await repo.add_autokick(owner_id, target_id)
+    
+    @staticmethod
+    async def remove_autokick(
+        session: AsyncSession, owner_id: int, target_id: int
+    ) -> None:
+        """Remove an autokick entry."""
+        from core.repositories import AutoKickRepository
+        repo = AutoKickRepository(session)
+        await repo.remove_autokick(owner_id, target_id)
+    
+    @staticmethod
+    async def get_all_autokicks(session: AsyncSession):
+        """Get all autokick entries."""
+        from core.repositories import AutoKickRepository
+        repo = AutoKickRepository(session)
+        return await repo.get_all_autokicks()
+    
+    @staticmethod
+    async def get_owner_autokicks(
+        session: AsyncSession, owner_id: int
+    ):
+        """Get all autokicks for a specific owner."""
+        from core.repositories import AutoKickRepository
+        repo = AutoKickRepository(session)
+        return await repo.get_owner_autokicks(owner_id)
+    
+    @staticmethod
+    async def get_target_autokicks(
+        session: AsyncSession, target_id: int
+    ):
+        """Get all autokicks targeting a specific member."""
+        from core.repositories import AutoKickRepository
+        repo = AutoKickRepository(session)
+        return await repo.get_target_autokicks(target_id)
+
+
+class ChannelPermissionQueriesAdapter:
+    """Adapter to make ChannelRepository compatible with old ChannelPermissionQueries interface."""
+    
+    @staticmethod
+    async def add_or_update_permission(
+        session: AsyncSession,
+        member_id: int,
+        target_id: int,
+        allow_permissions_value: int,
+        deny_permissions_value: int,
+        guild_id: int,
+    ):
+        """Add or update channel permissions for a specific member or role."""
+        from core.repositories import ChannelRepository
+        repo = ChannelRepository(session)
+        return await repo.add_or_update_permission(
+            member_id, target_id, allow_permissions_value, 
+            deny_permissions_value, guild_id
+        )
+    
+    @staticmethod
+    async def remove_permission(session: AsyncSession, member_id: int, target_id: int):
+        """Remove channel permissions for a specific member or role."""
+        from core.repositories import ChannelRepository
+        repo = ChannelRepository(session)
+        await repo.remove_permission(member_id, target_id)
+    
+    @staticmethod
+    async def get_permission(
+        session: AsyncSession, member_id: int, target_id: int
+    ):
+        """Get channel permissions for a specific member or role."""
+        from core.repositories import ChannelRepository
+        repo = ChannelRepository(session)
+        return await repo.get_permission(member_id, target_id)
+    
+    @staticmethod
+    async def get_permissions_for_target(
+        session: AsyncSession, target_id: int
+    ):
+        """Get all channel permissions for a specific target."""
+        from core.repositories import ChannelRepository
+        repo = ChannelRepository(session)
+        return await repo.get_permissions_for_target(target_id)
+    
+    @staticmethod
+    async def get_permissions_for_member(
+        session: AsyncSession, member_id: int, limit: int = 95
+    ):
+        """Get channel permissions for a specific member."""
+        from core.repositories import ChannelRepository
+        repo = ChannelRepository(session)
+        return await repo.get_permissions_for_member(member_id, limit)
+    
+    @staticmethod
+    async def remove_all_permissions(session: AsyncSession, owner_id: int):
+        """Remove all permissions for a specific owner."""
+        from core.repositories import ChannelRepository
+        repo = ChannelRepository(session)
+        await repo.remove_all_permissions(owner_id)
+    
+    @staticmethod
+    async def remove_mod_permissions_granted_by_member(
+        session: AsyncSession, owner_id: int
+    ):
+        """Remove only moderator permissions granted by a specific member."""
+        from core.repositories import ChannelRepository
+        repo = ChannelRepository(session)
+        await repo.remove_mod_permissions_granted_by_member(owner_id)
+    
+    @staticmethod
+    async def remove_mod_permissions_for_target(session: AsyncSession, target_id: int):
+        """Remove all moderator permissions for a specific target."""
+        from core.repositories import ChannelRepository
+        repo = ChannelRepository(session)
+        await repo.remove_mod_permissions_for_target(target_id)
+
+
+class InviteQueriesAdapter:
+    """Adapter to make InviteRepository compatible with old InviteQueries interface."""
+    
+    @staticmethod
+    async def add_or_update_invite(
+        session: AsyncSession,
+        invite_id: str,
+        creator_id: Optional[int],
+        uses: int,
+        created_at: datetime,
+        last_used_at: Optional[datetime] = None,
+    ):
+        """Add or update an invite."""
+        from core.repositories import InviteRepository
+        repo = InviteRepository(session)
+        return await repo.add_or_update_invite(
+            invite_id, creator_id, uses, created_at, last_used_at
+        )
+    
+    @staticmethod
+    async def get_inactive_invites(
+        session: AsyncSession,
+        days: int = 30,
+        max_uses: int = 5,
+        limit: int = 100,
+        sort_by: str = "uses",
+        order: str = "asc",
+    ):
+        """Get inactive invites based on criteria."""
+        from core.repositories import InviteRepository
+        repo = InviteRepository(session)
+        return await repo.get_inactive_invites(days, max_uses, limit, sort_by, order)
+    
+    @staticmethod
+    async def delete_invite(session: AsyncSession, invite_id: str):
+        """Delete an invite."""
+        from core.repositories import InviteRepository
+        repo = InviteRepository(session)
+        await repo.delete_invite(invite_id)
+    
+    @staticmethod
+    async def get_invite_count(session: AsyncSession):
+        """Get total count of invites."""
+        from core.repositories import InviteRepository
+        repo = InviteRepository(session)
+        return await repo.get_invite_count()
+    
+    @staticmethod
+    async def get_sorted_invites(
+        session: AsyncSession, sort_by: str = "uses", order: str = "desc"
+    ):
+        """Get all invites sorted by specified field."""
+        from core.repositories import InviteRepository
+        repo = InviteRepository(session)
+        return await repo.get_sorted_invites(sort_by, order)
+    
+    @staticmethod
+    async def get_all_invites(session: AsyncSession):
+        """Get all invites."""
+        from core.repositories import InviteRepository
+        repo = InviteRepository(session)
+        return await repo.get_all_invites()
+    
+    @staticmethod
+    async def get_invites_for_cleanup(
+        session: AsyncSession,
+        limit: int = 100,
+        inactive_threshold: timedelta = timedelta(days=1),
+    ):
+        """Get invites that should be cleaned up."""
+        from core.repositories import InviteRepository
+        repo = InviteRepository(session)
+        return await repo.get_invites_for_cleanup(limit, inactive_threshold.days)
+    
+    @staticmethod
+    async def get_member_invite_count(session: AsyncSession, member_id: int):
+        """Get total count of invites (uses) for a specific member."""
+        from core.repositories import InviteRepository
+        repo = InviteRepository(session)
+        return await repo.get_member_invite_count(member_id)
+    
+    @staticmethod
+    async def get_member_valid_invite_count(
+        session: AsyncSession, member_id: int, guild, min_days: int = 7
+    ):
+        """Get count of valid invites for a specific member."""
+        from core.repositories import InviteRepository
+        repo = InviteRepository(session)
+        return await repo.get_member_valid_invite_count(member_id, guild, min_days)
+
+
 class RoleQueriesAdapter:
     """Adapter to make RoleRepository compatible with old RoleQueries interface."""
     

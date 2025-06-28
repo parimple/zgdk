@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  app:
+    volumes:
+      - ../:/app  # Mount całego kodu dla hot reload
+      - /app/.venv  # Exclude venv
+      - /app/__pycache__  # Exclude cache
+    environment:
+      - DEV_MODE=true
+      - HOT_RELOAD=true
+      - PYTHONUNBUFFERED=1
+    command: python -u main.py  # -u for unbuffered output

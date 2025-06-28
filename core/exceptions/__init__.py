@@ -7,6 +7,10 @@ from .base import (
     PermissionError,
     ConfigurationError,
     ExternalServiceError,
+    ServiceException,
+    TransactionException,
+    ValidationException,
+    ResourceNotFoundException,
 )
 
 from .database import (
@@ -31,6 +35,12 @@ from .domain import (
     LimitExceededError,
 )
 
+from .service import (
+    InsufficientFundsException,
+    CooldownException,
+    RateLimitException,
+)
+
 __all__ = [
     # Base
     "BotError",
@@ -39,6 +49,10 @@ __all__ = [
     "PermissionError",
     "ConfigurationError",
     "ExternalServiceError",
+    "ServiceException",
+    "TransactionException",
+    "ValidationException",
+    "ResourceNotFoundException",
     # Database
     "DatabaseError",
     "EntityNotFoundError",
@@ -55,4 +69,14 @@ __all__ = [
     "InsufficientBalanceError",
     "CooldownError",
     "LimitExceededError",
+    # Service (compatibility)
+    "InsufficientFundsException",
+    "CooldownException",
+    "RateLimitException",
+    "BotException",
+    "PermissionException",
+    "ResourceNotFoundException",
+    "ValidationException",
+    "DatabaseException",
+    "ErrorCodes",
 ]

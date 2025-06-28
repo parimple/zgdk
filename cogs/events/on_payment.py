@@ -12,7 +12,7 @@ from discord.ext import commands, tasks
 
 from cogs.views.shop_views import BuyRoleButton
 from core.interfaces.member_interfaces import IMemberService
-from datasources.queries import HandledPaymentQueries
+from core.repositories import PaymentRepository
 from core.services.currency_service import CurrencyService
 from utils.premium import PremiumManager, TipplyDataProvider
 from utils.premium_logic import PREMIUM_PRIORITY, PremiumRoleManager
@@ -215,8 +215,9 @@ class OnPaymentEvent(commands.Cog):
                 await self.premium_manager.notify_unban(banned_user)
                 
                 # Update payment record with user ID
-                payment_record = await HandledPaymentQueries.get_payment_by_name_and_amount(
-                    session, payment_data.name, payment_data.amount
+                payment_repo = PaymentRepository(session)
+                payment_record = await payment_repo.get_payment_by_name_and_amount(
+                    payment_data.name, payment_data.amount
                 )
                 if payment_record:
                     payment_record.member_id = banned_user.id
@@ -241,8 +242,9 @@ class OnPaymentEvent(commands.Cog):
             
             # If not banned either, show the original error message
             # Try to find the payment record to get its ID for the admin command
-            payment_record = await HandledPaymentQueries.get_payment_by_name_and_amount(
-                session, payment_data.name, payment_data.amount
+            payment_repo = PaymentRepository(session)
+            payment_record = await payment_repo.get_payment_by_name_and_amount(
+                payment_data.name, payment_data.amount
             )
             channel_id = self.bot.config["channels"]["donation"]
             channel = self.bot.get_channel(channel_id)

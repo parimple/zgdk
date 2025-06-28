@@ -5,9 +5,22 @@ This module provides centralized imports for all query classes,
 maintaining backward compatibility for existing imports.
 """
 
-from .autokick_queries import AutoKickQueries
-from .channel_queries import ChannelPermissionQueries
-from .invite_queries import InviteQueries
+# Use adapter for migrated queries
+try:
+    from core.adapters.query_to_repository_adapter import AutoKickQueriesAdapter as AutoKickQueries
+except ImportError:
+    # Fallback to original if adapter not available
+    from .autokick_queries import AutoKickQueries
+try:
+    from core.adapters.query_to_repository_adapter import ChannelPermissionQueriesAdapter as ChannelPermissionQueries
+except ImportError:
+    # Fallback to original if adapter not available
+    from .channel_queries import ChannelPermissionQueries
+try:
+    from core.adapters.query_to_repository_adapter import InviteQueriesAdapter as InviteQueries
+except ImportError:
+    # Fallback to original if adapter not available
+    from .invite_queries import InviteQueries
 
 # Use adapters for migrated queries
 try:
