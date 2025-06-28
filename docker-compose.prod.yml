@@ -2,9 +2,6 @@ version: "3.9"
 services:
   app:
     image: ppyzel/zgdk:latest
-    # build: 
-    #   context: .
-    #   dockerfile: docker/app/Dockerfile
     command: python main.py
     env_file:
       - .env
@@ -15,10 +12,9 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - TIPO_API_TOKEN=${TIPO_API_TOKEN}
     ports:
-      - 8000:8000
-      - 8090:8090
-      - 8091:8091
-    platform: linux/arm64
+      - "8000:8000"
+      - "8090:8090"
+      - "8091:8091"
     depends_on:
       - db
     healthcheck:
@@ -27,7 +23,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-
+    restart: unless-stopped
+    
   db:
     image: postgres:15.2
     environment:
@@ -40,6 +37,12 @@ services:
       - db-data:/var/lib/postgresql/data
       - ./pg_log:/var/lib/postgresql/data/pg_log
     command: ["postgres", "-c", "logging_collector=on", "-c", "log_min_messages=warning", "-c", "log_directory=pg_log", "-c", "log_filename=postgresql-%Y-%m-%d.log"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   db-data:
