@@ -139,15 +139,3 @@ class TargetHelper:
         }
 
 
-def get_target_and_permission(ctx, target_arg, permission_value=None):
-    """Legacy function for backward compatibility."""
-    if isinstance(target_arg, discord.Member):
-        return target_arg, permission_value
-
-    try:
-        # Try to get member by ID
-        member_id = int("".join(filter(str.isdigit, target_arg)))
-        return ctx.guild.get_member(member_id), permission_value
-    except (ValueError, TypeError):
-        # If not ID, try to find member by name
-        return discord.utils.get(ctx.guild.members, name=target_arg), permission_value

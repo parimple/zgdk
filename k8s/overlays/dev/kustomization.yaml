@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: zgdk-dev
+
+bases:
+  - ../../base
+
+patchesStrategicMerge:
+  - bot-deployment-patch.yaml
+  - ai-agents-patch.yaml
+
+configMapGenerator:
+  - name: zgdk-config
+    behavior: merge
+    literals:
+      - DEV_MODE=true
+      - HOT_RELOAD=true
+      - LOG_LEVEL=DEBUG
+
+replicas:
+  - name: ai-agents
+    count: 1  # Tylko 1 agent w dev

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zgdk
+  labels:
+    name: zgdk
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zgdk-dev
+  labels:
+    name: zgdk-dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zgdk-staging
+  labels:
+    name: zgdk-staging

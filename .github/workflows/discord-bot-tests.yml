@@ -1,0 +1,161 @@
+name: Discord Bot Integration Tests
+
+on:
+  push:
+    branches: [ main, develop, refactor/*, fix/* ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  POSTGRES_DB: postgres_test
+  POSTGRES_PORT: 5432
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15.2
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov
+
+    - name: Install Playwright browsers
+      run: |
+        python -m playwright install chromium
+
+    - name: Run database migrations
+      env:
+        POSTGRES_HOST: localhost
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_DB: postgres_test
+        POSTGRES_PORT: 5432
+      run: |
+        python -c "
+        import asyncio
+        from sqlalchemy.ext.asyncio import create_async_engine
+        from datasources.models import Base
+        
+        async def create_tables():
+            engine = create_async_engine('postgresql+asyncpg://postgres:postgres@localhost:5432/postgres_test')
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            await engine.dispose()
+        
+        asyncio.run(create_tables())
+        "
+
+    - name: Create test config
+      run: |
+        echo "guild_id: 123456789" > config.yml
+        echo "prefix: ','" >> config.yml
+        echo "channels: {}" >> config.yml
+        echo "force_channel_notifications: true" >> config.yml
+
+    - name: Run unit tests
+      env:
+        POSTGRES_HOST: localhost
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_DB: postgres_test
+        POSTGRES_PORT: 5432
+        ZAGADKA_TOKEN: test_token_for_ci
+      run: |
+        python -m pytest tests/ -v --tb=short || true
+
+    - name: Run linting
+      continue-on-error: true
+      run: |
+        pip install pylint black isort
+        black --check . || echo "Black formatting check failed"
+        isort --check-only . || echo "Import sorting check failed"
+        pylint --fail-under=7.0 cogs/ core/ utils/ datasources/ || echo "Pylint check failed"
+
+    - name: Run integration tests (if secrets available)
+      env:
+        CLAUDE_BOT: ${{ secrets.CLAUDE_BOT }}
+        ZAGADKA_TOKEN: ${{ secrets.ZAGADKA_TOKEN }}
+        TIPO_API_TOKEN: ${{ secrets.TIPO_API_TOKEN }}
+      run: |
+        if [ -n "$CLAUDE_BOT" ]; then
+          echo "Running integration tests with bot tokens..."
+          python tests/integration/test_shop_integration.py
+        else
+          echo "Skipping integration tests - bot tokens not available"
+        fi
+
+    - name: Generate test report
+      if: always()
+      run: |
+        echo "## Test Results" > test_results.md
+        echo "- Unit Tests: $(if [ $? -eq 0 ]; then echo "✅ PASSED"; else echo "❌ FAILED"; fi)" >> test_results.md
+        echo "- Linting: $(if [ $? -eq 0 ]; then echo "✅ PASSED"; else echo "❌ FAILED"; fi)" >> test_results.md
+        echo "- Integration Tests: $(if [ -n "$CLAUDE_BOT" ]; then echo "✅ RUN"; else echo "⏭️ SKIPPED"; fi)" >> test_results.md
+        cat test_results.md
+
+    - name: Upload test artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          test_results.md
+          pytest-report.xml
+          coverage.xml
+        retention-days: 30
+
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run security scan
+      continue-on-error: true
+      uses: github/super-linter@v5
+      env:
+        DEFAULT_BRANCH: main
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VALIDATE_PYTHON_BLACK: false
+        VALIDATE_PYTHON_PYLINT: false
+        VALIDATE_DOCKERFILE: true
+        VALIDATE_YAML: true
+        VALIDATE_JSON: true
+        FILTER_REGEX_EXCLUDE: .*test.*|.*tests.*

@@ -11,9 +11,12 @@ import discord
 import httpx
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright  # pylint: disable=import-error
+from utils.browser_manager import BrowserManager
 from sqlalchemy.exc import IntegrityError
 
-from datasources.queries import HandledPaymentQueries, MemberQueries
+from core.interfaces.member_interfaces import IMemberService
+from core.interfaces.premium_interfaces import IPremiumService
+from core.repositories import PaymentRepository
 
 TIPPLY_API_URL = (
     "https://widgets.tipply.pl/LATEST_MESSAGES/"
@@ -133,17 +136,28 @@ class PremiumManager:
     @staticmethod
     def add_premium_roles_to_embed(ctx, embed, premium_roles):
         """Add premium roles to the provided embed."""
-        for member_role, role in premium_roles:
-            formatted_date = discord.utils.format_dt(member_role.expiration_date, "D")
-            relative_date = discord.utils.format_dt(member_role.expiration_date, "R")
-            embed.add_field(
-                name=f"Rola premium: {role.name}",
-                value=f"Do: {formatted_date} ({relative_date})",
-                inline=False,
-            )
+        for role_data in premium_roles:
+            # Extract data from dictionary format
+            role_name = role_data.get("role_name", "Unknown Role")
+            expiration_date = role_data.get("expiration_date")
+            
+            if expiration_date:
+                formatted_date = discord.utils.format_dt(expiration_date, "D")
+                relative_date = discord.utils.format_dt(expiration_date, "R")
+                embed.add_field(
+                    name=f"Rola premium: {role_name}",
+                    value=f"Do: {formatted_date} ({relative_date})",
+                    inline=False,
+                )
+            else:
+                embed.add_field(
+                    name=f"Rola premium: {role_name}",
+                    value="Permanentna",
+                    inline=False,
+                )
 
     async def process_data(self, session, payment_data: PaymentData) -> None:
-        """Process Payment"""
+        """Process Payment using new service architecture"""
         if not self.guild:
             logger.error(
                 "Guild is not set in process_data. Cannot process payment: %s",
@@ -152,14 +166,20 @@ class PremiumManager:
             return
 
         logger.info("Processing payment: %s", payment_data)
+        
+        # Get services
+        member_service = await self.bot.get_service(IMemberService, session)
+        premium_service = await self.bot.get_service(IPremiumService, session)
+        premium_service.set_guild(self.guild)
+        
         # First, try to find the banned member
         banned_member = await self.get_banned_member(payment_data.name)
         if banned_member:
             logger.info("unban: %s", banned_member)
             await self.guild.unban(banned_member)
             await self.notify_unban(banned_member)
-            payment = await HandledPaymentQueries.add_payment(
-                session,
+            payment_repo = PaymentRepository(session)
+            payment = await payment_repo.add_payment(
                 banned_member.id,
                 payment_data.name,
                 payment_data.amount,
@@ -171,8 +191,8 @@ class PremiumManager:
             member = await self.get_member(payment_data.name)
             if member:
                 logger.info("member id: %s", member)
-                payment = await HandledPaymentQueries.add_payment(
-                    session,
+                payment_repo = PaymentRepository(session)
+                payment = await payment_repo.add_payment(
                     member.id,
                     payment_data.name,
                     payment_data.amount,
@@ -180,7 +200,9 @@ class PremiumManager:
                     payment_data.payment_type,
                 )
                 logger.info("payment: %s", payment)
-                await MemberQueries.get_or_add_member(session, member.id)
+                
+                # Use new service architecture
+                await member_service.get_or_create_member(member)
 
                 # Najpierw sprawdź konwersję legacy i ustal finalną kwotę
                 final_amount = payment_data.amount
@@ -215,13 +237,14 @@ class PremiumManager:
                     logger.info(
                         f"No premium role match for amount {final_amount}, adding to wallet: {payment_data.amount}"
                     )
-                    await MemberQueries.add_to_wallet_balance(
-                        session, member.id, payment_data.amount
-                    )
+                    # Use new service architecture
+                    db_member = await member_service.get_or_create_member(member)
+                    new_balance = db_member.wallet_balance + payment_data.amount
+                    await member_service.update_member_info(db_member, wallet_balance=new_balance)
             else:
                 logger.warning("Member not found for payment: %s", payment_data.name)
-                payment = await HandledPaymentQueries.add_payment(
-                    session,
+                payment_repo = PaymentRepository(session)
+                payment = await payment_repo.add_payment(
                     None,
                     payment_data.name,
                     payment_data.amount,
@@ -295,25 +318,9 @@ class TipplyDataProvider(DataProvider):
 
     async def fetch_payments(self) -> list[PaymentData]:
         """Fetch Payments from the Tipply widget"""
-        browser = None
         try:
-            async with async_playwright() as playwright:
-                browser = await playwright.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--disable-web-security",
-                        "--disable-features=VizDisplayCompositor",
-                        "--disable-extensions",
-                        "--disable-background-timer-throttling",
-                        "--disable-backgrounding-occluded-windows",
-                        "--disable-renderer-backgrounding",
-                        "--single-process",
-                    ],
-                )
-                page = await browser.new_page()
+            async with BrowserManager() as browser_manager:
+                page = await browser_manager.new_page()
                 try:
                     await page.goto(self.widget_url, timeout=30000)
                     await page.wait_for_selector(
@@ -351,20 +358,6 @@ class TipplyDataProvider(DataProvider):
         except Exception as e:
             logger.error(f"Error fetching payments: {str(e)}")
             return []
-        finally:
-            # Zawsze zamknij przeglądarkę
-            if browser:
-                try:
-                    await browser.close()
-                    # Dodatkowy cleanup procesów
-                    browser_process = getattr(browser, "_browser_process", None)
-                    if browser_process and hasattr(browser_process, "kill"):
-                        try:
-                            browser_process.kill()
-                        except Exception:
-                            pass
-                except Exception as cleanup_error:
-                    logger.error(f"Error during browser cleanup: {cleanup_error}")
 
     async def get_data(self, session):
         try:
@@ -375,8 +368,9 @@ class TipplyDataProvider(DataProvider):
 
             # Get the 10 last handled payments of type "tipply"
             async with self.get_db() as session:
-                last_handled_payments = await HandledPaymentQueries.get_last_payments(
-                    session, offset=0, limit=10, payment_type=self.payment_type
+                payment_repo = PaymentRepository(session)
+                last_handled_payments = await payment_repo.get_last_payments(
+                    offset=0, limit=10, payment_type=self.payment_type
                 )
             logger.debug("last_handled_payments: %s", last_handled_payments[:3])
 

@@ -6,9 +6,12 @@ import discord
 from sqlalchemy import text
 
 from datasources.queries import MemberQueries, RoleQueries
-from utils.currency import CURRENCY_UNIT
+from core.services.currency_service import CurrencyService
 from utils.refund import calculate_refund
 
+
+# Currency constant
+CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
 logger = logging.getLogger(__name__)
 
 

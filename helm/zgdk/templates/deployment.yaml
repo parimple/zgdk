@@ -1,0 +1,71 @@
+{{- range $agent, $config := .Values.agents }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $agent }}-agent
+  labels:
+    app: {{ $.Release.Name }}
+    component: {{ $agent }}-agent
+spec:
+  replicas: {{ $config.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}
+      component: {{ $agent }}-agent
+  template:
+    metadata:
+      labels:
+        app: {{ $.Release.Name }}
+        component: {{ $agent }}-agent
+    spec:
+      containers:
+      - name: agent
+        image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+        imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ $.Values.service.port }}
+        env:
+        - name: AGENT_TYPE
+          value: {{ $agent }}
+        - name: REDIS_HOST
+          value: {{ $.Values.redis.host }}
+        - name: POSTGRES_HOST
+          value: {{ $.Values.postgresql.host }}
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.gemini.apiKeySecret }}
+              key: {{ $.Values.gemini.apiKeyKey }}
+        - name: MCP_ENABLED
+          value: "{{ $.Values.mcp.enabled }}"
+        - name: MCP_ENDPOINT
+          value: {{ $.Values.mcp.endpoint }}
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        resources:
+          requests:
+            memory: {{ $config.memory }}
+            cpu: {{ $config.cpu }}
+          limits:
+            memory: {{ $config.memory }}
+            cpu: {{ $config.cpu }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ $.Values.service.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: {{ $.Values.service.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: {{ $.Release.Name }}-config
+{{- end }}

@@ -1,0 +1,12 @@
+# Test results
+*.json
+*.xml
+*.html
+reports/
+coverage/
+.coverage
+*.log
+
+# Keep directory structure
+!.gitignore
+!reports/.gitkeep

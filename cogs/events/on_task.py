@@ -10,16 +10,18 @@ from typing import Optional
 import discord
 from discord.ext import commands, tasks
 
-from cogs.commands.info import remove_premium_role_mod_permissions
-from datasources.queries import (
-    MemberQueries,
-    ModerationLogQueries,
-    NotificationLogQueries,
-    RoleQueries,
+from cogs.commands.info.admin_info import remove_premium_role_mod_permissions
+from core.repositories import ModerationRepository, NotificationRepository, RoleRepository
+from core.interfaces.member_interfaces import (
+    IMemberService,
+    IModerationService,
 )
-from utils.currency import CURRENCY_UNIT, g_to_pln
+from core.services.currency_service import CurrencyService
 from utils.role_manager import RoleManager
 
+
+# Currency constant
+CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
 logger = logging.getLogger(__name__)
 
 
@@ -70,9 +72,8 @@ class OnTaskEvent(commands.Cog):
             expiration_threshold = now + timedelta(hours=24)
             async with self.bot.get_db() as session:
                 # Fetch all MemberRole entries that are premium
-                all_premium_member_roles = await RoleQueries.get_all_premium_roles(
-                    session
-                )
+                role_repo = RoleRepository(session)
+                all_premium_member_roles = await role_repo.get_all_premium_roles()
 
                 # Logujemy tylko jeśli znaleziono role premium (i tylko przy godzinowym sprawdzeniu)
                 if all_premium_member_roles:
@@ -99,9 +100,10 @@ class OnTaskEvent(commands.Cog):
                             continue  # Skip if role not on server
 
                         if guild_role in member.roles:
+                            notification_repo = NotificationRepository(session)
                             notification_log = (
-                                await NotificationLogQueries.get_notification_log(
-                                    session, member.id, "premium_role_expiry"
+                                await notification_repo.get_notification_log(
+                                    member.id, "premium_role_expiry"
                                 )
                             )
                             if (
@@ -112,8 +114,8 @@ class OnTaskEvent(commands.Cog):
                                 await self.notify_premium_expiry(
                                     member, member_role_db, guild_role
                                 )
-                                await NotificationLogQueries.add_or_update_notification_log(
-                                    session, member.id, "premium_role_expiry"
+                                await notification_repo.add_or_update_notification_log(
+                                    member.id, "premium_role_expiry"
                                 )
                                 premium_notifications_sent += 1
                                 changes_made = True
@@ -177,7 +179,7 @@ class OnTaskEvent(commands.Cog):
                 )
                 if role_price_info and "price" in role_price_info:
                     price = role_price_info["price"]
-                    price_pln = g_to_pln(price)
+                    price_pln = CurrencyService().g_to_pln(price)
                     full_message += f"\nAby ją {renewal_action_verb}, potrzebujesz {price}{CURRENCY_UNIT} ({price_pln} PLN)."
                     full_message += f"\nZasil swoje konto{renewal_payment_action_prefix}: {self.bot.config['donate_url']}"
                     full_message += "\nWpisując **TYLKO** swoje id w polu - Twój nick."
@@ -303,12 +305,14 @@ class OnTaskEvent(commands.Cog):
                     bot_id = self.bot.user.id
 
                     # Upewnij się, że użytkownicy istnieją w bazie
-                    await MemberQueries.get_or_add_member(session, member.id)
-                    await MemberQueries.get_or_add_member(session, bot_id)
+                    member_service = await self.bot.get_service(IMemberService, session)
+                    await member_service.get_or_create_member(member)
+                    bot_user = await self.bot.fetch_user(bot_id)
+                    await member_service.get_or_create_member(bot_user)
 
                     # Zapisz automatyczne unmute do logu
-                    await ModerationLogQueries.log_mute_action(
-                        session=session,
+                    moderation_repo = ModerationRepository(session)
+                    await moderation_repo.log_mute_action(
                         target_user_id=member.id,
                         moderator_id=bot_id,  # Bot jako moderator dla automatycznych akcji
                         action_type="unmute",
@@ -349,9 +353,10 @@ class OnTaskEvent(commands.Cog):
                 f"audit_removal_{discord_role.name}",  # Powiadomienie z audytu dla tej konkretnej roli
             ]
 
+            notification_repo = NotificationRepository(session)
             for tag in notification_tags_to_check:
-                notification_log = await NotificationLogQueries.get_notification_log(
-                    session, member.id, tag
+                notification_log = await notification_repo.get_notification_log(
+                    member.id, tag
                 )
                 if notification_log:
                     # Sprawdź czy powiadomienie zostało wysłane w ciągu ostatnich 24 godzin
@@ -392,8 +397,8 @@ class OnTaskEvent(commands.Cog):
             )
 
             # Zapisz że powiadomienie zostało wysłane, aby uniknąć duplikatów w przyszłości
-            await NotificationLogQueries.add_or_update_notification_log(
-                session, member.id, f"audit_removal_{role_name}"
+            await notification_repo.add_or_update_notification_log(
+                member.id, f"audit_removal_{role_name}"
             )
             await session.commit()
 
@@ -416,7 +421,8 @@ class OnTaskEvent(commands.Cog):
         """Command to check and display expired roles"""
         now = datetime.now(timezone.utc)
         async with self.bot.get_db() as session:
-            expired_roles = await RoleQueries.get_expired_roles(session, now)
+            role_repo = RoleRepository(session)
+            expired_roles = await role_repo.get_expired_roles(now)
             if not expired_roles:
                 await ctx.send("No expired roles found.")
                 return
@@ -450,9 +456,8 @@ class OnTaskEvent(commands.Cog):
     async def check_premium_role(self, ctx, member: discord.Member):
         """Command to check premium roles for a specific member"""
         async with self.bot.get_db() as session:
-            premium_roles = await RoleQueries.get_member_premium_roles(
-                session, member.id
-            )
+            role_repo = RoleRepository(session)
+            premium_roles = await role_repo.get_member_premium_roles(member.id)
             current_time = datetime.now(timezone.utc)
             if not premium_roles:
                 await ctx.send(
@@ -478,7 +483,8 @@ class OnTaskEvent(commands.Cog):
         async with self.bot.get_db() as session:
             if member:
                 # Sprawdź tylko wyciszenia konkretnego użytkownika
-                member_roles = await RoleQueries.get_member_roles(session, member.id)
+                role_repo = RoleRepository(session)
+                member_roles = await role_repo.get_member_roles(member.id)
                 mute_roles = [
                     role for role in member_roles if role.role_id in mute_role_ids
                 ]
@@ -493,7 +499,7 @@ class OnTaskEvent(commands.Cog):
                     expiry_status = (
                         "aktywne" if role.expiration_date > now else "wygasłe"
                     )
-                    expiry_time = (
+                    expiration_date = (
                         f"wygasa {discord.utils.format_dt(role.expiration_date, 'R')}"
                         if role.expiration_date
                         else "stałe"
@@ -502,13 +508,14 @@ class OnTaskEvent(commands.Cog):
                     await ctx.send(
                         f"Wyciszenie {self.bot.guild.get_role(role.role_id).name} dla {member.display_name}:\n"
                         f"Status: {expiry_status}\n"
-                        f"Czas: {expiry_time}"
+                        f"Czas: {expiration_date}"
                     )
             else:
                 # Sprawdź wszystkie wyciszenia
                 all_mute_roles = []
+                role_repo = RoleRepository(session)
                 for role_id in mute_role_ids:
-                    role_members = await RoleQueries.get_role_members(session, role_id)
+                    role_members = await role_repo.get_role_members(role_id)
                     all_mute_roles.extend(role_members)
 
                 if not all_mute_roles:
@@ -525,13 +532,13 @@ class OnTaskEvent(commands.Cog):
                         else f"ID: {member_role.member_id}"
                     )
                     role_name = self.bot.guild.get_role(member_role.role_id).name
-                    expiry_time = (
+                    expiration_date = (
                         f"wygasa {discord.utils.format_dt(member_role.expiration_date, 'R')}"
                         if member_role.expiration_date
                         else "stałe"
                     )
 
-                    await ctx.send(f"{i}. {member_name}: {role_name} ({expiry_time})")
+                    await ctx.send(f"{i}. {member_name}: {role_name} ({expiration_date})")
 
                 if len(all_mute_roles) > 10:
                     await ctx.send(f"... i {len(all_mute_roles) - 10} więcej.")
@@ -599,8 +606,9 @@ class OnTaskEvent(commands.Cog):
                 )
                 async with self.bot.get_db() as session:
                     try:
-                        db_member_role_entry = await RoleQueries.get_member_role(
-                            session, member.id, discord_role.id
+                        role_repo = RoleRepository(session)
+                        db_member_role_entry = await role_repo.get_member_role(
+                            member.id, discord_role.id
                         )
 
                         if db_member_role_entry is None:
@@ -655,8 +663,8 @@ class OnTaskEvent(commands.Cog):
                                 await remove_premium_role_mod_permissions(
                                     session, self.bot, member.id
                                 )
-                                await RoleQueries.delete_member_role(
-                                    session, member.id, discord_role.id
+                                await role_repo.delete_member_role(
+                                    member.id, discord_role.id
                                 )
                                 await session.commit()
                                 # Powiadomienie użytkownika
@@ -696,7 +704,20 @@ class OnTaskEvent(commands.Cog):
                 "Przeprowadzono audyt ról premium. Wykonane akcje:\n- "
                 + "\n- ".join(actions_taken_summary)
             )
-            # TODO: Send summary_message to an admin channel
+            # Send summary to admin channel if configured
+            admin_channel_id = self.bot.config.get("channels", {}).get("admin_logs")
+            if admin_channel_id:
+                admin_channel = self.bot.get_channel(admin_channel_id)
+                if admin_channel:
+                    embed = discord.Embed(
+                        title="📊 Audit rang Premium",
+                        description=summary_message[:4000],  # Discord limit
+                        color=discord.Color.blue(),
+                        timestamp=datetime.now(timezone.utc)
+                    )
+                    embed.set_footer(text=f"Akcje: {len(actions_taken_summary)}")
+                    await admin_channel.send(embed=embed)
+            
             logger.info(
                 f"Premium roles audit completed. Actions taken: {len(actions_taken_summary)}"
             )

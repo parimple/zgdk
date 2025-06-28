@@ -30,19 +30,17 @@ class ChannelPermissionManager:
         Returns:
             dict: A dictionary of permission overwrites
         """
-        # Initialize mute roles dictionary
-        mute_roles = {
-            role["description"]: guild.get_role(role["id"])
-            for role in self.bot.config["mute_roles"]
-        }
+        # Initialize mute roles dictionary - filter out None values
+        mute_roles = {}
+        for role_config in self.bot.config["mute_roles"]:
+            role = guild.get_role(role_config["id"])
+            if role:  # Only add if role exists
+                mute_roles[role_config["description"]] = role
+            else:
+                logger.warning(f"Mute role {role_config['description']} (ID: {role_config['id']}) not found in guild")
 
-        # Set up permission overwrites
-        return {
-            mute_roles["stream_off"]: PermissionOverwrite(stream=False),
-            mute_roles["send_messages_off"]: PermissionOverwrite(send_messages=False),
-            mute_roles["attach_files_off"]: PermissionOverwrite(
-                attach_files=False, embed_links=False, external_emojis=False
-            ),
+        # Set up permission overwrites - only add if roles exist
+        overwrites = {
             owner: PermissionOverwrite(
                 view_channel=True,
                 connect=True,
@@ -51,6 +49,18 @@ class ChannelPermissionManager:
                 manage_messages=True,
             ),
         }
+        
+        # Add mute role overwrites if they exist
+        if mute_roles.get("stream_off"):
+            overwrites[mute_roles["stream_off"]] = PermissionOverwrite(stream=False)
+        if mute_roles.get("send_messages_off"):
+            overwrites[mute_roles["send_messages_off"]] = PermissionOverwrite(send_messages=False)
+        if mute_roles.get("attach_files_off"):
+            overwrites[mute_roles["attach_files_off"]] = PermissionOverwrite(
+                attach_files=False, embed_links=False, external_emojis=False
+            )
+            
+        return overwrites
 
     async def reset_user_permissions(
         self, channel: discord.VoiceChannel, owner: Member, target: Member

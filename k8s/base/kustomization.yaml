@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - bot-deployment.yaml
+  - ai-agents-deployment.yaml
+  - postgres-statefulset.yaml
+  - redis-deployment.yaml
+  - configmap.yaml
+  - secrets.yaml
+
+commonLabels:
+  app.kubernetes.io/name: zgdk
+  app.kubernetes.io/instance: production
+
+images:
+  - name: zgdk/bot
+    newTag: latest
+  - name: zgdk/ai-agent
+    newTag: latest

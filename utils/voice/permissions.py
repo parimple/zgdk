@@ -232,6 +232,7 @@ class PermissionChecker:
         self.message_sender = MessageSender()
         self.logger = logging.getLogger(__name__)
 
+    @staticmethod
     def voice_command(requires_owner: bool = False):
         """
         Decorator for voice commands that enforces channel permission requirements.
@@ -374,6 +375,9 @@ class PermissionChecker:
                             )
                         elif mention.isdigit():  # Handle raw user ID
                             target = ctx.guild.get_member(int(mention))
+                            if not target:
+                                # Log when member is not found
+                                logger.warning(f"Member with ID {mention} not found in guild")
                         else:
                             target = ctx.guild.default_role
                         return target, second_arg
@@ -598,7 +602,7 @@ class VoicePermissionManager:
             )
         else:
             await self.message_sender.send_permission_update(
-                ctx, target, permission_flag, new_value
+                ctx, target, permission_flag, new_value, current_channel
             )
 
         if (

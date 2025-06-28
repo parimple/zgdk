@@ -1,0 +1,21 @@
+apiVersion: v2
+name: zgdk
+description: Discord bot with scalable AI agents
+type: application
+version: 1.1.0
+appVersion: "1.1.0"
+keywords:
+  - discord
+  - bot
+  - ai
+maintainers:
+  - name: ZGDK Team
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "17.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled

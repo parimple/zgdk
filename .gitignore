@@ -1,6 +1,7 @@
 # Ignore cache files
 __pycache__/
 .pytest_cache/
+.mypy_cache/
 .coverage
 
 # Ignore these directories

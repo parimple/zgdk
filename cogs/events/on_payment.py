@@ -11,11 +11,15 @@ import discord
 from discord.ext import commands, tasks
 
 from cogs.views.shop_views import BuyRoleButton
-from datasources.queries import HandledPaymentQueries, MemberQueries
-from utils.currency import CURRENCY_UNIT
+from core.interfaces.member_interfaces import IMemberService
+from core.repositories import PaymentRepository
+from core.services.currency_service import CurrencyService
 from utils.premium import PremiumManager, TipplyDataProvider
 from utils.premium_logic import PREMIUM_PRIORITY, PremiumRoleManager
 
+
+# Currency constant
+CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TIPO_API_TOKEN")
@@ -77,14 +81,19 @@ class OnPaymentEvent(commands.Cog):
 
                 logger.info("Found %s new payments", len(payments_data))
 
-                # First ensure all members exist in database
+                # First ensure all members exist in database using service architecture
+                member_service = await self.bot.get_service(IMemberService, session)
+                
                 for payment_data in payments_data:
                     try:
+                        if not self.premium_manager:
+                            logger.error("Premium manager not initialized")
+                            continue
                         member = await self.premium_manager.get_member(
                             payment_data.name
                         )
                         if member:
-                            await MemberQueries.get_or_add_member(session, member.id)
+                            await member_service.get_or_create_member(member)
                             logger.info(
                                 f"Ensured member {member.display_name} exists in database"
                             )
@@ -99,6 +108,9 @@ class OnPaymentEvent(commands.Cog):
                 async with self.bot.get_db() as session:
                     for payment_data in payments_data:
                         try:
+                            if not self.premium_manager:
+                                logger.error("Premium manager not initialized for payment processing")
+                                continue
                             # Process payment data first
                             await self.premium_manager.process_data(
                                 session, payment_data
@@ -182,13 +194,57 @@ class OnPaymentEvent(commands.Cog):
                 logger.error("Timeout waiting for guild to be ready")
                 return
 
+        if not self.premium_manager:
+            logger.error("Premium manager not initialized in handle_payment")
+            return
         member = await self.premium_manager.get_member(payment_data.name)
 
         if member is None:
             logger.error("Member not found: %s", payment_data.name)
+            
+            # Check if user is banned (try with stripped name too)
+            banned_user = await self.premium_manager.get_banned_member(payment_data.name)
+            if not banned_user and payment_data.name.strip() != payment_data.name:
+                # Try with stripped name if original has spaces
+                banned_user = await self.premium_manager.get_banned_member(payment_data.name.strip())
+            
+            if banned_user:
+                logger.info("Found banned user %s for payment %s", banned_user, payment_data.name)
+                # Unban the user
+                await self.guild.unban(banned_user)
+                await self.premium_manager.notify_unban(banned_user)
+                
+                # Update payment record with user ID
+                payment_repo = PaymentRepository(session)
+                payment_record = await payment_repo.get_payment_by_name_and_amount(
+                    payment_data.name, payment_data.amount
+                )
+                if payment_record:
+                    payment_record.member_id = banned_user.id
+                    await session.commit()
+                
+                # Send notification
+                channel_id = self.bot.config["channels"]["donation"]
+                channel = self.bot.get_channel(channel_id)
+                if channel:
+                    embed = discord.Embed(
+                        title="✅ Użytkownik został odbanowany",
+                        description=(
+                            f"Użytkownik **{banned_user}** został odbanowany.\n"
+                            f"Wpłata **{payment_data.amount} {CURRENCY_UNIT}** została wykorzystana na odbanowanie."
+                        ),
+                        color=discord.Color.green(),
+                    )
+                    embed.set_footer(text=f"ID Wpłaty: {payment_record.id} | ID Użytkownika: {banned_user.id}")
+                    embed.timestamp = payment_data.paid_at
+                    await channel.send(embed=embed)
+                return
+            
+            # If not banned either, show the original error message
             # Try to find the payment record to get its ID for the admin command
-            payment_record = await HandledPaymentQueries.get_payment_by_name_and_amount(
-                session, payment_data.name, payment_data.amount
+            payment_repo = PaymentRepository(session)
+            payment_record = await payment_repo.get_payment_by_name_and_amount(
+                payment_data.name, payment_data.amount
             )
             channel_id = self.bot.config["channels"]["donation"]
             channel = self.bot.get_channel(channel_id)
@@ -212,11 +268,12 @@ class OnPaymentEvent(commands.Cog):
                 embed.set_footer(text=f"ID Wpłaty: {payment_record.id}")
                 embed.timestamp = payment_data.paid_at
                 await channel.send(embed=embed)
-            return
+                return
 
         # Ensure member exists in database before proceeding
         try:
-            await MemberQueries.get_or_add_member(session, member.id)
+            member_service = await self.bot.get_service(IMemberService, session)
+            await member_service.get_or_create_member(member)
             await session.flush()
             logger.info(
                 f"Ensured member {member.display_name} exists in database before payment processing"
@@ -300,13 +357,16 @@ class OnPaymentEvent(commands.Cog):
                         if highest_role_priority > target_role_priority:
                             # User has higher role than what they're trying to buy with original amount
                             # Add original amount to wallet and don't process legacy conversion
-                            await MemberQueries.add_to_wallet_balance(
-                                session, member.id, original_amount
+                            member_service = await self.bot.get_service(IMemberService, session)
+                            db_member = await member_service.get_or_create_member(member)
+                            updated_member = await member_service.update_member_info(
+                                db_member, wallet_balance=db_member.wallet_balance + original_amount
                             )
                             await session.flush()
 
                             # Remove mute roles regardless
-                            await self.role_manager.remove_mute_roles(member)
+                            if self.role_manager:
+                                await self.role_manager.remove_mute_roles(member)
 
                             embed = discord.Embed(
                                 title="Doładowanie konta",
@@ -363,13 +423,16 @@ class OnPaymentEvent(commands.Cog):
                                 if original_amount in legacy_amounts:
                                     # This is a legacy conversion - user didn't pay enough for real upgrade
                                     # Add original amount to wallet instead
-                                    await MemberQueries.add_to_wallet_balance(
-                                        session, member.id, original_amount
+                                    member_service = await self.bot.get_service(IMemberService, session)
+                                    db_member = await member_service.get_or_create_member(member)
+                                    updated_member = await member_service.update_member_info(
+                                        db_member, wallet_balance=db_member.wallet_balance + original_amount
                                     )
                                     await session.flush()
 
                                     # Remove mute roles regardless
-                                    await self.role_manager.remove_mute_roles(member)
+                                    if self.role_manager:
+                                        await self.role_manager.remove_mute_roles(member)
 
                                     embed = discord.Embed(
                                         title="Doładowanie konta",
@@ -449,7 +512,8 @@ class OnPaymentEvent(commands.Cog):
                             await session.flush()
 
                             # Remove mute roles regardless of the role assignment result
-                            await self.role_manager.remove_mute_roles(member)
+                            if self.role_manager:
+                                await self.role_manager.remove_mute_roles(member)
 
                             # Handle wallet balance - only add if not explicitly set to False
                             if add_to_wallet is not False:
@@ -460,8 +524,10 @@ class OnPaymentEvent(commands.Cog):
                                     amount_to_add = final_amount - role_price
 
                                 if amount_to_add > 0:
-                                    await MemberQueries.add_to_wallet_balance(
-                                        session, member.id, amount_to_add
+                                    member_service = await self.bot.get_service(IMemberService, session)
+                                    db_member = await member_service.get_or_create_member(member)
+                                    updated_member = await member_service.update_member_info(
+                                        db_member, wallet_balance=db_member.wallet_balance + amount_to_add
                                     )
                                     await session.flush()
                             break
@@ -475,12 +541,15 @@ class OnPaymentEvent(commands.Cog):
                 # Jeśli nie znaleziono pasującej roli lub użytkownik ma wyższą rolę, dodaj całą kwotę do portfela
                 if amount_to_add == final_amount:
                     try:
-                        await MemberQueries.add_to_wallet_balance(
-                            session, member.id, amount_to_add
+                        member_service = await self.bot.get_service(IMemberService, session)
+                        db_member = await member_service.get_or_create_member(member)
+                        updated_member = await member_service.update_member_info(
+                            db_member, wallet_balance=db_member.wallet_balance + amount_to_add
                         )
                         await session.flush()
                         # Remove mute roles even if no role was purchased
-                        await self.role_manager.remove_mute_roles(member)
+                        if self.role_manager:
+                            await self.role_manager.remove_mute_roles(member)
                     except Exception as e:
                         logger.error(f"Error adding balance to wallet: {str(e)}")
                         raise

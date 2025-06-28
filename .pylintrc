@@ -1,5 +1,37 @@
+[MASTER]
+# Ignore certain files and directories
+ignore=tests,test_*.py,conftest.py,setup.py,migrations,__pycache__
+
+[MESSAGES CONTROL]
+# Disable certain warnings
+disable=
+    C0111,  # missing-docstring
+    C0103,  # invalid-name
+    C0301,  # line-too-long
+    R0903,  # too-few-public-methods
+    R0913,  # too-many-arguments
+    R0914,  # too-many-locals
+    W0611,  # unused-import
+    W0613,  # unused-argument
+    W0703,  # broad-except
+    E1101,  # no-member (often false positive with Discord.py)
+    R0801,  # duplicate-code
+    C0114,  # missing-module-docstring
+    C0115,  # missing-class-docstring
+    C0116,  # missing-function-docstring
+
+[FORMAT]
+# Maximum line length
+max-line-length=120
+
+[BASIC]
+# Good variable names
+good-names=i,j,k,ex,_,id,pk,db,ctx,bot
+
 [DESIGN]
-# Minimum number of public methods for a class (consider reducing  pylint's noise by
-# raising this to 2 or 3 or more, or by defining your own list of interfaces that must
-# be overridden).
-min-public-methods=0
+# Maximum number of arguments for function / method
+max-args=10
+# Maximum number of attributes for a class
+max-attributes=15
+# Maximum number of public methods for a class
+max-public-methods=30

@@ -17,9 +17,10 @@ class OnCommandEvent(commands.Cog):
     async def on_command(self, ctx: commands.Context):
         """On Command Event"""
         logger.info(
-            "Command '%s' was executed by '%s' in '%s'",
+            "Command '%s' was executed by '%s' (ID: %s) in '%s'",
             ctx.command,
             ctx.author,
+            ctx.author.id,
             ctx.guild,
         )
 

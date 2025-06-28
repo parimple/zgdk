@@ -1,0 +1,25 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }}
+  $ helm get all {{ .Release.Name }}
+
+Discord Bot Health Checks:
+- Liveness: http://{{ .Release.Name }}-discord-bot:8091/health
+- Readiness: http://{{ .Release.Name }}-discord-bot:8091/ready
+- Startup: http://{{ .Release.Name }}-discord-bot:8091/startup
+
+To check if the bot is ready:
+  $ kubectl get pods -l app={{ .Release.Name }},component=discord-bot
+  $ kubectl describe pod -l app={{ .Release.Name }},component=discord-bot
+
+To view bot logs:
+  $ kubectl logs -l app={{ .Release.Name }},component=discord-bot -f
+
+Agent endpoints:
+{{- range $agent, $config := .Values.agents }}
+- {{ $agent | title }}: http://{{ $.Release.Name }}-{{ $agent }}-agent:{{ $.Values.service.port }}
+{{- end }}

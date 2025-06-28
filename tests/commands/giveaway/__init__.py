@@ -1,0 +1,3 @@
+"""
+Giveaway command tests
+"""

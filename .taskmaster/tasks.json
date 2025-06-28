@@ -1,0 +1,62 @@
+{
+  "tasks": [
+    {
+      "id": "task-001",
+      "title": "Naprawić błąd w komendzie ranking/stats",
+      "description": "Activity service nie działa poprawnie, trzeba sprawdzić wstrzykiwanie zależności",
+      "status": "in-progress",
+      "priority": "high",
+      "category": "bug-fix",
+      "files": ["cogs/commands/ranking.py"],
+      "dependencies": []
+    },
+    {
+      "id": "task-002", 
+      "title": "Przetestować powiadomienia po bumpie",
+      "description": "Sprawdzić czy wiadomości gratulacyjne pojawiają się po bumpie gdy minie cooldown",
+      "status": "blocked",
+      "priority": "high",
+      "category": "testing",
+      "files": ["cogs/events/bump/handlers.py", "cogs/events/bump/bump_event.py"],
+      "dependencies": [],
+      "blockedBy": "Czekamy na zakończenie cooldownu (2h dla Disboard)"
+    },
+    {
+      "id": "task-003",
+      "title": "Naprawić komendy team",
+      "description": "Komendy team nie zwracają żadnej odpowiedzi, trzeba debugować",
+      "status": "pending",
+      "priority": "medium",
+      "category": "bug-fix",
+      "files": ["cogs/commands/team/"],
+      "dependencies": []
+    },
+    {
+      "id": "task-004",
+      "title": "Dokończyć migrację do architektury serwisowej",
+      "description": "Zamienić pozostałe utility classes na serwisy oparte na Protocol",
+      "status": "pending",
+      "priority": "medium",
+      "category": "refactoring",
+      "files": ["utils/", "core/services/"],
+      "dependencies": ["task-001", "task-003"]
+    },
+    {
+      "id": "task-005",
+      "title": "Podzielić duże pliki na mniejsze moduły",
+      "description": "Rozbić mod.py, on_message.py i main.py na mniejsze, bardziej zarządzalne pliki",
+      "status": "pending",
+      "priority": "low",
+      "category": "refactoring",
+      "files": ["cogs/commands/mod.py", "cogs/events/on_message.py", "main.py"],
+      "dependencies": ["task-004"]
+    }
+  ],
+  "metadata": {
+    "project": "zaGadka Discord Bot",
+    "created": "2024-06-28",
+    "lastUpdated": "2024-06-28",
+    "totalTasks": 5,
+    "completedTasks": 0
+  }
+}
