@@ -3,7 +3,7 @@ name: zgdk
 description: Discord bot with scalable AI agents
 type: application
 version: 1.1.0
-appVersion: "main-22e0105"
+appVersion: "main-28dfc48"
 keywords:
   - discord
   - bot
