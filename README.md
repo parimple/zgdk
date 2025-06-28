@@ -94,3 +94,4 @@ System automatycznie przywraca uprawnienia użytkowników po ponownym dołączen
 ### Diagnostyczne komendy
 - **voice_stats** - Statystyki systemu voice (tylko admini)
 - **debug_permissions** - Sprawdzanie uprawnień w bazie danych (tylko admini)
+# Pipeline Test Sat 28 Jun 2025 07:51:53 PM UTC
