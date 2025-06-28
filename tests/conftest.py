@@ -2,7 +2,7 @@
 
 import sys
 import types
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 # Mock Discord modules BEFORE any imports (gentler approach)
 # Following your brilliant solution A - stub only what we need, leave commands alone
@@ -85,11 +85,13 @@ sys.modules['utils.premium'] = mock_premium
 # Now safe to import
 import discord
 import pytest
-# Note: discord.ext.commands is now stubbed per-test for flexibility
 
 # Import fixture modules
 from tests.fixtures.database_fixtures import *  # noqa
 from tests.fixtures.service_fixtures import *  # noqa
+
+# Note: discord.ext.commands is now stubbed per-test for flexibility
+
 
 
 @pytest.fixture

@@ -31,21 +31,21 @@ def check_permission_level(bot, member: discord.Member, level: PermissionLevel) 
         # New owner_ids list support
         owner_ids = bot.config.get("owner_ids", [])
         is_in_owner_list = member.id in owner_ids
-        
+
         # Backward compatibility with single owner_id
         is_main_owner = member.id == bot.config.get("owner_id")
-        
+
         # Legacy test owner support
         test_owner_ids = bot.config.get("test_owner_ids", [])
         is_test_owner = member.id in test_owner_ids
         single_test_owner = bot.config.get("test_owner_id")
         is_legacy_test_owner = single_test_owner and member.id == single_test_owner
-        
+
         # Debug logging
         logger.info(f"OWNER CHECK: user_id={member.id}")
         logger.info(f"  owner_ids list: {owner_ids}, in_list={is_in_owner_list}")
         logger.info(f"  main_owner: {is_main_owner}, test_owners: {is_test_owner}, legacy: {is_legacy_test_owner}")
-        
+
         result = is_in_owner_list or is_main_owner or is_test_owner or is_legacy_test_owner
         logger.info(f"OWNER FINAL RESULT: {result}")
         return result
@@ -79,9 +79,7 @@ def check_permission_level(bot, member: discord.Member, level: PermissionLevel) 
     return False
 
 
-def has_permission_level(
-    level: Union[PermissionLevel, List[PermissionLevel]], *, require_all: bool = False
-):
+def has_permission_level(level: Union[PermissionLevel, List[PermissionLevel]], *, require_all: bool = False):
     """
     Decorator to check if a user has the required permission level(s).
 
@@ -113,23 +111,15 @@ def has_permission_level(
     async def app_predicate(interaction: discord.Interaction):
         if require_all:
             for permission_level in levels:
-                if not check_permission_level(
-                    interaction.client, interaction.user, permission_level
-                ):
-                    await interaction.response.send_message(
-                        "Nie masz uprawnień do użycia tej komendy!", ephemeral=True
-                    )
+                if not check_permission_level(interaction.client, interaction.user, permission_level):
+                    await interaction.response.send_message("Nie masz uprawnień do użycia tej komendy!", ephemeral=True)
                     return False
             return True
         else:
             for permission_level in levels:
-                if check_permission_level(
-                    interaction.client, interaction.user, permission_level
-                ):
+                if check_permission_level(interaction.client, interaction.user, permission_level):
                     return True
-            await interaction.response.send_message(
-                "Nie masz uprawnień do użycia tej komendy!", ephemeral=True
-            )
+            await interaction.response.send_message("Nie masz uprawnień do użycia tej komendy!", ephemeral=True)
             return False
 
     def decorator(func):

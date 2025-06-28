@@ -1,20 +1,34 @@
 """
 Database fixtures for testing
 """
-import pytest
-from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from datasources.models.base import Base
+
 from datasources.models import (
-    Member, MemberRole, Activity, Role, HandledPayment, 
-    Invite, AutoKick, ModerationLog, ChannelPermission, 
-    Message, NotificationLog
+    Activity,
+    AutoKick,
+    ChannelPermission,
+    HandledPayment,
+    Invite,
+    Member,
+    MemberRole,
+    Message,
+    ModerationLog,
+    NotificationLog,
+    Role,
 )
+from datasources.models.base import Base
 from tests.data.test_constants import (
-    TEST_USER_1_ID, TEST_USER_2_ID, MAIN_OWNER_ID,
-    WALLET_BALANCES, ROLE_ZG50_ID, ROLE_ZG100_ID
+    MAIN_OWNER_ID,
+    ROLE_ZG50_ID,
+    ROLE_ZG100_ID,
+    TEST_USER_1_ID,
+    TEST_USER_2_ID,
+    WALLET_BALANCES,
 )
 
 

@@ -1,7 +1,9 @@
 """Unit tests for permission system."""
+from unittest.mock import MagicMock, Mock
+
 import pytest
-from unittest.mock import Mock, MagicMock
-from utils.permissions import check_permission_level, PermissionLevel
+
+from utils.permissions import PermissionLevel, check_permission_level
 
 
 @pytest.mark.unit

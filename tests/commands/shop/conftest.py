@@ -2,7 +2,8 @@
 Shop command test fixtures with proper Discord mocking
 """
 import sys
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
 # Mock discord completely before any imports
@@ -44,8 +45,12 @@ permissions_mock.is_admin = is_admin
 sys.modules['utils.permissions'] = permissions_mock
 
 from tests.data.test_constants import (
-    TEST_USER_1_ID, MAIN_OWNER_ID, WALLET_BALANCES,
-    BOT_CONFIG, GUILD_ID, TEST_CHANNEL_ID
+    BOT_CONFIG,
+    GUILD_ID,
+    MAIN_OWNER_ID,
+    TEST_CHANNEL_ID,
+    TEST_USER_1_ID,
+    WALLET_BALANCES,
 )
 
 

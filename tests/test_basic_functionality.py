@@ -1,15 +1,17 @@
 """
 Basic unit tests for Discord bot core functionality
 """
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
+from core.repositories.premium_repository import PremiumRepository
 
 # Import modules to test
 from core.services.premium_service import PremiumService
-from core.repositories.premium_repository import PremiumRepository
-from datasources.models import MemberRole, Role, Member
+from datasources.models import Member, MemberRole, Role
 
 
 class TestPremiumService:

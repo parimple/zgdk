@@ -40,9 +40,9 @@ class ModerationRepository(BaseRepository):
             mute_type=mute_type,
             duration_seconds=duration_seconds,
             reason=reason,
-            channel_id=channel_id
+            channel_id=channel_id,
         )
-    
+
     async def log_mute_action(
         self,
         target_user_id: int,
@@ -58,9 +58,7 @@ class ModerationRepository(BaseRepository):
             # Calculate expiration date if duration provided
             expires_at = None
             if duration_seconds is not None:
-                expires_at = datetime.now(timezone.utc) + timedelta(
-                    seconds=duration_seconds
-                )
+                expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
 
             # Create log entry
             moderation_log = ModerationLog(
@@ -96,9 +94,7 @@ class ModerationRepository(BaseRepository):
             )
             raise
 
-    async def get_user_mute_history(
-        self, user_id: int, limit: int = 50
-    ) -> List[ModerationLog]:
+    async def get_user_mute_history(self, user_id: int, limit: int = 50) -> List[ModerationLog]:
         """Get mute history for a user."""
         try:
             result = await self.session.execute(
@@ -124,9 +120,7 @@ class ModerationRepository(BaseRepository):
             self._log_error("get_user_mute_history", e, user_id=user_id)
             return []
 
-    async def get_user_mute_count(
-        self, user_id: int, days_back: int = 30
-    ) -> int:
+    async def get_user_mute_count(self, user_id: int, days_back: int = 30) -> int:
         """Count how many times a user was muted in the last X days."""
         try:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
@@ -192,9 +186,7 @@ class ModerationRepository(BaseRepository):
             self._log_error("get_moderator_actions", e, moderator_id=moderator_id)
             return []
 
-    async def get_mute_statistics(
-        self, days_back: int = 30
-    ) -> Dict[str, any]:
+    async def get_mute_statistics(self, days_back: int = 30) -> Dict[str, any]:
         """Get mute statistics for the last X days."""
         try:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
@@ -266,9 +258,7 @@ class ModerationRepository(BaseRepository):
                 "period_days": days_back,
             }
 
-    async def get_recent_actions(
-        self, limit: int = 20
-    ) -> List[ModerationLog]:
+    async def get_recent_actions(self, limit: int = 20) -> List[ModerationLog]:
         """Get recent moderation actions."""
         try:
             result = await self.session.execute(
@@ -305,10 +295,7 @@ class ModerationRepository(BaseRepository):
                     joinedload(ModerationLog.moderator),
                 )
                 .where(ModerationLog.action_type == "mute")
-                .where(
-                    (ModerationLog.expires_at.is_(None))
-                    | (ModerationLog.expires_at > now)
-                )
+                .where((ModerationLog.expires_at.is_(None)) | (ModerationLog.expires_at > now))
                 .order_by(ModerationLog.created_at.desc())
             )
             logs = list(result.scalars().all())

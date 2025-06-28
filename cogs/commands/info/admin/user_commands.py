@@ -10,10 +10,10 @@ from datasources.queries import MemberQueries
 from utils.permissions import is_admin
 
 from .helpers import (
+    get_member_active_mutes,
     get_member_premium_roles_info,
     get_member_teams_info,
     get_member_voice_permissions_info,
-    get_member_active_mutes,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,9 +36,7 @@ class UserCommands(commands.Cog):
                 f"Dodano {hours} godzin czasu T dla {user.mention}. Nowy czas wygaśnięcia: {member.voice_bypass_until}"
             )
 
-    @commands.command(
-        name="checkstatus", description="Sprawdź status użytkownika i jego teamy."
-    )
+    @commands.command(name="checkstatus", description="Sprawdź status użytkownika i jego teamy.")
     @is_admin()
     async def check_status(self, ctx, member: discord.Member):
         """Sprawdź status użytkownika i jego teamy."""
@@ -54,9 +52,7 @@ class UserCommands(commands.Cog):
             # 1. Podstawowe informacje
             embed.add_field(name="ID", value=str(member.id), inline=True)
             embed.add_field(name="Nick", value=member.display_name, inline=True)
-            embed.add_field(
-                name="Dołączył", value=member.joined_at.strftime("%Y-%m-%d"), inline=True
-            )
+            embed.add_field(name="Dołączył", value=member.joined_at.strftime("%Y-%m-%d"), inline=True)
 
             # 2. Informacje z bazy danych
             db_member = await MemberQueries.get_or_add_member(
@@ -73,9 +69,7 @@ class UserCommands(commands.Cog):
             premium_roles = await get_member_premium_roles_info(session, ctx.guild, member)
 
             if premium_roles:
-                embed.add_field(
-                    name="Role Premium", value="\n".join(premium_roles), inline=False
-                )
+                embed.add_field(name="Role Premium", value="\n".join(premium_roles), inline=False)
             else:
                 embed.add_field(name="Role Premium", value="Brak", inline=False)
 
@@ -110,9 +104,7 @@ class UserCommands(commands.Cog):
             # 6. Aktywne kary
             active_mutes = get_member_active_mutes(ctx.guild, member)
             if active_mutes:
-                embed.add_field(
-                    name="Aktywne Kary", value=", ".join(active_mutes), inline=False
-                )
+                embed.add_field(name="Aktywne Kary", value=", ".join(active_mutes), inline=False)
 
             # 7. Status połączenia głosowego
             if member.voice:

@@ -1,13 +1,12 @@
 """
 Simplified tests for shop functionality without complex mocking
 """
-import pytest
-from unittest.mock import MagicMock, AsyncMock
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
-from tests.data.test_constants import (
-    TEST_USER_1_ID, WALLET_BALANCES, SAMPLE_PAYMENT_DATA
-)
+import pytest
+
+from tests.data.test_constants import SAMPLE_PAYMENT_DATA, TEST_USER_1_ID, WALLET_BALANCES
 
 
 def test_shop_command_configuration():
@@ -151,7 +150,7 @@ def test_payment_assignment_workflow():
 def test_error_message_constants():
     """Test error message constants"""
     from tests.data.test_constants import ERROR_MESSAGES
-    
+
     # Verify required error messages exist
     required_errors = [
         "no_balance",

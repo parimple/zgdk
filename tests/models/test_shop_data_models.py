@@ -1,14 +1,21 @@
 """
 Shop command tests using realistic constants from config.yml
 """
-import pytest
-from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from tests.data.test_constants import (
-    ROLE_ZG50_ID, ROLE_ZG100_ID, PREMIUM_ROLES_CONFIG,
-    WALLET_BALANCES, ERROR_MESSAGES, MAIN_OWNER_ID,
-    TEST_USER_1_ID, BOT_CONFIG, SAMPLE_PAYMENT_DATA
+    BOT_CONFIG,
+    ERROR_MESSAGES,
+    MAIN_OWNER_ID,
+    PREMIUM_ROLES_CONFIG,
+    ROLE_ZG50_ID,
+    ROLE_ZG100_ID,
+    SAMPLE_PAYMENT_DATA,
+    TEST_USER_1_ID,
+    WALLET_BALANCES,
 )
 
 

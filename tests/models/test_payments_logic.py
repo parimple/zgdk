@@ -1,13 +1,12 @@
 """
 Test payments command as individual functions with proper mocking
 """
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from tests.data.test_constants import (
-    TEST_USER_1_ID, WALLET_BALANCES, SAMPLE_PAYMENT_DATA
-)
+import pytest
+
+from tests.data.test_constants import SAMPLE_PAYMENT_DATA, TEST_USER_1_ID, WALLET_BALANCES
 
 
 @patch('discord.utils.format_dt')

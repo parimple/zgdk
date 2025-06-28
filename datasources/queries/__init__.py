@@ -24,11 +24,11 @@ except ImportError:
 
 # Use adapters for migrated queries
 try:
-    from core.adapters.query_to_repository_adapter import MemberQueriesAdapter as MemberQueries
-    from core.adapters.query_to_repository_adapter import RoleQueriesAdapter as RoleQueries
     from core.adapters.query_to_repository_adapter import HandledPaymentQueriesAdapter as HandledPaymentQueries
+    from core.adapters.query_to_repository_adapter import MemberQueriesAdapter as MemberQueries
     from core.adapters.query_to_repository_adapter import MessageQueriesAdapter as MessageQueries
     from core.adapters.query_to_repository_adapter import ModerationLogQueriesAdapter as ModerationLogQueries
+    from core.adapters.query_to_repository_adapter import RoleQueriesAdapter as RoleQueries
 except ImportError:
     # Fallback to original if adapter not available
     from .member_queries import MemberQueries
@@ -43,12 +43,13 @@ from .notification_queries import NotificationLogQueries
 try:
     # Use adapters for migrated activity functions
     from core.adapters.query_to_repository_adapter import ActivityQueriesAdapter
+
     add_activity_points = ActivityQueriesAdapter.add_activity_points
     ensure_member_exists = ActivityQueriesAdapter.ensure_member_exists
     get_member_ranking_position = ActivityQueriesAdapter.get_member_ranking_position
     get_member_total_points = ActivityQueriesAdapter.get_member_total_points
     get_top_members_by_points = ActivityQueriesAdapter.get_top_members_by_points
-    
+
     # Import remaining functions from original
     from .activity_queries import (
         cleanup_old_activity_data,
@@ -83,7 +84,6 @@ __all__ = [
     "ModerationLogQueries",
     "NotificationLogQueries",
     "RoleQueries",
-    
     # Activity/ranking functions
     "add_activity_points",
     "cleanup_old_activity_data",

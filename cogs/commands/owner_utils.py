@@ -1,13 +1,13 @@
 """Owner utilities for testing and debugging commands."""
 
-import logging
-from typing import Optional, Dict, Any, List
 import asyncio
 import json
+import logging
+from typing import Any, Dict, List, Optional
 
 import discord
-from discord.ext import commands
 from aiohttp import web
+from discord.ext import commands
 
 from utils.permissions import is_zagadka_owner
 
@@ -24,34 +24,34 @@ class OwnerUtilsCog(commands.Cog):
         self.owner_id = bot.config.get("owner_id", 956602391891947592)
         self.test_channel_id = bot.config.get("channels", {}).get("test_channel", 1387864734002446407)
         self.guild_id = bot.config.get("guild_id", 960665311701528596)
-        
+
         # API server for automated testing
         self.app = web.Application()
         self.runner = None
         self.site = None
         self.api_port = 8089
         self.last_responses = {}  # Store last responses for each command
-        
+
         # Setup API routes
         self.setup_routes()
 
     def setup_routes(self):
         """Setup HTTP API routes."""
-        self.app.router.add_post('/execute', self.api_execute_command)
-        self.app.router.add_get('/status', self.api_status)
-        self.app.router.add_get('/last_response', self.api_last_response)
-        
+        self.app.router.add_post("/execute", self.api_execute_command)
+        self.app.router.add_get("/status", self.api_status)
+        self.app.router.add_get("/last_response", self.api_last_response)
+
     async def start_api_server(self):
         """Start the API server."""
         try:
             self.runner = web.AppRunner(self.app)
             await self.runner.setup()
-            self.site = web.TCPSite(self.runner, '0.0.0.0', self.api_port)
+            self.site = web.TCPSite(self.runner, "0.0.0.0", self.api_port)
             await self.site.start()
             logger.info(f"Owner Utils API started on http://localhost:{self.api_port}")
         except Exception as e:
             logger.error(f"Failed to start API server: {e}")
-            
+
     async def stop_api_server(self):
         """Stop the API server."""
         if self.site:
@@ -64,7 +64,7 @@ class OwnerUtilsCog(commands.Cog):
         """Event listener which is called when the bot goes online."""
         logger.info("Cog: owner_utils.py Loaded")
         await self.start_api_server()
-        
+
     def cog_unload(self):
         """Cleanup when cog is unloaded."""
         asyncio.create_task(self.stop_api_server())
@@ -74,7 +74,7 @@ class OwnerUtilsCog(commands.Cog):
     async def simulate_command(self, ctx: commands.Context, *, command_string: str):
         """
         Simulate a command execution as the owner.
-        
+
         Usage: !simulate <command>
         Example: !simulate profile
         Example: !simulate profile @someuser
@@ -99,24 +99,20 @@ class OwnerUtilsCog(commands.Cog):
 
         # Create a fake message from the owner
         fake_message = FakeMessage(
-            content=f"{ctx.prefix}{command_string}",
-            author=owner_member,
-            channel=channel,
-            guild=guild,
-            bot=self.bot
+            content=f"{ctx.prefix}{command_string}", author=owner_member, channel=channel, guild=guild, bot=self.bot
         )
 
         # Create context from the fake message
         fake_ctx = await self.bot.get_context(fake_message)
-        
+
         # Log the simulation
         logger.info(f"Simulating command '{command_string}' as {owner_member} in #{channel.name}")
-        
+
         # Send notification that we're simulating
         embed = discord.Embed(
             title="🔧 Command Simulation",
             description=f"Simulating command: `{command_string}`\nAs: {owner_member.mention}\nIn: {channel.mention}",
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         await ctx.send(embed=embed)
 
@@ -124,12 +120,12 @@ class OwnerUtilsCog(commands.Cog):
             # Invoke the command
             if fake_ctx.valid:
                 await self.bot.invoke(fake_ctx)
-                
+
                 # Send success notification
                 success_embed = discord.Embed(
                     title="✅ Simulation Complete",
                     description=f"Command `{command_string}` executed successfully.",
-                    color=discord.Color.green()
+                    color=discord.Color.green(),
                 )
                 await ctx.send(embed=success_embed)
             else:
@@ -137,16 +133,14 @@ class OwnerUtilsCog(commands.Cog):
                 error_embed = discord.Embed(
                     title="❌ Invalid Command",
                     description=f"Command `{command_string}` is not valid or not found.",
-                    color=discord.Color.red()
+                    color=discord.Color.red(),
                 )
                 await ctx.send(embed=error_embed)
-                
+
         except Exception as e:
             logger.error(f"Error simulating command '{command_string}': {e}")
             error_embed = discord.Embed(
-                title="❌ Simulation Error",
-                description=f"Error executing command: {str(e)}",
-                color=discord.Color.red()
+                title="❌ Simulation Error", description=f"Error executing command: {str(e)}", color=discord.Color.red()
             )
             await ctx.send(embed=error_embed)
 
@@ -185,37 +179,39 @@ class OwnerUtilsCog(commands.Cog):
 
         # Send the message
         await channel.send(message)
-        
+
         # Confirm
         embed = discord.Embed(
             title="✅ Message Sent",
             description=f"Sent message in {channel.mention}:\n```{message}```",
-            color=discord.Color.green()
+            color=discord.Color.green(),
         )
         await ctx.send(embed=embed)
-    
+
     async def api_status(self, request):
         """API endpoint to check bot status."""
-        return web.json_response({
-            "status": "online",
-            "bot_name": self.bot.user.name if self.bot.user else "Not connected",
-            "guild_id": self.guild_id,
-            "test_channel_id": self.test_channel_id,
-            "api_port": self.api_port
-        })
-        
+        return web.json_response(
+            {
+                "status": "online",
+                "bot_name": self.bot.user.name if self.bot.user else "Not connected",
+                "guild_id": self.guild_id,
+                "test_channel_id": self.test_channel_id,
+                "api_port": self.api_port,
+            }
+        )
+
     async def api_last_response(self, request):
         """API endpoint to get last command response."""
-        command = request.query.get('command', '')
+        command = request.query.get("command", "")
         if command in self.last_responses:
             return web.json_response(self.last_responses[command])
         else:
             return web.json_response({"error": "No response found for command"}, status=404)
-            
+
     async def api_execute_command(self, request):
         """
         API endpoint to execute a command.
-        
+
         Expected JSON payload:
         {
             "command": "profile",
@@ -226,41 +222,41 @@ class OwnerUtilsCog(commands.Cog):
             data = await request.json()
             command = data.get("command", "")
             args = data.get("args", "")
-            
+
             if not command:
                 return web.json_response({"error": "Command is required"}, status=400)
-                
+
             # Build full command string
             command_string = command
             if args:
                 command_string += f" {args}"
-                
+
             # Get guild and channel
             guild = self.bot.get_guild(self.guild_id)
             if not guild:
                 return web.json_response({"error": "Guild not found"}, status=500)
-                
+
             # Get channel from request or use default
             channel_id = data.get("channel_id", self.test_channel_id)
             if isinstance(channel_id, str):
                 channel_id = int(channel_id)
-            
+
             channel = guild.get_channel(channel_id)
             if not channel:
                 return web.json_response({"error": "Channel not found"}, status=500)
-                
+
             # Get author from request or use owner
             author_id = data.get("author_id", self.owner_id)
             if isinstance(author_id, str):
                 author_id = int(author_id)
-                
+
             author_member = guild.get_member(author_id)
             if not author_member:
                 return web.json_response({"error": f"Author {author_id} not found in guild"}, status=500)
-                
+
             # Prepare to capture responses
             responses = []
-            
+
             # Create a wrapper channel to capture sends
             class ChannelWrapper:
                 def __init__(self, channel):
@@ -270,83 +266,76 @@ class OwnerUtilsCog(commands.Cog):
                     self.guild = channel.guild
                     self._state = channel._state
                     self.type = channel.type
-                    
+
                 async def send(self, content=None, **kwargs):
                     """Capture bot responses."""
                     response = {"content": content}
-                    
+
                     if "embed" in kwargs:
                         embed = kwargs["embed"]
                         response["embed"] = {
                             "title": embed.title,
                             "description": embed.description,
                             "color": embed.color.value if embed.color else None,
-                            "fields": [{"name": f.name, "value": f.value, "inline": f.inline} for f in embed.fields]
+                            "fields": [{"name": f.name, "value": f.value, "inline": f.inline} for f in embed.fields],
                         }
-                        
+
                     if "embeds" in kwargs:
                         response["embeds"] = []
                         for embed in kwargs["embeds"]:
-                            response["embeds"].append({
-                                "title": embed.title,
-                                "description": embed.description,
-                                "color": embed.color.value if embed.color else None,
-                                "fields": [{"name": f.name, "value": f.value, "inline": f.inline} for f in embed.fields]
-                            })
-                            
+                            response["embeds"].append(
+                                {
+                                    "title": embed.title,
+                                    "description": embed.description,
+                                    "color": embed.color.value if embed.color else None,
+                                    "fields": [
+                                        {"name": f.name, "value": f.value, "inline": f.inline} for f in embed.fields
+                                    ],
+                                }
+                            )
+
                     responses.append(response)
                     return fake_message
-                    
+
                 def __getattr__(self, name):
                     return getattr(self._channel, name)
-                    
+
             # Use wrapper channel
             wrapped_channel = ChannelWrapper(channel)
-            
+
             # Create fake message with wrapped channel
             fake_message = FakeMessage(
                 content=f"{self.bot.command_prefix[0]}{command_string}",
                 author=author_member,
                 channel=wrapped_channel,
                 guild=guild,
-                bot=self.bot
+                bot=self.bot,
             )
-            
+
             try:
                 # Get context and invoke
                 fake_ctx = await self.bot.get_context(fake_message)
-                
+
                 if not fake_ctx.valid:
-                    return web.json_response({
-                        "success": False,
-                        "error": f"Invalid command: {command}"
-                    })
-                    
+                    return web.json_response({"success": False, "error": f"Invalid command: {command}"})
+
                 # Execute command
                 await self.bot.invoke(fake_ctx)
-                
+
                 # Store response
                 self.last_responses[command] = {
                     "success": True,
                     "command": command_string,
                     "responses": responses,
-                    "timestamp": discord.utils.utcnow().isoformat()
+                    "timestamp": discord.utils.utcnow().isoformat(),
                 }
-                
-                return web.json_response({
-                    "success": True,
-                    "command": command_string,
-                    "responses": responses
-                })
-                
+
+                return web.json_response({"success": True, "command": command_string, "responses": responses})
+
             except Exception as e:
                 logger.error(f"Error executing command '{command_string}': {e}")
-                return web.json_response({
-                    "success": False,
-                    "error": str(e)
-                }, status=500)
-                
-                
+                return web.json_response({"success": False, "error": str(e)}, status=500)
+
         except Exception as e:
             logger.error(f"API error: {e}")
             return web.json_response({"error": str(e)}, status=500)
@@ -354,16 +343,22 @@ class OwnerUtilsCog(commands.Cog):
 
 class FakeMessage:
     """Fake message object for simulating commands."""
-    
-    def __init__(self, content: str, author: discord.Member, channel: discord.TextChannel, 
-                 guild: discord.Guild, bot: commands.Bot):
+
+    def __init__(
+        self,
+        content: str,
+        author: discord.Member,
+        channel: discord.TextChannel,
+        guild: discord.Guild,
+        bot: commands.Bot,
+    ):
         self.content = content
         self.author = author
         self.channel = channel
         self.guild = guild
         self.bot = bot
         self._state = bot._connection
-        
+
         # Set required attributes
         self.id = 0  # Fake ID
         self.webhook_id = None
@@ -383,30 +378,30 @@ class FakeMessage:
         self.reference = None
         self.interaction = None
         self.created_at = discord.utils.utcnow()
-        
+
     @property
     def jump_url(self):
         """Return a fake jump URL."""
         return f"https://discord.com/channels/{self.guild.id}/{self.channel.id}/{self.id}"
-    
+
     @property
     def clean_content(self):
         """Return clean content."""
         return self.content
-    
+
     async def delete(self, *, delay: float = None):
         """Fake delete method."""
         pass
-    
+
     async def reply(self, content: str = None, **kwargs):
         """Send a reply in the channel."""
         if content:
             await self.channel.send(content, **kwargs)
-        elif 'embed' in kwargs:
-            await self.channel.send(embed=kwargs['embed'])
-        elif 'embeds' in kwargs:
-            await self.channel.send(embeds=kwargs['embeds'])
-    
+        elif "embed" in kwargs:
+            await self.channel.send(embed=kwargs["embed"])
+        elif "embeds" in kwargs:
+            await self.channel.send(embeds=kwargs["embeds"])
+
     async def add_reaction(self, emoji):
         """Fake add reaction method."""
         pass

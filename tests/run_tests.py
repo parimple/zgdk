@@ -3,18 +3,18 @@
 Main test runner for Discord bot tests.
 """
 
-import sys
-import os
-import unittest
-import asyncio
 import argparse
+import asyncio
+import os
+import sys
+import unittest
 from typing import List, Optional
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests.utils.client import TestClient
 from tests.config import API_BASE_URL
+from tests.utils.client import TestClient
 
 
 def check_bot_connection() -> bool:

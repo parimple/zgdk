@@ -22,23 +22,17 @@ class ServiceContainer:
     def register_singleton(self, interface: Type[T], implementation: T) -> None:
         """Register a singleton service instance."""
         self._singletons[interface] = implementation
-        self.logger.debug(
-            f"Registered singleton: {interface.__name__} -> {implementation.__class__.__name__}"
-        )
+        self.logger.debug(f"Registered singleton: {interface.__name__} -> {implementation.__class__.__name__}")
 
     def register_factory(self, interface: Type[T], factory: callable) -> None:
         """Register a factory function for creating service instances."""
         self._factories[interface] = factory
         self.logger.debug(f"Registered factory: {interface.__name__}")
 
-    def register_transient(
-        self, interface: Type[T], implementation_class: Type[T]
-    ) -> None:
+    def register_transient(self, interface: Type[T], implementation_class: Type[T]) -> None:
         """Register a transient service class (new instance each time)."""
         self._services[interface] = implementation_class
-        self.logger.debug(
-            f"Registered transient: {interface.__name__} -> {implementation_class.__name__}"
-        )
+        self.logger.debug(f"Registered transient: {interface.__name__} -> {implementation_class.__name__}")
 
     def get_service(self, interface: Type[T]) -> T:
         """Get service instance by interface type."""
@@ -72,11 +66,7 @@ class ServiceContainer:
 
     def has_service(self, interface: Type[T]) -> bool:
         """Check if a service is registered."""
-        return (
-            interface in self._singletons
-            or interface in self._factories
-            or interface in self._services
-        )
+        return interface in self._singletons or interface in self._factories or interface in self._services
 
     def clear(self) -> None:
         """Clear all registered services."""
@@ -90,9 +80,7 @@ class ServiceContainer:
         services = {}
 
         for interface, implementation in self._singletons.items():
-            services[
-                interface.__name__
-            ] = f"Singleton: {implementation.__class__.__name__}"
+            services[interface.__name__] = f"Singleton: {implementation.__class__.__name__}"
 
         for interface in self._factories.keys():
             services[interface.__name__] = "Factory"

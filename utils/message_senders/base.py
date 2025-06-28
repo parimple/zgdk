@@ -1,7 +1,7 @@
 """Base message sender with common functionality."""
 
 from datetime import datetime, timezone
-from typing import Optional, Union, List, Tuple
+from typing import List, Optional, Tuple, Union
 
 import discord
 from discord import AllowedMentions
@@ -97,21 +97,21 @@ class BaseMessageSender:
         """
         Builds a description with premium text if the user doesn't have premium.
         """
-        from utils.bump_checker import BumpChecker
         from datasources.queries import MemberQueries
-        
+        from utils.bump_checker import BumpChecker
+
         if ctx is None:
             return base_text
 
         # Extract bot and member from context
         bot = None
         member = None
-        
-        if hasattr(ctx, 'bot'):
+
+        if hasattr(ctx, "bot"):
             bot = ctx.bot
         if isinstance(ctx, discord.Member):
             member = ctx
-        elif hasattr(ctx, 'author'):
+        elif hasattr(ctx, "author"):
             member = ctx.author
 
         if not bot or not member:
@@ -121,15 +121,16 @@ class BaseMessageSender:
         has_premium = False
         try:
             import asyncio
+
             loop = asyncio.get_event_loop()
-            
+
             async def check_premium():
                 async with bot.get_db() as session:
                     db_member = await MemberQueries.get_or_add_member(
                         session, member.id, wallet_balance=0, joined_at=member.joined_at
                     )
                     return await db_member.has_premium_role(member, bot.config.get("premium_roles", []))
-            
+
             if loop.is_running():
                 # We're in an async context, but can't await here
                 # Return base text for now
@@ -156,14 +157,14 @@ class BaseMessageSender:
 
         mastercard = ctx.bot.config.get("emojis", {}).get("mastercard", "💳")
         premium_channel_id = ctx.bot.config["channels"]["premium_info"]
-        
+
         # Try to get guild from ctx
         guild = None
-        if hasattr(ctx, 'guild'):
+        if hasattr(ctx, "guild"):
             guild = ctx.guild
-        elif hasattr(ctx, 'bot') and hasattr(ctx.bot, 'guild_id'):
+        elif hasattr(ctx, "bot") and hasattr(ctx.bot, "guild_id"):
             guild = ctx.bot.get_guild(ctx.bot.guild_id)
-            
+
         if guild:
             premium_channel = guild.get_channel(premium_channel_id)
             premium_text = (
@@ -255,7 +256,7 @@ class BaseMessageSender:
             ctx=ctx,
             add_author=add_author,
         )
-        
+
         return await self._send_embed(
             ctx=ctx,
             embed=embed,

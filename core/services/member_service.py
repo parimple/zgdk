@@ -26,11 +26,7 @@ class MemberService(BaseService, IMemberService):
     """Service for comprehensive member management."""
 
     def __init__(
-        self,
-        member_repository: IMemberRepository,
-        invite_repository: IInviteRepository,
-        unit_of_work,
-        **kwargs
+        self, member_repository: IMemberRepository, invite_repository: IInviteRepository, unit_of_work, **kwargs
     ):
         super().__init__(unit_of_work=unit_of_work)
         self.member_repository = member_repository
@@ -40,9 +36,7 @@ class MemberService(BaseService, IMemberService):
         """Validate member operation."""
         return True
 
-    async def get_or_create_member(
-        self, discord_user: discord.Member | discord.User
-    ) -> Member:
+    async def get_or_create_member(self, discord_user: discord.Member | discord.User) -> Member:
         """Get existing member or create new one."""
         try:
             member = await self.member_repository.get_by_discord_id(discord_user.id)
@@ -83,21 +77,15 @@ class MemberService(BaseService, IMemberService):
             updated = False
 
             if wallet_balance is not None:
-                await self.member_repository.update_wallet_balance(
-                    member.id, wallet_balance
-                )
+                await self.member_repository.update_wallet_balance(member.id, wallet_balance)
                 updated = True
 
             if voice_bypass_until is not None:
-                await self.member_repository.update_voice_bypass(
-                    member.id, voice_bypass_until
-                )
+                await self.member_repository.update_voice_bypass(member.id, voice_bypass_until)
                 updated = True
 
             if current_inviter_id is not None:
-                await self.member_repository.update_inviter(
-                    member.id, current_inviter_id, update_current=True
-                )
+                await self.member_repository.update_inviter(member.id, current_inviter_id, update_current=True)
                 updated = True
 
             if updated:
@@ -140,14 +128,10 @@ class MemberService(BaseService, IMemberService):
 
                 # Set first inviter if not set
                 if member.first_inviter_id is None:
-                    await self.member_repository.update_inviter(
-                        member.id, inviter_member.id, update_current=False
-                    )
+                    await self.member_repository.update_inviter(member.id, inviter_member.id, update_current=False)
 
                 # Always update current inviter
-                await self.member_repository.update_inviter(
-                    member.id, inviter_member.id, update_current=True
-                )
+                await self.member_repository.update_inviter(member.id, inviter_member.id, update_current=True)
 
             # Update invite usage if invite code provided
             if invite_code:
@@ -258,7 +242,7 @@ class MemberService(BaseService, IMemberService):
         try:
             # Use optimized repository method that eliminates N+1 queries
             leaderboard = await self.member_repository.get_invite_leaderboard_optimized(limit)
-            
+
             self._log_operation("get_invite_leaderboard", limit=limit, count=len(leaderboard))
             return leaderboard
 
@@ -272,10 +256,10 @@ class MemberService(BaseService, IMemberService):
             member = await self.member_repository.get_by_discord_id(member_id)
             if not member:
                 return None
-            
+
             self._log_operation("get_voice_bypass_status", member_id=member_id)
             return member.voice_bypass_until
-            
+
         except Exception as e:
             self._log_error("get_voice_bypass_status", e, member_id=member_id)
             return None
@@ -284,10 +268,10 @@ class MemberService(BaseService, IMemberService):
         """Set voice bypass expiration for member."""
         try:
             success = await self.member_repository.update_voice_bypass(member_id, expiration)
-            
+
             self._log_operation("set_voice_bypass_status", member_id=member_id, expiration=expiration)
             return success
-            
+
         except Exception as e:
             self._log_error("set_voice_bypass_status", e, member_id=member_id)
             return False
@@ -296,12 +280,7 @@ class MemberService(BaseService, IMemberService):
 class ActivityService(BaseService, IActivityService):
     """Service for activity tracking and management."""
 
-    def __init__(
-        self,
-        activity_repository: IActivityRepository,
-        member_repository: IMemberRepository,
-        **kwargs
-    ):
+    def __init__(self, activity_repository: IActivityRepository, member_repository: IMemberRepository, **kwargs):
         super().__init__(**kwargs)
         self.activity_repository = activity_repository
         self.member_repository = member_repository
@@ -310,9 +289,7 @@ class ActivityService(BaseService, IActivityService):
         """Validate activity operation."""
         return True
 
-    async def track_activity(
-        self, member: Member, activity_type: str, points: int
-    ) -> Activity:
+    async def track_activity(self, member: Member, activity_type: str, points: int) -> Activity:
         """Track member activity and award points."""
         try:
             activity = await self.activity_repository.add_activity(
@@ -334,17 +311,13 @@ class ActivityService(BaseService, IActivityService):
             self._log_error("track_activity", e, member_id=member.id)
             raise
 
-    async def get_member_activity_summary(
-        self, member_id: int, days: int = 30
-    ) -> dict[str, Any]:
+    async def get_member_activity_summary(self, member_id: int, days: int = 30) -> dict[str, Any]:
         """Get member activity summary for specified period."""
         try:
             start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Get total points
-            total_points = await self.activity_repository.get_member_total_points(
-                member_id, start_date=start_date
-            )
+            total_points = await self.activity_repository.get_member_total_points(member_id, start_date=start_date)
 
             # Get points by activity type
             voice_points = await self.activity_repository.get_member_total_points(
@@ -360,9 +333,7 @@ class ActivityService(BaseService, IActivityService):
             )
 
             # Get recent activity
-            recent_activities = await self.activity_repository.get_member_activity(
-                member_id, start_date=start_date
-            )
+            recent_activities = await self.activity_repository.get_member_activity(member_id, start_date=start_date)
 
             summary = {
                 "member_id": member_id,
@@ -403,13 +374,15 @@ class ActivityService(BaseService, IActivityService):
 
             leaderboard = []
             for rank, (member, points) in enumerate(leaderboard_raw, 1):
-                leaderboard.append({
-                    "rank": rank,
-                    "member_id": member.id,
-                    "points": points,
-                    "activity_type": activity_type or "all",
-                    "period_days": days,
-                })
+                leaderboard.append(
+                    {
+                        "rank": rank,
+                        "member_id": member.id,
+                        "points": points,
+                        "activity_type": activity_type or "all",
+                        "period_days": days,
+                    }
+                )
 
             self._log_operation(
                 "get_activity_leaderboard",
@@ -424,14 +397,12 @@ class ActivityService(BaseService, IActivityService):
             self._log_error("get_activity_leaderboard", e)
             return []
 
-    async def track_message_activity(
-        self, member_id: int, message_content: str, channel_id: int
-    ) -> Activity:
+    async def track_message_activity(self, member_id: int, message_content: str, channel_id: int) -> Activity:
         """Track text message activity."""
         try:
             # Ensure member exists
             member = await self.member_repository.get_or_create(member_id)
-            
+
             # Calculate points based on message length (1-3 points)
             message_length = len(message_content.strip())
             if message_length < 10:
@@ -461,14 +432,12 @@ class ActivityService(BaseService, IActivityService):
             self._log_error("track_message_activity", e, member_id=member_id)
             raise
 
-    async def track_voice_activity(
-        self, member_id: int, channel_id: int, is_with_others: bool
-    ) -> Activity:
+    async def track_voice_activity(self, member_id: int, channel_id: int, is_with_others: bool) -> Activity:
         """Track voice channel activity."""
         try:
             # Ensure member exists
             member = await self.member_repository.get_or_create(member_id)
-            
+
             # Award more points when with others (social bonus)
             points = 2 if is_with_others else 1
 
@@ -498,7 +467,7 @@ class ActivityService(BaseService, IActivityService):
         try:
             # Ensure member exists
             member = await self.member_repository.get_or_create(member_id)
-            
+
             # Award bonus points for promoting the server
             points = 5
 
@@ -520,9 +489,7 @@ class ActivityService(BaseService, IActivityService):
             self._log_error("track_promotion_activity", e, member_id=member_id)
             raise
 
-    async def award_bonus_points(
-        self, member: Member, points: int, reason: str = "bonus"
-    ) -> Activity:
+    async def award_bonus_points(self, member: Member, points: int, reason: str = "bonus") -> Activity:
         """Award bonus points to member."""
         try:
             activity = await self.activity_repository.add_activity(
@@ -550,31 +517,25 @@ class ActivityService(BaseService, IActivityService):
             start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Get total points across all activity types
-            total_points = await self.activity_repository.get_total_points(
-                start_date=start_date
-            )
+            total_points = await self.activity_repository.get_total_points(start_date=start_date)
 
             # Get activity breakdown
             voice_activity = await self.activity_repository.get_total_points(
                 activity_type="voice", start_date=start_date
             )
-            
-            text_activity = await self.activity_repository.get_total_points(
-                activity_type="text", start_date=start_date
-            )
-            
+
+            text_activity = await self.activity_repository.get_total_points(activity_type="text", start_date=start_date)
+
             promotion_activity = await self.activity_repository.get_total_points(
                 activity_type="promotion", start_date=start_date
             )
-            
+
             bonus_activity = await self.activity_repository.get_total_points(
                 activity_type="bonus", start_date=start_date
             )
 
             # Get active members count
-            active_members = await self.activity_repository.get_active_members_count(
-                start_date=start_date
-            )
+            active_members = await self.activity_repository.get_active_members_count(start_date=start_date)
 
             stats = {
                 "period_days": days,
@@ -598,9 +559,7 @@ class ActivityService(BaseService, IActivityService):
             self._log_error("get_server_activity_stats", e)
             return {}
 
-    async def award_bonus_points(
-        self, member: Member, points: int, reason: str = "bonus"
-    ) -> Activity:
+    async def award_bonus_points(self, member: Member, points: int, reason: str = "bonus") -> Activity:
         """Award bonus points to member."""
         try:
             activity = await self.activity_repository.add_activity(
@@ -628,9 +587,7 @@ class ActivityService(BaseService, IActivityService):
             start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Get leaderboards for different activity types
-            overall_leaderboard = await self.activity_repository.get_leaderboard(
-                limit=5, start_date=start_date
-            )
+            overall_leaderboard = await self.activity_repository.get_leaderboard(limit=5, start_date=start_date)
 
             voice_leaderboard = await self.activity_repository.get_leaderboard(
                 activity_type="voice", limit=5, start_date=start_date
@@ -646,18 +603,9 @@ class ActivityService(BaseService, IActivityService):
             stats = {
                 "period_days": days,
                 "total_members": total_members,
-                "top_overall": [
-                    {"member_id": member.id, "points": points}
-                    for member, points in overall_leaderboard
-                ],
-                "top_voice": [
-                    {"member_id": member.id, "points": points}
-                    for member, points in voice_leaderboard
-                ],
-                "top_text": [
-                    {"member_id": member.id, "points": points}
-                    for member, points in text_leaderboard
-                ],
+                "top_overall": [{"member_id": member.id, "points": points} for member, points in overall_leaderboard],
+                "top_voice": [{"member_id": member.id, "points": points} for member, points in voice_leaderboard],
+                "top_text": [{"member_id": member.id, "points": points} for member, points in text_leaderboard],
             }
 
             self._log_operation("get_server_activity_stats", days=days)
@@ -671,12 +619,7 @@ class ActivityService(BaseService, IActivityService):
 class ModerationService(BaseService, IModerationService):
     """Service for moderation operations."""
 
-    def __init__(
-        self,
-        moderation_repository: IModerationRepository,
-        member_repository: IMemberRepository,
-        **kwargs
-    ):
+    def __init__(self, moderation_repository: IModerationRepository, member_repository: IMemberRepository, **kwargs):
         super().__init__(**kwargs)
         self.moderation_repository = moderation_repository
         self.member_repository = member_repository
@@ -700,7 +643,7 @@ class ModerationService(BaseService, IModerationService):
             await self.member_repository.get_or_create(target.id)
             # Ensure moderator exists in database
             await self.member_repository.get_or_create(moderator.id)
-            
+
             expires_at = None
             if duration_seconds:
                 expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
@@ -746,7 +689,7 @@ class ModerationService(BaseService, IModerationService):
             await self.member_repository.get_or_create(target.id)
             # Ensure moderator exists in database
             await self.member_repository.get_or_create(moderator.id)
-            
+
             if channel_id is None:
                 channel_id = 0  # Default fallback
 
@@ -841,9 +784,7 @@ class ModerationService(BaseService, IModerationService):
     async def get_member_warnings(self, member_id: int) -> list[ModerationLog]:
         """Get all warnings for member."""
         try:
-            warnings = await self.moderation_repository.get_member_history(
-                member_id, action_type="mute"
-            )
+            warnings = await self.moderation_repository.get_member_history(member_id, action_type="mute")
 
             self._log_operation("get_member_warnings", member_id=member_id)
             return warnings
@@ -870,7 +811,7 @@ class ModerationService(BaseService, IModerationService):
         try:
             # Get all active mutes
             active_mutes = await self.moderation_repository.get_active_mutes()
-            
+
             current_time = datetime.now(timezone.utc)
             expired_mutes = []
 
@@ -889,12 +830,7 @@ class ModerationService(BaseService, IModerationService):
 class InviteService(BaseService, IInviteService):
     """Service for invite tracking and management."""
 
-    def __init__(
-        self,
-        invite_repository: IInviteRepository,
-        member_repository: IMemberRepository,
-        **kwargs
-    ):
+    def __init__(self, invite_repository: IInviteRepository, member_repository: IMemberRepository, **kwargs):
         super().__init__(**kwargs)
         self.invite_repository = invite_repository
         self.member_repository = member_repository
@@ -913,7 +849,7 @@ class InviteService(BaseService, IInviteService):
             for discord_invite in discord_invites:
                 # Get or create invite in database
                 db_invite = await self.invite_repository.get_by_code(discord_invite.code)
-                
+
                 if not db_invite:
                     # Ensure creator exists in members table before creating invite
                     creator_id = 0  # Default fallback
@@ -925,14 +861,14 @@ class InviteService(BaseService, IInviteService):
                                 # Create member if doesn't exist (might be a user who left the server)
                                 creator_member = await self.member_repository.create_member(
                                     discord_id=discord_invite.inviter.id,
-                                    joined_at=None  # We don't have join date for invite creators
+                                    joined_at=None,  # We don't have join date for invite creators
                                 )
                             creator_id = creator_member.id
                         except Exception as e:
                             # If we can't create the member for any reason, use fallback
                             self._log_error("sync_server_invites_creator", e, discord_id=discord_invite.inviter.id)
                             creator_id = 0
-                    
+
                     # Create new invite with proper creator_id
                     db_invite = await self.invite_repository.create_invite(
                         invite_code=discord_invite.code,
@@ -959,15 +895,13 @@ class InviteService(BaseService, IInviteService):
             return {}
 
     async def process_invite_usage(
-        self, 
-        before_invites: dict[str, discord.Invite], 
-        after_invites: dict[str, discord.Invite]
+        self, before_invites: dict[str, discord.Invite], after_invites: dict[str, discord.Invite]
     ) -> Optional[Invite]:
         """Process invite usage change and return used invite."""
         try:
             for code, after_invite in after_invites.items():
                 before_invite = before_invites.get(code)
-                
+
                 if before_invite and after_invite.uses > before_invite.uses:
                     # This invite was used
                     await self.invite_repository.update_invite_usage(
@@ -975,15 +909,15 @@ class InviteService(BaseService, IInviteService):
                         after_invite.uses,
                         last_used_at=datetime.now(timezone.utc),
                     )
-                    
+
                     db_invite = await self.invite_repository.get_by_code(code)
-                    
+
                     self._log_operation(
                         "process_invite_usage",
                         invite_code=code,
                         new_uses=after_invite.uses,
                     )
-                    
+
                     return db_invite
 
             return None
@@ -997,10 +931,10 @@ class InviteService(BaseService, IInviteService):
         try:
             # Get basic invite stats
             basic_stats = await self.invite_repository.get_invite_stats(member_id)
-            
+
             # Get invited members
             invited_members = await self.member_repository.get_members_by_inviter(member_id)
-            
+
             # Get member's invites
             member_invites = await self.invite_repository.get_member_invites(member_id)
 
@@ -1028,17 +962,15 @@ class InviteService(BaseService, IInviteService):
             self._log_error("get_member_invite_stats", e, member_id=member_id)
             return {}
 
-    async def create_tracked_invite(
-        self, invite: discord.Invite, creator: discord.Member
-    ) -> Optional[Invite]:
+    async def create_tracked_invite(self, invite: discord.Invite, creator: discord.Member) -> Optional[Invite]:
         """Create tracked invite in database."""
         try:
             # Import InviteQueries to avoid circular imports
             from datasources.queries import InviteQueries
-            
+
             # Need to get session from somewhere - use member repository's session
             session = self.member_repository.session
-            
+
             db_invite = await InviteQueries.add_or_update_invite(
                 session=session,
                 invite_id=invite.code,
@@ -1068,7 +1000,7 @@ class InviteService(BaseService, IInviteService):
 
             # Get all database invites (this would need a method to get all)
             # For now, we'll just log this operation
-            
+
             self._log_operation("cleanup_expired_invites", guild_id=guild.id)
             return 0  # Placeholder
 

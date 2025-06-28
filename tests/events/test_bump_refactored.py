@@ -1,15 +1,15 @@
 """Tests for refactored bump event module."""
 
-import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
+import pytest
 from discord.ext import commands
 
+from cogs.events.bump.bump_event import OnBumpEvent
 from cogs.events.bump.constants import BYPASS_DURATIONS, SERVICE_COOLDOWNS
 from cogs.events.bump.handlers import DisboardHandler, DzikHandler
-from cogs.events.bump.bump_event import OnBumpEvent
 
 
 class TestBumpHandlers:

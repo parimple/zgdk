@@ -89,8 +89,8 @@ class TestTeamWorkflow(BaseCommandTest):
             premium_service.get_highest_premium_role = AsyncMock(return_value=self.author.roles[-1])
             
             async def get_service(service_type, session):
-                from core.interfaces.role_interfaces import IRoleService
                 from core.interfaces.premium_interfaces import IPremiumService
+                from core.interfaces.role_interfaces import IRoleService
                 
                 if service_type == IRoleService:
                     return role_service
@@ -147,8 +147,8 @@ class TestTeamWorkflow(BaseCommandTest):
             premium_service.has_premium_role = AsyncMock(return_value=True)
             
             async def get_service(service_type, session):
-                from core.interfaces.role_interfaces import IRoleService
                 from core.interfaces.premium_interfaces import IPremiumService
+                from core.interfaces.role_interfaces import IRoleService
                 
                 if service_type == IRoleService:
                     return role_service
@@ -201,8 +201,8 @@ class TestTeamWorkflow(BaseCommandTest):
             premium_service.get_highest_premium_role = AsyncMock(return_value=self.author.roles[0])
             
             async def get_service(service_type, session):
-                from core.interfaces.role_interfaces import IRoleService
                 from core.interfaces.premium_interfaces import IPremiumService
+                from core.interfaces.role_interfaces import IRoleService
                 
                 if service_type == IRoleService:
                     return role_service
@@ -301,8 +301,8 @@ class TestTeamWorkflow(BaseCommandTest):
             session.commit = AsyncMock()
             
             async def get_service(service_type, sess):
-                from core.interfaces.role_interfaces import IRoleService
                 from core.interfaces.premium_interfaces import IPremiumService
+                from core.interfaces.role_interfaces import IRoleService
                 
                 if service_type == IRoleService:
                     return role_service
@@ -434,8 +434,8 @@ class TestTeamWorkflow(BaseCommandTest):
             premium_service.has_premium_role = AsyncMock(return_value=True)
             
             async def get_service(service_type, session):
-                from core.interfaces.role_interfaces import IRoleService
                 from core.interfaces.premium_interfaces import IPremiumService
+                from core.interfaces.role_interfaces import IRoleService
                 
                 if service_type == IRoleService:
                     return role_service

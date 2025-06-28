@@ -1,13 +1,12 @@
 """
 Service fixtures for testing bot services
 """
-import pytest
-from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
-from tests.data.test_constants import (
-    TEST_USER_1_ID, WALLET_BALANCES, ROLE_ZG50_ID
-)
+import pytest
+
+from tests.data.test_constants import ROLE_ZG50_ID, TEST_USER_1_ID, WALLET_BALANCES
 
 
 @pytest.fixture

@@ -4,27 +4,17 @@ Notification-related SQLAlchemy models.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import (
-    BigInteger,
-    Boolean,
-    DateTime,
-    ForeignKey,
-    Integer,
-    PrimaryKeyConstraint,
-    String,
-)
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, PrimaryKeyConstraint, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base, MEMBER_ID
+from .base import MEMBER_ID, Base
 
 
 class NotificationLog(Base):
     """NotificationLog Model"""
 
     __tablename__ = "notification_logs"
-    member_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(MEMBER_ID), primary_key=True
-    )
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
     notification_tag: Mapped[str] = mapped_column(String, primary_key=True)
     sent_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)
@@ -34,11 +24,7 @@ class NotificationLog(Base):
 
     member: Mapped["Member"] = relationship("Member", backref="notification_logs")
 
-    __table_args__ = (
-        PrimaryKeyConstraint(
-            "member_id", "notification_tag", name="notification_log_pk"
-        ),
-    )
+    __table_args__ = (PrimaryKeyConstraint("member_id", "notification_tag", name="notification_log_pk"),)
 
     def __repr__(self) -> str:
         return f"<NotificationLog(member_id={self.member_id}, notification_tag={self.notification_tag}, sent_at={self.sent_at}, notification_count={self.notification_count}, opted_out={self.opted_out})>"

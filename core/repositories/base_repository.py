@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-
 class BaseRepository:
     """Base repository class providing common CRUD operations."""
 
@@ -23,23 +22,15 @@ class BaseRepository:
         try:
             result = await self.session.get(self.entity_class, entity_id)
             if result:
-                self.logger.debug(
-                    f"Found {self.entity_class.__name__} with ID: {entity_id}"
-                )
+                self.logger.debug(f"Found {self.entity_class.__name__} with ID: {entity_id}")
             else:
-                self.logger.debug(
-                    f"No {self.entity_class.__name__} found with ID: {entity_id}"
-                )
+                self.logger.debug(f"No {self.entity_class.__name__} found with ID: {entity_id}")
             return result
         except Exception as e:
-            self.logger.error(
-                f"Error getting {self.entity_class.__name__} by ID {entity_id}: {e}"
-            )
+            self.logger.error(f"Error getting {self.entity_class.__name__} by ID {entity_id}: {e}")
             raise
 
-    async def get_all(
-        self, limit: Optional[int] = None, offset: Optional[int] = None
-    ) -> list[Any]:
+    async def get_all(self, limit: Optional[int] = None, offset: Optional[int] = None) -> list[Any]:
         """Get all entities with optional pagination."""
         try:
             stmt = select(self.entity_class)
@@ -50,9 +41,7 @@ class BaseRepository:
 
             result = await self.session.execute(stmt)
             entities = result.scalars().all()
-            self.logger.debug(
-                f"Retrieved {len(entities)} {self.entity_class.__name__} entities"
-            )
+            self.logger.debug(f"Retrieved {len(entities)} {self.entity_class.__name__} entities")
             return list(entities)
         except Exception as e:
             self.logger.error(f"Error getting all {self.entity_class.__name__}: {e}")
@@ -87,19 +76,13 @@ class BaseRepository:
             if entity:
                 await self.session.delete(entity)
                 await self.session.flush()
-                self.logger.debug(
-                    f"Deleted {self.entity_class.__name__} with ID: {entity_id}"
-                )
+                self.logger.debug(f"Deleted {self.entity_class.__name__} with ID: {entity_id}")
                 return True
             else:
-                self.logger.warning(
-                    f"Cannot delete {self.entity_class.__name__} - not found: {entity_id}"
-                )
+                self.logger.warning(f"Cannot delete {self.entity_class.__name__} - not found: {entity_id}")
                 return False
         except Exception as e:
-            self.logger.error(
-                f"Error deleting {self.entity_class.__name__} with ID {entity_id}: {e}"
-            )
+            self.logger.error(f"Error deleting {self.entity_class.__name__} with ID {entity_id}: {e}")
             raise
 
     async def exists(self, entity_id: Any) -> bool:
@@ -108,9 +91,7 @@ class BaseRepository:
             entity = await self.get_by_id(entity_id)
             return entity is not None
         except Exception as e:
-            self.logger.error(
-                f"Error checking existence of {self.entity_class.__name__} with ID {entity_id}: {e}"
-            )
+            self.logger.error(f"Error checking existence of {self.entity_class.__name__} with ID {entity_id}: {e}")
             raise
 
     def _log_operation(self, operation_name: str, **context: Any) -> None:

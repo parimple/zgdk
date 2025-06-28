@@ -5,16 +5,21 @@ import asyncio
 import json
 import subprocess
 
+
 async def test_bump_command():
     """Test the bump command."""
-    
+
     print("Testing ,bump command via MCP")
     print("=" * 40)
-    
+
     # Execute bump command via docker exec
     cmd = [
-        "docker", "exec", "-i", "zgdk-mcp-1",
-        "python", "-c",
+        "docker",
+        "exec",
+        "-i",
+        "zgdk-mcp-1",
+        "python",
+        "-c",
         """
 import asyncio
 import json
@@ -28,9 +33,9 @@ async def main():
         print()
 
 asyncio.run(main())
-"""
+""",
     ]
-    
+
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         print("Output:")
@@ -42,6 +47,7 @@ asyncio.run(main())
         print(f"Error executing command: {e}")
         print(f"stdout: {e.stdout}")
         print(f"stderr: {e.stderr}")
+
 
 if __name__ == "__main__":
     asyncio.run(test_bump_command())

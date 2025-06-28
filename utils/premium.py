@@ -11,12 +11,12 @@ import discord
 import httpx
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright  # pylint: disable=import-error
-from utils.browser_manager import BrowserManager
 from sqlalchemy.exc import IntegrityError
 
 from core.interfaces.member_interfaces import IMemberService
 from core.interfaces.premium_interfaces import IPremiumService
 from core.repositories import PaymentRepository
+from utils.browser_manager import BrowserManager
 
 TIPPLY_API_URL = (
     "https://widgets.tipply.pl/LATEST_MESSAGES/"
@@ -82,9 +82,7 @@ class PremiumManager:
             ban_list = [entry async for entry in self.guild.bans()]
             for ban_entry in ban_list:
                 if name_or_id.lower() == ban_entry.user.name.lower():
-                    logger.info(
-                        "Banned user found by exact name: %s", ban_entry.user.id
-                    )
+                    logger.info("Banned user found by exact name: %s", ban_entry.user.id)
                     return ban_entry.user
         except discord.Forbidden:
             logger.error("Bot doesn't have permission to fetch bans")
@@ -112,14 +110,8 @@ class PremiumManager:
         for member in self.guild.members:
             if (
                 (member.name and name_or_id_lower == member.name.lower())
-                or (
-                    member.display_name
-                    and name_or_id_lower == member.display_name.lower()
-                )
-                or (
-                    member.global_name
-                    and name_or_id_lower == member.global_name.lower()
-                )
+                or (member.display_name and name_or_id_lower == member.display_name.lower())
+                or (member.global_name and name_or_id_lower == member.global_name.lower())
             ):
                 return member
 
@@ -140,7 +132,7 @@ class PremiumManager:
             # Extract data from dictionary format
             role_name = role_data.get("role_name", "Unknown Role")
             expiration_date = role_data.get("expiration_date")
-            
+
             if expiration_date:
                 formatted_date = discord.utils.format_dt(expiration_date, "D")
                 relative_date = discord.utils.format_dt(expiration_date, "R")
@@ -166,12 +158,12 @@ class PremiumManager:
             return
 
         logger.info("Processing payment: %s", payment_data)
-        
+
         # Get services
         member_service = await self.bot.get_service(IMemberService, session)
         premium_service = await self.bot.get_service(IPremiumService, session)
         premium_service.set_guild(self.guild)
-        
+
         # First, try to find the banned member
         banned_member = await self.get_banned_member(payment_data.name)
         if banned_member:
@@ -200,16 +192,14 @@ class PremiumManager:
                     payment_data.payment_type,
                 )
                 logger.info("payment: %s", payment)
-                
+
                 # Use new service architecture
                 await member_service.get_or_create_member(member)
 
                 # Najpierw sprawdź konwersję legacy i ustal finalną kwotę
                 final_amount = payment_data.amount
                 if self.bot.config.get("legacy_system", {}).get("enabled", False):
-                    legacy_amounts = self.bot.config.get("legacy_system", {}).get(
-                        "amounts", {}
-                    )
+                    legacy_amounts = self.bot.config.get("legacy_system", {}).get("amounts", {})
                     if final_amount in legacy_amounts:
                         # Najpierw konwertuj na nową kwotę
                         final_amount = legacy_amounts[final_amount]
@@ -227,9 +217,7 @@ class PremiumManager:
                 for role_config in self.bot.config["premium_roles"]:
                     if final_amount in [role_config["price"], role_config["price"] + 1]:
                         is_premium_payment = True
-                        logger.info(
-                            f"Found premium role match for amount {final_amount}"
-                        )
+                        logger.info(f"Found premium role match for amount {final_amount}")
                         break
 
                 # Dodaj do portfela tylko jeśli to nie jest płatność za rolę premium
@@ -323,9 +311,7 @@ class TipplyDataProvider(DataProvider):
                 page = await browser_manager.new_page()
                 try:
                     await page.goto(self.widget_url, timeout=30000)
-                    await page.wait_for_selector(
-                        ".ListItemWrapper-sc-1ode8mk-0", timeout=15000
-                    )
+                    await page.wait_for_selector(".ListItemWrapper-sc-1ode8mk-0", timeout=15000)
                     content = await page.content()
                     soup = BeautifulSoup(content, "html.parser")
                     payments = []
@@ -334,21 +320,13 @@ class TipplyDataProvider(DataProvider):
                         {"class": "ListItemWrapper-sc-1ode8mk-0 eYIAvf single-element"},
                     ):
                         name = div.find("span", {"data-element": "nickname"}).text
-                        amount_str = div.find(
-                            "span", {"data-element": "price"}
-                        ).text.replace(",", ".")
+                        amount_str = div.find("span", {"data-element": "price"}).text.replace(",", ".")
                         amount_str = amount_str.replace(" zł", "")
                         # Konwertujemy na grosze, zaokrąglamy w górę jeśli >= 99 groszy, w dół jeśli mniej
                         amount_groszy = round(float(amount_str) * 100)
-                        amount = (
-                            (amount_groszy + 99) // 100
-                            if amount_groszy % 100 >= 99
-                            else amount_groszy // 100
-                        )
+                        amount = (amount_groszy + 99) // 100 if amount_groszy % 100 >= 99 else amount_groszy // 100
                         payment_time = datetime.now(timezone.utc)
-                        payment_data = PaymentData(
-                            name, amount, payment_time, self.payment_type
-                        )
+                        payment_data = PaymentData(name, amount, payment_time, self.payment_type)
                         payments.append(payment_data)
                     return payments
                 finally:
@@ -376,9 +354,7 @@ class TipplyDataProvider(DataProvider):
 
             # Transform both lists to contain only (name, amount) tuples
             all_payments = [(payment.name, payment.amount) for payment in all_payments]
-            last_handled_payments = [
-                (payment.name, payment.amount) for payment in last_handled_payments
-            ]
+            last_handled_payments = [(payment.name, payment.amount) for payment in last_handled_payments]
             logger.debug("all_payments: %s", all_payments[:3])
 
             # Iterate over the fetched payments from newest to oldest
@@ -395,9 +371,7 @@ class TipplyDataProvider(DataProvider):
             payment_data_list = []
             for i, (name, amount) in enumerate(new_payments[::-1]):
                 payment_time = current_time + timedelta(seconds=i)
-                payment_data_list.append(
-                    PaymentData(name, amount, payment_time, self.payment_type)
-                )
+                payment_data_list.append(PaymentData(name, amount, payment_time, self.payment_type))
 
             if payment_data_list:
                 logger.info("Found %d new payments", len(payment_data_list))

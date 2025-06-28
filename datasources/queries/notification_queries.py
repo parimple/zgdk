@@ -31,9 +31,7 @@ class NotificationLogQueries:
         For global services (bumps), member_id should be guild_id.
         For user-specific services, member_id should be user_id.
         """
-        notification_log = await session.get(
-            NotificationLog, (member_id, notification_tag)
-        )
+        notification_log = await session.get(NotificationLog, (member_id, notification_tag))
 
         if notification_log is None:
             notification_log = NotificationLog(
@@ -59,17 +57,12 @@ class NotificationLogQueries:
         Increment notification count and return if max count reached.
         Returns (notification_log, should_opt_out)
         """
-        notification_log = await session.get(
-            NotificationLog, (member_id, notification_tag)
-        )
+        notification_log = await session.get(NotificationLog, (member_id, notification_tag))
         if not notification_log:
             return None, False
 
         notification_log.notification_count += 1
-        should_opt_out = (
-            notification_log.notification_count
-            >= NotificationLogQueries.MAX_NOTIFICATION_COUNT
-        )
+        should_opt_out = notification_log.notification_count >= NotificationLogQueries.MAX_NOTIFICATION_COUNT
         if should_opt_out:
             notification_log.opted_out = True
 
@@ -91,26 +84,18 @@ class NotificationLogQueries:
     ) -> Optional[NotificationLog]:
         """Get notification log for a service, handling both global and user-specific services"""
         # For global services (bumps), use guild_id as member_id
-        member_id = (
-            guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
-        )
+        member_id = guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
         if member_id is None:
             return None
 
         return await session.get(NotificationLog, (member_id, service))
 
     @staticmethod
-    async def get_service_users(
-        session: AsyncSession, service: str, guild_id: Optional[int] = None
-    ) -> List[int]:
+    async def get_service_users(session: AsyncSession, service: str, guild_id: Optional[int] = None) -> List[int]:
         """Get all users who have used a service"""
         from sqlalchemy import select
 
-        query = (
-            select(NotificationLog.member_id)
-            .where(NotificationLog.notification_tag == service)
-            .distinct()
-        )
+        query = select(NotificationLog.member_id).where(NotificationLog.notification_tag == service).distinct()
 
         if guild_id is not None:
             query = query.where(NotificationLog.member_id != guild_id)
@@ -128,9 +113,7 @@ class NotificationLogQueries:
     ) -> bool:
         """Check if service can be used based on cooldown"""
         # For global services (bumps), use guild_id as member_id
-        member_id = (
-            guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
-        )
+        member_id = guild_id if service in NotificationLogQueries.GLOBAL_SERVICES else user_id
         if member_id is None:
             return False
 
@@ -155,16 +138,12 @@ class NotificationLogQueries:
         If dry_run is True, only check if service can be used without updating the log.
         """
         # Get current notification log
-        log = await NotificationLogQueries.get_service_notification_log(
-            session, service, guild_id, user_id
-        )
+        log = await NotificationLogQueries.get_service_notification_log(session, service, guild_id, user_id)
 
         # If no log exists, service can be used
         if not log:
             if not dry_run:
-                log = await NotificationLogQueries.add_or_update_notification_log(
-                    session, user_id, service
-                )
+                log = await NotificationLogQueries.add_or_update_notification_log(session, user_id, service)
             return True, log
 
         # Check if cooldown has passed
@@ -174,8 +153,6 @@ class NotificationLogQueries:
 
         # Service can be used - update log if not dry run
         if not dry_run:
-            log = await NotificationLogQueries.add_or_update_notification_log(
-                session, user_id, service
-            )
+            log = await NotificationLogQueries.add_or_update_notification_log(session, user_id, service)
 
         return True, log

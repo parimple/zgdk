@@ -1,12 +1,13 @@
 """Database-related exceptions."""
 
-from typing import Optional, Any
+from typing import Any, Optional
+
 from .base import BotError
 
 
 class DatabaseError(BotError):
     """Base exception for database errors."""
-    
+
     def __init__(
         self,
         message: str,
@@ -20,7 +21,7 @@ class DatabaseError(BotError):
             details["operation"] = operation
         if table:
             details["table"] = table
-        
+
         super().__init__(
             message=message,
             code="DATABASE_ERROR",
@@ -31,7 +32,7 @@ class DatabaseError(BotError):
 
 class EntityNotFoundError(DatabaseError):
     """Raised when an entity is not found in the database."""
-    
+
     def __init__(
         self,
         entity_type: str,
@@ -51,7 +52,7 @@ class EntityNotFoundError(DatabaseError):
 
 class IntegrityError(DatabaseError):
     """Raised when a database integrity constraint is violated."""
-    
+
     def __init__(
         self,
         constraint: str,
@@ -69,7 +70,7 @@ class IntegrityError(DatabaseError):
 
 class ConnectionError(DatabaseError):
     """Raised when database connection fails."""
-    
+
     def __init__(
         self,
         message: Optional[str] = None,

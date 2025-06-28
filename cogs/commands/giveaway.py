@@ -34,9 +34,7 @@ class GiveawayCog(commands.Cog):
     ):
         """Losuj określoną liczbę wiadomości z kanału."""
         if winners_count < 1:
-            await self.message_sender.send_error(
-                ctx, "Liczba wygranych musi być większa od 0!"
-            )
+            await self.message_sender.send_error(ctx, "Liczba wygranych musi być większa od 0!")
             return
 
         # Użyj bieżącego kanału jeśli nie podano innego
@@ -45,9 +43,7 @@ class GiveawayCog(commands.Cog):
         # Zbierz wszystkie wiadomości z kanału
         messages = []
         async for message in target_channel.history(limit=None):
-            if (
-                message.author.bot and not message.webhook_id
-            ):  # Pomijamy boty, ale nie webhooki
+            if message.author.bot and not message.webhook_id:  # Pomijamy boty, ale nie webhooki
                 continue
             messages.append(message)
 
@@ -79,19 +75,13 @@ class GiveawayCog(commands.Cog):
 
         # Przygotuj i wyślij wyniki
         if not winners:
-            await self.message_sender.send_error(
-                ctx, "Nie udało się wylosować żadnej wiadomości!"
-            )
+            await self.message_sender.send_error(ctx, "Nie udało się wylosować żadnej wiadomości!")
             return
 
         # Wyślij wyniki
-        await self.message_sender.send_giveaway_results(
-            ctx, winners, target_channel, winners_count
-        )
+        await self.message_sender.send_giveaway_results(ctx, winners, target_channel, winners_count)
 
-    @commands.hybrid_command(
-        name="giveawayr", description="Losuje użytkownika z wybranych ról."
-    )
+    @commands.hybrid_command(name="giveawayr", description="Losuje użytkownika z wybranych ról.")
     @commands.has_role("✪")
     @discord.app_commands.describe(
         role1="Pierwsza rola do losowania (wymagana)",
@@ -114,9 +104,7 @@ class GiveawayCog(commands.Cog):
         ,giveawayr "Nazwa Roli 1" "Nazwa Roli 2"                    # Losuje użytkownika z obiema rolami (domyślnie and)
         """
         # Sprawdź czy użytkownik ma rolę administratora
-        if not discord.utils.get(
-            ctx.author.roles, id=self.bot.config["admin_roles"]["admin"]
-        ):
+        if not discord.utils.get(ctx.author.roles, id=self.bot.config["admin_roles"]["admin"]):
             await ctx.send("Ta komenda jest dostępna tylko dla administratorów.")
             return
 
@@ -157,8 +145,7 @@ class GiveawayCog(commands.Cog):
         if not eligible_members:
             role_names = ", ".join(f"'{role.name}'" for role in roles)
             await ctx.send(
-                f"Nie znaleziono żadnych użytkowników z wymaganymi rolami ({role_names}) "
-                f"w trybie {mode.upper()}."
+                f"Nie znaleziono żadnych użytkowników z wymaganymi rolami ({role_names}) " f"w trybie {mode.upper()}."
             )
             return
 

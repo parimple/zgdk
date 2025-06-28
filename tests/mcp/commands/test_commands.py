@@ -2,8 +2,10 @@
 """Test various bot commands through MCP."""
 
 import asyncio
-import aiohttp
 import json
+
+import aiohttp
+
 
 async def test_command(command: str, params: dict = None):
     """Test a single command."""

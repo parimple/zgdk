@@ -4,10 +4,11 @@ Simple Discord bot testing without complex imports
 Tests actual Discord commands via subprocess calls
 """
 
-import subprocess
-import os
 import json
+import os
+import subprocess
 from datetime import datetime
+
 
 def test_discord_commands_simple():
     """Simple Discord command testing"""

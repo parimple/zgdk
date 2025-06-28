@@ -6,9 +6,10 @@ This client connects to the MCP server running in Docker container.
 
 import asyncio
 import json
-from typing import Any, Dict, Optional
 import subprocess
 import sys
+from typing import Any, Dict, Optional
+
 
 async def call_mcp_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """Call an MCP tool and return the result."""

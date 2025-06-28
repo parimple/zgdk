@@ -1,12 +1,13 @@
 """Discord-related exceptions."""
 
 from typing import Optional
+
 from .base import BotError
 
 
 class DiscordError(BotError):
     """Base exception for Discord API errors."""
-    
+
     def __init__(
         self,
         message: str,
@@ -17,7 +18,7 @@ class DiscordError(BotError):
         details = {}
         if discord_code:
             details["discord_code"] = discord_code
-        
+
         super().__init__(
             message=message,
             code="DISCORD_ERROR",
@@ -28,7 +29,7 @@ class DiscordError(BotError):
 
 class CommandError(DiscordError):
     """Raised when a command execution fails."""
-    
+
     def __init__(
         self,
         command_name: str,
@@ -45,7 +46,7 @@ class CommandError(DiscordError):
 
 class InteractionError(DiscordError):
     """Raised when an interaction fails."""
-    
+
     def __init__(
         self,
         interaction_type: str,
@@ -62,7 +63,7 @@ class InteractionError(DiscordError):
 
 class RateLimitError(DiscordError):
     """Raised when Discord rate limit is hit."""
-    
+
     def __init__(
         self,
         retry_after: float,
@@ -73,7 +74,7 @@ class RateLimitError(DiscordError):
         details = {"retry_after": retry_after}
         if endpoint:
             details["endpoint"] = endpoint
-        
+
         super().__init__(
             message=f"Rate limited for {retry_after}s",
             user_message=user_message or f"Przekroczono limit zapytań. Spróbuj ponownie za {int(retry_after)} sekund.",

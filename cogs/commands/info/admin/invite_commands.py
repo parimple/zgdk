@@ -47,9 +47,7 @@ class InviteCommands(commands.Cog):
         :param order: Kolejność sortowania (desc lub asc)
         :param target: Opcjonalny użytkownik do filtrowania zaproszeń
         """
-        logger.info(
-            f"Admin {ctx.author} requested invite list (sort_by={sort_by}, order={order}, target={target})"
-        )
+        logger.info(f"Admin {ctx.author} requested invite list (sort_by={sort_by}, order={order}, target={target})")
 
         async with self.bot.get_db() as session:
             # Pobierz wszystkie zaproszenia z bazy
@@ -58,9 +56,7 @@ class InviteCommands(commands.Cog):
 
             # Filtruj po użytkowniku jeśli podano
             if target:
-                all_invites = [
-                    inv for inv in all_invites if inv.creator_id == target.id
-                ]
+                all_invites = [inv for inv in all_invites if inv.creator_id == target.id]
 
             # Stwórz listę InviteInfo
             invite_infos = []

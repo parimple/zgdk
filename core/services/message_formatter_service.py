@@ -34,9 +34,7 @@ class MessageFormatterService(IMessageFormatter):
 
         return f"<t:{unix_timestamp}:{style}>"
 
-    def build_description(
-        self, base_text: str, ctx: Any, channel: Optional[discord.TextChannel] = None
-    ) -> str:
+    def build_description(self, base_text: str, ctx: Any, channel: Optional[discord.TextChannel] = None) -> str:
         """Build formatted description with context."""
         description = base_text
 
@@ -49,9 +47,7 @@ class MessageFormatterService(IMessageFormatter):
             author = None
 
         if author:
-            description += (
-                f"\n\n**Wykonano przez:** {self.format_member_mention(author)}"
-            )
+            description += f"\n\n**Wykonano przez:** {self.format_member_mention(author)}"
 
         # Add channel information if provided
         if channel:
@@ -103,23 +99,17 @@ class MessageFormatterService(IMessageFormatter):
         percentage = (value / total) * 100
         return f"{percentage:.1f}%"
 
-    def format_user_list(
-        self, users: list[discord.Member], max_display: int = 10
-    ) -> str:
+    def format_user_list(self, users: list[discord.Member], max_display: int = 10) -> str:
         """Format a list of users with mention limits."""
         if not users:
             return "Brak użytkowników"
 
         if len(users) <= max_display:
-            return "\n".join(
-                [f"• {self.format_member_mention(user)}" for user in users]
-            )
+            return "\n".join([f"• {self.format_member_mention(user)}" for user in users])
         else:
             displayed = users[:max_display]
             remaining = len(users) - max_display
-            user_list = "\n".join(
-                [f"• {self.format_member_mention(user)}" for user in displayed]
-            )
+            user_list = "\n".join([f"• {self.format_member_mention(user)}" for user in displayed])
             user_list += f"\n... i {remaining} więcej"
             return user_list
 
@@ -133,9 +123,7 @@ class MessageFormatterService(IMessageFormatter):
         else:
             displayed = roles[:max_display]
             remaining = len(roles) - max_display
-            role_list = "\n".join(
-                [f"• {self.format_role_mention(role)}" for role in displayed]
-            )
+            role_list = "\n".join([f"• {self.format_role_mention(role)}" for role in displayed])
             role_list += f"\n... i {remaining} więcej"
             return role_list
 
@@ -148,9 +136,7 @@ class MessageFormatterService(IMessageFormatter):
         truncated = text[: max_length - 3]
         last_space = truncated.rfind(" ")
 
-        if (
-            last_space > max_length * 0.8
-        ):  # If we can truncate at a reasonable word boundary
+        if last_space > max_length * 0.8:  # If we can truncate at a reasonable word boundary
             return truncated[:last_space] + "..."
         else:
             return truncated + "..."

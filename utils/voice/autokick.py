@@ -5,8 +5,8 @@ import logging
 import discord
 from sqlalchemy import select
 
-from datasources.models import AutoKick
 from core.repositories import AutoKickRepository
+from datasources.models import AutoKick
 from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
@@ -31,9 +31,7 @@ class AutoKickManager:
         try:
             async with self.bot.get_db() as session:
                 # Get all autokicks using SQLAlchemy ORM
-                result = await session.execute(
-                    select(AutoKick.target_id, AutoKick.owner_id)
-                )
+                result = await session.execute(select(AutoKick.target_id, AutoKick.owner_id))
                 rows = result.all()
 
                 # Clear existing cache
@@ -44,9 +42,7 @@ class AutoKickManager:
                     if target_id not in self._autokick_cache:
                         self._autokick_cache[target_id] = set()
                     self._autokick_cache[target_id].add(owner_id)
-                    self.logger.info(
-                        f"Added autokick: target={target_id}, owner={owner_id}"
-                    )
+                    self.logger.info(f"Added autokick: target={target_id}, owner={owner_id}")
 
                 self.logger.info(f"Cache initialized with {len(rows)} entries")
                 self._cache_initialized = True
@@ -78,15 +74,11 @@ class AutoKickManager:
             max_autokicks = await self.get_autokick_limit(ctx.author)
 
             if max_autokicks == 0:
-                await self.message_sender.send_no_autokick_permission(
-                    ctx, self.bot.config["channels"]["premium_info"]
-                )
+                await self.message_sender.send_no_autokick_permission(ctx, self.bot.config["channels"]["premium_info"])
                 return
 
             # Check cache for existing autokicks count
-            owner_autokicks_count = sum(
-                1 for owners in self._autokick_cache.values() if ctx.author.id in owners
-            )
+            owner_autokicks_count = sum(1 for owners in self._autokick_cache.values() if ctx.author.id in owners)
 
             if owner_autokicks_count >= max_autokicks:
                 await self.message_sender.send_autokick_limit_reached(
@@ -95,10 +87,7 @@ class AutoKickManager:
                 return
 
             # Check if autokick already exists
-            if (
-                target.id in self._autokick_cache
-                and ctx.author.id in self._autokick_cache[target.id]
-            ):
+            if target.id in self._autokick_cache and ctx.author.id in self._autokick_cache[target.id]:
                 await self.message_sender.send_autokick_already_exists(ctx, target)
                 return
 
@@ -111,9 +100,7 @@ class AutoKickManager:
             async with self.bot.get_db() as session:
                 autokick_repo = AutoKickRepository(session)
                 await autokick_repo.add_autokick(ctx.author.id, target.id)
-                self.logger.info(
-                    f"Added autokick: owner={ctx.author.id}, target={target.id}"
-                )
+                self.logger.info(f"Added autokick: owner={ctx.author.id}, target={target.id}")
                 await self.message_sender.send_autokick_added(ctx, target)
         except Exception as e:
             self.logger.error(f"Error in add_autokick: {str(e)}")
@@ -126,10 +113,7 @@ class AutoKickManager:
             await self._initialize_cache()
 
             # Check cache first
-            if (
-                target.id not in self._autokick_cache
-                or ctx.author.id not in self._autokick_cache[target.id]
-            ):
+            if target.id not in self._autokick_cache or ctx.author.id not in self._autokick_cache[target.id]:
                 await self.message_sender.send_autokick_not_found(ctx, target)
                 return
 
@@ -142,9 +126,7 @@ class AutoKickManager:
             async with self.bot.get_db() as session:
                 autokick_repo = AutoKickRepository(session)
                 await autokick_repo.remove_autokick(ctx.author.id, target.id)
-                self.logger.info(
-                    f"Removed autokick: owner={ctx.author.id}, target={target.id}"
-                )
+                self.logger.info(f"Removed autokick: owner={ctx.author.id}, target={target.id}")
                 await self.message_sender.send_autokick_removed(ctx, target)
         except Exception as e:
             self.logger.error(f"Error in remove_autokick: {str(e)}")
@@ -156,11 +138,7 @@ class AutoKickManager:
         await self._initialize_cache()
 
         # Get all targets that this user has autokick on
-        user_autokicks = [
-            target_id
-            for target_id, owners in self._autokick_cache.items()
-            if ctx.author.id in owners
-        ]
+        user_autokicks = [target_id for target_id, owners in self._autokick_cache.items() if ctx.author.id in owners]
 
         if not user_autokicks:
             await self.message_sender.send_autokick_list_empty(ctx)
@@ -169,9 +147,7 @@ class AutoKickManager:
         max_autokicks = await self.get_autokick_limit(ctx.author)
         await self.message_sender.send_autokick_list(ctx, user_autokicks, max_autokicks)
 
-    async def check_autokick(
-        self, member: discord.Member, channel: discord.VoiceChannel
-    ) -> tuple[bool, set[int]]:
+    async def check_autokick(self, member: discord.Member, channel: discord.VoiceChannel) -> tuple[bool, set[int]]:
         """
         Check if a member should be autokicked from a channel.
         Returns a tuple of (should_kick: bool, matching_owners: set[int])

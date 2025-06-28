@@ -72,18 +72,13 @@ class MessageRepository(BaseRepository):
             self._log_error("get_message_by_id", e, message_id=message_id)
             return None
 
-    async def get_messages_by_author(
-        self, author_id: int, limit: int = 100
-    ) -> list[Message]:
+    async def get_messages_by_author(self, author_id: int, limit: int = 100) -> list[Message]:
         """Get messages by author ID."""
         try:
             from sqlalchemy import select
 
             result = await self.session.execute(
-                select(Message)
-                .where(Message.author_id == author_id)
-                .order_by(Message.timestamp.desc())
-                .limit(limit)
+                select(Message).where(Message.author_id == author_id).order_by(Message.timestamp.desc()).limit(limit)
             )
             messages = list(result.scalars().all())
 
@@ -130,9 +125,7 @@ class MessageRepository(BaseRepository):
             self._log_error("get_messages_by_channel", e, channel_id=channel_id)
             return []
 
-    async def count_messages_by_author(
-        self, author_id: int, after: Optional[datetime] = None
-    ) -> int:
+    async def count_messages_by_author(self, author_id: int, after: Optional[datetime] = None) -> int:
         """Count messages by author with optional date filter."""
         try:
             from sqlalchemy import func, select
@@ -157,9 +150,7 @@ class MessageRepository(BaseRepository):
             self._log_error("count_messages_by_author", e, author_id=author_id)
             return 0
 
-    async def get_reply_chain(
-        self, message_id: int, max_depth: int = 10
-    ) -> list[Message]:
+    async def get_reply_chain(self, message_id: int, max_depth: int = 10) -> list[Message]:
         """Get the reply chain for a message."""
         try:
             messages = []

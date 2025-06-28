@@ -5,19 +5,21 @@ This server communicates with the bot's HTTP API to execute commands.
 """
 
 import asyncio
-import aiohttp
 import logging
 from typing import Any, Dict, List
 
+import aiohttp
+
 from mcp.server import Server
-from mcp.types import Tool, TextContent
 from mcp.server.stdio import stdio_server
+from mcp.types import TextContent, Tool
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Bot API configuration
 import os
+
 # Use command_tester API on port 8090 instead of owner_utils
 API_BASE_URL = os.getenv("API_BASE_URL", "http://app:8090")
 

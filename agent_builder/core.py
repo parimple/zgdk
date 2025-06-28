@@ -1,22 +1,23 @@
 """Core Agent Builder functionality."""
 
-import os
+import asyncio
 import json
-from typing import Dict, List, Optional, Any, Callable
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-import asyncio
+from typing import Any, Callable, Dict, List, Optional
 
+import google.generativeai as genai
 import yaml
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-import google.generativeai as genai
 
 
 @dataclass
 class AgentConfig:
     """Configuration for an AI agent."""
+
     name: str
     purpose: str
     model: str = "gemini-1.5-flash"
@@ -27,63 +28,59 @@ class AgentConfig:
     resources: Dict[str, Any] = field(default_factory=dict)
     metrics: List[str] = field(default_factory=list)
     k8s_config: Dict[str, Any] = field(default_factory=dict)
-    
+
 
 class WorkflowStep(BaseModel):
     """Single step in agent workflow."""
+
     name: str
     action: str
     inputs: Dict[str, Any] = Field(default_factory=dict)
     outputs: List[str] = Field(default_factory=list)
     error_handling: Optional[str] = None
-    
+
 
 class AgentBuilder:
     """Main builder for creating AI agents."""
-    
+
     def __init__(self, project_root: Path = None):
         self.project_root = project_root or Path.cwd()
         self.agents_dir = self.project_root / "agents"
         self.tests_dir = self.project_root / "tests" / "agents"
         self.k8s_dir = self.project_root / "k8s" / "agents"
-        
+
         # Create directories
         self.agents_dir.mkdir(parents=True, exist_ok=True)
         self.tests_dir.mkdir(parents=True, exist_ok=True)
         self.k8s_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Load Gemini API
         self._setup_gemini()
-        
+
     def _setup_gemini(self):
         """Setup Gemini API from environment."""
         api_key = os.getenv("GEMINI_API_KEY")
         if api_key:
             genai.configure(api_key=api_key)
-            
+
     def create_agent(self, config: AgentConfig) -> Dict[str, Path]:
         """Create a new agent with all necessary files."""
         agent_name = config.name.lower().replace(" ", "_")
-        
+
         # Generate agent code
         agent_file = self._generate_agent_code(agent_name, config)
-        
+
         # Generate tests
         test_file = self._generate_tests(agent_name, config)
-        
+
         # Generate K8s configs
         k8s_files = self._generate_k8s_configs(agent_name, config)
-        
+
         # Generate documentation
         doc_file = self._generate_documentation(agent_name, config)
-        
-        return {
-            "agent": agent_file,
-            "test": test_file,
-            "k8s": k8s_files,
-            "docs": doc_file
-        }
-        
+
+        return {"agent": agent_file, "test": test_file, "k8s": k8s_files, "docs": doc_file}
+
     def _generate_agent_code(self, name: str, config: AgentConfig) -> Path:
         """Generate Python code for the agent."""
         template = f'''"""
@@ -192,11 +189,11 @@ async def create_{name}_agent() -> {name.title().replace("_", "")}Agent:
     await agent.initialize()
     return agent
 '''
-        
+
         file_path = self.agents_dir / f"{name}_agent.py"
         file_path.write_text(template)
         return file_path
-        
+
     def _generate_tests(self, name: str, config: AgentConfig) -> Path:
         """Generate test code for the agent."""
         template = f'''"""Tests for {config.name} Agent."""
@@ -274,133 +271,93 @@ async def test_{name}_metrics(agent):
     assert "avg_duration" in metrics
     assert "last_success" in metrics
 '''
-        
+
         file_path = self.tests_dir / f"test_{name}_agent.py"
         file_path.write_text(template)
         return file_path
-        
+
     def _generate_k8s_configs(self, name: str, config: AgentConfig) -> Dict[str, Path]:
         """Generate Kubernetes configurations."""
         # Deployment
         deployment = {
             "apiVersion": "apps/v1",
             "kind": "Deployment",
-            "metadata": {
-                "name": f"{name}-agent",
-                "labels": {
-                    "app": f"{name}-agent",
-                    "component": "ai-agent"
-                }
-            },
+            "metadata": {"name": f"{name}-agent", "labels": {"app": f"{name}-agent", "component": "ai-agent"}},
             "spec": {
                 "replicas": config.k8s_config.get("replicas", 2),
-                "selector": {
-                    "matchLabels": {
-                        "app": f"{name}-agent"
-                    }
-                },
+                "selector": {"matchLabels": {"app": f"{name}-agent"}},
                 "template": {
-                    "metadata": {
-                        "labels": {
-                            "app": f"{name}-agent"
-                        }
-                    },
+                    "metadata": {"labels": {"app": f"{name}-agent"}},
                     "spec": {
-                        "containers": [{
-                            "name": "agent",
-                            "image": f"zgdk/{name}-agent:latest",
-                            "ports": [{"containerPort": 8080}],
-                            "env": [
-                                {"name": "AGENT_NAME", "value": config.name},
-                                {"name": "REDIS_HOST", "value": "redis-service"}
-                            ],
-                            "envFrom": [
-                                {"secretRef": {"name": "ai-secrets"}}
-                            ],
-                            "resources": {
-                                "requests": config.resources.get("requests", {
-                                    "memory": "256Mi",
-                                    "cpu": "100m"
-                                }),
-                                "limits": config.resources.get("limits", {
-                                    "memory": "512Mi",
-                                    "cpu": "500m"
-                                })
+                        "containers": [
+                            {
+                                "name": "agent",
+                                "image": f"zgdk/{name}-agent:latest",
+                                "ports": [{"containerPort": 8080}],
+                                "env": [
+                                    {"name": "AGENT_NAME", "value": config.name},
+                                    {"name": "REDIS_HOST", "value": "redis-service"},
+                                ],
+                                "envFrom": [{"secretRef": {"name": "ai-secrets"}}],
+                                "resources": {
+                                    "requests": config.resources.get("requests", {"memory": "256Mi", "cpu": "100m"}),
+                                    "limits": config.resources.get("limits", {"memory": "512Mi", "cpu": "500m"}),
+                                },
                             }
-                        }]
-                    }
-                }
-            }
+                        ]
+                    },
+                },
+            },
         }
-        
+
         # Service
         service = {
             "apiVersion": "v1",
             "kind": "Service",
-            "metadata": {
-                "name": f"{name}-agent-service"
-            },
-            "spec": {
-                "selector": {
-                    "app": f"{name}-agent"
-                },
-                "ports": [{
-                    "port": 8080,
-                    "targetPort": 8080
-                }]
-            }
+            "metadata": {"name": f"{name}-agent-service"},
+            "spec": {"selector": {"app": f"{name}-agent"}, "ports": [{"port": 8080, "targetPort": 8080}]},
         }
-        
+
         # HPA
         hpa = {
             "apiVersion": "autoscaling/v2",
             "kind": "HorizontalPodAutoscaler",
-            "metadata": {
-                "name": f"{name}-agent-hpa"
-            },
+            "metadata": {"name": f"{name}-agent-hpa"},
             "spec": {
-                "scaleTargetRef": {
-                    "apiVersion": "apps/v1",
-                    "kind": "Deployment",
-                    "name": f"{name}-agent"
-                },
+                "scaleTargetRef": {"apiVersion": "apps/v1", "kind": "Deployment", "name": f"{name}-agent"},
                 "minReplicas": config.k8s_config.get("minReplicas", 1),
                 "maxReplicas": config.k8s_config.get("maxReplicas", 5),
-                "metrics": [{
-                    "type": "Resource",
-                    "resource": {
-                        "name": "cpu",
-                        "target": {
-                            "type": "Utilization",
-                            "averageUtilization": 70
-                        }
+                "metrics": [
+                    {
+                        "type": "Resource",
+                        "resource": {"name": "cpu", "target": {"type": "Utilization", "averageUtilization": 70}},
                     }
-                }]
-            }
+                ],
+            },
         }
-        
+
         files = {}
-        
+
         # Save deployment
         deployment_path = self.k8s_dir / f"{name}-deployment.yaml"
         with open(deployment_path, "w") as f:
             yaml.dump(deployment, f)
         files["deployment"] = deployment_path
-        
+
         # Save service
         service_path = self.k8s_dir / f"{name}-service.yaml"
         with open(service_path, "w") as f:
             yaml.dump(service, f)
         files["service"] = service_path
-        
+
         # Save HPA
         hpa_path = self.k8s_dir / f"{name}-hpa.yaml"
         with open(hpa_path, "w") as f:
             yaml.dump(hpa, f)
         files["hpa"] = hpa_path
-        
+
         return files
-        
+
     def _generate_documentation(self, name: str, config: AgentConfig) -> Path:
         """Generate documentation for the agent."""
         doc = f"""# {config.name} Agent
@@ -466,29 +423,29 @@ Environment variables:
 pytest tests/agents/test_{name}_agent.py -v
 ```
 """
-        
+
         doc_path = self.agents_dir / f"{name}_agent.md"
         doc_path.write_text(doc)
         return doc_path
-        
+
     # Helper methods
     def _generate_pydantic_fields(self, fields: Dict[str, str]) -> str:
         """Generate Pydantic field definitions."""
         if not fields:
             return "    pass"
-        
+
         lines = []
         for name, type_hint in fields.items():
             lines.append(f'    {name}: {type_hint} = Field(description="{name}")')
         return "\n".join(lines)
-        
+
     def _format_workflow(self, workflow: List[Dict[str, Any]]) -> str:
         """Format workflow for docstring."""
         lines = []
         for i, step in enumerate(workflow, 1):
             lines.append(f'    {i}. {step.get("name", "Step")}: {step.get("action", "")}')
         return "\n".join(lines)
-        
+
     def _format_workflow_markdown(self, workflow: List[Dict[str, Any]]) -> str:
         """Format workflow for markdown."""
         lines = []
@@ -499,46 +456,46 @@ pytest tests/agents/test_{name}_agent.py -v
             if "outputs" in step:
                 lines.append(f'   - Outputs: {", ".join(step["outputs"])}')
         return "\n".join(lines)
-        
+
     def _format_io_markdown(self, io_dict: Dict[str, str]) -> str:
         """Format input/output for markdown."""
         if not io_dict:
             return "None"
-        
+
         lines = []
         for name, type_hint in io_dict.items():
             lines.append(f"- `{name}`: {type_hint}")
         return "\n".join(lines)
-        
+
     def _generate_workflow_code(self, workflow: List[Dict[str, Any]]) -> str:
         """Generate workflow implementation code."""
         code_lines = []
-        
+
         for i, step in enumerate(workflow):
             code_lines.append(f'            # Step {i+1}: {step.get("name", "Step")}')
-            
+
             # Add step implementation based on action type
             action = step.get("action", "").lower()
-            
+
             if "ai" in action or "llm" in action:
-                code_lines.append('            result = await self.agent.run(input_data.dict())')
+                code_lines.append("            result = await self.agent.run(input_data.dict())")
             elif "cache" in action:
                 code_lines.append('            cached = await self.redis_client.get(f"cache:{input_data}")')
             elif "validate" in action:
-                code_lines.append('            # Validation logic here')
+                code_lines.append("            # Validation logic here")
             else:
-                code_lines.append('            # Custom logic here')
-                
+                code_lines.append("            # Custom logic here")
+
             code_lines.append("")
-            
+
         # Add output creation
-        code_lines.append('            # Create output')
+        code_lines.append("            # Create output")
         code_lines.append(f'            output = {workflow[0].get("name", "").title().replace("_", "")}Output(')
-        code_lines.append('                # Set output fields')
-        code_lines.append('            )')
-        
+        code_lines.append("                # Set output fields")
+        code_lines.append("            )")
+
         return "\n".join(code_lines)
-        
+
     def _generate_metrics_dict(self, metrics: List[str]) -> str:
         """Generate metrics dictionary initialization."""
         lines = []
@@ -554,7 +511,7 @@ pytest tests/agents/test_{name}_agent.py -v
             else:
                 lines.append(f'            "{metric}": 0,')
         return "\n".join(lines)
-        
+
     def _generate_test_input(self, inputs: Dict[str, str]) -> str:
         """Generate test input data."""
         lines = []
@@ -562,15 +519,15 @@ pytest tests/agents/test_{name}_agent.py -v
             if "str" in type_hint:
                 lines.append(f'        {name}="test_{name}",')
             elif "int" in type_hint:
-                lines.append(f'        {name}=123,')
+                lines.append(f"        {name}=123,")
             elif "float" in type_hint:
-                lines.append(f'        {name}=1.23,')
+                lines.append(f"        {name}=1.23,")
             elif "bool" in type_hint:
-                lines.append(f'        {name}=True,')
+                lines.append(f"        {name}=True,")
             else:
-                lines.append(f'        {name}=None,  # TODO: Set appropriate test value')
+                lines.append(f"        {name}=None,  # TODO: Set appropriate test value")
         return "\n".join(lines)
-        
+
     def _generate_example_input(self, inputs: Dict[str, str]) -> str:
         """Generate example input for documentation."""
         lines = []
@@ -578,11 +535,11 @@ pytest tests/agents/test_{name}_agent.py -v
             if "str" in type_hint:
                 lines.append(f'    {name}="example {name}",')
             elif "int" in type_hint:
-                lines.append(f'    {name}=42,')
+                lines.append(f"    {name}=42,")
             elif "float" in type_hint:
-                lines.append(f'    {name}=3.14,')
+                lines.append(f"    {name}=3.14,")
             elif "bool" in type_hint:
-                lines.append(f'    {name}=True,')
+                lines.append(f"    {name}=True,")
             else:
-                lines.append(f'    {name}=...,  # Set appropriate value')
+                lines.append(f"    {name}=...,  # Set appropriate value")
         return "\n".join(lines)

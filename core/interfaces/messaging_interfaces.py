@@ -23,30 +23,22 @@ class IEmbedBuilder(ABC):
         pass
 
     @abstractmethod
-    def create_success_embed(
-        self, title: str, description: str, **kwargs: Any
-    ) -> discord.Embed:
+    def create_success_embed(self, title: str, description: str, **kwargs: Any) -> discord.Embed:
         """Create a success-styled embed."""
         pass
 
     @abstractmethod
-    def create_error_embed(
-        self, title: str, description: str, **kwargs: Any
-    ) -> discord.Embed:
+    def create_error_embed(self, title: str, description: str, **kwargs: Any) -> discord.Embed:
         """Create an error-styled embed."""
         pass
 
     @abstractmethod
-    def create_info_embed(
-        self, title: str, description: str, **kwargs: Any
-    ) -> discord.Embed:
+    def create_info_embed(self, title: str, description: str, **kwargs: Any) -> discord.Embed:
         """Create an info-styled embed."""
         pass
 
     @abstractmethod
-    def create_warning_embed(
-        self, title: str, description: str, **kwargs: Any
-    ) -> discord.Embed:
+    def create_warning_embed(self, title: str, description: str, **kwargs: Any) -> discord.Embed:
         """Create a warning-styled embed."""
         pass
 
@@ -103,9 +95,7 @@ class INotificationService(ABC):
     """Interface for sending specific types of notifications."""
 
     @abstractmethod
-    async def send_permission_update(
-        self, ctx: Any, target: discord.Member, permission: str, new_value: bool
-    ) -> None:
+    async def send_permission_update(self, ctx: Any, target: discord.Member, permission: str, new_value: bool) -> None:
         """Send permission update notification."""
         pass
 
@@ -120,16 +110,12 @@ class INotificationService(ABC):
         pass
 
     @abstractmethod
-    async def send_voice_channel_info(
-        self, ctx: Any, channel: discord.VoiceChannel, **info: Any
-    ) -> None:
+    async def send_voice_channel_info(self, ctx: Any, channel: discord.VoiceChannel, **info: Any) -> None:
         """Send voice channel information."""
         pass
 
     @abstractmethod
-    async def send_role_update(
-        self, ctx: Any, target: discord.Member, role: discord.Role, added: bool
-    ) -> None:
+    async def send_role_update(self, ctx: Any, target: discord.Member, role: discord.Role, added: bool) -> None:
         """Send role update notification."""
         pass
 
@@ -158,8 +144,6 @@ class IMessageFormatter(ABC):
         pass
 
     @abstractmethod
-    def build_description(
-        self, base_text: str, ctx: Any, channel: Optional[discord.TextChannel] = None
-    ) -> str:
+    def build_description(self, base_text: str, ctx: Any, channel: Optional[discord.TextChannel] = None) -> str:
         """Build formatted description with context."""
         pass

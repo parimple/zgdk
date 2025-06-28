@@ -3,7 +3,8 @@ Ultra clean addbalance tests using the reusable commands stub.
 Demonstrates user's brilliant pass-through decorator approach.
 """
 import pytest
-from tests.utils import make_mock_bot, make_mock_context, make_mock_user, install_commands_stub
+
+from tests.utils import install_commands_stub, make_mock_bot, make_mock_context, make_mock_user
 
 
 @pytest.mark.asyncio

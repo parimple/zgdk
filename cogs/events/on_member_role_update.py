@@ -33,9 +33,7 @@ class OnMemberRoleUpdateEvent(commands.Cog):
         premium_roles = [role["name"] for role in self.bot.config["premium_roles"]]
 
         # Get all color roles
-        color_roles = [
-            role for role in guild.roles if role.name == self.color_role_name
-        ]
+        color_roles = [role for role in guild.roles if role.name == self.color_role_name]
 
         for color_role in color_roles:
             should_delete = True
@@ -44,9 +42,7 @@ class OnMemberRoleUpdateEvent(commands.Cog):
             if len(color_role.members) > 0:
                 for member in color_role.members:
                     # Check if member has any premium role
-                    has_premium = any(
-                        role.name in premium_roles for role in member.roles
-                    )
+                    has_premium = any(role.name in premium_roles for role in member.roles)
                     if has_premium:
                         # If at least one member with premium has this role, don't delete it
                         should_delete = False
@@ -69,16 +65,10 @@ class OnMemberRoleUpdateEvent(commands.Cog):
             # Delete role if it should be deleted (no members with premium or no members at all)
             if should_delete:
                 try:
-                    await color_role.delete(
-                        reason="No valid members with premium during startup check"
-                    )
-                    self.logger.info(
-                        f"Deleted color role {color_role.id} during startup check"
-                    )
+                    await color_role.delete(reason="No valid members with premium during startup check")
+                    self.logger.info(f"Deleted color role {color_role.id} during startup check")
                 except Exception as e:
-                    self.logger.error(
-                        f"Failed to delete color role {color_role.id} during startup: {str(e)}"
-                    )
+                    self.logger.error(f"Failed to delete color role {color_role.id} during startup: {str(e)}")
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
@@ -105,26 +95,18 @@ class OnMemberRoleUpdateEvent(commands.Cog):
                 for role in after.roles:
                     if role.name == self.color_role_name:
                         try:
-                            await after.remove_roles(
-                                role, reason="Premium role expired"
-                            )
-                            self.logger.info(
-                                f"Removed color role from {after.display_name} due to premium expiration"
-                            )
+                            await after.remove_roles(role, reason="Premium role expired")
+                            self.logger.info(f"Removed color role from {after.display_name} due to premium expiration")
                             # Delete the role since it's no longer needed
                             await role.delete(reason="Premium role expired")
                             break
                         except Exception as e:
-                            self.logger.error(
-                                f"Failed to remove color role from {after.display_name}: {str(e)}"
-                            )
+                            self.logger.error(f"Failed to remove color role from {after.display_name}: {str(e)}")
 
         # Handle nickname changes for mutenick users
         if nickname_changed:
             # Check if user has mutenick role
-            nick_mute_role_id = self.bot.config["mute_roles"][2][
-                "id"
-            ]  # ☢︎ role (attach_files_off)
+            nick_mute_role_id = self.bot.config["mute_roles"][2]["id"]  # ☢︎ role (attach_files_off)
             has_nick_mute = any(role.id == nick_mute_role_id for role in after.roles)
 
             if has_nick_mute:
@@ -142,9 +124,7 @@ class OnMemberRoleUpdateEvent(commands.Cog):
                             nick=default_nick,
                             reason="Automatyczne wymuszenie nicku mutenick",
                         )
-                        self.logger.info(
-                            f"Successfully enforced nick '{default_nick}' for mutenick user {after.id}"
-                        )
+                        self.logger.info(f"Successfully enforced nick '{default_nick}' for mutenick user {after.id}")
 
                         # Try to send DM to user about the enforcement
                         try:
@@ -157,13 +137,9 @@ class OnMemberRoleUpdateEvent(commands.Cog):
                             pass
 
                     except discord.Forbidden:
-                        self.logger.error(
-                            f"Failed to enforce nick for mutenick user {after.id} - permission denied"
-                        )
+                        self.logger.error(f"Failed to enforce nick for mutenick user {after.id} - permission denied")
                     except Exception as e:
-                        self.logger.error(
-                            f"Error enforcing nick for mutenick user {after.id}: {e}"
-                        )
+                        self.logger.error(f"Error enforcing nick for mutenick user {after.id}: {e}")
                 else:
                     # Nick is already correct, just log it
                     self.logger.debug(

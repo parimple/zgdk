@@ -1,17 +1,14 @@
 """Team commands module."""
 
 from discord.ext import commands
-from .team_management import TeamManagementCommands
+
 from .member_management import MemberManagementCommands
+from .team_management import TeamManagementCommands
 
 
-class TeamCog(
-    TeamManagementCommands,
-    MemberManagementCommands,
-    commands.Cog
-):
+class TeamCog(TeamManagementCommands, MemberManagementCommands, commands.Cog):
     """Team commands cog combining all team-related functionality."""
-    
+
     def __init__(self, bot):
         """Initialize team cog with all components."""
         self.bot = bot

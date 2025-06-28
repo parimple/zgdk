@@ -10,8 +10,8 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from datasources.queries import MemberQueries
 from core.repositories import InviteRepository
+from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
@@ -67,22 +67,15 @@ class PremiumChecker:
         """Check if user has active T (bypass)."""
         try:
             async with self.bot.get_db() as session:
-                bypass_until = await MemberQueries.get_voice_bypass_status(
-                    session, ctx.author.id
-                )
-                return bypass_until is not None and bypass_until > datetime.now(
-                    timezone.utc
-                )
+                bypass_until = await MemberQueries.get_voice_bypass_status(session, ctx.author.id)
+                return bypass_until is not None and bypass_until > datetime.now(timezone.utc)
         except Exception as e:
             logger.error(f"Error in has_active_bypass for user {ctx.author.id}: {e}")
             return False
 
     def has_booster_roles(self, ctx: commands.Context) -> bool:
         """Check if user has booster or invite role."""
-        return any(
-            role.id in [self.BOOSTER_ROLE_ID, self.INVITE_ROLE_ID]
-            for role in ctx.author.roles
-        )
+        return any(role.id in [self.BOOSTER_ROLE_ID, self.INVITE_ROLE_ID] for role in ctx.author.roles)
 
     def has_discord_invite_in_status(self, ctx: commands.Context) -> bool:
         """Check if user has 'discord.gg/zagadka' in their status."""
@@ -92,25 +85,13 @@ class PremiumChecker:
         if ctx.author.activities:
             for activity in ctx.author.activities:
                 # Check activity name
-                if (
-                    hasattr(activity, "name")
-                    and activity.name
-                    and target_text in activity.name.lower()
-                ):
+                if hasattr(activity, "name") and activity.name and target_text in activity.name.lower():
                     return True
                 # Check activity details
-                if (
-                    hasattr(activity, "details")
-                    and activity.details
-                    and target_text in activity.details.lower()
-                ):
+                if hasattr(activity, "details") and activity.details and target_text in activity.details.lower():
                     return True
                 # Check activity state
-                if (
-                    hasattr(activity, "state")
-                    and activity.state
-                    and target_text in activity.state.lower()
-                ):
+                if hasattr(activity, "state") and activity.state and target_text in activity.state.lower():
                     return True
                 # Check custom status (discord.CustomActivity)
                 if isinstance(activity, discord.CustomActivity):
@@ -122,23 +103,11 @@ class PremiumChecker:
             guild_member = ctx.guild.get_member(ctx.author.id)
             if guild_member and guild_member.activities:
                 for activity in guild_member.activities:
-                    if (
-                        hasattr(activity, "name")
-                        and activity.name
-                        and target_text in activity.name.lower()
-                    ):
+                    if hasattr(activity, "name") and activity.name and target_text in activity.name.lower():
                         return True
-                    if (
-                        hasattr(activity, "details")
-                        and activity.details
-                        and target_text in activity.details.lower()
-                    ):
+                    if hasattr(activity, "details") and activity.details and target_text in activity.details.lower():
                         return True
-                    if (
-                        hasattr(activity, "state")
-                        and activity.state
-                        and target_text in activity.state.lower()
-                    ):
+                    if hasattr(activity, "state") and activity.state and target_text in activity.state.lower():
                         return True
                     if isinstance(activity, discord.CustomActivity):
                         if activity.name and target_text in activity.name.lower():
@@ -161,23 +130,17 @@ class PremiumChecker:
                 return False
 
             if not self.has_discord_invite_in_status(ctx):
-                logger.debug(
-                    f"User {ctx.author.id} does not have discord invite in status"
-                )
+                logger.debug(f"User {ctx.author.id} does not have discord invite in status")
                 return False
 
             # Check invite count (with validation like legacy system)
             async with self.bot.get_db() as session:
                 invite_repo = InviteRepository(session)
-                invite_count = await invite_repo.get_member_valid_invite_count(
-                    ctx.author.id, ctx.guild, min_days=7
-                )
+                invite_count = await invite_repo.get_member_valid_invite_count(ctx.author.id, ctx.guild, min_days=7)
                 logger.debug(f"User {ctx.author.id} has {invite_count} valid invites")
                 return invite_count >= 4
         except Exception as e:
-            logger.error(
-                f"Error in has_alternative_bypass_access for user {ctx.author.id}: {e}"
-            )
+            logger.error(f"Error in has_alternative_bypass_access for user {ctx.author.id}: {e}")
             return False
 
     async def debug_alternative_access(self, ctx: commands.Context) -> str:
@@ -187,9 +150,7 @@ class PremiumChecker:
 
         async with self.bot.get_db() as session:
             invite_repo = InviteRepository(session)
-            invite_count = await invite_repo.get_member_valid_invite_count(
-                ctx.author.id, ctx.guild, min_days=7
-            )
+            invite_count = await invite_repo.get_member_valid_invite_count(ctx.author.id, ctx.guild, min_days=7)
 
         # Debug activities
         activities_debug = []
@@ -230,9 +191,7 @@ class PremiumChecker:
                 )
                 if guild_member.activities:
                     for i, activity in enumerate(guild_member.activities):
-                        debug_extra.append(
-                            f"Guild Activity {i}: {type(activity).__name__}"
-                        )
+                        debug_extra.append(f"Guild Activity {i}: {type(activity).__name__}")
                         if hasattr(activity, "name"):
                             debug_extra.append(f"  - name: {activity.name}")
         except Exception as e:
@@ -328,18 +287,14 @@ class PremiumChecker:
             # TIER_2 - Requires any premium role
             if command_tier == CommandTier.TIER_2:
                 if not has_premium:
-                    await checker.message_sender.send_specific_roles_required(
-                        ctx, ["zG50", "zG100", "zG500", "zG1000"]
-                    )
+                    await checker.message_sender.send_specific_roles_required(ctx, ["zG50", "zG100", "zG500", "zG1000"])
                     return False
                 return True
 
             # TIER_3 - Requires high premium role
             if command_tier == CommandTier.TIER_3:
                 if not has_high_premium:
-                    await checker.message_sender.send_specific_roles_required(
-                        ctx, ["zG500", "zG1000"]
-                    )
+                    await checker.message_sender.send_specific_roles_required(ctx, ["zG500", "zG1000"])
                     return False
                 return True
 
@@ -390,11 +345,7 @@ class PremiumChecker:
             voice_channel = ctx.author.voice.channel
             if voice_channel:
                 perms = voice_channel.overwrites_for(ctx.author)
-                is_channel_mod = (
-                    perms
-                    and perms.manage_messages is True
-                    and perms.priority_speaker is not True
-                )
+                is_channel_mod = perms and perms.manage_messages is True and perms.priority_speaker is not True
 
             # TIER_0 - Available to everyone without any requirements
             if command_tier == CommandTier.TIER_0:
@@ -411,9 +362,7 @@ class PremiumChecker:
             if command_tier == CommandTier.TIER_1:
                 if has_premium:
                     return True
-                if (has_booster or is_channel_mod) and (
-                    has_bypass or has_alternative_access
-                ):
+                if (has_booster or is_channel_mod) and (has_bypass or has_alternative_access):
                     return True
                 if has_booster or is_channel_mod:
                     await checker.message_sender.send_bypass_expired(ctx)
@@ -424,27 +373,19 @@ class PremiumChecker:
             # TIER_2 - Requires any premium role
             if command_tier == CommandTier.TIER_2:
                 # Special case for view and live - allow channel mods with active bypass or alternative access
-                if (
-                    command_name in ["view", "live"]
-                    and is_channel_mod
-                    and (has_bypass or has_alternative_access)
-                ):
+                if command_name in ["view", "live"] and is_channel_mod and (has_bypass or has_alternative_access):
                     return True
 
                 # For all TIER_2 commands, require premium unless exception above
                 if not has_premium:
-                    await checker.message_sender.send_specific_roles_required(
-                        ctx, ["zG50", "zG100", "zG500", "zG1000"]
-                    )
+                    await checker.message_sender.send_specific_roles_required(ctx, ["zG50", "zG100", "zG500", "zG1000"])
                     return False
                 return True
 
             # TIER_3 - Requires high premium role
             if command_tier == CommandTier.TIER_3:
                 if not has_high_premium:
-                    await checker.message_sender.send_specific_roles_required(
-                        ctx, ["zG500", "zG1000"]
-                    )
+                    await checker.message_sender.send_specific_roles_required(ctx, ["zG500", "zG1000"])
                     return False
                 return True
 
@@ -471,9 +412,7 @@ class PremiumChecker:
         from datetime import timedelta
 
         async with bot.get_db() as session:
-            return await MemberQueries.extend_voice_bypass(
-                session, member_id, timedelta(hours=hours)
-            )
+            return await MemberQueries.extend_voice_bypass(session, member_id, timedelta(hours=hours))
 
     @staticmethod
     def requires_specific_roles(required_roles: list[str]):
@@ -498,14 +437,10 @@ class PremiumChecker:
             checker = PremiumChecker(ctx.bot)
 
             # Sprawdź czy użytkownik ma którąkolwiek z wymaganych ról
-            has_required_role = any(
-                role.name in required_roles for role in ctx.author.roles
-            )
+            has_required_role = any(role.name in required_roles for role in ctx.author.roles)
 
             if not has_required_role:
-                await checker.message_sender.send_specific_roles_required(
-                    ctx, required_roles
-                )
+                await checker.message_sender.send_specific_roles_required(ctx, required_roles)
                 return False
 
             return True

@@ -8,4 +8,4 @@ This file now serves as a compatibility layer.
 from .message_sender_refactored import MessageSender
 
 # Export for backward compatibility
-__all__ = ['MessageSender']
+__all__ = ["MessageSender"]

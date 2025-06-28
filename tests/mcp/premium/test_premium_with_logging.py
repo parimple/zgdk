@@ -1,9 +1,10 @@
 """Test premium features with detailed logging."""
 
 import asyncio
-import aiohttp
 import json
 from datetime import datetime
+
+import aiohttp
 
 
 def format_embed(embed_data):

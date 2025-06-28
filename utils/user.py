@@ -137,5 +137,3 @@ class TargetHelper:
             "mention": channel.mention,
             "member_count": len(channel.members),
         }
-
-

@@ -1,13 +1,14 @@
 """Domain-specific exceptions."""
 
-from typing import Optional
 from datetime import datetime, timedelta
+from typing import Optional
+
 from .base import BotError
 
 
 class DomainError(BotError):
     """Base exception for domain logic errors."""
-    
+
     def __init__(
         self,
         message: str,
@@ -18,7 +19,7 @@ class DomainError(BotError):
         details = {}
         if domain:
             details["domain"] = domain
-        
+
         super().__init__(
             message=message,
             code="DOMAIN_ERROR",
@@ -29,7 +30,7 @@ class DomainError(BotError):
 
 class BusinessRuleViolation(DomainError):
     """Raised when a business rule is violated."""
-    
+
     def __init__(
         self,
         rule: str,
@@ -47,7 +48,7 @@ class BusinessRuleViolation(DomainError):
 
 class InsufficientBalanceError(DomainError):
     """Raised when user has insufficient balance."""
-    
+
     def __init__(
         self,
         required: int,
@@ -59,7 +60,8 @@ class InsufficientBalanceError(DomainError):
         super().__init__(
             message=f"Insufficient balance: required {required}, available {available}",
             domain="economy",
-            user_message=user_message or f"Niewystarczający balans. Potrzebujesz {required} {currency}, masz {available} {currency}.",
+            user_message=user_message
+            or f"Niewystarczający balans. Potrzebujesz {required} {currency}, masz {available} {currency}.",
         )
         self.required = required
         self.available = available
@@ -68,7 +70,7 @@ class InsufficientBalanceError(DomainError):
 
 class CooldownError(DomainError):
     """Raised when an action is on cooldown."""
-    
+
     def __init__(
         self,
         action: str,
@@ -80,19 +82,19 @@ class CooldownError(DomainError):
         seconds = int(retry_after.total_seconds())
         hours = seconds // 3600
         minutes = (seconds % 3600) // 60
-        
+
         if hours > 0:
             time_str = f"{hours}h {minutes}m"
         else:
             time_str = f"{minutes}m"
-        
+
         details = {
             "action": action,
             "retry_after_seconds": seconds,
         }
         if next_available:
             details["next_available"] = next_available.isoformat()
-        
+
         super().__init__(
             message=f"Action '{action}' on cooldown for {seconds}s",
             domain="cooldowns",
@@ -105,7 +107,7 @@ class CooldownError(DomainError):
 
 class LimitExceededError(DomainError):
     """Raised when a limit is exceeded."""
-    
+
     def __init__(
         self,
         resource: str,
@@ -120,7 +122,7 @@ class LimitExceededError(DomainError):
         }
         if current is not None:
             details["current"] = current
-        
+
         super().__init__(
             message=f"Limit exceeded for {resource}: {limit}",
             domain="limits",

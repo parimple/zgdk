@@ -45,15 +45,11 @@ class PremiumRepository(BaseRepository):
                     }
                 )
 
-            self.logger.debug(
-                f"Found {len(premium_roles)} premium roles for member {member_id}"
-            )
+            self.logger.debug(f"Found {len(premium_roles)} premium roles for member {member_id}")
             return premium_roles
 
         except Exception as e:
-            self.logger.error(
-                f"Error getting premium roles for member {member_id}: {e}"
-            )
+            self.logger.error(f"Error getting premium roles for member {member_id}: {e}")
             raise
 
     async def get_expired_premium_roles(self, current_time: datetime) -> list[dict]:
@@ -102,7 +98,7 @@ class PremiumRepository(BaseRepository):
             if role:
                 # Import the mapping
                 from premium_role_mapping import get_premium_role_discord_id
-                
+
                 role_data = {
                     "role": role,
                     "id": role.id,
@@ -136,37 +132,27 @@ class PremiumRepository(BaseRepository):
             )
 
             await self.create(member_role)
-            self.logger.debug(
-                f"Created member role: member={member_id}, role={role_id}"
-            )
+            self.logger.debug(f"Created member role: member={member_id}, role={role_id}")
             return True
 
         except Exception as e:
             self.logger.error(f"Error creating member role: {e}")
             raise
 
-    async def update_role_expiry(
-        self, member_id: int, role_id: int, new_expiry: datetime
-    ) -> bool:
+    async def update_role_expiry(self, member_id: int, role_id: int, new_expiry: datetime) -> bool:
         """Update role expiry time."""
         try:
-            stmt = select(MemberRole).where(
-                MemberRole.member_id == member_id, MemberRole.role_id == role_id
-            )
+            stmt = select(MemberRole).where(MemberRole.member_id == member_id, MemberRole.role_id == role_id)
             result = await self.session.execute(stmt)
             member_role = result.scalar_one_or_none()
 
             if member_role:
                 member_role.expiration_date = new_expiry
                 await self.session.flush()
-                self.logger.debug(
-                    f"Updated role expiry: member={member_id}, role={role_id}, new_expiry={new_expiry}"
-                )
+                self.logger.debug(f"Updated role expiry: member={member_id}, role={role_id}, new_expiry={new_expiry}")
                 return True
 
-            self.logger.warning(
-                f"Member role not found for expiry update: member={member_id}, role={role_id}"
-            )
+            self.logger.warning(f"Member role not found for expiry update: member={member_id}, role={role_id}")
             return False
 
         except Exception as e:
@@ -178,23 +164,20 @@ class PremiumRepository(BaseRepository):
         try:
             premium_role_names = ["zG50", "zG100", "zG500", "zG1000"]
             current_time = datetime.utcnow()
-            
+
             stmt = (
                 select(func.count(distinct(MemberRole.member_id)))
                 .join(Role, MemberRole.role_id == Role.id)
                 .where(Role.name.in_(premium_role_names))
-                .where(
-                    (MemberRole.expiration_date > current_time) | 
-                    (MemberRole.expiration_date.is_(None))
-                )
+                .where((MemberRole.expiration_date > current_time) | (MemberRole.expiration_date.is_(None)))
             )
-            
+
             result = await self.session.execute(stmt)
             count = result.scalar_one()
-            
+
             self.logger.debug(f"Found {count} unique premium users")
             return count or 0
-            
+
         except Exception as e:
             self.logger.error(f"Error counting unique premium users: {e}")
             # Return a fallback value instead of raising
@@ -203,23 +186,17 @@ class PremiumRepository(BaseRepository):
     async def remove_member_role(self, member_id: int, role_id: int) -> bool:
         """Remove a member role assignment."""
         try:
-            stmt = select(MemberRole).where(
-                MemberRole.member_id == member_id, MemberRole.role_id == role_id
-            )
+            stmt = select(MemberRole).where(MemberRole.member_id == member_id, MemberRole.role_id == role_id)
             result = await self.session.execute(stmt)
             member_role = result.scalar_one_or_none()
 
             if member_role:
                 await self.session.delete(member_role)
                 await self.session.flush()
-                self.logger.debug(
-                    f"Removed member role: member={member_id}, role={role_id}"
-                )
+                self.logger.debug(f"Removed member role: member={member_id}, role={role_id}")
                 return True
 
-            self.logger.warning(
-                f"Member role not found for removal: member={member_id}, role={role_id}"
-            )
+            self.logger.warning(f"Member role not found for removal: member={member_id}, role={role_id}")
             return False
 
         except Exception as e:
@@ -233,9 +210,7 @@ class PaymentRepository(BaseRepository):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(HandledPayment, session)
 
-    async def is_payment_handled(
-        self, payment_name: str, amount: int, paid_at: datetime
-    ) -> bool:
+    async def is_payment_handled(self, payment_name: str, amount: int, paid_at: datetime) -> bool:
         """Check if a payment has already been handled."""
         try:
             stmt = select(HandledPayment).where(
@@ -247,9 +222,7 @@ class PaymentRepository(BaseRepository):
             payment = result.scalar_one_or_none()
 
             handled = payment is not None
-            self.logger.debug(
-                f"Payment handled check: {payment_name}, amount={amount}, handled={handled}"
-            )
+            self.logger.debug(f"Payment handled check: {payment_name}, amount={amount}, handled={handled}")
             return handled
 
         except Exception as e:
@@ -276,18 +249,14 @@ class PaymentRepository(BaseRepository):
             )
 
             await self.create(handled_payment)
-            self.logger.debug(
-                f"Marked payment as handled: {payment_name}, amount={amount}"
-            )
+            self.logger.debug(f"Marked payment as handled: {payment_name}, amount={amount}")
             return True
 
         except Exception as e:
             self.logger.error(f"Error marking payment as handled: {e}")
             raise
 
-    async def get_handled_payments_for_member(
-        self, member_id: int, limit: int = 10
-    ) -> list[dict]:
+    async def get_handled_payments_for_member(self, member_id: int, limit: int = 10) -> list[dict]:
         """Get recent handled payments for a member."""
         try:
             stmt = (
@@ -312,13 +281,9 @@ class PaymentRepository(BaseRepository):
                     }
                 )
 
-            self.logger.debug(
-                f"Found {len(payment_list)} handled payments for member {member_id}"
-            )
+            self.logger.debug(f"Found {len(payment_list)} handled payments for member {member_id}")
             return payment_list
 
         except Exception as e:
-            self.logger.error(
-                f"Error getting handled payments for member {member_id}: {e}"
-            )
+            self.logger.error(f"Error getting handled payments for member {member_id}: {e}")
             raise

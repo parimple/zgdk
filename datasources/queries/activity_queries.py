@@ -33,9 +33,7 @@ async def add_activity_points(
 ) -> None:
     """Add points to member's activity for specific date and type."""
     if date is None:
-        date = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Check if activity record exists for this member, date and type
     activity = await session.get(Activity, (member_id, date, activity_type))
@@ -43,22 +41,16 @@ async def add_activity_points(
     if activity:
         activity.points += points
     else:
-        activity = Activity(
-            member_id=member_id, date=date, activity_type=activity_type, points=points
-        )
+        activity = Activity(member_id=member_id, date=date, activity_type=activity_type, points=points)
         session.add(activity)
 
 
-async def get_member_total_points(
-    session: AsyncSession, member_id: int, days_back: int = 7
-) -> int:
+async def get_member_total_points(session: AsyncSession, member_id: int, days_back: int = 7) -> int:
     """Get total points for a member from last N days."""
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
     result = await session.execute(
-        select(func.sum(Activity.points))
-        .where(Activity.member_id == member_id)
-        .where(Activity.date >= cutoff_date)
+        select(func.sum(Activity.points)).where(Activity.member_id == member_id).where(Activity.date >= cutoff_date)
     )
     total = result.scalar()
     return total or 0
@@ -80,9 +72,7 @@ async def get_top_members_by_points(
     return result.all()
 
 
-async def get_member_ranking_position(
-    session: AsyncSession, member_id: int, days_back: int = 7
-) -> int:
+async def get_member_ranking_position(session: AsyncSession, member_id: int, days_back: int = 7) -> int:
     """Get member's ranking position (1-based)."""
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
@@ -101,13 +91,9 @@ async def get_member_ranking_position(
     return 0  # Not found in ranking
 
 
-async def reset_daily_activity_points(
-    session: AsyncSession, activity_type: str = None
-) -> None:
+async def reset_daily_activity_points(session: AsyncSession, activity_type: str = None) -> None:
     """Reset activity points for today. If activity_type is None, reset all types."""
-    today = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     if activity_type:
         await session.execute(
@@ -117,14 +103,10 @@ async def reset_daily_activity_points(
             .values(points=0)
         )
     else:
-        await session.execute(
-            update(Activity).where(Activity.date == today).values(points=0)
-        )
+        await session.execute(update(Activity).where(Activity.date == today).values(points=0))
 
 
-async def get_member_activity_breakdown(
-    session: AsyncSession, member_id: int, days_back: int = 7
-) -> Dict[str, int]:
+async def get_member_activity_breakdown(session: AsyncSession, member_id: int, days_back: int = 7) -> Dict[str, int]:
     """Get breakdown of points by activity type for a member."""
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
@@ -138,9 +120,7 @@ async def get_member_activity_breakdown(
     return {activity_type: total_points for activity_type, total_points in result.all()}
 
 
-async def cleanup_old_activity_data(
-    session: AsyncSession, days_to_keep: int = 30
-) -> int:
+async def cleanup_old_activity_data(session: AsyncSession, days_to_keep: int = 30) -> int:
     """Remove activity data older than specified days. Returns number of deleted records."""
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
 
@@ -158,9 +138,7 @@ async def get_activity_leaderboard_with_names(
         select(
             Activity.member_id,
             func.sum(Activity.points).label("total_points"),
-            func.row_number()
-            .over(order_by=func.sum(Activity.points).desc())
-            .label("position"),
+            func.row_number().over(order_by=func.sum(Activity.points).desc()).label("position"),
         )
         .where(Activity.date >= cutoff_date)
         .group_by(Activity.member_id)
@@ -170,9 +148,7 @@ async def get_activity_leaderboard_with_names(
     return result.all()
 
 
-async def get_ranking_tier(
-    session: AsyncSession, member_id: int, days_back: int = 7
-) -> str:
+async def get_ranking_tier(session: AsyncSession, member_id: int, days_back: int = 7) -> str:
     """Get ranking tier for member (100, 200, 300, or None)."""
     position = await get_member_ranking_position(session, member_id, days_back)
 

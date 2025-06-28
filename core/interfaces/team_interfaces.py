@@ -75,9 +75,7 @@ class ITeamManagementService(ABC):
         pass
 
     @abstractmethod
-    async def validate_team_ownership(
-        self, session, team_id: int, owner_id: int
-    ) -> bool:
+    async def validate_team_ownership(self, session, team_id: int, owner_id: int) -> bool:
         """
         Validate if a user owns a specific team.
 

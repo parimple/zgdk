@@ -1,6 +1,6 @@
 """Permission related message senders."""
 
-from typing import Optional, Union, List
+from typing import List, Optional, Union
 
 import discord
 from discord.ext import commands
@@ -20,21 +20,21 @@ class PermissionsMessageSender(BaseMessageSender):
         """Send generic no permission message."""
         if reason is None:
             reason = "wykonania tej akcji!"
-        
+
         base_text = f"Nie masz uprawnień do {reason}"
         channel = None
-        
+
         # Get voice channel if user is in one
-        if hasattr(ctx, 'author'):
+        if hasattr(ctx, "author"):
             member = ctx.author
         else:
             member = ctx.user
-            
+
         if member.voice:
             channel = member.voice.channel
-        
+
         description = self.build_description(base_text, ctx, channel)
-        
+
         return await self.send_error(
             ctx=ctx,
             message=description,
@@ -50,21 +50,21 @@ class PermissionsMessageSender(BaseMessageSender):
     ) -> Optional[discord.Message]:
         """Send no moderator permission message."""
         base_text = "Nie jesteś moderatorem tego kanału!"
-        
+
         if not channel:
             # Try to get channel from context
-            member = ctx.author if hasattr(ctx, 'author') else ctx.user
+            member = ctx.author if hasattr(ctx, "author") else ctx.user
             if member.voice:
                 channel = member.voice.channel
-        
+
         description = self.build_description(base_text, ctx, channel)
-        
+
         embed = self._create_embed(
             title="🚫 Brak uprawnień moderatora",
             description=description,
             color="error",
         )
-        
+
         # Add tips
         embed.add_field(
             name="💡 Wskazówka",
@@ -76,7 +76,7 @@ class PermissionsMessageSender(BaseMessageSender):
             ),
             inline=False,
         )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
 
     async def send_permission_update(
@@ -92,32 +92,29 @@ class PermissionsMessageSender(BaseMessageSender):
         # Use original formatting
         mention_str = user.mention if isinstance(user, discord.Member) else "wszystkich"
         value_str = "+" if enabled else "-"
-        
+
         # Map permission flag to command name
         permission_map = {
             "speak": "speak",
-            "view_channel": "view", 
+            "view_channel": "view",
             "connect": "connect",
             "send_messages": "text",
             "stream": "live",
-            "manage_messages": "mod"
+            "manage_messages": "mod",
         }
         command_name = permission_map.get(permission, permission)
-        
+
         base_text = f"Ustawiono `{command_name}` na `{value_str}` dla {mention_str}"
-        
+
         # Create embed with channel info - don't override user color for voice commands
-        embed = self._create_embed(
-            description=base_text,
-            ctx=ctx
-        )
-        
+        embed = self._create_embed(description=base_text, ctx=ctx)
+
         # Add channel info to description
         if channel:
             _, channel_text = self._get_premium_text(ctx, channel)
             if channel_text:
                 embed.description = f"{embed.description}\n{channel_text}"
-        
+
         # Send with reply=True to match original behavior
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral, reply=True)
 
@@ -145,10 +142,7 @@ class PermissionsMessageSender(BaseMessageSender):
         """Send permission reset confirmation."""
         return await self.send_success(
             ctx=ctx,
-            message=(
-                f"Wszystkie uprawnienia dla {user.mention} "
-                f"na kanale {channel.mention} zostały zresetowane."
-            ),
+            message=(f"Wszystkie uprawnienia dla {user.mention} " f"na kanale {channel.mention} zostały zresetowane."),
             title="🔄 Uprawnienia zresetowane",
             ephemeral=ephemeral,
         )
@@ -175,8 +169,7 @@ class PermissionsMessageSender(BaseMessageSender):
         return await self.send_error(
             ctx=ctx,
             message=(
-                "Nie możesz modyfikować uprawnień innych moderatorów!\n"
-                "Tylko właściciel kanału może to zrobić."
+                "Nie możesz modyfikować uprawnień innych moderatorów!\n" "Tylko właściciel kanału może to zrobić."
             ),
             title="❌ Brak uprawnień",
             ephemeral=ephemeral,
@@ -206,13 +199,10 @@ class PermissionsMessageSender(BaseMessageSender):
         """Send channel moderator update message."""
         action = "dodany jako moderator" if is_add else "usunięty z moderatorów"
         emoji = "➕" if is_add else "➖"
-        
+
         return await self.send_success(
             ctx=ctx,
-            message=(
-                f"{emoji} {user.mention} został {action} "
-                f"kanału {channel.mention}"
-            ),
+            message=(f"{emoji} {user.mention} został {action} " f"kanału {channel.mention}"),
             title="👮 Moderator zaktualizowany",
             ephemeral=ephemeral,
         )
@@ -225,26 +215,26 @@ class PermissionsMessageSender(BaseMessageSender):
     ) -> Optional[discord.Message]:
         """Send moderator limit exceeded message."""
         base_text = f"Osiągnięto limit {max_mods} moderatorów dla tego kanału!"
-        
+
         # Get voice channel
-        member = ctx.author if hasattr(ctx, 'author') else ctx.user
+        member = ctx.author if hasattr(ctx, "author") else ctx.user
         channel = member.voice.channel if member.voice else None
-        
+
         description = self.build_description(base_text, ctx, channel)
-        
+
         embed = self._create_embed(
             title="❌ Limit moderatorów",
             description=description,
             color="error",
         )
-        
+
         # Add premium info
         embed.add_field(
             name="💎 Premium",
             value="Z rolą premium możesz mieć więcej moderatorów!",
             inline=False,
         )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
 
     async def send_mod_info(
@@ -260,7 +250,7 @@ class PermissionsMessageSender(BaseMessageSender):
             title=f"👮 Moderatorzy kanału {channel.name}",
             color="info",
         )
-        
+
         if mods:
             mod_list = "\n".join([f"• {mod.mention}" for mod in mods])
             embed.add_field(
@@ -270,7 +260,7 @@ class PermissionsMessageSender(BaseMessageSender):
             )
         else:
             embed.description = "Ten kanał nie ma moderatorów."
-        
+
         # Add available commands
         embed.add_field(
             name="📝 Zarządzanie moderatorami",
@@ -281,5 +271,5 @@ class PermissionsMessageSender(BaseMessageSender):
             ),
             inline=False,
         )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)

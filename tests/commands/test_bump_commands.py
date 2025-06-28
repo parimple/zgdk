@@ -4,9 +4,10 @@ Tests for bump commands.
 
 import unittest
 from datetime import datetime, timedelta
+
 from tests.base.test_base import CommandTestCase
 from tests.config import TEST_USER_ID
-from tests.utils.assertions import assert_user_mentioned, assert_has_timestamp
+from tests.utils.assertions import assert_has_timestamp, assert_user_mentioned
 
 
 class TestBumpCommands(CommandTestCase):

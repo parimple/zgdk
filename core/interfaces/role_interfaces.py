@@ -19,21 +19,19 @@ class IRoleRepository(IRepository):
         pass
 
     @abstractmethod
-    async def get_expired_roles(self, current_time: datetime, role_type: Optional[str] = None, role_ids: Optional[List[int]] = None) -> list[dict]:
+    async def get_expired_roles(
+        self, current_time: datetime, role_type: Optional[str] = None, role_ids: Optional[List[int]] = None
+    ) -> list[dict]:
         """Get all roles that have expired."""
         pass
 
     @abstractmethod
-    async def get_role_by_member_and_type(
-        self, member_id: int, role_type: str
-    ) -> Optional[dict]:
+    async def get_role_by_member_and_type(self, member_id: int, role_type: str) -> Optional[dict]:
         """Get specific role type for a member."""
         pass
 
     @abstractmethod
-    async def extend_role_expiry(
-        self, member_id: int, role_id: int, new_expiry: datetime
-    ) -> bool:
+    async def extend_role_expiry(self, member_id: int, role_id: int, new_expiry: datetime) -> bool:
         """Extend role expiry time."""
         pass
 
@@ -97,9 +95,7 @@ class IRoleRepository(IRepository):
         pass
 
     @abstractmethod
-    async def update_role_expiration_date_direct(
-        self, member_id: int, role_id: int, new_expiry: datetime
-    ) -> bool:
+    async def update_role_expiration_date_direct(self, member_id: int, role_id: int, new_expiry: datetime) -> bool:
         """Update role expiration date directly to a specific datetime."""
         pass
 
@@ -134,21 +130,19 @@ class IRoleService(IService):
         pass
 
     @abstractmethod
-    async def remove_role_from_member(
-        self, member: discord.Member, role: discord.Role
-    ) -> bool:
+    async def remove_role_from_member(self, member: discord.Member, role: discord.Role) -> bool:
         """Remove a role from a member."""
         pass
 
     @abstractmethod
-    async def process_expired_roles(self, role_type: Optional[str] = None, role_ids: Optional[List[int]] = None) -> list[dict]:
+    async def process_expired_roles(
+        self, role_type: Optional[str] = None, role_ids: Optional[List[int]] = None
+    ) -> list[dict]:
         """Process all expired roles and remove them."""
         pass
 
     @abstractmethod
-    async def extend_role_duration(
-        self, member_id: int, role_id: int, additional_time: int
-    ) -> bool:
+    async def extend_role_duration(self, member_id: int, role_id: int, additional_time: int) -> bool:
         """Extend role duration by specified time in seconds."""
         pass
 
@@ -202,9 +196,7 @@ class IRoleService(IService):
         pass
 
     @abstractmethod
-    async def update_role_expiration_date_direct(
-        self, member_id: int, role_id: int, new_expiry: datetime
-    ) -> bool:
+    async def update_role_expiration_date_direct(self, member_id: int, role_id: int, new_expiry: datetime) -> bool:
         """Update role expiration date directly to a specific datetime."""
         pass
 

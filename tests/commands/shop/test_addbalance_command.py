@@ -1,9 +1,10 @@
 """
 Tests for addbalance command execution
 """
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Mock Discord before any imports
 sys.modules['discord'] = MagicMock()
@@ -13,9 +14,11 @@ sys.modules['utils.permissions'] = MagicMock()
 sys.modules['core.interfaces.member_interfaces'] = MagicMock()
 sys.modules['datasources.queries'] = MagicMock()
 
+import types
+
 # Mock utils.premium but allow PaymentData import
 from unittest.mock import MagicMock as MockModule
-import types
+
 mock_premium = types.ModuleType('utils.premium')
 
 # Create a real PaymentData class for testing

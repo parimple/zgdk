@@ -2,8 +2,9 @@
 """Test ranking command through MCP."""
 
 import asyncio
-import subprocess
 import json
+import subprocess
+
 
 async def test_ranking():
     """Test the ranking command."""

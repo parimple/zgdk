@@ -3,6 +3,7 @@ Base configuration and constants for SQLAlchemy models.
 """
 
 from datetime import datetime, timezone
+
 from sqlalchemy.orm import declarative_base
 
 # SQLAlchemy Base

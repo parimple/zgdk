@@ -17,7 +17,7 @@ class BumpChecker:
     def get_service_emoji(self, service: str) -> str:
         """Get emoji for a service from config"""
         emojis = self.bot.config.get("emojis", {})
-        
+
         # Fallback to unicode if custom emoji not found
         fallbacks = {
             "disboard": "🇩",
@@ -26,7 +26,7 @@ class BumpChecker:
             "discordservers": "📊",
             "dsme": "📈",
         }
-        
+
         return emojis.get(service, fallbacks.get(service, ""))
 
     @staticmethod
@@ -82,9 +82,7 @@ class BumpChecker:
             from core.repositories import NotificationRepository
 
             notification_repo = NotificationRepository(session)
-            log = await notification_repo.get_notification_log(
-                check_id, service
-            )
+            log = await notification_repo.get_notification_log(check_id, service)
 
             if not log or now - log.sent_at > timedelta(hours=cooldown):
                 return {

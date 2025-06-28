@@ -56,9 +56,7 @@ class MessageSenderService(BaseService, IMessageSender):
 
             elif hasattr(target, "send"):
                 # Regular channel or user
-                message = await target.send(
-                    embed=embed, allowed_mentions=allowed_mentions
-                )
+                message = await target.send(embed=embed, allowed_mentions=allowed_mentions)
 
                 self._log_operation(
                     "send_embed",
@@ -123,9 +121,7 @@ class MessageSenderService(BaseService, IMessageSender):
 
             elif hasattr(target, "send"):
                 # Regular channel or user
-                message = await target.send(
-                    content=content, allowed_mentions=allowed_mentions
-                )
+                message = await target.send(content=content, allowed_mentions=allowed_mentions)
 
                 self._log_operation(
                     "send_text",
@@ -207,9 +203,7 @@ class MessageSenderService(BaseService, IMessageSender):
         try:
             # Check if it's an interaction context
             if hasattr(ctx, "interaction") and ctx.interaction:
-                await self.reply_to_interaction(
-                    ctx.interaction, embed=embed, content=content
-                )
+                await self.reply_to_interaction(ctx.interaction, embed=embed, content=content)
                 return await ctx.interaction.original_response()
 
             # Regular text command context

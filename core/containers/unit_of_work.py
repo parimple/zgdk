@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.interfaces.base import IUnitOfWork
 from core.repositories.member_repository import (
     ActivityRepository,
-    InviteRepository, 
+    InviteRepository,
     MemberRepository,
     ModerationRepository,
 )
@@ -22,7 +22,7 @@ class UnitOfWork(IUnitOfWork):
         self.session = session
         self.logger = logging.getLogger(self.__class__.__name__)
         self._transaction_started = False
-        
+
         # Initialize repositories with shared session
         self.members = MemberRepository(session)
         self.activities = ActivityRepository(session)

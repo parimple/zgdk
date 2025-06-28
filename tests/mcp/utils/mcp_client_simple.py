@@ -5,10 +5,11 @@ This is a simpler approach that doesn't require the full MCP protocol.
 """
 
 import asyncio
-import aiohttp
 import json
 import sys
 from typing import Any, Dict, Optional
+
+import aiohttp
 
 
 class SimpleMCPClient:

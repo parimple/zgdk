@@ -5,10 +5,9 @@ from typing import Optional, Tuple
 import discord
 from sqlalchemy import text
 
-from datasources.queries import MemberQueries, RoleQueries
 from core.services.currency_service import CurrencyService
+from datasources.queries import MemberQueries, RoleQueries
 from utils.refund import calculate_refund
-
 
 # Currency constant
 CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
@@ -55,30 +54,20 @@ class RoleSaleManager:
             async with self.bot.get_db() as session:
                 try:
                     # Check if user has the role in database
-                    db_role = await RoleQueries.get_member_role(
-                        session, member.id, role.id
-                    )
+                    db_role = await RoleQueries.get_member_role(session, member.id, role.id)
                     if not db_role:
                         return False, "Nie posiadasz tej roli w bazie danych.", None
 
                     # Calculate refund
-                    refund_amount = calculate_refund(
-                        db_role.expiration_date, role_config["price"], role.name
-                    )
+                    refund_amount = calculate_refund(db_role.expiration_date, role_config["price"], role.name)
 
                     # Remove role from Discord first
                     await member.remove_roles(role)
-                    logger.info(
-                        f"[ROLE_SALE] Removed role {role.name} from Discord for {member.display_name}"
-                    )
+                    logger.info(f"[ROLE_SALE] Removed role {role.name} from Discord for {member.display_name}")
 
                     # Remove role from database
-                    delete_sql = text(
-                        "DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
-                    )
-                    result = await session.execute(
-                        delete_sql, {"member_id": member.id, "role_id": role.id}
-                    )
+                    delete_sql = text("DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
+                    result = await session.execute(delete_sql, {"member_id": member.id, "role_id": role.id})
 
                     if result.rowcount == 0:
                         # Rollback Discord change if database operation failed
@@ -87,9 +76,7 @@ class RoleSaleManager:
 
                     # Add refund to wallet
                     if refund_amount > 0:
-                        await MemberQueries.add_to_wallet_balance(
-                            session, member.id, refund_amount
-                        )
+                        await MemberQueries.add_to_wallet_balance(session, member.id, refund_amount)
 
                     # Remove premium role privileges
                     await self._remove_premium_privileges(session, member.id)

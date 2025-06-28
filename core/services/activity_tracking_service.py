@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple
 import discord
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.interfaces.activity_interfaces import IActivityTrackingService, ActivityType
+from core.interfaces.activity_interfaces import ActivityType, IActivityTrackingService
 from core.services.base_service import BaseService
 from datasources.queries import (
     add_activity_points,
@@ -60,16 +60,14 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
         self.guild = guild
         self._log_operation("set_guild", guild_id=guild.id if guild else None)
 
-    async def add_voice_activity(
-        self, session: AsyncSession, member_id: int, is_with_others: bool = True
-    ) -> None:
+    async def add_voice_activity(self, session: AsyncSession, member_id: int, is_with_others: bool = True) -> None:
         """Add voice activity points for a member."""
         try:
             base_points = self.VOICE_WITH_OTHERS if is_with_others else self.VOICE_ALONE
             time_bonus = self.get_time_bonus()
             total_points = base_points + time_bonus
             await self._add_points(session, member_id, ActivityType.VOICE, total_points)
-            
+
             self._log_operation(
                 "add_voice_activity",
                 member_id=member_id,
@@ -87,9 +85,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
                 is_with_others=is_with_others,
             )
 
-    async def add_text_activity(
-        self, session: AsyncSession, member_id: int, message_content: str = ""
-    ) -> None:
+    async def add_text_activity(self, session: AsyncSession, member_id: int, message_content: str = "") -> None:
         """Add text activity points for a member based on word count."""
         try:
             if not message_content:
@@ -103,7 +99,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
 
             if points > 0:
                 await self._add_points(session, member_id, ActivityType.TEXT, points)
-                
+
                 self._log_operation(
                     "add_text_activity",
                     member_id=member_id,
@@ -120,15 +116,11 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
                 message_length=len(message_content) if message_content else 0,
             )
 
-    async def add_promotion_activity(
-        self, session: AsyncSession, member_id: int
-    ) -> None:
+    async def add_promotion_activity(self, session: AsyncSession, member_id: int) -> None:
         """Add promotion activity points for a member."""
         try:
-            await self._add_points(
-                session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS
-            )
-            
+            await self._add_points(session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS)
+
             self._log_operation(
                 "add_promotion_activity",
                 member_id=member_id,
@@ -138,13 +130,11 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
         except Exception as e:
             self._log_error("add_promotion_activity", e, member_id=member_id)
 
-    async def add_bonus_activity(
-        self, session: AsyncSession, member_id: int, points: int
-    ) -> None:
+    async def add_bonus_activity(self, session: AsyncSession, member_id: int, points: int) -> None:
         """Add bonus activity points for a member."""
         try:
             await self._add_points(session, member_id, ActivityType.BONUS, points)
-            
+
             self._log_operation(
                 "add_bonus_activity",
                 member_id=member_id,
@@ -159,9 +149,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
                 points=points,
             )
 
-    async def _add_points(
-        self, session: AsyncSession, member_id: int, activity_type: str, points: int
-    ) -> None:
+    async def _add_points(self, session: AsyncSession, member_id: int, activity_type: str, points: int) -> None:
         """Internal method to add points."""
         try:
             # Ensure member exists in database
@@ -172,15 +160,11 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
             self.logger.debug(f"Added {points} {activity_type} points to member {member_id}")
 
         except Exception as e:
-            self.logger.error(
-                f"Failed to add {points} {activity_type} points to member {member_id}: {e}"
-            )
+            self.logger.error(f"Failed to add {points} {activity_type} points to member {member_id}: {e}")
             await session.rollback()
             raise
 
-    async def get_member_stats(
-        self, session: AsyncSession, member_id: int, days_back: int = 7
-    ) -> Dict[str, any]:
+    async def get_member_stats(self, session: AsyncSession, member_id: int, days_back: int = 7) -> Dict[str, any]:
         """Get comprehensive stats for a member."""
         try:
             total_points = await get_member_total_points(session, member_id, days_back)
@@ -228,7 +212,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
         """Get leaderboard with member_id, points, and position."""
         try:
             leaderboard = await get_activity_leaderboard_with_names(session, limit, days_back)
-            
+
             self._log_operation(
                 "get_leaderboard",
                 limit=limit,
@@ -256,10 +240,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
             for activity in member.activities:
                 # Check custom status
                 if isinstance(activity, discord.CustomActivity):
-                    if activity.name and any(
-                        keyword in activity.name.lower()
-                        for keyword in self.promotion_keywords
-                    ):
+                    if activity.name and any(keyword in activity.name.lower() for keyword in self.promotion_keywords):
                         self._log_operation(
                             "promotion_status_found",
                             member_id=member.id,
@@ -270,10 +251,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
 
                 # Check activity name
                 if hasattr(activity, "name") and activity.name:
-                    if any(
-                        keyword in activity.name.lower()
-                        for keyword in self.promotion_keywords
-                    ):
+                    if any(keyword in activity.name.lower() for keyword in self.promotion_keywords):
                         self._log_operation(
                             "promotion_status_found",
                             member_id=member.id,
@@ -284,10 +262,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
 
                 # Check activity details
                 if hasattr(activity, "details") and activity.details:
-                    if any(
-                        keyword in activity.details.lower()
-                        for keyword in self.promotion_keywords
-                    ):
+                    if any(keyword in activity.details.lower() for keyword in self.promotion_keywords):
                         self._log_operation(
                             "promotion_status_found",
                             member_id=member.id,
@@ -298,10 +273,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
 
                 # Check activity state
                 if hasattr(activity, "state") and activity.state:
-                    if any(
-                        keyword in activity.state.lower()
-                        for keyword in self.promotion_keywords
-                    ):
+                    if any(keyword in activity.state.lower() for keyword in self.promotion_keywords):
                         self._log_operation(
                             "promotion_status_found",
                             member_id=member.id,
@@ -327,10 +299,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
                 if isinstance(activity, discord.CustomActivity):
                     if activity.name and ".gg/" in activity.name.lower():
                         # Check if it's NOT our server
-                        if not any(
-                            keyword in activity.name.lower()
-                            for keyword in self.promotion_keywords
-                        ):
+                        if not any(keyword in activity.name.lower() for keyword in self.promotion_keywords):
                             self._log_operation(
                                 "antipromo_status_found",
                                 member_id=member.id,
@@ -342,10 +311,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
                 # Check activity name
                 if hasattr(activity, "name") and activity.name:
                     if ".gg/" in activity.name.lower():
-                        if not any(
-                            keyword in activity.name.lower()
-                            for keyword in self.promotion_keywords
-                        ):
+                        if not any(keyword in activity.name.lower() for keyword in self.promotion_keywords):
                             self._log_operation(
                                 "antipromo_status_found",
                                 member_id=member.id,
@@ -360,48 +326,33 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
             self._log_error("check_member_antipromo_status", e, member_id=member.id)
             return False
 
-    async def track_message_activity(
-        self, member_id: int, content: str, channel_id: int
-    ) -> None:
+    async def track_message_activity(self, member_id: int, content: str, channel_id: int) -> None:
         """Track message activity for points."""
         try:
             # Get session from unit of work
             if not self.unit_of_work:
-                self._log_error(
-                    "track_message_activity",
-                    ValueError("No unit of work available"),
-                    member_id=member_id
-                )
+                self._log_error("track_message_activity", ValueError("No unit of work available"), member_id=member_id)
                 return
-                
+
             async with self.unit_of_work as uow:
                 # Use the existing add_text_activity method
-                await self.add_text_activity(
-                    uow.session,
-                    member_id,
-                    content
-                )
+                await self.add_text_activity(uow.session, member_id, content)
                 await uow.commit()
-                
+
                 # Log the operation
                 word_count = len(content.split())
                 points = min(word_count * self.TEXT_MESSAGE, self.MAX_MESSAGE_POINTS)
-                
+
                 self._log_operation(
                     "track_message_activity",
                     member_id=member_id,
                     points=points,
                     word_count=word_count,
-                    channel_id=channel_id
+                    channel_id=channel_id,
                 )
-                
+
         except Exception as e:
-            self._log_error(
-                "track_message_activity",
-                e,
-                member_id=member_id,
-                channel_id=channel_id
-            )
+            self._log_error("track_message_activity", e, member_id=member_id, channel_id=channel_id)
 
     def format_leaderboard_embed(
         self,
@@ -413,11 +364,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
         """Format leaderboard as Discord embed."""
         try:
             # Use author's color if provided, otherwise blue
-            color = (
-                author_color
-                if author_color and author_color.value != 0
-                else discord.Color.blue()
-            )
+            color = author_color if author_color and author_color.value != 0 else discord.Color.blue()
 
             embed = discord.Embed(
                 title=f"🏆 Ranking Aktywności zaGadki",
@@ -505,9 +452,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
                 color=discord.Color.red(),
             )
 
-    def format_member_stats_embed(
-        self, stats: Dict[str, any], member: discord.Member
-    ) -> discord.Embed:
+    def format_member_stats_embed(self, stats: Dict[str, any], member: discord.Member) -> discord.Embed:
         """Format member stats as Discord embed."""
         try:
             # Use member's color if available, otherwise blue
@@ -520,9 +465,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
             )
 
             # Main stats
-            position_text = (
-                f"**#{stats['position']}**" if stats["position"] > 0 else "Brak rankingu"
-            )
+            position_text = f"**#{stats['position']}**" if stats["position"] > 0 else "Brak rankingu"
             embed.add_field(name="🏆 Pozycja w rankingu", value=position_text, inline=True)
 
             embed.add_field(name="🏅 Ranga", value=f"**{stats['tier']}**", inline=True)
@@ -600,16 +543,12 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
                 color=discord.Color.red(),
             )
 
-    async def has_daily_activity_today(
-        self, session: AsyncSession, member_id: int, activity_type: str
-    ) -> bool:
+    async def has_daily_activity_today(self, session: AsyncSession, member_id: int, activity_type: str) -> bool:
         """Check if member already got points for this activity type today."""
         try:
-            today_breakdown = await get_member_activity_breakdown(
-                session, member_id, days_back=1
-            )
+            today_breakdown = await get_member_activity_breakdown(session, member_id, days_back=1)
             has_activity = activity_type in today_breakdown and today_breakdown[activity_type] > 0
-            
+
             self._log_operation(
                 "has_daily_activity_today",
                 member_id=member_id,
@@ -639,7 +578,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
 
             points = self.VOICE_WITH_OTHERS if is_with_others else self.VOICE_ALONE
             await self._add_points(session, member_id, ActivityType.VOICE, points)
-            
+
             self._log_operation(
                 "add_voice_activity_daily",
                 member_id=member_id,
@@ -655,21 +594,15 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
                 is_with_others=is_with_others,
             )
 
-    async def add_promotion_activity_daily(
-        self, session: AsyncSession, member_id: int
-    ) -> None:
+    async def add_promotion_activity_daily(self, session: AsyncSession, member_id: int) -> None:
         """Add promotion activity points once per day."""
         try:
             # Check if user already got promotion points today
-            if await self.has_daily_activity_today(
-                session, member_id, ActivityType.PROMOTION
-            ):
+            if await self.has_daily_activity_today(session, member_id, ActivityType.PROMOTION):
                 return
 
-            await self._add_points(
-                session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS
-            )
-            
+            await self._add_points(session, member_id, ActivityType.PROMOTION, self.PROMOTION_STATUS)
+
             self._log_operation(
                 "add_promotion_activity_daily",
                 member_id=member_id,
@@ -716,9 +649,7 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
             self._log_error("get_time_bonus", e)
             return 0
 
-    async def track_voice_activity(
-        self, member_id: int, channel_id: int, is_with_others: bool = True
-    ) -> None:
+    async def track_voice_activity(self, member_id: int, channel_id: int, is_with_others: bool = True) -> None:
         """Track voice activity for a member in a specific channel."""
         try:
             # Get session from unit of work
@@ -727,33 +658,21 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
                     "track_voice_activity",
                     ValueError("No unit of work available"),
                     member_id=member_id,
-                    channel_id=channel_id
+                    channel_id=channel_id,
                 )
                 return
-                
+
             async with self.unit_of_work as uow:
                 # Use the existing add_voice_activity method
-                await self.add_voice_activity(
-                    uow.session,
-                    member_id,
-                    is_with_others
-                )
+                await self.add_voice_activity(uow.session, member_id, is_with_others)
                 await uow.commit()
-                
+
                 self._log_operation(
-                    "track_voice_activity",
-                    member_id=member_id,
-                    channel_id=channel_id,
-                    is_with_others=is_with_others
+                    "track_voice_activity", member_id=member_id, channel_id=channel_id, is_with_others=is_with_others
                 )
-                
+
         except Exception as e:
-            self._log_error(
-                "track_voice_activity",
-                e,
-                member_id=member_id,
-                channel_id=channel_id
-            )
+            self._log_error("track_voice_activity", e, member_id=member_id, channel_id=channel_id)
 
     async def track_promotion_activity(self, member_id: int) -> None:
         """Track promotion activity for a member."""
@@ -761,74 +680,52 @@ class ActivityTrackingService(BaseService, IActivityTrackingService):
             # Get session from unit of work
             if not self.unit_of_work:
                 self._log_error(
-                    "track_promotion_activity",
-                    ValueError("No unit of work available"),
-                    member_id=member_id
+                    "track_promotion_activity", ValueError("No unit of work available"), member_id=member_id
                 )
                 return
-                
+
             async with self.unit_of_work as uow:
                 # Use the existing add_promotion_activity method
-                await self.add_promotion_activity(
-                    uow.session,
-                    member_id
-                )
+                await self.add_promotion_activity(uow.session, member_id)
                 await uow.commit()
-                
-                self._log_operation(
-                    "track_promotion_activity",
-                    member_id=member_id,
-                    points=self.PROMOTION_STATUS
-                )
-                
-        except Exception as e:
-            self._log_error(
-                "track_promotion_activity",
-                e,
-                member_id=member_id
-            )
 
-    async def get_member_activity_summary(
-        self, member_id: int, days_back: int = 7
-    ) -> Dict[str, any]:
+                self._log_operation("track_promotion_activity", member_id=member_id, points=self.PROMOTION_STATUS)
+
+        except Exception as e:
+            self._log_error("track_promotion_activity", e, member_id=member_id)
+
+    async def get_member_activity_summary(self, member_id: int, days_back: int = 7) -> Dict[str, any]:
         """Get a summary of member's activity for profile display."""
         try:
             # Get session from unit of work
             if not self.unit_of_work:
                 self._log_error(
-                    "get_member_activity_summary",
-                    ValueError("No unit of work available"),
-                    member_id=member_id
+                    "get_member_activity_summary", ValueError("No unit of work available"), member_id=member_id
                 )
                 return None
-                
+
             async with self.unit_of_work as uow:
                 # Use get_member_stats method
                 stats = await self.get_member_stats(uow.session, member_id, days_back)
-                
+
                 # Format for profile display
                 summary = {
-                    'total_points': stats.get('total_points', 0),
-                    'ranking_position': stats.get('position', 0),
-                    'tier': stats.get('tier', 'No Rank'),
-                    'days_included': days_back,
-                    'breakdown': stats.get('breakdown', {})
+                    "total_points": stats.get("total_points", 0),
+                    "ranking_position": stats.get("position", 0),
+                    "tier": stats.get("tier", "No Rank"),
+                    "days_included": days_back,
+                    "breakdown": stats.get("breakdown", {}),
                 }
-                
+
                 self._log_operation(
                     "get_member_activity_summary",
                     member_id=member_id,
                     days_back=days_back,
-                    total_points=summary['total_points']
+                    total_points=summary["total_points"],
                 )
-                
+
                 return summary
-                
+
         except Exception as e:
-            self._log_error(
-                "get_member_activity_summary",
-                e,
-                member_id=member_id,
-                days_back=days_back
-            )
+            self._log_error("get_member_activity_summary", e, member_id=member_id, days_back=days_back)
             return None

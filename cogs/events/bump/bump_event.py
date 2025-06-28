@@ -11,21 +11,8 @@ from discord.ext import commands
 from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 
-from .constants import (
-    DISCADIA,
-    DISBOARD,
-    DISCORDSERVERS,
-    DSME,
-    DZIK,
-    SERVICE_COOLDOWNS,
-)
-from .handlers import (
-    DiscadiaHandler,
-    DisboardHandler,
-    DiscordServersHandler,
-    DSMEHandler,
-    DzikHandler,
-)
+from .constants import DISBOARD, DISCADIA, DISCORDSERVERS, DSME, DZIK, SERVICE_COOLDOWNS
+from .handlers import DisboardHandler, DiscadiaHandler, DiscordServersHandler, DSMEHandler, DzikHandler
 from .status import BumpStatusHandler
 
 logger = logging.getLogger(__name__)
@@ -37,7 +24,7 @@ class OnBumpEvent(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.message_sender = MessageSender(bot)
-        
+
         # Initialize handlers
         self.disboard_handler = DisboardHandler(bot, self.message_sender)
         self.dzik_handler = DzikHandler(bot, self.message_sender)
@@ -61,10 +48,7 @@ class OnBumpEvent(commands.Cog):
             return False
 
         # Handle /bump command from Disboard
-        if (
-            message.author.id == DISBOARD["id"]
-            and message.interaction.name == "bump"
-        ):
+        if message.author.id == DISBOARD["id"] and message.interaction.name == "bump":
             await self.disboard_handler.handle(message)
             return True
 
@@ -122,7 +106,7 @@ class OnBumpEvent(commands.Cog):
         # Skip if no guild
         if not message.guild:
             return
-        
+
         # Debug logging for DISBOARD
         if message.author.id == DISBOARD["id"]:
             logger.info(f"[BUMP DEBUG] DISBOARD message detected!")
@@ -131,17 +115,19 @@ class OnBumpEvent(commands.Cog):
             if message.embeds:
                 logger.info(f"[BUMP DEBUG] Embeds: {len(message.embeds)}")
                 for i, embed in enumerate(message.embeds):
-                    logger.info(f"[BUMP DEBUG] Embed {i}: Title={embed.title}, Description={embed.description[:100] if embed.description else 'None'}")
-            
+                    logger.info(
+                        f"[BUMP DEBUG] Embed {i}: Title={embed.title}, Description={embed.description[:100] if embed.description else 'None'}"
+                    )
+
         # Log all bot messages on bump channel - check if channel exists
-        if message.channel and hasattr(message.channel, 'id'):
+        if message.channel and hasattr(message.channel, "id"):
             if message.channel.id == 1326322441383051385 and message.author.bot:
                 logger.info(f"Bot message on bump channel from {message.author.name} ({message.author.id})")
                 if message.content:
                     logger.info(f"Content preview: {message.content[:100]}")
                 if message.embeds:
                     logger.info(f"Has {len(message.embeds)} embeds")
-            
+
         # Ignore messages from non-bots
         if not message.author.bot:
             return
@@ -152,35 +138,37 @@ class OnBumpEvent(commands.Cog):
             DZIK["id"]: "DZIK",
             DISCADIA["id"]: "DISCADIA",
             DISCORDSERVERS["id"]: "DISCORDSERVERS",
-            DSME["id"]: "DSME"
+            DSME["id"]: "DSME",
         }
-        
+
         if message.author.id in bump_bots:
             bot_name = bump_bots[message.author.id]
             logger.info(f"{bot_name} message detected! Embeds: {len(message.embeds)}, Content: {message.content[:100]}")
             if message.embeds:
                 embed = message.embeds[0]
-                logger.info(f"{bot_name} embed - Title: {embed.title}, Description: {embed.description[:200] if embed.description else 'None'}")
+                logger.info(
+                    f"{bot_name} embed - Title: {embed.title}, Description: {embed.description[:200] if embed.description else 'None'}"
+                )
             if message.interaction:
-                logger.info(f"{bot_name} interaction - Name: {message.interaction.name}, User: {message.interaction.user}")
+                logger.info(
+                    f"{bot_name} interaction - Name: {message.interaction.name}, User: {message.interaction.user}"
+                )
 
         try:
             # Try different handlers based on message type
             if await self.handle_slash_command(message):
                 return
-            
+
             if await self.handle_webhook_message(message):
                 return
-                
+
             if await self.handle_regular_message(message):
                 return
 
         except Exception as e:
             logger.error(f"Error handling bump message: {e}", exc_info=True)
 
-    async def send_bump_marketing(
-        self, channel: discord.TextChannel, service: str, user: discord.Member
-    ) -> None:
+    async def send_bump_marketing(self, channel: discord.TextChannel, service: str, user: discord.Member) -> None:
         """Send marketing message after bump."""
         marketing_messages = {
             "disboard": (
@@ -222,12 +210,9 @@ class OnBumpEvent(commands.Cog):
                 color="info",
                 description=marketing_messages[service],
             )
-            embed.set_author(
-                name=user.display_name,
-                icon_url=user.display_avatar.url if user.display_avatar else None
-            )
+            embed.set_author(name=user.display_name, icon_url=user.display_avatar.url if user.display_avatar else None)
             embed.set_footer(text="Czas T pozwala korzystać z komend głosowych!")
-            
+
             await channel.send(embed=embed)
 
     @commands.hybrid_command(name="bump", description="Sprawdź status swoich bumpów")
@@ -237,13 +222,13 @@ class OnBumpEvent(commands.Cog):
         class FakeResponse:
             def __init__(self, ctx):
                 self.ctx = ctx
-                
+
             async def defer(self):
                 pass
-                
+
             async def send_message(self, **kwargs):
                 return await self.ctx.send(**kwargs)
-        
+
         class FakeInteraction:
             def __init__(self, ctx):
                 self.user = ctx.author
@@ -252,7 +237,7 @@ class OnBumpEvent(commands.Cog):
                 self.followup = self
                 self.response = FakeResponse(ctx)
                 self._ctx = ctx
-                
+
             async def send(self, **kwargs):
                 return await self._ctx.send(**kwargs)
 
@@ -265,10 +250,10 @@ class OnBumpEvent(commands.Cog):
         # Get bypass role IDs from config
         nitro_role_name = "♵"  # nitro booster
         server_booster_name = "♼"  # server booster
-        
+
         nitro_role = discord.utils.get(after.guild.roles, name=nitro_role_name)
         booster_role = discord.utils.get(after.guild.roles, name=server_booster_name)
-        
+
         if not nitro_role and not booster_role:
             return
 
@@ -276,27 +261,25 @@ class OnBumpEvent(commands.Cog):
         before_roles = set(before.roles)
         after_roles = set(after.roles)
         new_roles = after_roles - before_roles
-        
+
         for role in new_roles:
             if role == nitro_role:
                 await self.send_booster_notification(after, "Nitro Booster", 12)
             elif role == booster_role:
                 await self.send_booster_notification(after, "Server Booster", 6)
 
-    async def send_booster_notification(
-        self, member: discord.Member, booster_type: str, hours: int
-    ) -> None:
+    async def send_booster_notification(self, member: discord.Member, booster_type: str, hours: int) -> None:
         """Send notification when user becomes a booster."""
         # Add bypass time
         async with self.bot.get_db() as session:
             db_member = await MemberQueries.get_or_add_member(session, member.id)
-            
+
             current_time = datetime.now(timezone.utc)
             if db_member.bypass_expiry and db_member.bypass_expiry > current_time:
                 db_member.bypass_expiry = db_member.bypass_expiry + timedelta(hours=hours)
             else:
                 db_member.bypass_expiry = current_time + timedelta(hours=hours)
-            
+
             await session.commit()
 
         # Send notification
@@ -304,15 +287,13 @@ class OnBumpEvent(commands.Cog):
             color="success",
             title=f"🎉 Dziękujemy za zostanie {booster_type}!",
             description=(
-                f"Otrzymujesz **{hours}T** czasu bypass!\n"
-                f"Możesz teraz korzystać z komend głosowych bez ograniczeń."
+                f"Otrzymujesz **{hours}T** czasu bypass!\n" f"Możesz teraz korzystać z komend głosowych bez ograniczeń."
             ),
         )
         embed.set_author(
-            name=member.display_name,
-            icon_url=member.display_avatar.url if member.display_avatar else None
+            name=member.display_name, icon_url=member.display_avatar.url if member.display_avatar else None
         )
-        
+
         # Try to send in a suitable channel
         if hasattr(self.bot, "config"):
             channel_id = self.bot.config.get("channels", {}).get("lounge")

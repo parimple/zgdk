@@ -4,12 +4,7 @@ Payment-related SQLAlchemy models.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import (
-    BigInteger,
-    DateTime,
-    Integer,
-    String,
-)
+from sqlalchemy import BigInteger, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base

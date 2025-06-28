@@ -1,12 +1,13 @@
 """CLI interface for Agent Builder."""
 
 import asyncio
-import click
 from pathlib import Path
 from typing import Optional
 
-from .factory import AgentFactory
+import click
+
 from .core import AgentConfig
+from .factory import AgentFactory
 
 
 @click.group()
@@ -16,15 +17,13 @@ def cli():
 
 
 @cli.command()
-@click.argument("template", type=click.Choice([
-    "moderation", "analytics", "test-runner", "optimizer", "custom"
-]))
+@click.argument("template", type=click.Choice(["moderation", "analytics", "test-runner", "optimizer", "custom"]))
 @click.option("--name", help="Agent name (for custom agents)")
 @click.option("--purpose", help="Agent purpose (for custom agents)")
 def create(template: str, name: Optional[str], purpose: Optional[str]):
     """Create a new agent from template."""
     factory = AgentFactory()
-    
+
     if template == "moderation":
         config = factory.template.moderation_agent()
     elif template == "analytics":
@@ -38,9 +37,9 @@ def create(template: str, name: Optional[str], purpose: Optional[str]):
             click.echo("Error: --name and --purpose required for custom agents")
             return
         config = factory.template.custom_agent(name, purpose)
-    
+
     agent_id = factory.register_agent(config)
-    
+
     click.echo(f"✅ Agent '{config.name}' created successfully!")
     click.echo(f"   ID: {agent_id}")
     click.echo(f"   Files generated:")
@@ -55,19 +54,19 @@ def list():
     """List all registered agents."""
     factory = AgentFactory()
     agents = factory.list_agents()
-    
+
     if not agents:
         click.echo("No agents registered")
         return
-        
+
     click.echo("Registered Agents:")
     click.echo("-" * 60)
-    
+
     for agent in agents:
         status_icon = "🟢" if agent["status"] == "running" else "⚪"
         click.echo(f"{status_icon} {agent['name']} ({agent['id']})")
         click.echo(f"   Purpose: {agent['purpose']}")
-        
+
         if "metrics" in agent:
             metrics = agent["metrics"]["performance"]
             click.echo(f"   Performance: {metrics['success_rate']:.1f}% success rate")
@@ -78,6 +77,7 @@ def list():
 @click.argument("agent_id")
 def start(agent_id: str):
     """Start an agent."""
+
     async def _start():
         factory = AgentFactory()
         try:
@@ -85,7 +85,7 @@ def start(agent_id: str):
             click.echo(f"✅ Agent '{agent_id}' started successfully!")
         except Exception as e:
             click.echo(f"❌ Failed to start agent: {e}")
-            
+
     asyncio.run(_start())
 
 
@@ -93,11 +93,12 @@ def start(agent_id: str):
 @click.argument("agent_id")
 def stop(agent_id: str):
     """Stop a running agent."""
+
     async def _stop():
         factory = AgentFactory()
         await factory.stop_agent(agent_id)
         click.echo(f"✅ Agent '{agent_id}' stopped")
-        
+
     asyncio.run(_stop())
 
 
@@ -106,20 +107,16 @@ def stop(agent_id: str):
 def test(agent_id: str):
     """Run tests for an agent."""
     import subprocess
-    
+
     test_file = f"tests/agents/test_{agent_id}_agent.py"
-    
+
     if not Path(test_file).exists():
         click.echo(f"❌ Test file not found: {test_file}")
         return
-        
+
     click.echo(f"Running tests for '{agent_id}'...")
-    result = subprocess.run(
-        ["pytest", test_file, "-v"],
-        capture_output=True,
-        text=True
-    )
-    
+    result = subprocess.run(["pytest", test_file, "-v"], capture_output=True, text=True)
+
     click.echo(result.stdout)
     if result.returncode != 0:
         click.echo(result.stderr)
@@ -131,18 +128,18 @@ def deploy(agent_id: str):
     """Deploy agent to Kubernetes."""
     k8s_dir = Path(f"k8s/agents")
     files = list(k8s_dir.glob(f"{agent_id}-*.yaml"))
-    
+
     if not files:
         click.echo(f"❌ No Kubernetes files found for '{agent_id}'")
         return
-        
+
     click.echo(f"Deploying '{agent_id}' to Kubernetes...")
-    
+
     for file in files:
         click.echo(f"Applying {file.name}...")
         # In real implementation, would run kubectl apply
         click.echo(f"kubectl apply -f {file}")
-        
+
     click.echo(f"✅ Agent '{agent_id}' deployed!")
 
 
@@ -151,32 +148,29 @@ def quickstart():
     """Interactive agent creation wizard."""
     click.echo("🚀 Agent Builder Quickstart")
     click.echo("-" * 40)
-    
+
     name = click.prompt("Agent name")
     purpose = click.prompt("Agent purpose")
-    
+
     # Workflow steps
     click.echo("\nDefine workflow steps (enter empty step to finish):")
     workflow = []
     step_num = 1
-    
+
     while True:
         step_name = click.prompt(f"Step {step_num} name", default="", show_default=False)
         if not step_name:
             break
-            
+
         step_action = click.prompt(f"Step {step_num} action")
-        workflow.append({
-            "name": step_name,
-            "action": step_action
-        })
+        workflow.append({"name": step_name, "action": step_action})
         step_num += 1
-        
+
     # Create agent
     factory = AgentFactory()
     config = factory.create_custom_agent_config(name, purpose, workflow)
     agent_id = factory.register_agent(config)
-    
+
     click.echo(f"\n✅ Agent '{name}' created successfully!")
     click.echo(f"   ID: {agent_id}")
     click.echo(f"\nNext steps:")

@@ -1,15 +1,15 @@
 """Tests for refactored admin info module."""
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
+import pytest
 from discord.ext import commands
 
+from cogs.commands.info.admin.admin_info import AdminInfoCog
 from cogs.commands.info.admin.helpers import InviteInfo, get_member_active_mutes
 from cogs.commands.info.admin.views import InviteListView
-from cogs.commands.info.admin.admin_info import AdminInfoCog
 
 
 class TestAdminHelpers:

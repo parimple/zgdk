@@ -1,9 +1,10 @@
 """Test premium system after fixing role IDs."""
 
 import asyncio
-import aiohttp
 import json
 from datetime import datetime
+
+import aiohttp
 
 
 async def test_premium_fixed():

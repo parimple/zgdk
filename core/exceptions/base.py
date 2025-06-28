@@ -1,11 +1,11 @@
 """Base exceptions for the bot."""
 
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 
 class BotError(Exception):
     """Base exception for all bot errors."""
-    
+
     def __init__(
         self,
         message: str,
@@ -14,7 +14,7 @@ class BotError(Exception):
         user_message: Optional[str] = None,
     ):
         """Initialize bot error.
-        
+
         Args:
             message: Error message for logging
             code: Error code for identification
@@ -29,7 +29,7 @@ class BotError(Exception):
 
 class ValidationError(BotError):
     """Raised when input validation fails."""
-    
+
     def __init__(
         self,
         message: str,
@@ -43,7 +43,7 @@ class ValidationError(BotError):
             details["field"] = field
         if value is not None:
             details["value"] = str(value)
-        
+
         super().__init__(
             message=message,
             code="VALIDATION_ERROR",
@@ -54,7 +54,7 @@ class ValidationError(BotError):
 
 class NotFoundError(BotError):
     """Raised when a requested resource is not found."""
-    
+
     def __init__(
         self,
         resource: str,
@@ -65,7 +65,7 @@ class NotFoundError(BotError):
         details = {"resource": resource}
         if identifier is not None:
             details["identifier"] = str(identifier)
-        
+
         super().__init__(
             message=f"{resource} not found",
             code="NOT_FOUND",
@@ -76,7 +76,7 @@ class NotFoundError(BotError):
 
 class PermissionError(BotError):
     """Raised when user lacks required permissions."""
-    
+
     def __init__(
         self,
         action: str,
@@ -87,7 +87,7 @@ class PermissionError(BotError):
         details = {"action": action}
         if required_permission:
             details["required_permission"] = required_permission
-        
+
         super().__init__(
             message=f"Permission denied for action: {action}",
             code="PERMISSION_DENIED",
@@ -98,7 +98,7 @@ class PermissionError(BotError):
 
 class ConfigurationError(BotError):
     """Raised when there's an issue with bot configuration."""
-    
+
     def __init__(
         self,
         config_key: str,
@@ -116,7 +116,7 @@ class ConfigurationError(BotError):
 
 class ExternalServiceError(BotError):
     """Raised when an external service fails."""
-    
+
     def __init__(
         self,
         service: str,
@@ -128,7 +128,7 @@ class ExternalServiceError(BotError):
         details = {"service": service}
         if status_code:
             details["status_code"] = status_code
-        
+
         super().__init__(
             message=message or f"External service error: {service}",
             code="EXTERNAL_SERVICE_ERROR",
@@ -139,19 +139,23 @@ class ExternalServiceError(BotError):
 
 class ServiceException(BotError):
     """Raised when a service operation fails."""
+
     pass
 
 
 class TransactionException(BotError):
     """Raised when a database transaction fails."""
+
     pass
 
 
 class ValidationException(ValidationError):
     """Alias for ValidationError for backward compatibility."""
+
     pass
 
 
 class ResourceNotFoundException(NotFoundError):
     """Alias for NotFoundError for backward compatibility."""
+
     pass

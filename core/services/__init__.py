@@ -19,41 +19,29 @@ from .team_management_service import TeamManagementService
 __all__ = [
     # Base service
     "BaseService",
-    
     # Activity tracking
     "ActivityTrackingService",
-    
     # Cache
     "CacheService",
-    
     # Currency
     "CurrencyService",
-    
     # Embed building
     "EmbedBuilderService",
-    
     # Member management
     "MemberService",
-    
     # Message handling
     "MessageFormatterService",
     "MessageSenderService",
-    
     # Notifications
     "NotificationService",
-    
     # Payment processing
     "PaymentProcessorService",
-    
     # Permissions
     "PermissionService",
-    
     # Premium
     "PremiumService",
-    
     # Role management
     "RoleService",
-    
     # Team management
     "TeamManagementService",
 ]

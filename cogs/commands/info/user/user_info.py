@@ -4,8 +4,8 @@ import logging
 
 from discord.ext import commands
 
-from .profile_commands import ProfileCommands
 from .bypass_commands import BypassCommands
+from .profile_commands import ProfileCommands
 
 logger = logging.getLogger(__name__)
 

@@ -2,9 +2,10 @@
 Tests for giveawayss command - randomly selecting messages from a channel
 Professional test implementation with proper fixtures and mocking
 """
-import pytest
-from unittest.mock import patch, call
 import random
+from unittest.mock import call, patch
+
+import pytest
 
 
 async def test_giveawayss_success_current_channel(giveaway_cog, mock_ctx, mock_regular_messages, mock_channel_with_history):

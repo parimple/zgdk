@@ -25,16 +25,12 @@ class OnCommandEvent(commands.Cog):
         )
 
     @commands.Cog.listener()
-    async def on_command_error(
-        self, ctx: commands.Context, exception: commands.CommandError
-    ):
+    async def on_command_error(self, ctx: commands.Context, exception: commands.CommandError):
         """On Command Error Event"""
         if isinstance(exception, commands.CommandNotFound):
             return
         elif isinstance(exception, commands.MemberNotFound):
-            logger.warning(
-                f"MemberNotFound error for command '{ctx.command}': {exception}"
-            )
+            logger.warning(f"MemberNotFound error for command '{ctx.command}': {exception}")
             await ctx.send(f"Nie znaleziono użytkownika: {exception.argument}")
             return
 

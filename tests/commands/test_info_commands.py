@@ -3,6 +3,7 @@ Tests for info commands.
 """
 
 import unittest
+
 from tests.base.test_base import CommandTestCase
 from tests.config import TEST_USER_ID
 

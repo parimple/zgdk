@@ -1,9 +1,10 @@
 """
 Simple tests for shop command without complex mocking
 """
-import pytest
-from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 async def test_simple_shop_mock():

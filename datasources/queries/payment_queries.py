@@ -46,21 +46,14 @@ class HandledPaymentQueries:
         payment_type: Optional[str] = None,
     ) -> List[HandledPayment]:
         """Get last 'limit' payments of specific type. If payment_type is None, return all types"""
-        query = (
-            select(HandledPayment)
-            .order_by(HandledPayment.id.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+        query = select(HandledPayment).order_by(HandledPayment.id.desc()).offset(offset).limit(limit)
         if payment_type is not None:
             query = query.where(HandledPayment.payment_type == payment_type)
         result = await session.execute(query)
         return result.scalars().all()
 
     @staticmethod
-    async def add_member_id_to_payment(
-        session: AsyncSession, payment_id: int, member_id: int
-    ) -> None:
+    async def add_member_id_to_payment(session: AsyncSession, payment_id: int, member_id: int) -> None:
         """Add member_id to an existing payment"""
         payment = await session.get(HandledPayment, payment_id)
         if payment is not None:
@@ -69,16 +62,12 @@ class HandledPaymentQueries:
             logger.error("Payment with id %s not found", payment_id)
 
     @staticmethod
-    async def get_payment_by_id(
-        session: AsyncSession, payment_id: int
-    ) -> Optional[HandledPayment]:
+    async def get_payment_by_id(session: AsyncSession, payment_id: int) -> Optional[HandledPayment]:
         """Get a payment by its ID"""
         return await session.get(HandledPayment, payment_id)
 
     @staticmethod
-    async def get_payment_by_name_and_amount(
-        session: AsyncSession, name: str, amount: int
-    ) -> Optional[HandledPayment]:
+    async def get_payment_by_name_and_amount(session: AsyncSession, name: str, amount: int) -> Optional[HandledPayment]:
         """Get the last payment by name and amount"""
         result = await session.execute(
             select(HandledPayment)

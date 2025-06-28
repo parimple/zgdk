@@ -4,20 +4,14 @@ from typing import Any
 
 import discord
 
-from core.interfaces.messaging_interfaces import (
-    IEmbedBuilder,
-    IMessageSender,
-    INotificationService,
-)
+from core.interfaces.messaging_interfaces import IEmbedBuilder, IMessageSender, INotificationService
 from core.services.base_service import BaseService
 
 
 class NotificationService(BaseService, INotificationService):
     """Service for sending specialized notifications to Discord."""
 
-    def __init__(
-        self, embed_builder: IEmbedBuilder, message_sender: IMessageSender, **kwargs
-    ):
+    def __init__(self, embed_builder: IEmbedBuilder, message_sender: IMessageSender, **kwargs):
         super().__init__(**kwargs)
         self.embed_builder = embed_builder
         self.message_sender = message_sender
@@ -26,9 +20,7 @@ class NotificationService(BaseService, INotificationService):
         """Validate notification operation."""
         return True
 
-    async def send_permission_update(
-        self, ctx: Any, target: discord.Member, permission: str, new_value: bool
-    ) -> None:
+    async def send_permission_update(self, ctx: Any, target: discord.Member, permission: str, new_value: bool) -> None:
         """Send permission update notification."""
         try:
             action = "przyznano" if new_value else "odebrano"
@@ -82,19 +74,13 @@ class NotificationService(BaseService, INotificationService):
             self._log_operation(
                 "send_no_permission",
                 required_permission=required_permission,
-                user_id=getattr(
-                    ctx.author if hasattr(ctx, "author") else ctx.user, "id", None
-                ),
+                user_id=getattr(ctx.author if hasattr(ctx, "author") else ctx.user, "id", None),
             )
 
         except Exception as e:
-            self._log_error(
-                "send_no_permission", e, required_permission=required_permission
-            )
+            self._log_error("send_no_permission", e, required_permission=required_permission)
 
-    async def send_voice_channel_info(
-        self, ctx: Any, channel: discord.VoiceChannel, **info: Any
-    ) -> None:
+    async def send_voice_channel_info(self, ctx: Any, channel: discord.VoiceChannel, **info: Any) -> None:
         """Send voice channel information."""
         try:
             embed = self.embed_builder.create_voice_info_embed(channel, **info)
@@ -109,9 +95,7 @@ class NotificationService(BaseService, INotificationService):
         except Exception as e:
             self._log_error("send_voice_channel_info", e, channel_id=channel.id)
 
-    async def send_role_update(
-        self, ctx: Any, target: discord.Member, role: discord.Role, added: bool
-    ) -> None:
+    async def send_role_update(self, ctx: Any, target: discord.Member, role: discord.Role, added: bool) -> None:
         """Send role update notification."""
         try:
             action = "przyznano" if added else "odebrano"
@@ -137,9 +121,7 @@ class NotificationService(BaseService, INotificationService):
                 role_id=role.id,
             )
 
-    async def send_voice_not_connected(
-        self, ctx: Any, target: discord.Member = None
-    ) -> None:
+    async def send_voice_not_connected(self, ctx: Any, target: discord.Member = None) -> None:
         """Send notification that user is not connected to voice channel."""
         try:
             if target:
@@ -176,17 +158,13 @@ class NotificationService(BaseService, INotificationService):
             self._log_operation(
                 "send_premium_required",
                 feature=feature,
-                user_id=getattr(
-                    ctx.author if hasattr(ctx, "author") else ctx.user, "id", None
-                ),
+                user_id=getattr(ctx.author if hasattr(ctx, "author") else ctx.user, "id", None),
             )
 
         except Exception as e:
             self._log_error("send_premium_required", e, feature=feature)
 
-    async def send_operation_success(
-        self, ctx: Any, operation: str, details: str = None
-    ) -> None:
+    async def send_operation_success(self, ctx: Any, operation: str, details: str = None) -> None:
         """Send generic operation success notification."""
         try:
             description = f"Operacja **{operation}** została wykonana pomyślnie."
@@ -204,9 +182,7 @@ class NotificationService(BaseService, INotificationService):
         except Exception as e:
             self._log_error("send_operation_success", e, operation=operation)
 
-    async def send_operation_error(
-        self, ctx: Any, operation: str, error_details: str = None
-    ) -> None:
+    async def send_operation_error(self, ctx: Any, operation: str, error_details: str = None) -> None:
         """Send generic operation error notification."""
         try:
             description = f"Operacja **{operation}** nie powiodła się."

@@ -17,9 +17,7 @@ class ChannelPermissionManager:
         self.bot = bot
         self.logger = logging.getLogger(__name__)
 
-    def get_default_permission_overwrites(
-        self, guild: discord.Guild, owner: Member
-    ) -> dict:
+    def get_default_permission_overwrites(self, guild: discord.Guild, owner: Member) -> dict:
         """
         Get the default permission overwrites for a voice channel.
 
@@ -49,7 +47,7 @@ class ChannelPermissionManager:
                 manage_messages=True,
             ),
         }
-        
+
         # Add mute role overwrites if they exist
         if mute_roles.get("stream_off"):
             overwrites[mute_roles["stream_off"]] = PermissionOverwrite(stream=False)
@@ -59,12 +57,10 @@ class ChannelPermissionManager:
             overwrites[mute_roles["attach_files_off"]] = PermissionOverwrite(
                 attach_files=False, embed_links=False, external_emojis=False
             )
-            
+
         return overwrites
 
-    async def reset_user_permissions(
-        self, channel: discord.VoiceChannel, owner: Member, target: Member
-    ):
+    async def reset_user_permissions(self, channel: discord.VoiceChannel, owner: Member, target: Member):
         """
         Reset permissions for a specific user.
 
@@ -78,13 +74,9 @@ class ChannelPermissionManager:
 
         # Remove permissions from database
         async with self.bot.get_db() as session:
-            await ChannelPermissionQueries.remove_permission(
-                session, owner.id, target.id
-            )
+            await ChannelPermissionQueries.remove_permission(session, owner.id, target.id)
 
-    async def reset_channel_permissions(
-        self, channel: discord.VoiceChannel, owner: Member
-    ):
+    async def reset_channel_permissions(self, channel: discord.VoiceChannel, owner: Member):
         """
         Reset all channel permissions to default.
 
@@ -93,9 +85,7 @@ class ChannelPermissionManager:
             owner: The channel owner
         """
         # Get default permission overwrites
-        permission_overwrites = self.get_default_permission_overwrites(
-            channel.guild, owner
-        )
+        permission_overwrites = self.get_default_permission_overwrites(channel.guild, owner)
 
         # Reset channel permissions
         await channel.edit(overwrites=permission_overwrites)
@@ -120,39 +110,27 @@ class ChannelPermissionManager:
         """
         remaining_overwrites = {}
         async with self.bot.get_db() as session:
-            member_permissions = (
-                await ChannelPermissionQueries.get_permissions_for_member(
-                    session, member_id, limit=95
-                )
-            )
-            self.logger.info(
-                f"Found {len(member_permissions)} permissions in database for member {member_id}"
-            )
+            member_permissions = await ChannelPermissionQueries.get_permissions_for_member(session, member_id, limit=95)
+            self.logger.info(f"Found {len(member_permissions)} permissions in database for member {member_id}")
 
         for permission in member_permissions:
             allow_permissions = discord.Permissions(permission.allow_permissions_value)
             deny_permissions = discord.Permissions(permission.deny_permissions_value)
-            overwrite = PermissionOverwrite.from_pair(
-                allow_permissions, deny_permissions
-            )
+            overwrite = PermissionOverwrite.from_pair(allow_permissions, deny_permissions)
             self.logger.info(
                 f"Processing permission for target {permission.target_id}: "
                 f"allow={permission.allow_permissions_value}, deny={permission.deny_permissions_value}"
             )
 
             # Convert target_id to appropriate Discord object
-            target = guild.get_member(permission.target_id) or guild.get_role(
-                permission.target_id
-            )
+            target = guild.get_member(permission.target_id) or guild.get_role(permission.target_id)
             if target:
                 if target in permission_overwrites:
                     # If target already exists in main permissions, add new permissions to it
                     for key, value in overwrite._values.items():
                         if value is not None:
                             setattr(permission_overwrites[target], key, value)
-                            self.logger.info(
-                                f"Updated existing permission {key}={value} for {target}"
-                            )
+                            self.logger.info(f"Updated existing permission {key}={value} for {target}")
                 else:
                     # If target doesn't exist in main permissions, add to remaining
                     remaining_overwrites[target] = overwrite
@@ -160,9 +138,7 @@ class ChannelPermissionManager:
 
         return remaining_overwrites
 
-    async def add_remaining_overwrites(
-        self, channel: discord.VoiceChannel, remaining_overwrites: dict
-    ):
+    async def add_remaining_overwrites(self, channel: discord.VoiceChannel, remaining_overwrites: dict):
         """
         Add remaining overwrites to the channel.
 
@@ -174,8 +150,6 @@ class ChannelPermissionManager:
             try:
                 await channel.set_permissions(target, overwrite=overwrite)
             except discord.errors.NotFound:
-                self.logger.warning(
-                    f"Target {target.id} not found while adding remaining overwrites"
-                )
+                self.logger.warning(f"Target {target.id} not found while adding remaining overwrites")
             except Exception as e:
                 self.logger.error(f"Error adding overwrite for {target.id}: {str(e)}")

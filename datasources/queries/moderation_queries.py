@@ -33,9 +33,7 @@ class ModerationLogQueries:
         # Oblicz datę wygaśnięcia jeśli podano czas trwania
         expires_at = None
         if duration_seconds is not None:
-            expires_at = datetime.now(timezone.utc) + timedelta(
-                seconds=duration_seconds
-            )
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
 
         # Stwórz wpis w logu
         moderation_log = ModerationLog(
@@ -54,9 +52,7 @@ class ModerationLogQueries:
         return moderation_log
 
     @staticmethod
-    async def get_user_mute_history(
-        session: AsyncSession, user_id: int, limit: int = 50
-    ) -> List[ModerationLog]:
+    async def get_user_mute_history(session: AsyncSession, user_id: int, limit: int = 50) -> List[ModerationLog]:
         """Pobiera historię mute'ów użytkownika"""
         result = await session.execute(
             select(ModerationLog)
@@ -69,9 +65,7 @@ class ModerationLogQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def get_user_mute_count(
-        session: AsyncSession, user_id: int, days_back: int = 30
-    ) -> int:
+    async def get_user_mute_count(session: AsyncSession, user_id: int, days_back: int = 30) -> int:
         """Zlicza ile razy użytkownik był mutowany w ostatnich X dniach"""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
@@ -110,9 +104,7 @@ class ModerationLogQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def get_mute_statistics(
-        session: AsyncSession, days_back: int = 30
-    ) -> Dict[str, any]:
+    async def get_mute_statistics(session: AsyncSession, days_back: int = 30) -> Dict[str, any]:
         """Pobiera statystyki mute'ów z ostatnich X dni"""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
@@ -166,9 +158,7 @@ class ModerationLogQueries:
         }
 
     @staticmethod
-    async def get_recent_actions(
-        session: AsyncSession, limit: int = 20
-    ) -> List[ModerationLog]:
+    async def get_recent_actions(session: AsyncSession, limit: int = 20) -> List[ModerationLog]:
         """Pobiera ostatnie akcje moderatorskie"""
         result = await session.execute(
             select(ModerationLog)

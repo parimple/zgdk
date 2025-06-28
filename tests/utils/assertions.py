@@ -3,7 +3,7 @@ Custom assertions for Discord bot testing.
 """
 
 import re
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 def assert_user_mentioned(response: Dict[str, Any], user_id: str) -> bool:

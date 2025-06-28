@@ -1,12 +1,11 @@
 """
 Test assign_payment command functionality without importing actual cog
 """
-import pytest
 from unittest.mock import MagicMock
 
-from tests.data.test_constants import (
-    TEST_USER_1_ID, WALLET_BALANCES, SAMPLE_PAYMENT_DATA
-)
+import pytest
+
+from tests.data.test_constants import SAMPLE_PAYMENT_DATA, TEST_USER_1_ID, WALLET_BALANCES
 
 
 def test_assign_payment_logic():

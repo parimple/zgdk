@@ -1,8 +1,9 @@
 """
 Simple tests for assign_payment command - testing core logic without complex imports
 """
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 
 
 @pytest.mark.asyncio

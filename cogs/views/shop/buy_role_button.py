@@ -18,9 +18,7 @@ class BuyRoleButton(discord.ui.Button):
         """
         kwargs.setdefault("style", discord.ButtonStyle.primary)
         kwargs.setdefault("label", "Kup rolę")
-        kwargs.setdefault(
-            "emoji", bot.config.get("emojis", {}).get("mastercard", "💳") if bot else "💳"
-        )
+        kwargs.setdefault("emoji", bot.config.get("emojis", {}).get("mastercard", "💳") if bot else "💳")
         super().__init__(**kwargs)
         self.bot = bot
         self.member = member
@@ -41,8 +39,6 @@ class BuyRoleButton(discord.ui.Button):
         # Otherwise use the standard shop command (from shop view)
         else:
             if self.role_name:
-                await interaction.client.get_command("shop")(
-                    interaction, role_name=self.role_name
-                )
+                await interaction.client.get_command("shop")(interaction, role_name=self.role_name)
             else:
                 await interaction.client.get_command("shop")(interaction)

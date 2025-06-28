@@ -3,15 +3,15 @@ Base test class for Discord bot testing.
 """
 
 import asyncio
-import unittest
-from typing import Dict, Any, Optional, List
-import sys
 import os
+import sys
+import unittest
+from typing import Any, Dict, List, Optional
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from tests.config import API_BASE_URL, CONNECTION_TIMEOUT, COMMAND_TIMEOUT
+from tests.config import API_BASE_URL, COMMAND_TIMEOUT, CONNECTION_TIMEOUT
 
 
 class BaseDiscordTest(unittest.TestCase):

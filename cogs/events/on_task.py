@@ -11,14 +11,10 @@ import discord
 from discord.ext import commands, tasks
 
 from cogs.commands.info.admin_info import remove_premium_role_mod_permissions
+from core.interfaces.member_interfaces import IMemberService, IModerationService
 from core.repositories import ModerationRepository, NotificationRepository, RoleRepository
-from core.interfaces.member_interfaces import (
-    IMemberService,
-    IModerationService,
-)
 from core.services.currency_service import CurrencyService
 from utils.role_manager import RoleManager
-
 
 # Currency constant
 CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
@@ -81,10 +77,7 @@ class OnTaskEvent(commands.Cog):
 
                 for member_role_db in all_premium_member_roles:
                     # Ensure expiration_date is not None before comparison
-                    if (
-                        member_role_db.expiration_date
-                        and now < member_role_db.expiration_date <= expiration_threshold
-                    ):
+                    if member_role_db.expiration_date and now < member_role_db.expiration_date <= expiration_threshold:
                         member = self.bot.guild.get_member(member_role_db.member_id)
                         if not member:
                             logger.debug(
@@ -101,22 +94,13 @@ class OnTaskEvent(commands.Cog):
 
                         if guild_role in member.roles:
                             notification_repo = NotificationRepository(session)
-                            notification_log = (
-                                await notification_repo.get_notification_log(
-                                    member.id, "premium_role_expiry"
-                                )
+                            notification_log = await notification_repo.get_notification_log(
+                                member.id, "premium_role_expiry"
                             )
-                            if (
-                                not notification_log
-                                or now - notification_log.sent_at > timedelta(hours=24)
-                            ):
+                            if not notification_log or now - notification_log.sent_at > timedelta(hours=24):
                                 # Pass the MemberRole and discord.Role objects to the notification handler
-                                await self.notify_premium_expiry(
-                                    member, member_role_db, guild_role
-                                )
-                                await notification_repo.add_or_update_notification_log(
-                                    member.id, "premium_role_expiry"
-                                )
+                                await self.notify_premium_expiry(member, member_role_db, guild_role)
+                                await notification_repo.add_or_update_notification_log(member.id, "premium_role_expiry")
                                 premium_notifications_sent += 1
                                 changes_made = True
                 await session.commit()
@@ -125,9 +109,7 @@ class OnTaskEvent(commands.Cog):
             if premium_notifications_sent > 0:
                 log_start = True
                 log_completed = True
-                logger.info(
-                    f"Sent {premium_notifications_sent} premium expiry notifications"
-                )
+                logger.info(f"Sent {premium_notifications_sent} premium expiry notifications")
 
             # Sprawdź i usuń wygasłe role premium
             premium_removed = await self.role_manager.check_expired_roles(
@@ -161,32 +143,28 @@ class OnTaskEvent(commands.Cog):
     ):
         """Wysyła sformatowane powiadomienie do użytkownika."""
         try:
-            if (
-                title_prefix
-            ):  # If title_prefix is provided, use the "prefix: role_name" structure
+            if title_prefix:  # If title_prefix is provided, use the "prefix: role_name" structure
                 full_message = f"{title_prefix}: {role_name}\n{reason_details}"
             else:  # Otherwise, assume reason_details contains the full main message
                 full_message = reason_details
 
             if include_renewal_info:
                 role_price_info = next(
-                    (
-                        r
-                        for r in self.bot.config["premium_roles"]
-                        if r["name"] == role_name
-                    ),
+                    (r for r in self.bot.config["premium_roles"] if r["name"] == role_name),
                     None,
                 )
                 if role_price_info and "price" in role_price_info:
                     price = role_price_info["price"]
                     price_pln = CurrencyService().g_to_pln(price)
-                    full_message += f"\nAby ją {renewal_action_verb}, potrzebujesz {price}{CURRENCY_UNIT} ({price_pln} PLN)."
-                    full_message += f"\nZasil swoje konto{renewal_payment_action_prefix}: {self.bot.config['donate_url']}"
+                    full_message += (
+                        f"\nAby ją {renewal_action_verb}, potrzebujesz {price}{CURRENCY_UNIT} ({price_pln} PLN)."
+                    )
+                    full_message += (
+                        f"\nZasil swoje konto{renewal_payment_action_prefix}: {self.bot.config['donate_url']}"
+                    )
                     full_message += "\nWpisując **TYLKO** swoje id w polu - Twój nick."
                 else:
-                    full_message += (
-                        "\nSkontaktuj się z administracją w sprawie odnowienia."
-                    )
+                    full_message += "\nSkontaktuj się z administracją w sprawie odnowienia."
 
             # Replace escaped newlines with actual newlines for sending
             full_message = full_message.replace("\\n", "\n")
@@ -216,10 +194,7 @@ class OnTaskEvent(commands.Cog):
         current_time = datetime.now(timezone.utc)
         # Check if the role is actually expiring in the future.
         # member_role.expiration_date should be > current_time for this notification.
-        if (
-            not member_role.expiration_date
-            or member_role.expiration_date <= current_time
-        ):
+        if not member_role.expiration_date or member_role.expiration_date <= current_time:
             logger.warning(
                 f"notify_premium_expiry called for a role that is not in the future or already expired. Member: {member.id}, Role: {role.id}, Expiration: {member_role.expiration_date}. This should be handled by removal logic."
             )
@@ -264,18 +239,12 @@ class OnTaskEvent(commands.Cog):
                     member.id,
                 )
         except Exception as e:
-            logger.error(
-                f"Error in notify_premium_removal specific logic: {e}", exc_info=True
-            )
+            logger.error(f"Error in notify_premium_removal specific logic: {e}", exc_info=True)
 
     async def notify_mute_removal(self, member, member_role, role):
         """Powiadomienie o automatycznym usunięciu wyciszenia."""
         role_desc = next(
-            (
-                r["description"]
-                for r in self.bot.config["mute_roles"]
-                if r["id"] == role.id
-            ),
+            (r["description"] for r in self.bot.config["mute_roles"] if r["id"] == role.id),
             "",
         )
         if role_desc:
@@ -323,9 +292,7 @@ class OnTaskEvent(commands.Cog):
                     )
                     await session.commit()
 
-                    logger.info(
-                        f"Saved automatic unmute to database: user {member.id}, type {mute_type}"
-                    )
+                    logger.info(f"Saved automatic unmute to database: user {member.id}, type {mute_type}")
             except Exception as db_error:
                 logger.error(
                     f"Error saving automatic unmute to database: {db_error}",
@@ -355,14 +322,10 @@ class OnTaskEvent(commands.Cog):
 
             notification_repo = NotificationRepository(session)
             for tag in notification_tags_to_check:
-                notification_log = await notification_repo.get_notification_log(
-                    member.id, tag
-                )
+                notification_log = await notification_repo.get_notification_log(member.id, tag)
                 if notification_log:
                     # Sprawdź czy powiadomienie zostało wysłane w ciągu ostatnich 24 godzin
-                    time_since_notification = (
-                        datetime.now(timezone.utc) - notification_log.sent_at
-                    )
+                    time_since_notification = datetime.now(timezone.utc) - notification_log.sent_at
                     if time_since_notification < timedelta(hours=24):
                         logger.info(
                             f"AuditRemoval: Skipping notification for {member.display_name} ({member.id}) "
@@ -379,9 +342,7 @@ class OnTaskEvent(commands.Cog):
                 expiration_str = discord.utils.format_dt(db_expiration_date, "R")
                 main_message_body = f"Twoja rola premium {role_name} wygasła {expiration_str} i została usunięta w ramach korekty systemowej."
                 include_renewal = True
-                local_renewal_payment_action_prefix = (
-                    ", aby ją odnowić"  # Ustawiamy dla spójności
-                )
+                local_renewal_payment_action_prefix = ", aby ją odnowić"  # Ustawiamy dla spójności
             else:
                 main_message_body = f"Twoja rola premium {role_name} została usunięta z powodu {audit_reason_key}."
 
@@ -397,9 +358,7 @@ class OnTaskEvent(commands.Cog):
             )
 
             # Zapisz że powiadomienie zostało wysłane, aby uniknąć duplikatów w przyszłości
-            await notification_repo.add_or_update_notification_log(
-                member.id, f"audit_removal_{role_name}"
-            )
+            await notification_repo.add_or_update_notification_log(member.id, f"audit_removal_{role_name}")
             await session.commit()
 
     @check_roles_expiry.before_loop
@@ -431,11 +390,7 @@ class OnTaskEvent(commands.Cog):
             for mr in expired_roles:
                 role_name = mr.role.name if mr.role else "Unknown Role"
                 member = self.bot.guild.get_member(mr.member_id)
-                member_name = (
-                    member.display_name
-                    if member
-                    else f"Unknown Member (ID: {mr.member_id})"
-                )
+                member_name = member.display_name if member else f"Unknown Member (ID: {mr.member_id})"
                 expiry_formatted = discord.utils.format_dt(mr.expiration_date, "F")
                 embed.add_field(
                     name=f"Role: {role_name} for {member_name}",
@@ -444,9 +399,7 @@ class OnTaskEvent(commands.Cog):
                 )
                 if len(embed.fields) == 25:
                     await ctx.send(embed=embed)
-                    embed = discord.Embed(
-                        title="Expired Roles (Cont.)", color=discord.Color.orange()
-                    )
+                    embed = discord.Embed(title="Expired Roles (Cont.)", color=discord.Color.orange())
 
             if embed.fields:
                 await ctx.send(embed=embed)
@@ -460,9 +413,7 @@ class OnTaskEvent(commands.Cog):
             premium_roles = await role_repo.get_member_premium_roles(member.id)
             current_time = datetime.now(timezone.utc)
             if not premium_roles:
-                await ctx.send(
-                    f"Użytkownik {member.display_name} nie ma żadnych ról premium."
-                )
+                await ctx.send(f"Użytkownik {member.display_name} nie ma żadnych ról premium.")
                 return
 
             for role in premium_roles:
@@ -485,20 +436,14 @@ class OnTaskEvent(commands.Cog):
                 # Sprawdź tylko wyciszenia konkretnego użytkownika
                 role_repo = RoleRepository(session)
                 member_roles = await role_repo.get_member_roles(member.id)
-                mute_roles = [
-                    role for role in member_roles if role.role_id in mute_role_ids
-                ]
+                mute_roles = [role for role in member_roles if role.role_id in mute_role_ids]
 
                 if not mute_roles:
-                    await ctx.send(
-                        f"Użytkownik {member.display_name} nie ma żadnych wyciszeń."
-                    )
+                    await ctx.send(f"Użytkownik {member.display_name} nie ma żadnych wyciszeń.")
                     return
 
                 for role in mute_roles:
-                    expiry_status = (
-                        "aktywne" if role.expiration_date > now else "wygasłe"
-                    )
+                    expiry_status = "aktywne" if role.expiration_date > now else "wygasłe"
                     expiration_date = (
                         f"wygasa {discord.utils.format_dt(role.expiration_date, 'R')}"
                         if role.expiration_date
@@ -526,11 +471,7 @@ class OnTaskEvent(commands.Cog):
 
                 for i, member_role in enumerate(all_mute_roles[:10], 1):
                     member_obj = self.bot.guild.get_member(member_role.member_id)
-                    member_name = (
-                        member_obj.display_name
-                        if member_obj
-                        else f"ID: {member_role.member_id}"
-                    )
+                    member_name = member_obj.display_name if member_obj else f"ID: {member_role.member_id}"
                     role_name = self.bot.guild.get_role(member_role.role_id).name
                     expiration_date = (
                         f"wygasa {discord.utils.format_dt(member_role.expiration_date, 'R')}"
@@ -576,9 +517,7 @@ class OnTaskEvent(commands.Cog):
         premium_role_ids = audit_config.get("premium_role_ids_for_audit", [])
 
         if not premium_role_ids:
-            logger.warning(
-                "Audit: No premium_role_ids_for_audit defined in config. Skipping audit."
-            )
+            logger.warning("Audit: No premium_role_ids_for_audit defined in config. Skipping audit.")
             return
 
         actions_taken_summary = []
@@ -586,14 +525,10 @@ class OnTaskEvent(commands.Cog):
         for role_id in premium_role_ids:
             discord_role = guild.get_role(role_id)
             if not discord_role:
-                logger.warning(
-                    f"Audit: Role ID {role_id} not found on server. Skipping."
-                )
+                logger.warning(f"Audit: Role ID {role_id} not found on server. Skipping.")
                 continue
 
-            logger.info(
-                f"Audit: Checking role '{discord_role.name}' (ID: {discord_role.id})"
-            )
+            logger.info(f"Audit: Checking role '{discord_role.name}' (ID: {discord_role.id})")
             members_with_role = discord_role.members
 
             if not members_with_role:
@@ -607,9 +542,7 @@ class OnTaskEvent(commands.Cog):
                 async with self.bot.get_db() as session:
                     try:
                         role_repo = RoleRepository(session)
-                        db_member_role_entry = await role_repo.get_member_role(
-                            member.id, discord_role.id
-                        )
+                        db_member_role_entry = await role_repo.get_member_role(member.id, discord_role.id)
 
                         if db_member_role_entry is None:
                             logger.warning(
@@ -627,9 +560,7 @@ class OnTaskEvent(commands.Cog):
                                     audit_reason_key="braku wpisu w bazie danych",
                                 )
                                 # Usuń też powiązane uprawnienia na wszelki wypadek
-                                await remove_premium_role_mod_permissions(
-                                    session, self.bot, member.id
-                                )
+                                await remove_premium_role_mod_permissions(session, self.bot, member.id)
                                 await session.commit()  # Commit po usunięciu uprawnień
 
                                 actions_taken_summary.append(
@@ -649,8 +580,7 @@ class OnTaskEvent(commands.Cog):
 
                         elif (
                             db_member_role_entry.expiration_date
-                            and db_member_role_entry.expiration_date
-                            <= datetime.now(timezone.utc)
+                            and db_member_role_entry.expiration_date <= datetime.now(timezone.utc)
                         ):
                             logger.warning(
                                 f"Audit: Member {member.display_name} (ID: {member.id}) has role '{discord_role.name}' on Discord, but it's expired in DB (Exp: {db_member_role_entry.expiration_date}). Removing."
@@ -660,12 +590,8 @@ class OnTaskEvent(commands.Cog):
                                     discord_role,
                                     reason="Audit: Rola wygasła wg bazy danych",
                                 )
-                                await remove_premium_role_mod_permissions(
-                                    session, self.bot, member.id
-                                )
-                                await role_repo.delete_member_role(
-                                    member.id, discord_role.id
-                                )
+                                await remove_premium_role_mod_permissions(session, self.bot, member.id)
+                                await role_repo.delete_member_role(member.id, discord_role.id)
                                 await session.commit()
                                 # Powiadomienie użytkownika
                                 await self.notify_audit_role_removal(
@@ -700,9 +626,8 @@ class OnTaskEvent(commands.Cog):
                         await session.rollback()
 
         if actions_taken_summary:
-            summary_message = (
-                "Przeprowadzono audyt ról premium. Wykonane akcje:\n- "
-                + "\n- ".join(actions_taken_summary)
+            summary_message = "Przeprowadzono audyt ról premium. Wykonane akcje:\n- " + "\n- ".join(
+                actions_taken_summary
             )
             # Send summary to admin channel if configured
             admin_channel_id = self.bot.config.get("channels", {}).get("admin_logs")
@@ -713,34 +638,26 @@ class OnTaskEvent(commands.Cog):
                         title="📊 Audit rang Premium",
                         description=summary_message[:4000],  # Discord limit
                         color=discord.Color.blue(),
-                        timestamp=datetime.now(timezone.utc)
+                        timestamp=datetime.now(timezone.utc),
                     )
                     embed.set_footer(text=f"Akcje: {len(actions_taken_summary)}")
                     await admin_channel.send(embed=embed)
-            
-            logger.info(
-                f"Premium roles audit completed. Actions taken: {len(actions_taken_summary)}"
-            )
+
+            logger.info(f"Premium roles audit completed. Actions taken: {len(actions_taken_summary)}")
             logger.info("Audit Summary:\n" + "\n".join(actions_taken_summary))
 
         else:
-            logger.info(
-                "Premium roles audit completed. No inconsistencies found or actions taken."
-            )
+            logger.info("Premium roles audit completed. No inconsistencies found or actions taken.")
 
     @audit_discord_premium_roles.before_loop
     async def before_audit_premium_roles(self):
         """Wait for bot to be ready and guild to be set before starting audit task"""
-        logger.info(
-            "Waiting for bot to be ready before starting premium roles audit task"
-        )
+        logger.info("Waiting for bot to be ready before starting premium roles audit task")
         await self.bot.wait_until_ready()
         while self.bot.guild is None:
             logger.info("Audit: Waiting for guild to be set...")
             await asyncio.sleep(5)  # Czekaj nieco dłużej, bo to rzadsze zadanie
-        logger.info(
-            "Audit: Bot is ready and guild is set, audit task will start on schedule."
-        )
+        logger.info("Audit: Bot is ready and guild is set, audit task will start on schedule.")
 
     async def _log_automatic_unmute_action(self, member, member_role, role):
         """Loguje automatyczne odciszenie na kanale logów.
@@ -757,16 +674,12 @@ class OnTaskEvent(commands.Cog):
             log_channel_id = self.bot.config.get("channels", {}).get("unmute_logs")
 
             if not log_channel_id:
-                logger.warning(
-                    "Brak konfiguracji kanału logów odciszeń (unmute_logs) dla automatycznego unmute"
-                )
+                logger.warning("Brak konfiguracji kanału logów odciszeń (unmute_logs) dla automatycznego unmute")
                 return
 
             log_channel = self.bot.get_channel(log_channel_id)
             if not log_channel:
-                logger.error(
-                    f"Nie można znaleźć kanału logów odciszeń o ID: {log_channel_id}"
-                )
+                logger.error(f"Nie można znaleźć kanału logów odciszeń o ID: {log_channel_id}")
                 return
 
             # Znajdź typ wyciszenia na podstawie konfiguracji

@@ -1,6 +1,6 @@
 """Autokick related message senders."""
 
-from typing import Optional, Union, List, Dict
+from typing import Dict, List, Optional, Union
 
 import discord
 from discord.ext import commands
@@ -85,26 +85,26 @@ class AutokickMessageSender(BaseMessageSender):
     ) -> Optional[discord.Message]:
         """Send autokick limit reached message."""
         base_text = f"Osiągnięto limit {max_autokicks} użytkowników na liście autokick!"
-        
+
         # Get voice channel
-        member = ctx.author if hasattr(ctx, 'author') else ctx.user
+        member = ctx.author if hasattr(ctx, "author") else ctx.user
         channel = member.voice.channel if member.voice else None
-        
+
         description = self.build_description(base_text, ctx, channel)
-        
+
         embed = self._create_embed(
             title="❌ Limit autokick",
             description=description,
             color="error",
         )
-        
+
         # Add premium info
         embed.add_field(
             name="💎 Premium",
             value="Z rolą premium możesz dodać więcej użytkowników do autokick!",
             inline=False,
         )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
 
     async def send_autokick_list(
@@ -120,35 +120,33 @@ class AutokickMessageSender(BaseMessageSender):
             title=f"🚫 Lista autokick - {channel.name}",
             color="info",
         )
-        
+
         if autokicks:
             # Group by moderator who added them
             by_mod = {}
             for ak in autokicks:
-                mod_id = ak.get('added_by', 'unknown')
+                mod_id = ak.get("added_by", "unknown")
                 if mod_id not in by_mod:
                     by_mod[mod_id] = []
                 by_mod[mod_id].append(ak)
-            
+
             # Create list
             autokick_list = []
             for mod_id, users in by_mod.items():
-                mod = ctx.guild.get_member(int(mod_id)) if mod_id != 'unknown' else None
+                mod = ctx.guild.get_member(int(mod_id)) if mod_id != "unknown" else None
                 mod_name = mod.display_name if mod else "Nieznany"
-                
+
                 for user_data in users:
-                    user = ctx.guild.get_member(user_data['user_id'])
+                    user = ctx.guild.get_member(user_data["user_id"])
                     if user:
-                        autokick_list.append(
-                            f"• {user.mention} - dodane przez {mod_name}"
-                        )
-            
+                        autokick_list.append(f"• {user.mention} - dodane przez {mod_name}")
+
             embed.add_field(
                 name=f"Użytkownicy ({len(autokicks)}/{max_autokicks})",
                 value="\n".join(autokick_list[:10]),  # Limit to 10 entries
                 inline=False,
             )
-            
+
             if len(autokick_list) > 10:
                 embed.add_field(
                     name="",
@@ -157,7 +155,7 @@ class AutokickMessageSender(BaseMessageSender):
                 )
         else:
             embed.description = "Lista autokick jest pusta."
-        
+
         # Add commands info
         embed.add_field(
             name="📝 Zarządzanie autokick",
@@ -168,7 +166,7 @@ class AutokickMessageSender(BaseMessageSender):
             ),
             inline=False,
         )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
 
     async def send_autokick_list_empty(
@@ -203,18 +201,16 @@ class AutokickMessageSender(BaseMessageSender):
                 ),
                 color="error",
             )
-            
+
             if moderator:
                 embed.add_field(
                     name="Dodane przez",
                     value=moderator.mention,
                     inline=True,
                 )
-            
-            embed.set_footer(
-                text="Skontaktuj się z właścicielem kanału, aby usunąć Cię z listy."
-            )
-            
+
+            embed.set_footer(text="Skontaktuj się z właścicielem kanału, aby usunąć Cię z listy.")
+
             await user.send(embed=embed)
         except discord.Forbidden:
             # User has DMs disabled

@@ -9,10 +9,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from core.performance import CacheKeyBuilder, cache, optimize_query
+
 # Interfaces are now Protocols - no need to import for inheritance
 from core.repositories.base_repository import BaseRepository
 from datasources.models import Activity, AutoKick, Invite, Member, ModerationLog
-from core.performance import cache, CacheKeyBuilder, optimize_query
 
 
 class MemberRepository(BaseRepository):
@@ -21,14 +22,12 @@ class MemberRepository(BaseRepository):
     def __init__(self, session: AsyncSession):
         super().__init__(Member, session)
 
-    @cache(namespace='members', ttl=300, key_func=lambda self, discord_id: CacheKeyBuilder.member_key(discord_id))
+    @cache(namespace="members", ttl=300, key_func=lambda self, discord_id: CacheKeyBuilder.member_key(discord_id))
     @optimize_query
     async def get_by_discord_id(self, discord_id: int) -> Optional[Member]:
         """Get member by Discord ID."""
         try:
-            result = await self.session.execute(
-                select(Member).where(Member.id == discord_id)
-            )
+            result = await self.session.execute(select(Member).where(Member.id == discord_id))
             return result.scalar_one_or_none()
         except Exception as e:
             self._log_error("get_by_discord_id", e, discord_id=discord_id)
@@ -41,19 +40,19 @@ class MemberRepository(BaseRepository):
             member = await self.get_by_discord_id(discord_id)
             if member:
                 return member
-            
+
             # Create new member if not found
             return await self.create_member(
                 discord_id=discord_id,
-                first_inviter_id=kwargs.get('first_inviter_id'),
-                current_inviter_id=kwargs.get('current_inviter_id'),
-                joined_at=kwargs.get('joined_at')
+                first_inviter_id=kwargs.get("first_inviter_id"),
+                current_inviter_id=kwargs.get("current_inviter_id"),
+                joined_at=kwargs.get("joined_at"),
             )
-            
+
         except Exception as e:
             self._log_error("get_or_create", e, discord_id=discord_id)
             raise
-    
+
     async def get_all(self) -> list[Member]:
         """Get all members."""
         try:
@@ -124,9 +123,7 @@ class MemberRepository(BaseRepository):
             self._log_error("update_wallet_balance", e, member_id=member_id)
             return False
 
-    async def update_voice_bypass(
-        self, member_id: int, bypass_until: Optional[datetime]
-    ) -> bool:
+    async def update_voice_bypass(self, member_id: int, bypass_until: Optional[datetime]) -> bool:
         """Update member's voice bypass expiration."""
         try:
             member = await self.get_by_id(member_id)
@@ -148,9 +145,7 @@ class MemberRepository(BaseRepository):
             self._log_error("update_voice_bypass", e, member_id=member_id)
             return False
 
-    async def update_inviter(
-        self, member_id: int, new_inviter_id: Optional[int], update_current: bool = True
-    ) -> bool:
+    async def update_inviter(self, member_id: int, new_inviter_id: Optional[int], update_current: bool = True) -> bool:
         """Update member's inviter (current or first)."""
         try:
             member = await self.get_by_id(member_id)
@@ -182,9 +177,7 @@ class MemberRepository(BaseRepository):
     async def get_members_by_inviter(self, inviter_id: int) -> list[Member]:
         """Get all members invited by a specific inviter."""
         try:
-            result = await self.session.execute(
-                select(Member).where(Member.current_inviter_id == inviter_id)
-            )
+            result = await self.session.execute(select(Member).where(Member.current_inviter_id == inviter_id))
             return list(result.scalars().all())
 
         except Exception as e:
@@ -200,7 +193,6 @@ class MemberRepository(BaseRepository):
         except Exception as e:
             self._log_error("get_member_count", e)
             return 0
-
 
     async def get_or_add_member(
         self,
@@ -230,9 +222,9 @@ class MemberRepository(BaseRepository):
                 if rejoined_at is not None:
                     member.rejoined_at = rejoined_at
                 await self.session.flush()
-                
+
             return member
-            
+
         except Exception as e:
             self._log_error("get_or_add_member", e, member_id=member_id)
             raise
@@ -241,19 +233,14 @@ class MemberRepository(BaseRepository):
         """Legacy compatibility method for MemberQueries.add_to_wallet_balance."""
         try:
             from sqlalchemy import update
+
             await self.session.execute(
-                update(Member)
-                .where(Member.id == member_id)
-                .values(wallet_balance=Member.wallet_balance + amount)
+                update(Member).where(Member.id == member_id).values(wallet_balance=Member.wallet_balance + amount)
             )
             await self.session.flush()
-            
-            self._log_operation(
-                "add_to_wallet_balance",
-                member_id=member_id,
-                amount=amount
-            )
-            
+
+            self._log_operation("add_to_wallet_balance", member_id=member_id, amount=amount)
+
         except Exception as e:
             self._log_error("add_to_wallet_balance", e, member_id=member_id)
             raise
@@ -264,10 +251,10 @@ class MemberRepository(BaseRepository):
             member = await self.get_by_discord_id(member_id)
             if not member or not member.voice_bypass_until:
                 return None
-            
+
             now = datetime.now(timezone.utc)
             return member.voice_bypass_until if member.voice_bypass_until > now else None
-            
+
         except Exception as e:
             self._log_error("get_voice_bypass_status", e, member_id=member_id)
             return None
@@ -278,24 +265,21 @@ class MemberRepository(BaseRepository):
             member = await self.get_by_discord_id(member_id)
             if not member:
                 return None
-            
+
             now = datetime.now(timezone.utc)
             if not member.voice_bypass_until or member.voice_bypass_until < now:
                 member.voice_bypass_until = now + timedelta(hours=hours)
             else:
                 member.voice_bypass_until += timedelta(hours=hours)
-            
+
             await self.session.flush()
-            
+
             self._log_operation(
-                "add_bypass_time",
-                member_id=member_id,
-                hours=hours,
-                new_expiry=member.voice_bypass_until
+                "add_bypass_time", member_id=member_id, hours=hours, new_expiry=member.voice_bypass_until
             )
-            
+
             return member
-            
+
         except Exception as e:
             self._log_error("add_bypass_time", e, member_id=member_id)
             return None
@@ -305,23 +289,20 @@ class MemberRepository(BaseRepository):
         try:
             member = await self.get_or_add_member(member_id)
             now = datetime.now(timezone.utc)
-            
+
             if member.voice_bypass_until is None or member.voice_bypass_until < now:
                 member.voice_bypass_until = now + duration
             else:
                 member.voice_bypass_until += duration
-            
+
             await self.session.flush()
-            
+
             self._log_operation(
-                "extend_voice_bypass",
-                member_id=member_id,
-                duration=str(duration),
-                new_expiry=member.voice_bypass_until
+                "extend_voice_bypass", member_id=member_id, duration=str(duration), new_expiry=member.voice_bypass_until
             )
-            
+
             return member.voice_bypass_until
-            
+
         except Exception as e:
             self._log_error("extend_voice_bypass", e, member_id=member_id)
             return None
@@ -333,11 +314,11 @@ class MemberRepository(BaseRepository):
             if member:
                 member.voice_bypass_until = None
                 await self.session.flush()
-                
+
                 self._log_operation("clear_voice_bypass", member_id=member_id)
                 return True
             return False
-            
+
         except Exception as e:
             self._log_error("clear_voice_bypass", e, member_id=member_id)
             return False
@@ -459,14 +440,7 @@ class ActivityRepository(BaseRepository):
     ) -> list[tuple[Member, int]]:
         """Get activity leaderboard."""
         try:
-            query = (
-                select(
-                    Member,
-                    func.sum(Activity.points).label("total_points")
-                )
-                .join(Activity)
-                .group_by(Member.id)
-            )
+            query = select(Member, func.sum(Activity.points).label("total_points")).join(Activity).group_by(Member.id)
 
             if activity_type:
                 query = query.where(Activity.activity_type == activity_type)
@@ -545,9 +519,7 @@ class InviteRepository(BaseRepository):
         """Get invite by code."""
         try:
             result = await self.session.execute(
-                select(Invite)
-                .options(selectinload(Invite.creator))
-                .where(Invite.id == invite_code)
+                select(Invite).options(selectinload(Invite.creator)).where(Invite.id == invite_code)
             )
             return result.scalar_one_or_none()
 
@@ -567,16 +539,12 @@ class InviteRepository(BaseRepository):
             # Check if creator exists in members table
             member_repo = MemberRepository(self.session)
             creator = await member_repo.get_by_discord_id(creator_id)
-            
+
             if not creator:
                 # Create the member first if they don't exist
-                self._log_operation(
-                    "create_invite_with_member", 
-                    invite_code=invite_code, 
-                    creator_id=creator_id
-                )
+                self._log_operation("create_invite_with_member", invite_code=invite_code, creator_id=creator_id)
                 creator = await member_repo.get_or_create(creator_id)
-            
+
             if created_at is None:
                 created_at = datetime.now(timezone.utc)
 
@@ -635,9 +603,7 @@ class InviteRepository(BaseRepository):
         """Get all invites created by member."""
         try:
             result = await self.session.execute(
-                select(Invite)
-                .where(Invite.creator_id == creator_id)
-                .order_by(Invite.created_at.desc())
+                select(Invite).where(Invite.creator_id == creator_id).order_by(Invite.created_at.desc())
             )
             return list(result.scalars().all())
 
@@ -717,14 +683,10 @@ class ModerationRepository(BaseRepository):
             self._log_error("log_action", e, target_user_id=target_user_id)
             raise
 
-    async def get_member_history(
-        self, member_id: int, action_type: Optional[str] = None
-    ) -> list[ModerationLog]:
+    async def get_member_history(self, member_id: int, action_type: Optional[str] = None) -> list[ModerationLog]:
         """Get moderation history for member."""
         try:
-            query = select(ModerationLog).where(
-                ModerationLog.target_user_id == member_id
-            )
+            query = select(ModerationLog).where(ModerationLog.target_user_id == member_id)
 
             if action_type:
                 query = query.where(ModerationLog.action_type == action_type)
@@ -767,10 +729,7 @@ class ModerationRepository(BaseRepository):
         try:
             # Get counts by action type
             result = await self.session.execute(
-                select(
-                    ModerationLog.action_type,
-                    func.count(ModerationLog.id).label("count")
-                )
+                select(ModerationLog.action_type, func.count(ModerationLog.id).label("count"))
                 .where(ModerationLog.moderator_id == moderator_id)
                 .group_by(ModerationLog.action_type)
             )
@@ -857,9 +816,7 @@ class AutoKickRepository(BaseRepository):
         """Get all autokick settings for member."""
         try:
             result = await self.session.execute(
-                select(AutoKick)
-                .options(selectinload(AutoKick.target))
-                .where(AutoKick.owner_id == owner_id)
+                select(AutoKick).options(selectinload(AutoKick.target)).where(AutoKick.owner_id == owner_id)
             )
             return list(result.scalars().all())
 
@@ -871,9 +828,7 @@ class AutoKickRepository(BaseRepository):
         """Get all autokick settings targeting specific member."""
         try:
             result = await self.session.execute(
-                select(AutoKick)
-                .options(selectinload(AutoKick.owner))
-                .where(AutoKick.target_id == target_id)
+                select(AutoKick).options(selectinload(AutoKick.owner)).where(AutoKick.target_id == target_id)
             )
             return list(result.scalars().all())
 
@@ -885,34 +840,38 @@ class AutoKickRepository(BaseRepository):
         """Get invite leaderboard with optimized single query (eliminates N+1 problem)."""
         try:
             # Single aggregated query that replaces N+1 pattern
-            query = select(
-                Member.id.label("member_id"),
-                Member.joined_at,
-                func.count(Invite.id).label("total_invites"),
-                func.sum(Invite.uses).label("total_uses"),
-                func.count(Member.current_inviter_id).label("members_invited")
-            ).select_from(
-                Member
-            ).outerjoin(
-                # Join with invites created by this member
-                Invite, Member.id == Invite.creator_id
-            ).group_by(
-                Member.id, Member.joined_at
-            ).order_by(
-                func.sum(Invite.uses).desc().nulls_last()
-            ).limit(limit)
+            query = (
+                select(
+                    Member.id.label("member_id"),
+                    Member.joined_at,
+                    func.count(Invite.id).label("total_invites"),
+                    func.sum(Invite.uses).label("total_uses"),
+                    func.count(Member.current_inviter_id).label("members_invited"),
+                )
+                .select_from(Member)
+                .outerjoin(
+                    # Join with invites created by this member
+                    Invite,
+                    Member.id == Invite.creator_id,
+                )
+                .group_by(Member.id, Member.joined_at)
+                .order_by(func.sum(Invite.uses).desc().nulls_last())
+                .limit(limit)
+            )
 
             result = await self.session.execute(query)
-            
+
             leaderboard_data = []
             for row in result:
-                leaderboard_data.append({
-                    "member_id": row.member_id,
-                    "total_invites": row.total_invites or 0,
-                    "total_uses": row.total_uses or 0,
-                    "members_invited": row.members_invited or 0,
-                    "joined_at": row.joined_at,
-                })
+                leaderboard_data.append(
+                    {
+                        "member_id": row.member_id,
+                        "total_invites": row.total_invites or 0,
+                        "total_uses": row.total_uses or 0,
+                        "members_invited": row.members_invited or 0,
+                        "joined_at": row.joined_at,
+                    }
+                )
 
             self._log_operation("get_invite_leaderboard_optimized", limit=limit, count=len(leaderboard_data))
             return leaderboard_data
@@ -928,48 +887,43 @@ class AutoKickRepository(BaseRepository):
             cutoff_date = cutoff_date.replace(day=cutoff_date.day - days)
 
             # Single aggregated query for activity leaderboard
-            query = select(
-                Activity.member_id,
-                func.sum(Activity.points).label("total_points"),
-                func.sum(
-                    func.case(
-                        (Activity.activity_type == 'voice', Activity.points),
-                        else_=0
-                    )
-                ).label("voice_points"),
-                func.sum(
-                    func.case(
-                        (Activity.activity_type == 'text', Activity.points),
-                        else_=0
-                    )
-                ).label("text_points"),
-                func.sum(
-                    func.case(
-                        (Activity.activity_type == 'bonus', Activity.points),
-                        else_=0
-                    )
-                ).label("bonus_points")
-            ).where(
-                Activity.date >= cutoff_date
-            ).group_by(
-                Activity.member_id
-            ).order_by(
-                func.sum(Activity.points).desc()
-            ).limit(limit)
+            query = (
+                select(
+                    Activity.member_id,
+                    func.sum(Activity.points).label("total_points"),
+                    func.sum(func.case((Activity.activity_type == "voice", Activity.points), else_=0)).label(
+                        "voice_points"
+                    ),
+                    func.sum(func.case((Activity.activity_type == "text", Activity.points), else_=0)).label(
+                        "text_points"
+                    ),
+                    func.sum(func.case((Activity.activity_type == "bonus", Activity.points), else_=0)).label(
+                        "bonus_points"
+                    ),
+                )
+                .where(Activity.date >= cutoff_date)
+                .group_by(Activity.member_id)
+                .order_by(func.sum(Activity.points).desc())
+                .limit(limit)
+            )
 
             result = await self.session.execute(query)
-            
+
             leaderboard_data = []
             for row in result:
-                leaderboard_data.append({
-                    "member_id": row.member_id,
-                    "total_points": row.total_points or 0,
-                    "voice_points": row.voice_points or 0,
-                    "text_points": row.text_points or 0,
-                    "bonus_points": row.bonus_points or 0,
-                })
+                leaderboard_data.append(
+                    {
+                        "member_id": row.member_id,
+                        "total_points": row.total_points or 0,
+                        "voice_points": row.voice_points or 0,
+                        "text_points": row.text_points or 0,
+                        "bonus_points": row.bonus_points or 0,
+                    }
+                )
 
-            self._log_operation("get_activity_leaderboard_optimized", days=days, limit=limit, count=len(leaderboard_data))
+            self._log_operation(
+                "get_activity_leaderboard_optimized", days=days, limit=limit, count=len(leaderboard_data)
+            )
             return leaderboard_data
 
         except Exception as e:

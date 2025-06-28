@@ -1,14 +1,15 @@
 """Voice channel related message senders."""
 
 from datetime import datetime, timezone
-from typing import Optional, Union, List
+from typing import List, Optional, Union
 
 import discord
 from discord.ext import commands
 
-from .base import BaseMessageSender
 from datasources.queries import MemberQueries
 from utils.bump_checker import BumpChecker
+
+from .base import BaseMessageSender
 
 
 class VoiceMessageSender(BaseMessageSender):
@@ -25,7 +26,7 @@ class VoiceMessageSender(BaseMessageSender):
         """Send voice channel information."""
         # Owner field
         owner_value = owner.mention if owner else "brak"
-        
+
         # Moderators field
         mods_value = ", ".join(mod.mention for mod in mods) if mods else "brak"
 
@@ -39,15 +40,15 @@ class VoiceMessageSender(BaseMessageSender):
         }
 
         if disabled_perms:
-            converted_perms = [
-                f"`{perm_to_cmd.get(perm, perm)}`" for perm in disabled_perms
-            ]
+            converted_perms = [f"`{perm_to_cmd.get(perm, perm)}`" for perm in disabled_perms]
             perms_value = ", ".join(converted_perms)
         else:
             perms_value = "brak"
 
         # Create message content
-        base_text = f"**Właściciel:** {owner_value} • **Moderatorzy:** {mods_value}\n**Wyłączone uprawnienia:** {perms_value}"
+        base_text = (
+            f"**Właściciel:** {owner_value} • **Moderatorzy:** {mods_value}\n**Wyłączone uprawnienia:** {perms_value}"
+        )
 
         # Create embed with user's color
         embed = self._create_embed(description=base_text, ctx=ctx)
@@ -69,17 +70,17 @@ class VoiceMessageSender(BaseMessageSender):
     ) -> Optional[discord.Message]:
         """Send not in voice channel message."""
         description = f"Musisz być na kanale głosowym, aby użyć {action}."
-        
+
         # Check if user is in a voice channel
-        if hasattr(ctx, 'author'):
+        if hasattr(ctx, "author"):
             member = ctx.author
         else:
             member = ctx.user
-            
+
         if member.voice and member.voice.channel:
             # User is in voice but maybe wrong channel
             description = f"Musisz być na swoim kanale głosowym, aby użyć {action}."
-        
+
         return await self.send_error(
             ctx=ctx,
             message=description,
@@ -96,14 +97,14 @@ class VoiceMessageSender(BaseMessageSender):
         """Send channel creation info."""
         # When called from voice state update, ctx might be a FakeContext
         # In that case, send directly to the channel
-        if hasattr(ctx, '__class__') and ctx.__class__.__name__ == 'FakeContext':
+        if hasattr(ctx, "__class__") and ctx.__class__.__name__ == "FakeContext":
             # Get the owner from channel overwrites
             owner = None
             for target, overwrite in channel.overwrites.items():
                 if isinstance(target, discord.Member) and overwrite.priority_speaker:
                     owner = target
                     break
-            
+
             embed = self._create_embed(
                 title="🎙️ Kanał utworzony!",
                 description=f"Twój prywatny kanał {channel.mention} został utworzony.",
@@ -111,7 +112,7 @@ class VoiceMessageSender(BaseMessageSender):
                 ctx=owner,  # Use owner for color/author
                 add_author=True,
             )
-            
+
             embed.add_field(
                 name="💡 Dostępne komendy",
                 value=(
@@ -123,7 +124,7 @@ class VoiceMessageSender(BaseMessageSender):
                 ),
                 inline=False,
             )
-            
+
             # Send directly to the channel
             return await channel.send(embed=embed)
         else:
@@ -135,7 +136,7 @@ class VoiceMessageSender(BaseMessageSender):
                 ctx=ctx,
                 add_author=True,
             )
-            
+
             embed.add_field(
                 name="💡 Dostępne komendy",
                 value=(
@@ -147,7 +148,7 @@ class VoiceMessageSender(BaseMessageSender):
                 ),
                 inline=False,
             )
-            
+
             return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
 
     async def send_channel_reset(

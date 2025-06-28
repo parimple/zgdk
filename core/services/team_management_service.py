@@ -1,7 +1,7 @@
 """Team management service for handling team operations."""
 
 import logging
-from typing import Optional, List
+from typing import List, Optional
 
 import discord
 from sqlalchemy import select, text
@@ -37,9 +37,7 @@ class TeamManagementService(BaseService, ITeamManagementService):
         try:
             # Find teams owned by the user
             query_result = await session.execute(
-                select(DBRole).where(
-                    (DBRole.role_type == "team") & (DBRole.name == str(member_id))
-                )
+                select(DBRole).where((DBRole.role_type == "team") & (DBRole.name == str(member_id)))
             )
 
             # Handle async result properly
@@ -60,9 +58,7 @@ class TeamManagementService(BaseService, ITeamManagementService):
                         team_role = guild.get_role(team_role_db.id)
                         if team_role:
                             # Find team channel
-                            team_channel = await self._find_team_channel(
-                                guild, member_id, team_role_db.id
-                            )
+                            team_channel = await self._find_team_channel(guild, member_id, team_role_db.id)
 
                             # Delete team channel
                             if team_channel:
@@ -77,9 +73,7 @@ class TeamManagementService(BaseService, ITeamManagementService):
                                 )
 
                             # Delete team role
-                            await team_role.delete(
-                                reason=f"Team deletion after premium role loss for user {member_id}"
-                            )
+                            await team_role.delete(reason=f"Team deletion after premium role loss for user {member_id}")
                             self._log_operation(
                                 "delete_team_role",
                                 role_id=team_role_db.id,
@@ -128,9 +122,7 @@ class TeamManagementService(BaseService, ITeamManagementService):
         try:
             # First find all teams owned by the user
             query_result = await session.execute(
-                select(DBRole).where(
-                    (DBRole.role_type == "team") & (DBRole.name == str(member_id))
-                )
+                select(DBRole).where((DBRole.role_type == "team") & (DBRole.name == str(member_id)))
             )
 
             # Get results without using ORM
@@ -150,9 +142,7 @@ class TeamManagementService(BaseService, ITeamManagementService):
                         team_role = guild.get_role(team_role_db.id)
                         if team_role:
                             # Find team channel
-                            team_channel = await self._find_team_channel(
-                                guild, member_id, team_role_db.id
-                            )
+                            team_channel = await self._find_team_channel(guild, member_id, team_role_db.id)
 
                             # Delete team channel
                             if team_channel:
@@ -167,9 +157,7 @@ class TeamManagementService(BaseService, ITeamManagementService):
                                 )
 
                             # Delete team role
-                            await team_role.delete(
-                                reason=f"Team deletion after premium role loss for user {member_id}"
-                            )
+                            await team_role.delete(reason=f"Team deletion after premium role loss for user {member_id}")
                             self._log_operation(
                                 "delete_team_role_sql",
                                 role_id=team_role_db.id,
@@ -193,20 +181,12 @@ class TeamManagementService(BaseService, ITeamManagementService):
                         params = {f"id{i}": team_id for i, team_id in enumerate(team_ids)}
 
                         # First delete related records from member_roles table
-                        member_roles_sql = text(
-                            f"DELETE FROM member_roles WHERE role_id IN ({placeholders})"
-                        )
+                        member_roles_sql = text(f"DELETE FROM member_roles WHERE role_id IN ({placeholders})")
                         member_result = await session.execute(member_roles_sql, params)
-                        members_deleted = (
-                            member_result.rowcount
-                            if hasattr(member_result, "rowcount")
-                            else 0
-                        )
+                        members_deleted = member_result.rowcount if hasattr(member_result, "rowcount") else 0
 
                         # Now delete records from roles table
-                        sql = text(
-                            f"DELETE FROM roles WHERE id IN ({placeholders}) AND role_type = 'team'"
-                        )
+                        sql = text(f"DELETE FROM roles WHERE id IN ({placeholders}) AND role_type = 'team'")
                         result = await session.execute(sql, params)
                         num_deleted = result.rowcount if hasattr(result, "rowcount") else 0
 
@@ -306,9 +286,7 @@ class TeamManagementService(BaseService, ITeamManagementService):
         """
         try:
             query_result = await session.execute(
-                select(DBRole).where(
-                    (DBRole.role_type == "team") & (DBRole.name == str(owner_id))
-                )
+                select(DBRole).where((DBRole.role_type == "team") & (DBRole.name == str(owner_id)))
             )
 
             scalars_result = query_result.scalars()
@@ -331,9 +309,7 @@ class TeamManagementService(BaseService, ITeamManagementService):
             self._log_error("get_user_teams", e, owner_id=owner_id)
             return []
 
-    async def validate_team_ownership(
-        self, session, team_id: int, owner_id: int
-    ) -> bool:
+    async def validate_team_ownership(self, session, team_id: int, owner_id: int) -> bool:
         """
         Validate if a user owns a specific team.
 
@@ -348,9 +324,7 @@ class TeamManagementService(BaseService, ITeamManagementService):
         try:
             query_result = await session.execute(
                 select(DBRole).where(
-                    (DBRole.id == team_id)
-                    & (DBRole.role_type == "team")
-                    & (DBRole.name == str(owner_id))
+                    (DBRole.id == team_id) & (DBRole.role_type == "team") & (DBRole.name == str(owner_id))
                 )
             )
 
@@ -384,17 +358,10 @@ class TeamManagementService(BaseService, ITeamManagementService):
                 if hasattr(channel, "topic") and channel.topic:
                     topic_parts = channel.topic.split()
                     # Check if topic has format owner_id team_id
-                    if (
-                        len(topic_parts) >= 2
-                        and topic_parts[0] == str(owner_id)
-                        and topic_parts[1] == str(team_id)
-                    ):
+                    if len(topic_parts) >= 2 and topic_parts[0] == str(owner_id) and topic_parts[1] == str(team_id):
                         return channel
                     # For compatibility with old format
-                    elif (
-                        "Team Channel" in channel.topic
-                        and str(owner_id) in channel.topic
-                    ):
+                    elif "Team Channel" in channel.topic and str(owner_id) in channel.topic:
                         return channel
             return None
 
@@ -411,12 +378,12 @@ class TeamManagementService(BaseService, ITeamManagementService):
     def count_member_teams(guild: discord.Guild, member: discord.Member, team_symbol: str = "☫") -> int:
         """
         Count how many teams a member belongs to.
-        
+
         Args:
             guild: Discord guild
             member: Discord member
             team_symbol: Team role prefix symbol
-            
+
         Returns:
             Number of teams the member belongs to
         """
@@ -430,12 +397,12 @@ class TeamManagementService(BaseService, ITeamManagementService):
     def get_owned_teams(guild: discord.Guild, member: discord.Member, team_symbol: str = "☫") -> List[str]:
         """
         Get list of teams owned by the member.
-        
+
         Args:
             guild: Discord guild
             member: Discord member
             team_symbol: Team role prefix symbol
-            
+
         Returns:
             List of team names owned by the member
         """

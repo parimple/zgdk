@@ -12,18 +12,14 @@ from utils.message_sender import MessageSender
 from utils.premium_checker import PremiumChecker
 from utils.voice.autokick import AutoKickManager
 from utils.voice.channel import ChannelModManager, VoiceChannelManager
-from utils.voice.permissions import (
-    BasePermissionCommand,
-    PermissionChecker,
-    VoicePermissionManager,
-)
+from utils.voice.permissions import BasePermissionCommand, PermissionChecker, VoicePermissionManager
 
 logger = logging.getLogger(__name__)
 
 
 class AdminCommands:
     """Voice admin commands for autokick, reset, and debugging."""
-    
+
     def __init__(self, bot):
         """Initialize admin commands."""
         self.bot = bot
@@ -35,22 +31,14 @@ class AdminCommands:
         self.permission_checker = PermissionChecker(bot)
         self.autokick_manager = AutoKickManager(bot)
         self.premium_checker = PremiumChecker(bot)
-        
+
         # Initialize admin permission commands
         self.permission_commands = {
             "autokick": BasePermissionCommand(
-                "autokick",
-                requires_owner=True,
-                default_to_true=False,
-                toggle=True,
-                is_autokick=True
+                "autokick", requires_owner=True, default_to_true=False, toggle=True, is_autokick=True
             ),
             "reset": BasePermissionCommand(
-                "all",
-                requires_owner=True,
-                default_to_true=True,
-                toggle=False,
-                is_reset=True
+                "all", requires_owner=True, default_to_true=True, toggle=False, is_reset=True
             ),
         }
 
@@ -85,21 +73,15 @@ class AdminCommands:
 
     async def reset_channel_permissions(self, ctx):
         """Reset all channel permissions to default."""
-        await self.permission_manager.reset_channel_permissions(
-            ctx.author.voice.channel, ctx.author
-        )
+        await self.permission_manager.reset_channel_permissions(ctx.author.voice.channel, ctx.author)
         await self.message_sender.send_channel_reset(ctx)
 
     async def reset_user_permissions(self, ctx, target):
         """Reset permissions for a specific user."""
-        await self.permission_manager.reset_user_permissions(
-            ctx.author.voice.channel, ctx.author, target
-        )
+        await self.permission_manager.reset_user_permissions(ctx.author.voice.channel, ctx.author, target)
         await self.message_sender.send_permission_reset(ctx, target)
 
-    @commands.hybrid_command(
-        name="debug_access", description="Sprawdza alternatywny dostęp dla użytkownika"
-    )
+    @commands.hybrid_command(name="debug_access", description="Sprawdza alternatywny dostęp dla użytkownika")
     @discord.app_commands.describe(
         target="Użytkownik do sprawdzenia (opcjonalnie, domyślnie sprawdza ciebie)",
     )
@@ -137,9 +119,7 @@ class AdminCommands:
 
         # Cache statistics
         cache_total = metrics["cache_hits"] + metrics["cache_misses"]
-        cache_hit_rate = (
-            (metrics["cache_hits"] / cache_total * 100) if cache_total > 0 else 0
-        )
+        cache_hit_rate = (metrics["cache_hits"] / cache_total * 100) if cache_total > 0 else 0
 
         embed = discord.Embed(
             title="📊 Voice System Statistics",
@@ -191,7 +171,7 @@ class AdminCommands:
                 channel = self.bot.get_channel(channel_id)
                 if channel:
                     active_list.append(f"• {channel.name} ({len(channel.members)} users)")
-            
+
             if active_list:
                 embed.add_field(
                     name="🔊 Active Channels (Top 10)",

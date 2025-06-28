@@ -2,8 +2,10 @@
 """Test ranking command fix."""
 
 import asyncio
-import aiohttp
 import json
+
+import aiohttp
+
 
 async def test_ranking():
     async with aiohttp.ClientSession() as session:

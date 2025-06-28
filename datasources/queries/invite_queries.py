@@ -30,7 +30,7 @@ class InviteQueries:
         try:
             # Import here to avoid circular imports
             from .member_queries import MemberQueries
-            
+
             if creator_id:
                 await MemberQueries.get_or_add_member(session, creator_id)
             invite = await session.get(Invite, invite_id)
@@ -69,20 +69,12 @@ class InviteQueries:
         now = datetime.now(timezone.utc)
         cutoff_date = now - timedelta(days=days)
 
-        query = select(Invite).where(
-            and_(Invite.last_used_at < cutoff_date, Invite.uses <= max_uses)
-        )
+        query = select(Invite).where(and_(Invite.last_used_at < cutoff_date, Invite.uses <= max_uses))
 
         if sort_by == "uses":
-            query = query.order_by(
-                Invite.uses.asc() if order == "asc" else Invite.uses.desc()
-            )
+            query = query.order_by(Invite.uses.asc() if order == "asc" else Invite.uses.desc())
         elif sort_by == "last_used_at":
-            query = query.order_by(
-                Invite.last_used_at.asc()
-                if order == "asc"
-                else Invite.last_used_at.desc()
-            )
+            query = query.order_by(Invite.last_used_at.asc() if order == "asc" else Invite.last_used_at.desc())
         else:
             query = query.order_by(Invite.uses.asc(), Invite.last_used_at.asc())
 
@@ -104,18 +96,12 @@ class InviteQueries:
         return result.scalar_one()
 
     @staticmethod
-    async def get_sorted_invites(
-        session: AsyncSession, sort_by: str = "uses", order: str = "desc"
-    ) -> List[Invite]:
+    async def get_sorted_invites(session: AsyncSession, sort_by: str = "uses", order: str = "desc") -> List[Invite]:
         query = select(Invite)
         if sort_by == "uses":
-            query = query.order_by(
-                desc(Invite.uses) if order == "desc" else asc(Invite.uses)
-            )
+            query = query.order_by(desc(Invite.uses) if order == "desc" else asc(Invite.uses))
         elif sort_by == "created_at":
-            query = query.order_by(
-                desc(Invite.created_at) if order == "desc" else asc(Invite.created_at)
-            )
+            query = query.order_by(desc(Invite.created_at) if order == "desc" else asc(Invite.created_at))
 
         result = await session.execute(query)
         return result.scalars().all()
@@ -178,9 +164,7 @@ class InviteQueries:
             return 0
 
     @staticmethod
-    async def get_member_valid_invite_count(
-        session: AsyncSession, member_id: int, guild, min_days: int = 7
-    ) -> int:
+    async def get_member_valid_invite_count(session: AsyncSession, member_id: int, guild, min_days: int = 7) -> int:
         """
         Get count of valid invites for a specific member (like in legacy system).
         Only counts users who:
@@ -233,7 +217,5 @@ class InviteQueries:
             return valid_count
 
         except Exception as e:
-            logger.error(
-                f"Error getting valid invite count for member {member_id}: {e}"
-            )
+            logger.error(f"Error getting valid invite count for member {member_id}: {e}")
             return 0

@@ -49,9 +49,7 @@ class VoiceChannelManager:
         limit_text = "brak limitu" if max_members == 0 else str(max_members)
         await self.message_sender.send_member_limit_set(ctx, voice_channel, limit_text)
 
-    async def get_channel_info(
-        self, channel: discord.VoiceChannel, member: discord.Member
-    ):
+    async def get_channel_info(self, channel: discord.VoiceChannel, member: discord.Member):
         """Get voice channel information including permissions and roles."""
         # Lista uprawnień do sprawdzenia
         permissions_to_check = {
@@ -106,23 +104,16 @@ class ChannelModManager:
             t
             for t, overwrite in voice_channel.overwrites.items()
             if isinstance(t, discord.Member)
-            and overwrite.manage_messages
-            is True  # Musi być dokładnie True (nie None ani False)
-            and not (
-                overwrite.priority_speaker is True and t == ctx.author
-            )  # Wykluczamy tylko właściciela kanału
+            and overwrite.manage_messages is True  # Musi być dokładnie True (nie None ani False)
+            and not (overwrite.priority_speaker is True and t == ctx.author)  # Wykluczamy tylko właściciela kanału
         ]
 
-        current_mods_mentions = ", ".join(
-            [member.mention for member in current_mods if member != ctx.author]
-        )
+        current_mods_mentions = ", ".join([member.mention for member in current_mods if member != ctx.author])
         if not current_mods_mentions:
             current_mods_mentions = "brak"
 
         remaining_slots = max(0, mod_limit - len(current_mods))
-        await self.message_sender.send_mod_info(
-            ctx, current_mods_mentions, mod_limit, remaining_slots
-        )
+        await self.message_sender.send_mod_info(ctx, current_mods_mentions, mod_limit, remaining_slots)
 
     async def check_prerequisites(self, ctx, target, can_manage):
         """Checks prerequisites for assigning channel mod."""
@@ -133,9 +124,7 @@ class ChannelModManager:
             await self.message_sender.send_not_in_voice_channel(ctx)
             return False
 
-        if not await self.permission_manager.can_assign_channel_mod(
-            author, voice_channel
-        ):
+        if not await self.permission_manager.can_assign_channel_mod(author, voice_channel):
             await self.message_sender.send_no_mod_permission(ctx)
             return False
 
@@ -145,9 +134,7 @@ class ChannelModManager:
 
         return True
 
-    async def can_add_mod(
-        self, user: discord.Member, voice_channel: discord.VoiceChannel
-    ) -> bool:
+    async def can_add_mod(self, user: discord.Member, voice_channel: discord.VoiceChannel) -> bool:
         """
         Check if user can add another moderator (limit not exceeded).
 
@@ -170,9 +157,7 @@ class ChannelModManager:
         current_mods = [
             t
             for t, overwrite in voice_channel.overwrites.items()
-            if isinstance(t, discord.Member)
-            and overwrite.manage_messages is True
-            and not overwrite.priority_speaker
+            if isinstance(t, discord.Member) and overwrite.manage_messages is True and not overwrite.priority_speaker
         ]
 
         return len(current_mods) < mod_limit
@@ -203,9 +188,7 @@ class ChannelModManager:
         # Sprawdź role od najwyższej do najniższej
         for role_config in reversed(premium_roles):
             if role_config["name"] in member_roles:
-                logger.info(
-                    f"Found matching role: {role_config}, limit: {role_config['moderator_count']}"
-                )
+                logger.info(f"Found matching role: {role_config}, limit: {role_config['moderator_count']}")
                 return role_config["moderator_count"]
 
         return 0

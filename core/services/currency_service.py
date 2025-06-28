@@ -2,7 +2,7 @@
 
 import logging
 
-from core.exceptions import ValidationError, DomainError
+from core.exceptions import DomainError, ValidationError
 from core.interfaces.currency_interfaces import ICurrencyService
 from core.services.base_service import BaseService
 
@@ -42,13 +42,13 @@ class CurrencyService(BaseService, ICurrencyService):
         - 999G -> 999 PLN
         - 999.70G -> 999 PLN
         - 998.98G -> 998 PLN
-        
+
         Args:
             amount_g: Amount in G currency
-            
+
         Returns:
             Amount in PLN with proper rounding
-            
+
         Raises:
             ValidationError: If amount is invalid
         """
@@ -57,9 +57,9 @@ class CurrencyService(BaseService, ICurrencyService):
                 "Invalid amount for conversion",
                 field="amount_g",
                 value=amount_g,
-                user_message=f"Nieprawidłowa kwota: {amount_g}"
+                user_message=f"Nieprawidłowa kwota: {amount_g}",
             )
-        
+
         try:
             # Convert to PLN
             amount_pln = amount_g / self.PLN_TO_G_RATIO
@@ -89,16 +89,16 @@ class CurrencyService(BaseService, ICurrencyService):
             raise DomainError(
                 f"Failed to convert {amount_g}G to PLN: {str(e)}",
                 domain="currency",
-                user_message="Błąd podczas konwersji waluty"
+                user_message="Błąd podczas konwersji waluty",
             ) from e
 
     def pln_to_g(self, amount_pln: float) -> int:
         """
         Convert PLN to G currency.
-        
+
         Args:
             amount_pln: Amount in PLN
-            
+
         Returns:
             Amount in G currency
         """
@@ -118,11 +118,11 @@ class CurrencyService(BaseService, ICurrencyService):
     def format_currency(self, amount: int, show_unit: bool = True) -> str:
         """
         Format currency amount for display.
-        
+
         Args:
             amount: Amount to format
             show_unit: Whether to include currency unit
-            
+
         Returns:
             Formatted currency string
         """
@@ -139,30 +139,30 @@ class CurrencyService(BaseService, ICurrencyService):
     def validate_amount(self, amount: int) -> bool:
         """
         Validate if currency amount is valid.
-        
+
         Args:
             amount: Amount to validate
-            
+
         Returns:
             True if amount is valid
-            
+
         Raises:
             ValidationError: If amount is invalid (when strict=True)
         """
         try:
             # Check if amount is a non-negative integer
             is_valid = isinstance(amount, int) and amount >= 0
-            
+
             self._log_operation(
                 "validate_amount",
                 amount=amount,
                 is_valid=is_valid,
             )
-            
+
             if not is_valid:
                 # Log but don't raise - this method returns bool
                 self.logger.warning(f"Invalid amount: {amount} (type: {type(amount)})")
-            
+
             return is_valid
 
         except Exception as e:

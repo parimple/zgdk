@@ -2,11 +2,13 @@
 Test client wrapper for Discord bot testing.
 """
 
-import aiohttp
 import asyncio
-from typing import Dict, Any, Optional, Union
+from typing import Any, Dict, Optional, Union
 from unittest.mock import MagicMock
-from tests.config import API_BASE_URL, CONNECTION_TIMEOUT, COMMAND_TIMEOUT
+
+import aiohttp
+
+from tests.config import API_BASE_URL, COMMAND_TIMEOUT, CONNECTION_TIMEOUT
 
 
 class TestClient:

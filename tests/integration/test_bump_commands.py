@@ -1,11 +1,12 @@
 """Integration tests for bump commands."""
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-import discord
-from discord.ext import commands
 import datetime
 from datetime import timezone
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import discord
+import pytest
+from discord.ext import commands
 
 
 @pytest.mark.asyncio
@@ -14,7 +15,7 @@ async def test_bump_status_command():
     # Import the cog
     from cogs.events.bump.bump_event import OnBumpEvent
     from cogs.events.bump.status import BumpStatusHandler
-    
+
     # Create mock bot
     bot = MagicMock()
     bot.config = {
@@ -66,7 +67,7 @@ async def test_disboard_bump_detection():
     """Test DISBOARD bump detection."""
     from cogs.events.bump.bump_event import OnBumpEvent
     from cogs.events.bump.constants import DISBOARD
-    
+
     # Create mock bot
     bot = MagicMock()
     bot.config = {"prefix": ","}
@@ -108,7 +109,7 @@ async def test_disboard_bump_detection():
 async def test_bump_command_error_handling():
     """Test bump command error handling."""
     from cogs.events.bump.bump_event import OnBumpEvent
-    
+
     # Create mock bot
     bot = MagicMock()
     bot.config = {"prefix": ","}

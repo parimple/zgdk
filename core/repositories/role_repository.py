@@ -53,7 +53,9 @@ class RoleRepository(BaseRepository):
             self.logger.error(f"Error getting roles for member {member_id}: {e}")
             raise
 
-    async def get_expired_roles(self, current_time: datetime, role_type: Optional[str] = None, role_ids: Optional[List[int]] = None) -> list[dict]:
+    async def get_expired_roles(
+        self, current_time: datetime, role_type: Optional[str] = None, role_ids: Optional[List[int]] = None
+    ) -> list[dict]:
         """Get all roles that have expired."""
         try:
             stmt = (
@@ -97,9 +99,7 @@ class RoleRepository(BaseRepository):
             self.logger.error(f"Error getting expired roles: {e}")
             raise
 
-    async def get_role_by_member_and_type(
-        self, member_id: int, role_type: str
-    ) -> Optional[dict]:
+    async def get_role_by_member_and_type(self, member_id: int, role_type: str) -> Optional[dict]:
         """Get specific role type for a member."""
         try:
             stmt = (
@@ -122,48 +122,34 @@ class RoleRepository(BaseRepository):
                     "role_type": role.role_type,
                     "role_name": role.name,
                 }
-                self.logger.debug(
-                    f"Found {role_type} role for member {member_id}: {role.name}"
-                )
+                self.logger.debug(f"Found {role_type} role for member {member_id}: {role.name}")
                 return role_data
 
             self.logger.debug(f"No {role_type} role found for member {member_id}")
             return None
 
         except Exception as e:
-            self.logger.error(
-                f"Error getting {role_type} role for member {member_id}: {e}"
-            )
+            self.logger.error(f"Error getting {role_type} role for member {member_id}: {e}")
             raise
 
-    async def extend_role_expiry(
-        self, member_id: int, role_id: int, new_expiry: datetime
-    ) -> bool:
+    async def extend_role_expiry(self, member_id: int, role_id: int, new_expiry: datetime) -> bool:
         """Extend role expiry time."""
         try:
-            stmt = select(MemberRole).where(
-                MemberRole.member_id == member_id, MemberRole.role_id == role_id
-            )
+            stmt = select(MemberRole).where(MemberRole.member_id == member_id, MemberRole.role_id == role_id)
             result = await self.session.execute(stmt)
             member_role = result.scalar_one_or_none()
 
             if member_role:
                 member_role.expiration_date = new_expiry
                 await self.session.flush()
-                self.logger.debug(
-                    f"Extended role expiry for member {member_id}, role {role_id} to {new_expiry}"
-                )
+                self.logger.debug(f"Extended role expiry for member {member_id}, role {role_id} to {new_expiry}")
                 return True
 
-            self.logger.warning(
-                f"Cannot extend expiry - role not found: member {member_id}, role {role_id}"
-            )
+            self.logger.warning(f"Cannot extend expiry - role not found: member {member_id}, role {role_id}")
             return False
 
         except Exception as e:
-            self.logger.error(
-                f"Error extending role expiry for member {member_id}, role {role_id}: {e}"
-            )
+            self.logger.error(f"Error extending role expiry for member {member_id}, role {role_id}: {e}")
             raise
 
     async def get_role_by_id(self, role_id: int) -> Optional[Role]:
@@ -195,19 +181,11 @@ class RoleRepository(BaseRepository):
             raise
 
     async def add_member_role(
-        self, 
-        member_id: int, 
-        role_id: int, 
-        expiration_date: Optional[datetime] = None,
-        role_type: str = "temporary"
+        self, member_id: int, role_id: int, expiration_date: Optional[datetime] = None, role_type: str = "temporary"
     ) -> MemberRole:
         """Add a role to a member."""
         try:
-            member_role = MemberRole(
-                member_id=member_id,
-                role_id=role_id,
-                expiration_date=expiration_date
-            )
+            member_role = MemberRole(member_id=member_id, role_id=role_id, expiration_date=expiration_date)
             self.session.add(member_role)
             await self.session.flush()
             return member_role
@@ -222,9 +200,7 @@ class RoleRepository(BaseRepository):
     async def get_member_role(self, member_id: int, role_id: int) -> Optional[MemberRole]:
         """Get a specific member role."""
         try:
-            stmt = select(MemberRole).where(
-                and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id)
-            )
+            stmt = select(MemberRole).where(and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id))
             result = await self.session.execute(stmt)
             return result.scalar_one_or_none()
         except Exception as e:
@@ -244,9 +220,7 @@ class RoleRepository(BaseRepository):
     async def remove_member_role(self, member_id: int, role_id: int) -> bool:
         """Remove a role from a member."""
         try:
-            stmt = delete(MemberRole).where(
-                and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id)
-            )
+            stmt = delete(MemberRole).where(and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id))
             result = await self.session.execute(stmt)
             await self.session.flush()
             return result.rowcount > 0
@@ -254,9 +228,7 @@ class RoleRepository(BaseRepository):
             self.logger.error(f"Error removing role: {e}")
             raise
 
-    async def update_role_expiry(
-        self, member_id: int, role_id: int, new_expiry: datetime
-    ) -> Optional[MemberRole]:
+    async def update_role_expiry(self, member_id: int, role_id: int, new_expiry: datetime) -> Optional[MemberRole]:
         """Update role expiry time."""
         try:
             member_role = await self.get_member_role(member_id, role_id)
@@ -268,7 +240,6 @@ class RoleRepository(BaseRepository):
         except Exception as e:
             self.logger.error(f"Error updating role expiry: {e}")
             raise
-
 
     async def create_role(self, role_id: int, role_name: str, role_type: str = "premium") -> Role:
         """Create a new role."""
@@ -290,15 +261,11 @@ class RoleRepository(BaseRepository):
             member_role = await self.session.get(MemberRole, (member_id, role_id))
 
             # Calculate expiration date (if duration is None, set it to None for permanent)
-            expiration_date = (
-                None if duration is None else datetime.now(timezone.utc) + duration
-            )
+            expiration_date = None if duration is None else datetime.now(timezone.utc) + duration
 
             if member_role:
                 member_role.expiration_date = expiration_date
-                logger.info(
-                    f"Updated expiration date for role {role_id} of member {member_id}"
-                )
+                logger.info(f"Updated expiration date for role {role_id} of member {member_id}")
             else:
                 member_role = MemberRole(
                     member_id=member_id,
@@ -307,10 +274,10 @@ class RoleRepository(BaseRepository):
                 )
                 self.session.add(member_role)
                 logger.info(f"Added new role {role_id} to member {member_id}")
-            
+
             await self.session.flush()
             return True
-            
+
         except IntegrityError as e:
             await self.session.rollback()
             logger.error(
@@ -336,16 +303,12 @@ class RoleRepository(BaseRepository):
         """Delete a role from a member using raw SQL for safety."""
         try:
             # Use raw SQL for safe deletion
-            sql = text(
-                "DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
-            )
+            sql = text("DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
             await self.session.execute(sql, {"member_id": member_id, "role_id": role_id})
             logger.info(f"Deleted role {role_id} for member {member_id} using raw SQL")
             return True
         except Exception as e:
-            logger.error(
-                f"Error deleting role {role_id} for member {member_id}: {str(e)}"
-            )
+            logger.error(f"Error deleting role {role_id} for member {member_id}: {str(e)}")
             return False
 
     async def get_member_premium_roles(self, member_id: int) -> List[Tuple[MemberRole, Role]]:
@@ -354,9 +317,7 @@ class RoleRepository(BaseRepository):
             stmt = (
                 select(MemberRole, Role)
                 .join(Role, MemberRole.role_id == Role.id)
-                .where(
-                    (MemberRole.member_id == member_id) & (Role.role_type == "premium")
-                )
+                .where((MemberRole.member_id == member_id) & (Role.role_type == "premium"))
             )
             result = await self.session.execute(stmt)
             fetched_roles = result.all()
@@ -399,7 +360,7 @@ class RoleRepository(BaseRepository):
             )
             if role_type:
                 stmt = stmt.join(Role).where(Role.role_type == role_type)
-            
+
             result = await self.session.execute(stmt)
             return result.scalars().all()
         except Exception as e:
@@ -429,9 +390,7 @@ class RoleRepository(BaseRepository):
             logger.error(f"Error updating role expiration date: {str(e)}")
             raise
 
-    async def update_role_expiration_date_direct(
-        self, member_id: int, role_id: int, new_expiry: datetime
-    ) -> bool:
+    async def update_role_expiration_date_direct(self, member_id: int, role_id: int, new_expiry: datetime) -> bool:
         """Update role expiration date directly to a specific datetime."""
         try:
             stmt = select(MemberRole).where(
@@ -468,11 +427,7 @@ class RoleRepository(BaseRepository):
     async def get_role_members(self, role_id: int) -> List[MemberRole]:
         """Get all members that have a specific role."""
         try:
-            stmt = (
-                select(MemberRole)
-                .options(joinedload(MemberRole.role))
-                .where(MemberRole.role_id == role_id)
-            )
+            stmt = select(MemberRole).options(joinedload(MemberRole.role)).where(MemberRole.role_id == role_id)
             result = await self.session.execute(stmt)
             return result.scalars().all()
         except Exception as e:

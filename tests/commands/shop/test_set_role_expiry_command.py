@@ -1,13 +1,12 @@
 """
 Test set_role_expiry command as individual functions with proper validation
 """
-import pytest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
-from datetime import datetime, timezone, timedelta
 
-from tests.data.test_constants import (
-    TEST_USER_1_ID, PREMIUM_ROLES_CONFIG, ERROR_MESSAGES
-)
+import pytest
+
+from tests.data.test_constants import ERROR_MESSAGES, PREMIUM_ROLES_CONFIG, TEST_USER_1_ID
 
 
 def test_role_expiry_time_calculation():

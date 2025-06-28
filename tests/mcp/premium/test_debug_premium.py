@@ -1,9 +1,10 @@
 """Debug premium system configuration."""
 
 import asyncio
-import aiohttp
 import json
 from datetime import datetime
+
+import aiohttp
 
 
 async def test_debug_premium():

@@ -2,8 +2,10 @@
 """Test commands through MCP."""
 
 import asyncio
-import aiohttp
 import sys
+
+import aiohttp
+
 
 async def test_command(command, args=""):
     """Test a single command through API."""

@@ -1,16 +1,16 @@
 """
 Test utilities
 """
+from .commands_stub import install_commands_stub
 from .mock_helpers import (
+    create_shop_cog_with_mocks,
     make_async_cm,
     make_mock_bot,
     make_mock_context,
-    make_mock_user,
     make_mock_member,
+    make_mock_user,
     patch_shop_queries,
-    create_shop_cog_with_mocks
 )
-from .commands_stub import install_commands_stub
 
 __all__ = [
     'make_async_cm',
@@ -25,12 +25,8 @@ __all__ = [
 
 # New test utilities for command testing
 try:
+    from .assertions import assert_has_timestamp, assert_premium_info, assert_user_mentioned
     from .client import TestClient
-    from .assertions import (
-        assert_user_mentioned,
-        assert_has_timestamp,
-        assert_premium_info
-    )
     
     __all__.extend([
         "TestClient",

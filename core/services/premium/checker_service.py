@@ -65,7 +65,7 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
         """Get the name of the highest priority premium role of a member."""
         highest_priority = 0
         highest_role_name = None
-        
+
         for role in member.roles:
             role_name = role.name
             if role_name in self.PREMIUM_PRIORITY:
@@ -73,7 +73,7 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
                 if priority > highest_priority:
                     highest_priority = priority
                     highest_role_name = role_name
-                    
+
         return highest_role_name
 
     async def has_premium_role(self, member: discord.Member) -> bool:
@@ -85,10 +85,7 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
             return cached_result
 
         # Check member roles
-        result = any(
-            role.name in self.PREMIUM_PRIORITY
-            for role in member.roles
-        )
+        result = any(role.name in self.PREMIUM_PRIORITY for role in member.roles)
 
         # Cache the result
         await self.cache_service.set(cache_key, result)
@@ -104,10 +101,10 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
             db_member = await MemberQueries.get_or_add_member(
                 session, member.id, wallet_balance=0, joined_at=member.joined_at
             )
-            
+
             if db_member.bypass_expiry:
                 return db_member.bypass_expiry > datetime.now(timezone.utc)
-                
+
         return False
 
     def has_booster_roles(self, member: discord.Member) -> bool:
@@ -118,24 +115,25 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
         """Check if member has Discord invite link in status."""
         if not member.activities:
             return False
-            
+
         custom_status = None
         for activity in member.activities:
             if isinstance(activity, discord.CustomActivity):
                 custom_status = activity
                 break
-                
+
         if not custom_status or not custom_status.name:
             return False
-            
+
         # Check for discord invite patterns
         invite_patterns = [
             r"discord\.gg/[a-zA-Z0-9]+",
             r"discord\.com/invite/[a-zA-Z0-9]+",
             r"discordapp\.com/invite/[a-zA-Z0-9]+",
         ]
-        
+
         import re
+
         status_text = custom_status.name.lower()
         for pattern in invite_patterns:
             if re.search(pattern, status_text, re.IGNORECASE):
@@ -143,10 +141,10 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
                 our_invites = ["discord.gg/zagadka", "discord.gg/dVbm39mSZH"]
                 if not any(invite.lower() in status_text for invite in our_invites):
                     return False
-                    
+
                 # Check for ♵ role
                 return any(role.id == self.INVITE_ROLE_ID for role in member.roles)
-                
+
         return False
 
     async def has_alternative_bypass_access(self, member: discord.Member) -> bool:
@@ -159,15 +157,15 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
 
         # Check various bypass methods
         has_bypass = False
-        
+
         # Check active bypass time (T)
         if await self.has_active_bypass(member):
             has_bypass = True
-            
+
         # Check booster role
         elif self.has_booster_roles(member):
             has_bypass = True
-            
+
         # Check invite in status
         elif self.has_discord_invite_in_status(member):
             has_bypass = True
@@ -183,19 +181,17 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
                 return tier
         return CommandTier.TIER_0
 
-    async def has_bypass_permissions(
-        self, member: discord.Member, command_name: Optional[str] = None
-    ) -> bool:
+    async def has_bypass_permissions(self, member: discord.Member, command_name: Optional[str] = None) -> bool:
         """Check if member has bypass permissions for a specific command or generally."""
         # Check premium role first
         if await self.has_premium_role(member):
             if not command_name:
                 return True
-                
+
             # Check command tier requirements
             tier = await self.get_command_tier(command_name)
             member_level = self.get_user_highest_role_priority(member)
-            
+
             # Map priority to tier access
             tier_access = {
                 0: [CommandTier.TIER_0],
@@ -204,13 +200,13 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
                 3: [CommandTier.TIER_0, CommandTier.TIER_1, CommandTier.TIER_2, CommandTier.TIER_3],
                 4: [CommandTier.TIER_0, CommandTier.TIER_1, CommandTier.TIER_2, CommandTier.TIER_3],
             }
-            
+
             return tier in tier_access.get(member_level, [])
-            
+
         # Check alternative bypass for Tier T commands
         if command_name and await self.get_command_tier(command_name) == CommandTier.TIER_T:
             return await self.has_alternative_bypass_access(member)
-            
+
         return False
 
     async def get_member_premium_status(self, member: discord.Member) -> dict[str, Any]:
@@ -221,7 +217,7 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
             has_bypass = await self.has_active_bypass(member)
             has_booster = self.has_booster_roles(member)
             has_invite = self.has_discord_invite_in_status(member)
-            
+
             status = {
                 "has_premium": has_premium,
                 "premium_role": premium_role,
@@ -231,10 +227,10 @@ class PremiumCheckerService(BaseService, IPremiumChecker):
                 "has_invite": has_invite,
                 "has_any_access": has_premium or has_bypass or has_booster or has_invite,
             }
-            
+
             self._log_operation("get_member_premium_status", member_id=member.id)
             return status
-            
+
         except Exception as e:
             self._log_error("get_member_premium_status", e, member_id=member.id)
             return {

@@ -26,7 +26,7 @@ class InviteRepository(BaseRepository):
                 func.count(Invite.id).label("total_invites"),
                 func.sum(Invite.uses).label("total_uses"),
                 func.min(Invite.created_at).label("first_invite"),
-                func.max(Invite.last_used_at).label("last_used")
+                func.max(Invite.last_used_at).label("last_used"),
             ).where(Invite.creator_id == creator_id)
 
             result = await self.session.execute(query)
@@ -36,25 +36,16 @@ class InviteRepository(BaseRepository):
                 "total_invites": row.total_invites or 0,
                 "total_uses": row.total_uses or 0,
                 "first_invite": row.first_invite,
-                "last_used": row.last_used
+                "last_used": row.last_used,
             }
 
-            self._log_operation(
-                "get_invite_stats",
-                creator_id=creator_id,
-                **stats
-            )
+            self._log_operation("get_invite_stats", creator_id=creator_id, **stats)
 
             return stats
 
         except Exception as e:
             self._log_error("get_invite_stats", e, creator_id=creator_id)
-            return {
-                "total_invites": 0,
-                "total_uses": 0,
-                "first_invite": None,
-                "last_used": None
-            }
+            return {"total_invites": 0, "total_uses": 0, "first_invite": None, "last_used": None}
 
     async def create_invite(
         self,
@@ -68,22 +59,12 @@ class InviteRepository(BaseRepository):
             if created_at is None:
                 created_at = datetime.now(timezone.utc)
 
-            invite = Invite(
-                id=invite_code,
-                creator_id=creator_id,
-                uses=uses,
-                created_at=created_at
-            )
+            invite = Invite(id=invite_code, creator_id=creator_id, uses=uses, created_at=created_at)
 
             self.session.add(invite)
             await self.session.flush()
 
-            self._log_operation(
-                "create_invite",
-                invite_code=invite_code,
-                creator_id=creator_id,
-                uses=uses
-            )
+            self._log_operation("create_invite", invite_code=invite_code, creator_id=creator_id, uses=uses)
 
             return invite
 
@@ -92,10 +73,7 @@ class InviteRepository(BaseRepository):
             raise
 
     async def update_invite_usage(
-        self,
-        invite_code: str,
-        new_uses: int,
-        last_used_at: Optional[datetime] = None
+        self, invite_code: str, new_uses: int, last_used_at: Optional[datetime] = None
     ) -> bool:
         """Update invite usage count and last used timestamp."""
         try:
@@ -111,11 +89,7 @@ class InviteRepository(BaseRepository):
 
             await self.session.flush()
 
-            self._log_operation(
-                "update_invite_usage",
-                invite_code=invite_code,
-                new_uses=new_uses
-            )
+            self._log_operation("update_invite_usage", invite_code=invite_code, new_uses=new_uses)
 
             return True
 
@@ -126,18 +100,12 @@ class InviteRepository(BaseRepository):
     async def get_invites_by_creator(self, creator_id: int) -> list[Invite]:
         """Get all invites created by a specific member."""
         try:
-            query = select(Invite).where(
-                Invite.creator_id == creator_id
-            ).order_by(Invite.created_at.desc())
+            query = select(Invite).where(Invite.creator_id == creator_id).order_by(Invite.created_at.desc())
 
             result = await self.session.execute(query)
             invites = list(result.scalars().all())
 
-            self._log_operation(
-                "get_invites_by_creator",
-                creator_id=creator_id,
-                count=len(invites)
-            )
+            self._log_operation("get_invites_by_creator", creator_id=creator_id, count=len(invites))
 
             return invites
 
@@ -148,20 +116,12 @@ class InviteRepository(BaseRepository):
     async def get_most_used_invites(self, limit: int = 10) -> list[Invite]:
         """Get invites with highest usage."""
         try:
-            query = select(Invite).where(
-                Invite.uses > 0
-            ).order_by(
-                Invite.uses.desc()
-            ).limit(limit)
+            query = select(Invite).where(Invite.uses > 0).order_by(Invite.uses.desc()).limit(limit)
 
             result = await self.session.execute(query)
             invites = list(result.scalars().all())
 
-            self._log_operation(
-                "get_most_used_invites",
-                limit=limit,
-                count=len(invites)
-            )
+            self._log_operation("get_most_used_invites", limit=limit, count=len(invites))
 
             return invites
 
@@ -173,31 +133,30 @@ class InviteRepository(BaseRepository):
         """Get invite leaderboard (optimized single query)."""
         try:
             # Single aggregated query
-            query = select(
-                Invite.creator_id,
-                func.count(Invite.id).label("total_invites"),
-                func.sum(Invite.uses).label("total_uses")
-            ).group_by(
-                Invite.creator_id
-            ).order_by(
-                func.sum(Invite.uses).desc()
-            ).limit(limit)
+            query = (
+                select(
+                    Invite.creator_id,
+                    func.count(Invite.id).label("total_invites"),
+                    func.sum(Invite.uses).label("total_uses"),
+                )
+                .group_by(Invite.creator_id)
+                .order_by(func.sum(Invite.uses).desc())
+                .limit(limit)
+            )
 
             result = await self.session.execute(query)
-            
+
             leaderboard = []
             for row in result:
-                leaderboard.append({
-                    "creator_id": row.creator_id,
-                    "total_invites": row.total_invites or 0,
-                    "total_uses": row.total_uses or 0
-                })
+                leaderboard.append(
+                    {
+                        "creator_id": row.creator_id,
+                        "total_invites": row.total_invites or 0,
+                        "total_uses": row.total_uses or 0,
+                    }
+                )
 
-            self._log_operation(
-                "get_invite_leaderboard",
-                limit=limit,
-                count=len(leaderboard)
-            )
+            self._log_operation("get_invite_leaderboard", limit=limit, count=len(leaderboard))
 
             return leaderboard
 
@@ -208,15 +167,10 @@ class InviteRepository(BaseRepository):
     async def cleanup_unused_invites(self, days_old: int = 30) -> int:
         """Remove invites that haven't been used in specified days."""
         try:
-            cutoff_date = datetime.now(timezone.utc).replace(
-                day=datetime.now(timezone.utc).day - days_old
-            )
+            cutoff_date = datetime.now(timezone.utc).replace(day=datetime.now(timezone.utc).day - days_old)
 
             # Find unused invites older than cutoff
-            query = select(Invite).where(
-                Invite.uses == 0,
-                Invite.created_at < cutoff_date
-            )
+            query = select(Invite).where(Invite.uses == 0, Invite.created_at < cutoff_date)
 
             result = await self.session.execute(query)
             old_invites = list(result.scalars().all())
@@ -229,11 +183,7 @@ class InviteRepository(BaseRepository):
 
             await self.session.flush()
 
-            self._log_operation(
-                "cleanup_unused_invites",
-                days_old=days_old,
-                cleaned=count
-            )
+            self._log_operation("cleanup_unused_invites", days_old=days_old, cleaned=count)
 
             return count
 
@@ -258,9 +208,10 @@ class InviteRepository(BaseRepository):
             # Get or create creator member if provided
             if creator_id:
                 from .member_repository import MemberRepository
+
                 member_repo = MemberRepository(self.session)
                 await member_repo.get_or_create(creator_id)
-            
+
             invite = await self.get_by_id(invite_id)
             if invite is None:
                 invite = Invite(
@@ -278,18 +229,13 @@ class InviteRepository(BaseRepository):
                 invite.uses = uses
                 if last_used_at is not None:
                     invite.last_used_at = last_used_at
-            
+
             await self.session.flush()
-            
-            self._log_operation(
-                "add_or_update_invite",
-                invite_id=invite_id,
-                creator_id=creator_id,
-                uses=uses
-            )
-            
+
+            self._log_operation("add_or_update_invite", invite_id=invite_id, creator_id=creator_id, uses=uses)
+
             return invite
-            
+
         except Exception as e:
             self._log_error("add_or_update_invite", e, invite_id=invite_id)
             await self.session.rollback()
@@ -306,24 +252,16 @@ class InviteRepository(BaseRepository):
         """Get inactive invites based on criteria."""
         try:
             from datetime import timedelta
+
             now = datetime.now(timezone.utc)
             cutoff_date = now - timedelta(days=days)
 
-            query = select(Invite).where(
-                Invite.last_used_at < cutoff_date,
-                Invite.uses <= max_uses
-            )
+            query = select(Invite).where(Invite.last_used_at < cutoff_date, Invite.uses <= max_uses)
 
             if sort_by == "uses":
-                query = query.order_by(
-                    Invite.uses.asc() if order == "asc" else Invite.uses.desc()
-                )
+                query = query.order_by(Invite.uses.asc() if order == "asc" else Invite.uses.desc())
             elif sort_by == "last_used_at":
-                query = query.order_by(
-                    Invite.last_used_at.asc()
-                    if order == "asc"
-                    else Invite.last_used_at.desc()
-                )
+                query = query.order_by(Invite.last_used_at.asc() if order == "asc" else Invite.last_used_at.desc())
             else:
                 query = query.order_by(Invite.uses.asc(), Invite.last_used_at.asc())
 
@@ -331,16 +269,11 @@ class InviteRepository(BaseRepository):
 
             result = await self.session.execute(query)
             invites = list(result.scalars().all())
-            
-            self._log_operation(
-                "get_inactive_invites",
-                days=days,
-                max_uses=max_uses,
-                count=len(invites)
-            )
-            
+
+            self._log_operation("get_inactive_invites", days=days, max_uses=max_uses, count=len(invites))
+
             return invites
-            
+
         except Exception as e:
             self._log_error("get_inactive_invites", e)
             return []
@@ -352,11 +285,11 @@ class InviteRepository(BaseRepository):
             if invite:
                 await self.session.delete(invite)
                 await self.session.flush()
-                
+
                 self._log_operation("delete_invite", invite_id=invite_id)
                 return True
             return False
-            
+
         except Exception as e:
             self._log_error("delete_invite", e, invite_id=invite_id)
             return False
@@ -364,47 +297,34 @@ class InviteRepository(BaseRepository):
     async def get_invite_count(self) -> int:
         """Get total count of invites."""
         try:
-            result = await self.session.execute(
-                select(func.count()).select_from(Invite)
-            )
+            result = await self.session.execute(select(func.count()).select_from(Invite))
             count = result.scalar_one()
-            
+
             self._log_operation("get_invite_count", count=count)
             return count
-            
+
         except Exception as e:
             self._log_error("get_invite_count", e)
             return 0
 
-    async def get_sorted_invites(
-        self, sort_by: str = "uses", order: str = "desc"
-    ) -> list[Invite]:
+    async def get_sorted_invites(self, sort_by: str = "uses", order: str = "desc") -> list[Invite]:
         """Get all invites sorted by specified field."""
         try:
             from sqlalchemy import asc, desc
-            
+
             query = select(Invite)
             if sort_by == "uses":
-                query = query.order_by(
-                    desc(Invite.uses) if order == "desc" else asc(Invite.uses)
-                )
+                query = query.order_by(desc(Invite.uses) if order == "desc" else asc(Invite.uses))
             elif sort_by == "created_at":
-                query = query.order_by(
-                    desc(Invite.created_at) if order == "desc" else asc(Invite.created_at)
-                )
+                query = query.order_by(desc(Invite.created_at) if order == "desc" else asc(Invite.created_at))
 
             result = await self.session.execute(query)
             invites = list(result.scalars().all())
-            
-            self._log_operation(
-                "get_sorted_invites",
-                sort_by=sort_by,
-                order=order,
-                count=len(invites)
-            )
-            
+
+            self._log_operation("get_sorted_invites", sort_by=sort_by, order=order, count=len(invites))
+
             return invites
-            
+
         except Exception as e:
             self._log_error("get_sorted_invites", e)
             return []
@@ -414,10 +334,10 @@ class InviteRepository(BaseRepository):
         try:
             result = await self.session.execute(select(Invite))
             invites = list(result.scalars().all())
-            
+
             self._log_operation("get_all_invites", count=len(invites))
             return invites
-            
+
         except Exception as e:
             self._log_error("get_all_invites", e)
             return []
@@ -430,8 +350,9 @@ class InviteRepository(BaseRepository):
         """Get invites that should be cleaned up."""
         try:
             from datetime import timedelta
-            from sqlalchemy import and_, or_, case
-            
+
+            from sqlalchemy import and_, case, or_
+
             now = datetime.now(timezone.utc)
             threshold_date = now - timedelta(days=inactive_threshold_days)
 
@@ -465,16 +386,13 @@ class InviteRepository(BaseRepository):
 
             result = await self.session.execute(query)
             invites = list(result.scalars().all())
-            
+
             self._log_operation(
-                "get_invites_for_cleanup",
-                limit=limit,
-                threshold_days=inactive_threshold_days,
-                count=len(invites)
+                "get_invites_for_cleanup", limit=limit, threshold_days=inactive_threshold_days, count=len(invites)
             )
-            
+
             return invites
-            
+
         except Exception as e:
             self._log_error("get_invites_for_cleanup", e)
             return []
@@ -485,24 +403,18 @@ class InviteRepository(BaseRepository):
             query = select(func.sum(Invite.uses)).where(Invite.creator_id == member_id)
             result = await self.session.execute(query)
             count = result.scalar()
-            
+
             final_count = count if count is not None else 0
-            
-            self._log_operation(
-                "get_member_invite_count",
-                member_id=member_id,
-                count=final_count
-            )
-            
+
+            self._log_operation("get_member_invite_count", member_id=member_id, count=final_count)
+
             return final_count
-            
+
         except Exception as e:
             self._log_error("get_member_invite_count", e, member_id=member_id)
             return 0
 
-    async def get_member_valid_invite_count(
-        self, member_id: int, guild, min_days: int = 7
-    ) -> int:
+    async def get_member_valid_invite_count(self, member_id: int, guild, min_days: int = 7) -> int:
         """
         Get count of valid invites for a specific member.
         Only counts users who:
@@ -513,7 +425,7 @@ class InviteRepository(BaseRepository):
         """
         try:
             from datetime import timedelta
-            
+
             # Get all members invited by this user from database
             query = select(Member).where(Member.current_inviter_id == member_id)
             result = await self.session.execute(query)
@@ -549,15 +461,11 @@ class InviteRepository(BaseRepository):
                 "get_member_valid_invite_count",
                 member_id=member_id,
                 total_invited=len(invited_members),
-                valid_count=valid_count
+                valid_count=valid_count,
             )
-            
+
             return valid_count
 
         except Exception as e:
-            self._log_error(
-                "get_member_valid_invite_count", 
-                e, 
-                member_id=member_id
-            )
+            self._log_error("get_member_valid_invite_count", e, member_id=member_id)
             return 0

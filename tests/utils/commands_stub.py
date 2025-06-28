@@ -2,10 +2,10 @@
 Reusable lightweight Discord commands stub for testing.
 Implements the user's brilliant pass-through decorator approach.
 """
+import importlib
 import sys
 import types
-import importlib
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 
 def install_commands_stub():

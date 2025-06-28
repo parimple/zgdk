@@ -23,9 +23,7 @@ class IPermissionService(ABC):
     """Interface for permission management and checking."""
 
     @abstractmethod
-    def check_permission_level(
-        self, member: discord.Member, level: PermissionLevel
-    ) -> bool:
+    def check_permission_level(self, member: discord.Member, level: PermissionLevel) -> bool:
         """Check if a member has the required permission level."""
         pass
 

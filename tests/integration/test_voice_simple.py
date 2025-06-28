@@ -1,8 +1,9 @@
 """Simple test to verify test setup works."""
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
+
 import discord
+import pytest
 
 
 @pytest.mark.asyncio
@@ -47,7 +48,7 @@ async def test_simple_voice():
 async def test_mock_cog():
     """Test mock cog functionality."""
     from cogs.commands.voice import VoiceCog
-    
+
     # Create mock bot
     bot = MagicMock()
     bot.config = {

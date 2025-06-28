@@ -1,9 +1,10 @@
 """
 Example tests using database and service fixtures
 """
-import pytest
-from unittest.mock import patch
 from datetime import datetime, timezone
+from unittest.mock import patch
+
+import pytest
 
 from tests.data.test_constants import TEST_USER_1_ID, WALLET_BALANCES
 
@@ -23,7 +24,7 @@ async def test_shop_command_with_real_db(mock_db_session_with_data, mock_bot_wit
         
         # Import after mocking
         from cogs.commands.shop import ShopCog
-        
+
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.shop(mock_discord_context)
@@ -42,7 +43,7 @@ async def test_addbalance_with_services(mock_bot_with_services, mock_discord_con
     
     with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
         from cogs.commands.shop import ShopCog
-        
+
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
@@ -65,7 +66,7 @@ async def test_assign_payment_with_mocked_queries(mock_payment_queries, mock_bot
     
     with patch('cogs.commands.shop.HandledPaymentQueries', mock_payment_queries):
         from cogs.commands.shop import ShopCog
-        
+
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.assign_payment(mock_discord_context, payment_id, mock_discord_user)
@@ -151,9 +152,10 @@ def test_sample_data_fixtures(sample_member_data, sample_payment_data, sample_ac
 @pytest.mark.asyncio
 async def test_real_database_operations(mock_empty_db_session, sample_member_data):
     """Test actual database operations with in-memory SQLite"""
-    from datasources.models import Member
     from sqlalchemy import select
-    
+
+    from datasources.models import Member
+
     # Create a member
     member = Member(**sample_member_data)
     mock_empty_db_session.add(member)

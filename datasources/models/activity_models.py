@@ -3,26 +3,21 @@ Activity models for the database.
 """
 
 from datetime import datetime
+
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base, MEMBER_ID
+from .base import MEMBER_ID, Base
 
 
 class Activity(Base):
     """Activity Model"""
 
     __tablename__ = "activity"
-    member_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(MEMBER_ID), primary_key=True
-    )
-    date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, primary_key=True
-    )
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(MEMBER_ID), primary_key=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, primary_key=True)
     points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    activity_type: Mapped[str] = mapped_column(
-        String, nullable=False, primary_key=True
-    )  # 'text', 'voice', 'bonus'
+    activity_type: Mapped[str] = mapped_column(String, nullable=False, primary_key=True)  # 'text', 'voice', 'bonus'
 
     member: Mapped["Member"] = relationship("Member", backref="activities")
 

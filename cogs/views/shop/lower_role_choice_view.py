@@ -50,12 +50,7 @@ class LowerRoleChoiceView(discord.ui.View):
         buy_button.callback = self.buy_button_callback
         self.add_item(buy_button)
 
-        cancel_button = discord.ui.Button(
-            label="Anuluj",
-            style=discord.ButtonStyle.danger,
-            emoji="❌",
-            row=1
-        )
+        cancel_button = discord.ui.Button(label="Anuluj", style=discord.ButtonStyle.danger, emoji="❌", row=1)
         cancel_button.callback = self.cancel_button_callback
         self.add_item(cancel_button)
 
@@ -67,9 +62,7 @@ class LowerRoleChoiceView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Check if the interaction is from the correct user"""
         if interaction.user.id != self.member.id:
-            await interaction.response.send_message(
-                "Tylko osoba kupująca może wybrać tę opcję.", ephemeral=True
-            )
+            await interaction.response.send_message("Tylko osoba kupująca może wybrać tę opcję.", ephemeral=True)
             return False
         return True
 
@@ -94,11 +87,7 @@ class LowerRoleChoiceView(discord.ui.View):
     async def get_refund_info(self, session) -> int:
         """Calculate refund amount for current role."""
         role_config = next(
-            (
-                r
-                for r in self.bot.config["premium_roles"]
-                if r["name"] == self.current_role_name
-            ),
+            (r for r in self.bot.config["premium_roles"] if r["name"] == self.current_role_name),
             None,
         )
         if not role_config:

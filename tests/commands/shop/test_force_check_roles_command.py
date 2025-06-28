@@ -1,13 +1,18 @@
 """
 Test force_check_roles command as individual functions with proper validation
 """
-import pytest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
-from datetime import datetime, timezone, timedelta
+
+import pytest
 
 from tests.data.test_constants import (
-    PREMIUM_ROLES_CONFIG, ROLE_ZG50_ID, ROLE_ZG100_ID,
-    ROLE_ZG500_ID, ROLE_ZG1000_ID, TEST_USER_1_ID
+    PREMIUM_ROLES_CONFIG,
+    ROLE_ZG50_ID,
+    ROLE_ZG100_ID,
+    ROLE_ZG500_ID,
+    ROLE_ZG1000_ID,
+    TEST_USER_1_ID,
 )
 
 

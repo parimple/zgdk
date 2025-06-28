@@ -2,9 +2,10 @@
 Tests for giveawayr command - randomly selecting users from roles
 Professional test implementation with proper fixtures and constants
 """
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import discord
+import pytest
 
 
 async def test_giveawayr_success_single_role_string(giveaway_cog, mock_admin_context, mock_test_roles, 

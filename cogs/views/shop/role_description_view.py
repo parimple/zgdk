@@ -33,9 +33,7 @@ class RoleDescriptionView(discord.ui.View):
         self.message_sender = MessageSender(bot)
 
         # Add buttons
-        previous_button = discord.ui.Button(
-            label="⬅️", style=discord.ButtonStyle.secondary
-        )
+        previous_button = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary)
         previous_button.callback = self.previous_page
         self.add_item(previous_button)
 
@@ -48,9 +46,7 @@ class RoleDescriptionView(discord.ui.View):
         buy_button.callback = self.buy_role
         self.add_item(buy_button)
 
-        go_to_shop_button = discord.ui.Button(
-            label="Do sklepu", style=discord.ButtonStyle.primary
-        )
+        go_to_shop_button = discord.ui.Button(label="Do sklepu", style=discord.ButtonStyle.primary)
         go_to_shop_button.callback = self.go_to_shop
         self.add_item(go_to_shop_button)
 
@@ -78,9 +74,7 @@ class RoleDescriptionView(discord.ui.View):
     ) -> tuple[discord.Embed, "RoleDescriptionView"]:
         """Create a new view instance for a different user."""
         async with self.bot.get_db() as session:
-            db_viewer = await MemberQueries.get_or_add_member(
-                session, interaction.user.id
-            )
+            db_viewer = await MemberQueries.get_or_add_member(session, interaction.user.id)
             balance = db_viewer.wallet_balance
             await session.commit()
 
@@ -108,12 +102,8 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description(
-                "Oto twój własny widok opisu ról:"
-            )
-            await interaction.response.send_message(
-                base_text, embed=embed, view=view, ephemeral=True
-            )
+            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
+            await interaction.response.send_message(base_text, embed=embed, view=view, ephemeral=True)
             return
 
         self.page = (self.page % len(self.premium_roles)) + 1
@@ -141,12 +131,8 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description(
-                "Oto twój własny widok opisu ról:"
-            )
-            await interaction.response.send_message(
-                base_text, embed=embed, view=view, ephemeral=True
-            )
+            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
+            await interaction.response.send_message(base_text, embed=embed, view=view, ephemeral=True)
             return
 
         self.page = (self.page - 2) % len(self.premium_roles) + 1
@@ -174,20 +160,16 @@ class RoleDescriptionView(discord.ui.View):
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description(
-                "Oto twój własny widok opisu ról:"
-            )
-            await interaction.response.send_message(
-                base_text, embed=embed, view=view, ephemeral=True
-            )
+            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
+            await interaction.response.send_message(base_text, embed=embed, view=view, ephemeral=True)
             return
 
         role_name = self.premium_roles[self.page - 1]["name"]
         role_price = self.premium_roles[self.page - 1]["price"]
-        
+
         # Import here to avoid circular imports
         from .role_shop_view import RoleShopView
-        
+
         role_shop_view = RoleShopView(
             self.ctx,
             self.bot,
@@ -197,21 +179,15 @@ class RoleDescriptionView(discord.ui.View):
             self.viewer,
             self.member,
         )
-        await role_shop_view.handle_buy_role(
-            interaction, role_name, self.member, duration_days=30, price=role_price
-        )
+        await role_shop_view.handle_buy_role(interaction, role_name, self.member, duration_days=30, price=role_price)
 
     async def go_to_shop(self, interaction: discord.Interaction):
         """Go to the role shop view."""
         if interaction.user.id != self.viewer.id:
             embed, view = await self.create_view_for_user(interaction)
             # Add premium text to the message
-            base_text = self._add_premium_text_to_description(
-                "Oto twój własny widok opisu ról:"
-            )
-            await interaction.response.send_message(
-                base_text, embed=embed, view=view, ephemeral=True
-            )
+            base_text = self._add_premium_text_to_description("Oto twój własny widok opisu ról:")
+            await interaction.response.send_message(base_text, embed=embed, view=view, ephemeral=True)
             return
 
         async with self.bot.get_db() as session:
@@ -220,7 +196,7 @@ class RoleDescriptionView(discord.ui.View):
 
         # Import here to avoid circular imports
         from .role_shop_view import RoleShopView
-        
+
         view = RoleShopView(
             self.ctx,
             self.bot,

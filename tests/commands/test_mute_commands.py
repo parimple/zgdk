@@ -3,13 +3,14 @@ Tests for mute/unmute commands.
 """
 
 import unittest
+
 from tests.base.test_base import CommandTestCase
-from tests.config import TEST_USER_ID, TEST_MUTE_DURATIONS
+from tests.config import TEST_MUTE_DURATIONS, TEST_USER_ID
 from tests.utils.assertions import (
-    assert_user_mentioned,
     assert_has_timestamp,
+    assert_mute_response_valid,
     assert_premium_info,
-    assert_mute_response_valid
+    assert_user_mentioned,
 )
 
 

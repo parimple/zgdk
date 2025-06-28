@@ -30,16 +30,14 @@ class OnMessageEvent(commands.Cog):
         """
         # Temporarily disabled - remove this return to enable message saving
         return
-        
+
         if message.author.bot:
             return
 
         if message.channel.id not in self.allowed_channels:
             return
 
-        reply_to_message_id = (
-            message.reference.message_id if message.reference else None
-        )
+        reply_to_message_id = message.reference.message_id if message.reference else None
 
         async with self.bot.get_db() as session:
             message_repo = MessageRepository(session)
@@ -53,9 +51,7 @@ class OnMessageEvent(commands.Cog):
             )
             await session.commit()
 
-        logger.info(
-            "Message from %s saved to database: %s", message.author.id, message.content
-        )
+        logger.info("Message from %s saved to database: %s", message.author.id, message.content)
 
 
 async def setup(bot: commands.Bot):

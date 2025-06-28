@@ -45,9 +45,7 @@ class MemberQueries:
                 await session.rollback()
                 member = await session.get(Member, member_id)
                 if member is None:
-                    logger.error(
-                        f"Failed to add or retrieve member with ID {member_id}"
-                    )
+                    logger.error(f"Failed to add or retrieve member with ID {member_id}")
                     raise
 
         # Update fields for existing members
@@ -59,21 +57,16 @@ class MemberQueries:
         return member
 
     @staticmethod
-    async def add_to_wallet_balance(
-        session: AsyncSession, member_id: int, amount: int
-    ) -> None:
+    async def add_to_wallet_balance(session: AsyncSession, member_id: int, amount: int) -> None:
         """Add to the wallet balance of a Member"""
         from sqlalchemy import update
+
         await session.execute(
-            update(Member)
-            .where(Member.id == member_id)
-            .values(wallet_balance=Member.wallet_balance + amount)
+            update(Member).where(Member.id == member_id).values(wallet_balance=Member.wallet_balance + amount)
         )
 
     @staticmethod
-    async def extend_voice_bypass(
-        session: AsyncSession, member_id: int, duration: timedelta
-    ) -> Optional[datetime]:
+    async def extend_voice_bypass(session: AsyncSession, member_id: int, duration: timedelta) -> Optional[datetime]:
         """
         Extend the voice bypass duration for a member.
         If member has no active bypass, starts from now.
@@ -92,15 +85,11 @@ class MemberQueries:
             await session.flush()
             return member.voice_bypass_until
         except Exception as e:
-            logger.error(
-                f"Failed to extend voice bypass for member {member_id}: {str(e)}"
-            )
+            logger.error(f"Failed to extend voice bypass for member {member_id}: {str(e)}")
             return None
 
     @staticmethod
-    async def get_voice_bypass_status(
-        session: AsyncSession, member_id: int
-    ) -> Optional[datetime]:
+    async def get_voice_bypass_status(session: AsyncSession, member_id: int) -> Optional[datetime]:
         """
         Get the current voice bypass expiration datetime for a member.
         Returns None if member has no bypass or if it's expired.
@@ -126,15 +115,11 @@ class MemberQueries:
                 return True
             return False
         except Exception as e:
-            logger.error(
-                f"Failed to clear voice bypass for member {member_id}: {str(e)}"
-            )
+            logger.error(f"Failed to clear voice bypass for member {member_id}: {str(e)}")
             return False
 
     @staticmethod
-    async def add_bypass_time(
-        session: AsyncSession, user_id: int, hours: int
-    ) -> Optional[Member]:
+    async def add_bypass_time(session: AsyncSession, user_id: int, hours: int) -> Optional[Member]:
         """Add bypass time to a member"""
         member = await session.get(Member, user_id)
         if not member:
@@ -149,9 +134,7 @@ class MemberQueries:
         return member
 
     @staticmethod
-    async def set_voice_bypass_status(
-        session: AsyncSession, member_id: int, expiration: datetime
-    ) -> Optional[Member]:
+    async def set_voice_bypass_status(session: AsyncSession, member_id: int, expiration: datetime) -> Optional[Member]:
         """
         Set the voice bypass status for a member.
         Args:
@@ -167,7 +150,5 @@ class MemberQueries:
             await session.flush()
             return member
         except Exception as e:
-            logger.error(
-                f"Failed to set voice bypass status for member {member_id}: {str(e)}"
-            )
+            logger.error(f"Failed to set voice bypass status for member {member_id}: {str(e)}")
             return None

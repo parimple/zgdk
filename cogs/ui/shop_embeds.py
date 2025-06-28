@@ -2,8 +2,8 @@
 import discord
 from discord.ext.commands import Context
 
-from core.interfaces.premium_interfaces import IPremiumService
 from core.interfaces.currency_interfaces import ICurrencyService
+from core.interfaces.premium_interfaces import IPremiumService
 
 
 async def get_premium_users_count(ctx: Context) -> int:
@@ -12,7 +12,7 @@ async def get_premium_users_count(ctx: Context) -> int:
         async with ctx.bot.get_db() as session:
             # Use new service architecture
             premium_service = await ctx.bot.get_service(IPremiumService, session)
-            
+
             # Get actual count from the premium service
             return await premium_service.count_unique_premium_users()
     except Exception:
@@ -47,7 +47,7 @@ async def create_shop_embed(
     async with ctx.bot.get_db() as session:
         currency_service = await ctx.bot.get_service(ICurrencyService, session)
         currency_unit = currency_service.get_currency_unit()
-    
+
     # Current role information
     current_role_info = ""
     if premium_roles:
@@ -89,7 +89,7 @@ async def create_shop_embed(
         f"📌 `Wpłata:` ID ({viewer.id}) w polu nick",
         "💳 50zł = 50G = automatyczna ranga",
         "",
-        "🤝 Dziękujemy za wsparcie!"
+        "🤝 Dziękujemy za wsparcie!",
     ]
 
     embed = discord.Embed(
@@ -128,17 +128,17 @@ async def create_role_description_embed(
         currency_unit = currency_service.get_currency_unit()
 
     mastercard_emoji = ctx.bot.config.get("emojis", {}).get("mastercard", "💳")
-    
+
     # Build compact description
     lines = [f"• {feature}" for feature in role["features"]]
     lines.append("")
-    
+
     # Price info
     price = role["price"]
     annual_price = price * 10
     lines.append(f"💰 `Cena:` {price}{currency_unit}/mies. lub {annual_price}{currency_unit}/rok")
     lines.append(f"💠 `Saldo:` {balance}{currency_unit}")
-    
+
     # Additional info
     extra_info = []
     if role.get("team_size", 0) > 0:
@@ -147,17 +147,17 @@ async def create_role_description_embed(
         extra_info.append(f"Moderatorzy: {role['moderator_count']}")
     if role.get("points_multiplier", 0) > 0:
         extra_info.append(f"Bonus: +{role['points_multiplier']}%")
-    
+
     if extra_info:
         lines.append("")
         lines.append(f"📊 `Info:` {' • '.join(extra_info)}")
-    
+
     embed = discord.Embed(
         title=f"{role_name} {mastercard_emoji}",
         description="\n".join(lines),
         color=viewer.color if viewer.color.value != 0 else discord.Color.blurple(),
     )
-    
+
     avatar_url = get_user_avatar_url(viewer, ctx.bot)
     embed.set_thumbnail(url=avatar_url)
 

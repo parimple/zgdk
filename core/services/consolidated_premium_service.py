@@ -22,18 +22,16 @@ from core.interfaces.premium_interfaces import (
     PaymentData,
     PremiumRoleConfig,
 )
+from core.repositories import InviteRepository
 from core.repositories.premium_repository import PaymentRepository, PremiumRepository
 from core.services.base_service import BaseService
 from core.services.cache_service import CacheService
 from datasources.queries import HandledPaymentQueries, MemberQueries, RoleQueries
-from core.repositories import InviteRepository
 
 logger = logging.getLogger(__name__)
 
 
-class ConsolidatedPremiumService(
-    BaseService, IPremiumService, IPremiumChecker, IPremiumRoleManager
-):
+class ConsolidatedPremiumService(BaseService, IPremiumService, IPremiumChecker, IPremiumRoleManager):
     """Comprehensive premium service handling all premium-related operations."""
 
     # Premium role configurations from config
@@ -88,12 +86,12 @@ class ConsolidatedPremiumService(
         self.config = bot.config
         self.mute_roles = {role["name"]: role for role in bot.config.get("mute_roles", [])}
         self.premium_roles_config = bot.config.get("premium_roles", [])
-        
+
         # Initialize dynamic mappings
         self.partial_extensions = {}
         self.upgrade_paths = {}
         self.legacy_amounts = {}
-        
+
     async def validate_operation(self, *args, **kwargs) -> bool:
         """Validate premium operations."""
         return True
@@ -183,7 +181,7 @@ class ConsolidatedPremiumService(
         """Get Member by ID or Username"""
         if not self.guild:
             return None
-            
+
         # Try to extract an ID
         user_id = self.extract_id(name_or_id)
         if user_id:
@@ -211,17 +209,13 @@ class ConsolidatedPremiumService(
 
     def has_mute_roles(self, member: discord.Member) -> bool:
         """Check if member has any mute roles."""
-        return any(
-            role
-            for role in self.mute_roles.values()
-            if role["id"] in [r.id for r in member.roles]
-        )
+        return any(role for role in self.mute_roles.values() if role["id"] in [r.id for r in member.roles])
 
     async def remove_mute_roles(self, member: discord.Member):
         """Remove all mute roles from the member."""
         if not self.guild:
             return
-            
+
         roles_to_remove = [
             self.guild.get_role(role["id"])
             for role in self.mute_roles.values()
@@ -240,7 +234,7 @@ class ConsolidatedPremiumService(
         """Get the highest premium role priority for a member."""
         if not self.guild:
             return 0
-            
+
         user_highest_priority = 0
         for role_name, priority in self.PREMIUM_PRIORITY.items():
             role_obj = discord.utils.get(self.guild.roles, name=role_name)
@@ -252,7 +246,7 @@ class ConsolidatedPremiumService(
         """Get the name of highest premium role a member has."""
         if not self.guild:
             return None
-            
+
         highest_priority = 0
         highest_role_name = None
 
@@ -269,26 +263,24 @@ class ConsolidatedPremiumService(
         """Check if member has any premium role (cached)."""
         try:
             # Try cache first
-            cached_result = await self.cache_service.get(
-                "premium", "has_premium_role", member_id=member.id
-            )
+            cached_result = await self.cache_service.get("premium", "has_premium_role", member_id=member.id)
             if cached_result is not None:
                 return cached_result
-            
+
             # Check Discord roles directly
             user_roles = [role.name for role in member.roles]
             has_premium = any(role_name in self.PREMIUM_PRIORITY for role_name in user_roles)
-            
+
             # Cache result for 5 minutes
             await self.cache_service.set(
-                "premium", 
+                "premium",
                 "has_premium_role",
                 has_premium,
                 ttl=300,
                 tags={f"member:{member.id}", "premium_roles"},
-                member_id=member.id
+                member_id=member.id,
             )
-            
+
             return has_premium
         except Exception as e:
             self._log_error("has_premium_role", e, member_id=member.id)
@@ -308,12 +300,14 @@ class ConsolidatedPremiumService(
                     if role_obj:
                         db_role = await RoleQueries.get_member_role(session, member_id, role_obj.id)
                         if db_role:
-                            roles.append({
-                                "role_name": role_name,
-                                "role_id": role_obj.id,
-                                "expiration_date": db_role.expiration_date,
-                                "member_id": member_id
-                            })
+                            roles.append(
+                                {
+                                    "role_name": role_name,
+                                    "role_id": role_obj.id,
+                                    "expiration_date": db_role.expiration_date,
+                                    "member_id": member_id,
+                                }
+                            )
                 return roles
         except Exception as e:
             self._log_error("get_member_premium_roles", e, member_id=member_id)
@@ -323,9 +317,7 @@ class ConsolidatedPremiumService(
         """Check if user has active T (bypass)."""
         try:
             async with self.bot.get_db() as session:
-                bypass_until = await MemberQueries.get_voice_bypass_status(
-                    session, member.id
-                )
+                bypass_until = await MemberQueries.get_voice_bypass_status(session, member.id)
                 return bypass_until is not None and bypass_until > datetime.now(timezone.utc)
         except Exception as e:
             logger.error(f"Error in has_active_bypass for user {member.id}: {e}")
@@ -333,10 +325,7 @@ class ConsolidatedPremiumService(
 
     def has_booster_roles(self, member: discord.Member) -> bool:
         """Check if user has booster or invite role."""
-        return any(
-            role.id in [self.BOOSTER_ROLE_ID, self.INVITE_ROLE_ID]
-            for role in member.roles
-        )
+        return any(role.id in [self.BOOSTER_ROLE_ID, self.INVITE_ROLE_ID] for role in member.roles)
 
     def has_discord_invite_in_status(self, member: discord.Member) -> bool:
         """Check if user has 'discord.gg/zagadka' in their status."""
@@ -387,26 +376,20 @@ class ConsolidatedPremiumService(
             # Check invite count
             async with self.bot.get_db() as session:
                 invite_repo = InviteRepository(session)
-                invite_count = await invite_repo.get_member_valid_invite_count(
-                    member.id, self.guild, min_days=7
-                )
+                invite_count = await invite_repo.get_member_valid_invite_count(member.id, self.guild, min_days=7)
                 logger.debug(f"User {member.id} has {invite_count} valid invites")
                 return invite_count >= 4
         except Exception as e:
             logger.error(f"Error in has_alternative_bypass_access for user {member.id}: {e}")
             return False
 
-    async def check_command_access(
-        self, member: discord.Member, command_name: str
-    ) -> tuple[bool, str]:
+    async def check_command_access(self, member: discord.Member, command_name: str) -> tuple[bool, str]:
         """Check if member can access a specific command."""
         try:
             command_tier = await self.get_command_tier(command_name)
             return await self.validate_premium_access(member, command_tier)
         except Exception as e:
-            self._log_error(
-                "check_command_access", e, member_id=member.id, command=command_name
-            )
+            self._log_error("check_command_access", e, member_id=member.id, command=command_name)
             return False, "Błąd sprawdzania uprawnień"
 
     async def get_command_tier(self, command_name: str) -> CommandTier:
@@ -444,7 +427,7 @@ class ConsolidatedPremiumService(
                 None,
                 None,
             )
-            
+
         role = discord.utils.get(self.guild.roles, name=role_name)
         if not role:
             return (
@@ -462,9 +445,7 @@ class ConsolidatedPremiumService(
 
         # Get user's highest role
         highest_role_name = self.get_user_highest_role_name(member)
-        highest_role_priority = (
-            self.PREMIUM_PRIORITY.get(highest_role_name, 0) if highest_role_name else 0
-        )
+        highest_role_priority = self.PREMIUM_PRIORITY.get(highest_role_name, 0) if highest_role_name else 0
         current_role_priority = self.PREMIUM_PRIORITY.get(role_name, 0)
 
         # Special case for payment == 49/50 - remove mute and extend role
@@ -478,9 +459,7 @@ class ConsolidatedPremiumService(
                 role_to_extend = discord.utils.get(self.guild.roles, name=highest_role_name)
                 if role_to_extend:
                     # Get the role database entry
-                    db_role = await RoleQueries.get_member_role(
-                        session, member.id, role_to_extend.id
-                    )
+                    db_role = await RoleQueries.get_member_role(session, member.id, role_to_extend.id)
 
                     # Calculate days to extend based on highest role
                     days_to_add = {
@@ -519,9 +498,7 @@ class ConsolidatedPremiumService(
             return embed, None, True  # Add to wallet
 
         # Check for partial extension
-        partial_result = await self.check_partial_extension(
-            session, member, role_name, amount, current_role
-        )
+        partial_result = await self.check_partial_extension(session, member, role_name, amount, current_role)
         if partial_result:
             embed, days_to_add = partial_result
             updated_role = await RoleQueries.update_role_expiration_date(
@@ -556,9 +533,7 @@ class ConsolidatedPremiumService(
                 raise ValueError(f"Failed to update role expiration for {role_name}")
         else:
             # New purchase
-            await RoleQueries.add_role_to_member(
-                session, member.id, role.id, timedelta(days=duration_days)
-            )
+            await RoleQueries.add_role_to_member(session, member.id, role.id, timedelta(days=duration_days))
             await session.flush()
             await member.add_roles(role)
 
@@ -610,13 +585,11 @@ class ConsolidatedPremiumService(
 
         return None
 
-    async def assign_temporary_roles(
-        self, session, member: discord.Member, amount: int
-    ):
+    async def assign_temporary_roles(self, session, member: discord.Member, amount: int):
         """Assign temporary roles based on donation amount."""
         if not self.guild:
             return
-            
+
         logger.info(f"[TEMP_ROLES] Starting assign_temporary_roles for {member.display_name} with amount {amount}")
 
         roles_tiers = [
@@ -635,15 +608,11 @@ class ConsolidatedPremiumService(
                 role = discord.utils.get(self.guild.roles, name=role_name)
                 if role:
                     try:
-                        current_role = await RoleQueries.get_member_role(
-                            session, member.id, role.id
-                        )
+                        current_role = await RoleQueries.get_member_role(session, member.id, role.id)
                         days_to_add = 30
 
                         if current_role and role in member.roles:
-                            days_left = (
-                                current_role.expiration_date - datetime.now(timezone.utc)
-                            ).days
+                            days_left = (current_role.expiration_date - datetime.now(timezone.utc)).days
                             if days_left < 1 or days_left >= 29:
                                 days_to_add = 33
 
@@ -672,10 +641,10 @@ class ConsolidatedPremiumService(
             return
 
         logger.info("Processing payment: %s", payment_data)
-        
+
         # Get services
         member_service = await self.bot.get_service(IMemberService, session)
-        
+
         # First, try to find the banned member
         banned_member = await self.get_banned_member(payment_data.name)
         if banned_member:
@@ -704,7 +673,7 @@ class ConsolidatedPremiumService(
                     payment_data.payment_type,
                 )
                 logger.info("payment: %s", payment)
-                
+
                 # Use new service architecture
                 await member_service.get_or_create_member(member)
 
@@ -761,7 +730,7 @@ class ConsolidatedPremiumService(
         """Send notification about unban"""
         if not self.guild:
             return
-            
+
         channel_id = self.config["channels"]["donation"]
         channel = self.guild.get_channel(channel_id)
         if channel:
@@ -776,7 +745,7 @@ class ConsolidatedPremiumService(
         """Send notification about member not found"""
         if not self.guild:
             return
-            
+
         channel_id = self.config["channels"]["donation"]
         channel = self.guild.get_channel(channel_id)
         if channel:
@@ -788,9 +757,7 @@ class ConsolidatedPremiumService(
             await channel.send(embed=embed)
 
     # IPremiumService implementation
-    async def validate_premium_access(
-        self, member: discord.Member, required_tier: CommandTier
-    ) -> tuple[bool, str]:
+    async def validate_premium_access(self, member: discord.Member, required_tier: CommandTier) -> tuple[bool, str]:
         """Validate if member has required premium access."""
         try:
             if required_tier == CommandTier.TIER_0:
@@ -833,9 +800,7 @@ class ConsolidatedPremiumService(
             self._log_error("validate_premium_access", e, member_id=member.id)
             return False, "Błąd sprawdzania uprawnień"
 
-    async def handle_premium_payment(
-        self, payment: PaymentData
-    ) -> tuple[bool, str, Optional[discord.Member]]:
+    async def handle_premium_payment(self, payment: PaymentData) -> tuple[bool, str, Optional[discord.Member]]:
         """Handle a premium payment end-to-end."""
         try:
             async with self.bot.get_db() as session:
@@ -894,9 +859,7 @@ class ConsolidatedPremiumService(
                                 member = self.guild.get_member(member_role.member_id)
                                 if member and role_obj in member.roles:
                                     await member.remove_roles(role_obj)
-                                    await RoleQueries.delete_member_role(
-                                        session, member_role.member_id, role_obj.id
-                                    )
+                                    await RoleQueries.delete_member_role(session, member_role.member_id, role_obj.id)
                                     processed += 1
                             except Exception as e:
                                 logger.error(f"Error removing expired role: {e}")
@@ -911,9 +874,7 @@ class ConsolidatedPremiumService(
             self._log_error("process_premium_maintenance", e)
             return {"error": 1}
 
-    async def calculate_role_value(
-        self, member: discord.Member, target_role: str
-    ) -> Optional[int]:
+    async def calculate_role_value(self, member: discord.Member, target_role: str) -> Optional[int]:
         """Calculate the value of a premium role for pricing."""
         if target_role not in self.PREMIUM_ROLES:
             return None
@@ -934,7 +895,7 @@ class ConsolidatedPremiumService(
         for role_data in premium_roles:
             role_name = role_data.get("role_name", "Unknown Role")
             expiration_date = role_data.get("expiration_date")
-            
+
             if expiration_date:
                 formatted_date = discord.utils.format_dt(expiration_date, "D")
                 relative_date = discord.utils.format_dt(expiration_date, "R")
@@ -964,7 +925,7 @@ class ConsolidatedPremiumService(
                 session, member, role_name, payment_amount or 0, duration_days, "manual"
             )
             await session.commit()
-            
+
             success = embed.title == "Gratulacje!"
             return ExtensionResult(
                 success=success,
@@ -997,11 +958,11 @@ class ConsolidatedPremiumService(
                 new_expiry=None,
                 message="Guild nie jest ustawiony",
             )
-            
+
         old_role = discord.utils.get(self.guild.roles, name=from_role)
         if old_role and old_role in member.roles:
             await member.remove_roles(old_role)
-        
+
         return await self.assign_premium_role(member, to_role, self.MONTHLY_DURATION, payment_amount)
 
     async def remove_premium_role(self, member: discord.Member, role_name: str) -> bool:
@@ -1009,7 +970,7 @@ class ConsolidatedPremiumService(
         try:
             if not self.guild:
                 return False
-                
+
             role = discord.utils.get(self.guild.roles, name=role_name)
             if role and role in member.roles:
                 await member.remove_roles(role)
@@ -1022,9 +983,7 @@ class ConsolidatedPremiumService(
             self._log_error("remove_premium_role", e, member_id=member.id, role_name=role_name)
             return False
 
-    async def get_premium_role_info(
-        self, member: discord.Member
-    ) -> list[dict[str, Any]]:
+    async def get_premium_role_info(self, member: discord.Member) -> list[dict[str, Any]]:
         """Get premium role information for a member."""
         return await self.get_member_premium_roles(member.id)
 

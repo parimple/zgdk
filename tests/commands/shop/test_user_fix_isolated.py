@@ -4,7 +4,8 @@ This test doesn't use conftest.py to avoid conflicts
 """
 import sys
 import types
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
 # Mock Discord modules BEFORE any imports
@@ -72,7 +73,7 @@ def test_user_fix_preserves_coroutine():
     print(f"Type of commands_stub.Cog: {type(commands_stub.Cog)}")
     
     from cogs.commands.shop import ShopCog
-    
+
     # Check what ShopCog inherits from
     print(f"ShopCog.__bases__: {ShopCog.__bases__}")
     print(f"Type of ShopCog.__bases__[0]: {type(ShopCog.__bases__[0])}")
@@ -107,7 +108,7 @@ def test_user_fix_preserves_coroutine():
 async def test_addbalance_with_user_fix_isolated():
     """Test addbalance with user's fix in isolation"""
     from cogs.commands.shop import ShopCog
-    
+
     # Create bot mock
     bot = MagicMock()
     session_mock = AsyncMock()

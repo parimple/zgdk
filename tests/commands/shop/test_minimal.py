@@ -1,8 +1,9 @@
 """
 Minimal test to isolate the exact issue
 """
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 
 def test_import_shopcog():
@@ -34,7 +35,7 @@ async def test_shopcog_method_exists(mock_bot_with_services):
 async def test_add_balance_minimal(mock_payment_data, mock_add_payment, mock_bot_with_services, mock_discord_context, mock_discord_user):
     """Minimal test that patches everything that might be awaited"""
     from cogs.commands.shop import ShopCog
-    
+
     # Mock PaymentData creation
     mock_payment_data.return_value = mock_payment_data
     mock_payment_data.name = "TestUser"

@@ -1,9 +1,10 @@
 """Complete premium cycle test with cleanup."""
 
 import asyncio
-import aiohttp
 import json
 from datetime import datetime
+
+import aiohttp
 
 
 def format_response(data):

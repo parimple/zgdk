@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from core.interfaces.premium_interfaces import IPremiumService, PaymentData
 from core.repositories.premium_repository import PaymentRepository
 from core.services.base_service import BaseService
+
 # HandledPaymentQueries replaced by PaymentRepository usage
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ class PremiumPaymentService(BaseService, IPremiumService):
             r"<@!?(\d+)>",  # Discord mention
             r"(\d{17,19})",  # Raw Discord ID
         ]
-        
+
         for pattern in patterns:
             match = re.search(pattern, text)
             if match:
@@ -56,35 +57,35 @@ class PremiumPaymentService(BaseService, IPremiumService):
         """Try to find a banned member by name or ID."""
         if not self.guild:
             return None
-            
+
         try:
             # Try to extract ID first
             member_id = self.extract_id(name_or_id)
-            
+
             # Get ban list
             bans = [ban async for ban in self.guild.bans()]
-            
+
             for ban_entry in bans:
                 user = ban_entry.user
-                
+
                 # Check by ID
                 if member_id and user.id == member_id:
                     return user
-                    
+
                 # Check by exact name match
                 if user.name.lower() == name_or_id.lower():
                     return user
-                    
+
                 # Check by display name
                 if user.display_name.lower() == name_or_id.lower():
                     return user
-                    
+
                 # Check by name#discriminator
                 if str(user).lower() == name_or_id.lower():
                     return user
-                    
+
             return None
-            
+
         except Exception as e:
             logger.error(f"Error checking banned members: {e}")
             return None
@@ -93,14 +94,14 @@ class PremiumPaymentService(BaseService, IPremiumService):
         """Get a member by name or ID."""
         if not self.guild:
             return None
-            
+
         # Try to extract ID first
         member_id = self.extract_id(name_or_id)
         if member_id:
             member = self.guild.get_member(member_id)
             if member:
                 return member
-                
+
         # Try exact name match
         name_lower = name_or_id.lower()
         for member in self.guild.members:
@@ -110,15 +111,12 @@ class PremiumPaymentService(BaseService, IPremiumService):
                 or str(member).lower() == name_lower
             ):
                 return member
-                
+
         # Try partial match
         for member in self.guild.members:
-            if (
-                name_lower in member.name.lower()
-                or name_lower in member.display_name.lower()
-            ):
+            if name_lower in member.name.lower() or name_lower in member.display_name.lower():
                 return member
-                
+
         return None
 
     async def process_data(self, session, payment_data: PaymentData) -> None:
@@ -126,18 +124,16 @@ class PremiumPaymentService(BaseService, IPremiumService):
         try:
             # Check if already processed
             payment_repo = PaymentRepository(session)
-            existing = await payment_repo.get_payment_by_name_and_amount(
-                payment_data.name, payment_data.amount
-            )
-            
+            existing = await payment_repo.get_payment_by_name_and_amount(payment_data.name, payment_data.amount)
+
             if existing:
                 logger.info(f"Payment already processed: {payment_data}")
                 return
-                
+
             # Try to find member
             member = await self.get_member(payment_data.name)
             member_id = member.id if member else None
-            
+
             # Create payment record
             await payment_repo.add_payment(
                 member_id=member_id,
@@ -146,21 +142,21 @@ class PremiumPaymentService(BaseService, IPremiumService):
                 paid_at=payment_data.paid_at,
                 payment_type=payment_data.payment_type,
             )
-            
+
             # Commit to ensure payment is recorded
             await session.commit()
-            
+
             # Process invite commission if applicable
             if member and payment_data.amount >= 15:
                 await self._process_invite_commission(session, member, payment_data.amount)
-                
+
             self._log_operation(
                 "process_payment_data",
                 payment_name=payment_data.name,
                 amount=payment_data.amount,
                 member_found=member is not None,
             )
-            
+
         except IntegrityError:
             logger.warning(f"Payment already exists: {payment_data}")
             await session.rollback()
@@ -169,51 +165,45 @@ class PremiumPaymentService(BaseService, IPremiumService):
             await session.rollback()
             raise
 
-    async def _process_invite_commission(
-        self, session, member: discord.Member, amount: int
-    ) -> None:
+    async def _process_invite_commission(self, session, member: discord.Member, amount: int) -> None:
         """Process commission for the member's inviter."""
         try:
             from datasources.queries import MemberQueries
-            
+
             # Get member's inviter
             db_member = await MemberQueries.get_or_add_member(
                 session, member.id, wallet_balance=0, joined_at=member.joined_at
             )
-            
+
             if not db_member.current_inviter_id:
                 return
-                
+
             # Get inviter
             inviter = self.guild.get_member(db_member.current_inviter_id)
             if not inviter:
                 return
-                
+
             # Calculate commission (10%)
             commission = int(amount * 0.1)
             if commission < 1:
                 return
-                
+
             # Add commission to inviter's wallet
             inviter_db = await MemberQueries.get_or_add_member(
                 session, inviter.id, wallet_balance=0, joined_at=inviter.joined_at
             )
             inviter_db.wallet_balance += commission
-            
+
             # Log commission
-            logger.info(
-                f"Added {commission} PLN commission to {inviter} for {member}'s payment"
-            )
-            
+            logger.info(f"Added {commission} PLN commission to {inviter} for {member}'s payment")
+
             # Send notification to inviter
             await self._notify_commission(inviter, member, commission)
-            
+
         except Exception as e:
             logger.error(f"Error processing invite commission: {e}")
 
-    async def _notify_commission(
-        self, inviter: discord.Member, invited: discord.Member, amount: int
-    ) -> None:
+    async def _notify_commission(self, inviter: discord.Member, invited: discord.Member, amount: int) -> None:
         """Send commission notification to inviter."""
         try:
             embed = discord.Embed(
@@ -226,9 +216,9 @@ class PremiumPaymentService(BaseService, IPremiumService):
                 color=discord.Color.green(),
             )
             embed.set_footer(text="Prowizja została dodana do Twojego portfela")
-            
+
             await inviter.send(embed=embed)
-            
+
         except discord.Forbidden:
             logger.info(f"Cannot send commission notification to {inviter}")
         except Exception as e:
@@ -241,11 +231,11 @@ class PremiumPaymentService(BaseService, IPremiumService):
             log_channel_id = self.bot.config["channels"].get("modlogs")
             if not log_channel_id:
                 return
-                
+
             log_channel = self.bot.get_channel(log_channel_id)
             if not log_channel:
                 return
-                
+
             embed = discord.Embed(
                 title="🔓 Automatyczne odbanowanie",
                 description=f"Użytkownik {member} został automatycznie odbanowany po wpłacie.",
@@ -253,9 +243,9 @@ class PremiumPaymentService(BaseService, IPremiumService):
                 timestamp=discord.utils.utcnow(),
             )
             embed.set_footer(text=f"ID: {member.id}")
-            
+
             await log_channel.send(embed=embed)
-            
+
         except Exception as e:
             logger.error(f"Error sending unban notification: {e}")
 
@@ -267,7 +257,7 @@ class PremiumPaymentService(BaseService, IPremiumService):
             channel = self.bot.get_channel(channel_id)
             if not channel:
                 return
-                
+
             embed = discord.Embed(
                 title="❓ Nie znaleziono użytkownika",
                 description=(
@@ -278,9 +268,9 @@ class PremiumPaymentService(BaseService, IPremiumService):
                 ),
                 color=discord.Color.orange(),
             )
-            
+
             await channel.send(embed=embed)
-            
+
         except Exception as e:
             logger.error(f"Error sending member not found notification: {e}")
 
@@ -291,14 +281,14 @@ class PremiumPaymentService(BaseService, IPremiumService):
             legacy_amounts = self.bot.config.get("legacy_system", {}).get("amounts", {})
             if amount in legacy_amounts:
                 amount = legacy_amounts[amount]
-                
+
         # Find matching premium role
         for role_config in self.bot.config.get("premium_roles", []):
             role_price = role_config["price"]
             role_name = role_config["name"]
-            
+
             # Check exact match or +1 PLN
             if amount in [role_price, role_price + 1]:
                 return role_name, 30  # Default 30 days
-                
+
         return None

@@ -32,15 +32,11 @@ class RoleQueries:
             member_role = await session.get(MemberRole, (member_id, role_id))
 
             # Calculate expiration date (if duration is None, set it to None for permanent)
-            expiration_date = (
-                None if duration is None else datetime.now(timezone.utc) + duration
-            )
+            expiration_date = None if duration is None else datetime.now(timezone.utc) + duration
 
             if member_role:
                 member_role.expiration_date = expiration_date
-                logger.info(
-                    f"Updated expiration date for role {role_id} of member {member_id}"
-                )
+                logger.info(f"Updated expiration date for role {role_id} of member {member_id}")
             else:
                 member_role = MemberRole(
                     member_id=member_id,
@@ -70,15 +66,11 @@ class RoleQueries:
     ):
         """Add a role to a member with an expiration date"""
         expiration_date = datetime.now(timezone.utc) + duration
-        member_role = MemberRole(
-            member_id=member_id, role_id=role_id, expiration_date=expiration_date
-        )
+        member_role = MemberRole(member_id=member_id, role_id=role_id, expiration_date=expiration_date)
         session.add(member_role)
 
     @staticmethod
-    async def add_role(
-        session: AsyncSession, role_id: int, role_name: str, role_type: str = "premium"
-    ):
+    async def add_role(session: AsyncSession, role_id: int, role_name: str, role_type: str = "premium"):
         """Add a role to the database"""
         role = Role(id=role_id, name=role_name, role_type=role_type)
         session.add(role)
@@ -101,43 +93,31 @@ class RoleQueries:
         return await session.get(Role, role_id)
 
     @staticmethod
-    async def get_member_roles(
-        session: AsyncSession, member_id: int
-    ) -> list[MemberRole]:
+    async def get_member_roles(session: AsyncSession, member_id: int) -> list[MemberRole]:
         """Get all roles of a member"""
         result = await session.execute(
-            select(MemberRole)
-            .options(joinedload(MemberRole.role))
-            .where(MemberRole.member_id == member_id)
+            select(MemberRole).options(joinedload(MemberRole.role)).where(MemberRole.member_id == member_id)
         )
         return result.scalars().all()
 
     @staticmethod
-    async def get_member_premium_roles(
-        session: AsyncSession, member_id: int
-    ) -> list[tuple[MemberRole, Role]]:
+    async def get_member_premium_roles(session: AsyncSession, member_id: int) -> list[tuple[MemberRole, Role]]:
         """Pobiera wszystkie role premium użytkownika, aktywne i wygasłe."""
         try:
             # Poprawna logika zapytania: pobiera wszystkie role premium użytkownika (aktywne i wygasłe).
             query = (
                 select(MemberRole, Role)
                 .join(Role, MemberRole.role_id == Role.id)
-                .where(
-                    (MemberRole.member_id == member_id) & (Role.role_type == "premium")
-                )
+                .where((MemberRole.member_id == member_id) & (Role.role_type == "premium"))
             )
-            logger.info(
-                f"Executing query for member_id {member_id} in get_member_premium_roles: {query}"
-            )
+            logger.info(f"Executing query for member_id {member_id} in get_member_premium_roles: {query}")
             result = await session.execute(query)
 
             # Logowanie .first() dla wglądu w pierwszy potencjalny wiersz
             # Musimy być ostrożni, .first() może skonsumować wynik, więc lepiej wykonać to na nowym zapytaniu lub na kopii
             # Dla uproszczenia, po prostu zalogujemy i zobaczymy, czy .all() nadal działa.
             # W idealnym świecie, jeśli .first() konsumuje, należałoby ponownie wykonać zapytanie dla .all().
-            temp_result_for_first = await session.execute(
-                query
-            )  # Wykonaj zapytanie ponownie dla .first()
+            temp_result_for_first = await session.execute(query)  # Wykonaj zapytanie ponownie dla .first()
             first_row = temp_result_for_first.first()
             logger.info(f"Query result.first() for member_id {member_id}: {first_row}")
 
@@ -159,9 +139,7 @@ class RoleQueries:
     ) -> List[MemberRole]:
         """Get roles expiring within the next 24 hours"""
         query = (
-            select(MemberRole)
-            .options(joinedload(MemberRole.role))
-            .where(MemberRole.expiration_date <= reminder_time)
+            select(MemberRole).options(joinedload(MemberRole.role)).where(MemberRole.expiration_date <= reminder_time)
         )
         if role_type:
             query = query.join(Role).where(Role.role_type == role_type)
@@ -188,9 +166,7 @@ class RoleQueries:
             .options(joinedload(MemberRole.role))
             .where(
                 and_(
-                    MemberRole.expiration_date.isnot(
-                        None
-                    ),  # Don't select roles with no expiration date
+                    MemberRole.expiration_date.isnot(None),  # Don't select roles with no expiration date
                     MemberRole.expiration_date <= current_time,
                 )
             )
@@ -210,21 +186,15 @@ class RoleQueries:
         """Delete a role of a member"""
         try:
             # Bezpośrednie wykonanie SQL DELETE z użyciem text()
-            sql = text(
-                f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
-            )
+            sql = text(f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
             await session.execute(sql, {"member_id": member_id, "role_id": role_id})
             logger.info(f"Deleted role {role_id} for member {member_id} using raw SQL")
         except Exception as e:
-            logger.error(
-                f"Error deleting role {role_id} for member {member_id}: {str(e)}"
-            )
+            logger.error(f"Error deleting role {role_id} for member {member_id}: {str(e)}")
             raise
 
     @staticmethod
-    async def get_premium_role(
-        session: AsyncSession, member_id: int
-    ) -> Optional[MemberRole]:
+    async def get_premium_role(session: AsyncSession, member_id: int) -> Optional[MemberRole]:
         """Get the active premium role of a member"""
         result = await session.execute(
             select(MemberRole)
@@ -238,9 +208,7 @@ class RoleQueries:
         return result.scalars().first()
 
     @staticmethod
-    async def get_role_for_member(
-        session: AsyncSession, member_id: int, role_id: int
-    ) -> Optional[MemberRole]:
+    async def get_role_for_member(session: AsyncSession, member_id: int, role_id: int) -> Optional[MemberRole]:
         """Check if a member already has the role."""
         return await session.get(MemberRole, (member_id, role_id))
 
@@ -281,9 +249,7 @@ class RoleQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def update_role_expiration_date_direct(
-        session, member_id: int, role_id: int, new_expiry: datetime
-    ):
+    async def update_role_expiration_date_direct(session, member_id: int, role_id: int, new_expiry: datetime):
         """Update role expiration date directly to a specific datetime."""
         member_role = (
             await session.execute(
@@ -298,21 +264,15 @@ class RoleQueries:
             member_role.expiration_date = new_expiry
 
     @staticmethod
-    async def get_member_role(
-        session: AsyncSession, member_id: int, role_id: int
-    ) -> Optional[MemberRole]:
+    async def get_member_role(session: AsyncSession, member_id: int, role_id: int) -> Optional[MemberRole]:
         """Get a specific member role"""
         result = await session.execute(
-            select(MemberRole).where(
-                and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id)
-            )
+            select(MemberRole).where(and_(MemberRole.member_id == member_id, MemberRole.role_id == role_id))
         )
         return result.scalars().first()
 
     @staticmethod
-    async def safe_delete_member_role(
-        session: AsyncSession, member_id: int, role_id: int
-    ):
+    async def safe_delete_member_role(session: AsyncSession, member_id: int, role_id: int):
         """
         Bezpieczna metoda usuwania roli użytkownika, która unika problemów z ORM.
         W przeciwieństwie do delete_member_role, ta metoda:
@@ -322,9 +282,7 @@ class RoleQueries:
         """
         try:
             # Pobierz obiekt z bazy bez używania relacji
-            stmt = select(MemberRole).where(
-                (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
-            )
+            stmt = select(MemberRole).where((MemberRole.member_id == member_id) & (MemberRole.role_id == role_id))
             result = await session.execute(stmt)
             member_role = result.scalar_one_or_none()
 
@@ -333,69 +291,49 @@ class RoleQueries:
                 session.expunge(member_role)
 
                 # Wykonaj surowy SQL DELETE z użyciem text()
-                sql = text(
-                    f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
-                )
+                sql = text(f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
                 await session.execute(sql, {"member_id": member_id, "role_id": role_id})
 
                 logger.info(f"Safely deleted role {role_id} for member {member_id}")
                 return True
             else:
-                logger.warning(
-                    f"No role {role_id} found for member {member_id} to delete (safe)"
-                )
+                logger.warning(f"No role {role_id} found for member {member_id} to delete (safe)")
                 return False
         except Exception as e:
             logger.error(f"Error in safe_delete_member_role: {str(e)}")
             raise
 
     @staticmethod
-    async def raw_delete_member_role(
-        session: AsyncSession, member_id: int, role_id: int
-    ) -> bool:
+    async def raw_delete_member_role(session: AsyncSession, member_id: int, role_id: int) -> bool:
         """
         Najprostsza i najbezpieczniejsza metoda usuwania roli członka, używająca wyłącznie surowego SQL.
         Ta metoda jest stworzona specjalnie do rozwiązania problemu z usuwaniem ról podczas sprzedaży.
         """
         try:
             # Użyj text() do deklaracji surowego SQL
-            sql = text(
-                f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id"
-            )
+            sql = text(f"DELETE FROM member_roles WHERE member_id = :member_id AND role_id = :role_id")
             await session.execute(sql, {"member_id": member_id, "role_id": role_id})
-            logger.info(
-                f"Raw SQL deletion of role {role_id} for member {member_id} succeeded"
-            )
+            logger.info(f"Raw SQL deletion of role {role_id} for member {member_id} succeeded")
             return True
         except Exception as e:
-            logger.error(
-                f"Raw SQL deletion failed for role {role_id}, member {member_id}: {e}"
-            )
+            logger.error(f"Raw SQL deletion failed for role {role_id}, member {member_id}: {e}")
             return False
 
     @staticmethod
-    async def orm_delete_member_role(
-        session: AsyncSession, member_id: int, role_id: int
-    ) -> bool:
+    async def orm_delete_member_role(session: AsyncSession, member_id: int, role_id: int) -> bool:
         """
         Metoda usuwania roli członka używająca ORM SQLAlchemy, ale w bezpieczny sposób.
         Ta metoda używa funkcji delete() zamiast surowego SQL.
         """
         try:
             # Użyj delete() zamiast surowego SQL
-            stmt = delete(MemberRole).where(
-                (MemberRole.member_id == member_id) & (MemberRole.role_id == role_id)
-            )
+            stmt = delete(MemberRole).where((MemberRole.member_id == member_id) & (MemberRole.role_id == role_id))
             result = await session.execute(stmt)
             await session.flush()
-            logger.info(
-                f"ORM deletion of role {role_id} for member {member_id} succeeded"
-            )
+            logger.info(f"ORM deletion of role {role_id} for member {member_id} succeeded")
             return True
         except Exception as e:
-            logger.error(
-                f"ORM deletion failed for role {role_id}, member {member_id}: {e}"
-            )
+            logger.error(f"ORM deletion failed for role {role_id}, member {member_id}: {e}")
             return False
 
     @staticmethod
@@ -407,9 +345,7 @@ class RoleQueries:
         :return: List of MemberRole objects for all members with this role
         """
         result = await session.execute(
-            select(MemberRole)
-            .options(joinedload(MemberRole.role))
-            .where(MemberRole.role_id == role_id)
+            select(MemberRole).options(joinedload(MemberRole.role)).where(MemberRole.role_id == role_id)
         )
         return result.scalars().all()
 

@@ -26,12 +26,10 @@ class BumpStatusHandler:
         """Get status for a specific bump service."""
         async with self.bot.get_db() as session:
             # For global services like disboard, use guild_id
-            guild_id = self.bot.guild_id if hasattr(self.bot, 'guild_id') else None
+            guild_id = self.bot.guild_id if hasattr(self.bot, "guild_id") else None
             notification_repo = NotificationRepository(session)
-            last_notification = await notification_repo.get_service_notification_log(
-                service, guild_id, user_id
-            )
-            
+            last_notification = await notification_repo.get_service_notification_log(service, guild_id, user_id)
+
             if not last_notification:
                 return {
                     "service": service,
@@ -40,13 +38,13 @@ class BumpStatusHandler:
                     "next_available": None,
                     "cooldown_hours": SERVICE_COOLDOWNS.get(service, 0),
                 }
-            
+
             current_time = datetime.now(timezone.utc)
             cooldown_hours = SERVICE_COOLDOWNS.get(service, 0)
             cooldown_end = last_notification.sent_at + timedelta(hours=cooldown_hours)
-            
+
             is_available = current_time >= cooldown_end
-            
+
             return {
                 "service": service,
                 "available": is_available,
@@ -55,9 +53,7 @@ class BumpStatusHandler:
                 "cooldown_hours": cooldown_hours,
             }
 
-    async def show_status(
-        self, interaction: discord.Interaction, member: discord.Member
-    ) -> None:
+    async def show_status(self, interaction: discord.Interaction, member: discord.Member) -> None:
         """Show bump status for all services."""
         await interaction.response.defer()
 
@@ -71,7 +67,7 @@ class BumpStatusHandler:
             title="📊 Status Twoich Bumpów",
             description="Sprawdź, które serwisy możesz już podbić!",
             ctx=member,  # Pass member as ctx to get their color
-            add_author=True  # This will add author automatically
+            add_author=True,  # This will add author automatically
         )
 
         # Service emojis from config or fallback to default
@@ -83,7 +79,7 @@ class BumpStatusHandler:
             "discordservers": config_emojis.get("discordservers", "📊"),
             "dsme": config_emojis.get("dsme", "📈"),
         }
-        
+
         # Debug log
         logger.info(f"Bump emojis loaded: disboard={service_emojis['disboard'][:20]}")
 
@@ -110,7 +106,7 @@ class BumpStatusHandler:
             emoji = service_emojis.get(service_name, "❓")
             link = service_links.get(service_name, "")
             reward = service_rewards.get(service_name, "?T")
-            
+
             if status["available"]:
                 # Service is available
                 field_name = f"{emoji} {service_name.title()} - ✅ Dostępny"
@@ -118,28 +114,28 @@ class BumpStatusHandler:
             else:
                 # Service is on cooldown
                 field_name = f"{emoji} {service_name.title()} - ⏱️ Cooldown"
-                
+
                 # Calculate time remaining
                 if status["next_available"]:
                     time_remaining = status["next_available"] - datetime.now(timezone.utc)
                     hours = int(time_remaining.total_seconds() // 3600)
                     minutes = int((time_remaining.total_seconds() % 3600) // 60)
-                    
+
                     if hours > 0:
                         time_str = f"{hours}h {minutes}m"
                     else:
                         time_str = f"{minutes}m"
-                    
+
                     field_value = f"**Dostępny za:** {time_str}\n**Nagroda:** {reward}"
                 else:
                     field_value = f"**Nagroda:** {reward}"
-            
+
             embed.add_field(name=field_name, value=field_value, inline=True)
 
         # Add summary
         available_count = sum(1 for s in statuses.values() if s["available"])
         total_count = len(statuses)
-        
+
         embed.add_field(
             name="📈 Podsumowanie",
             value=(
@@ -157,34 +153,28 @@ class BumpStatusHandler:
                 inline=False,
             )
 
-        embed.set_footer(
-            text="Czas T pozwala korzystać z komend głosowych bez rang premium!"
-        )
-        
+        embed.set_footer(text="Czas T pozwala korzystać z komend głosowych bez rang premium!")
+
         # Add premium channel info if available
-        if hasattr(interaction, '_ctx'):
+        if hasattr(interaction, "_ctx"):
             # This is our fake interaction from bump_status command
             ctx = interaction._ctx
-            if hasattr(ctx, 'bot') and hasattr(ctx.bot, 'config'):
+            if hasattr(ctx, "bot") and hasattr(ctx.bot, "config"):
                 mastercard = ctx.bot.config.get("emojis", {}).get("mastercard", "💳")
                 premium_channel_id = ctx.bot.config.get("channels", {}).get("premium_info")
                 if premium_channel_id:
                     premium_channel = ctx.guild.get_channel(premium_channel_id)
                     if premium_channel:
                         embed.add_field(
-                            name="\u200b",
-                            value=f"Wybierz swój {premium_channel.mention} {mastercard}",
-                            inline=False
+                            name="\u200b", value=f"Wybierz swój {premium_channel.mention} {mastercard}", inline=False
                         )
 
         # Create view with buttons
         view = BumpStatusView(bot=self.bot)
-        
+
         await interaction.followup.send(embed=embed, view=view)
 
-    def calculate_potential_rewards(
-        self, statuses: Dict[str, dict], rewards: Dict[str, str]
-    ) -> int:
+    def calculate_potential_rewards(self, statuses: Dict[str, dict], rewards: Dict[str, str]) -> int:
         """Calculate total potential rewards from available services."""
         total = 0
         for service_name, status in statuses.items():

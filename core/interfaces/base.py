@@ -9,9 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 @runtime_checkable
 class IRepository(Protocol):
     """Base repository interface for data access operations."""
-    
+
     session: AsyncSession
-    
+
     async def get_by_id(self, entity_id: Any) -> Any:
         """Get entity by ID."""
         ...

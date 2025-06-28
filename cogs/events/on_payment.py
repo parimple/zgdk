@@ -17,7 +17,6 @@ from core.services.currency_service import CurrencyService
 from utils.premium import PremiumManager, TipplyDataProvider
 from utils.premium_logic import PREMIUM_PRIORITY, PremiumRoleManager
 
-
 # Currency constant
 CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT
 logger = logging.getLogger(__name__)
@@ -34,12 +33,8 @@ cleanup_counter = 0
 def cleanup_zombie_browser_processes():
     """Cleanup zombie browser processes"""
     try:
-        subprocess.run(
-            ["pkill", "-f", "headless_shell"], capture_output=True, timeout=5
-        )
-        subprocess.run(
-            ["pkill", "-f", "chrome.*--headless"], capture_output=True, timeout=5
-        )
+        subprocess.run(["pkill", "-f", "headless_shell"], capture_output=True, timeout=5)
+        subprocess.run(["pkill", "-f", "chrome.*--headless"], capture_output=True, timeout=5)
         logger.debug("Cleaned up zombie browser processes")
     except Exception as e:
         logger.warning(f"Error during zombie browser cleanup: {e}")
@@ -83,20 +78,16 @@ class OnPaymentEvent(commands.Cog):
 
                 # First ensure all members exist in database using service architecture
                 member_service = await self.bot.get_service(IMemberService, session)
-                
+
                 for payment_data in payments_data:
                     try:
                         if not self.premium_manager:
                             logger.error("Premium manager not initialized")
                             continue
-                        member = await self.premium_manager.get_member(
-                            payment_data.name
-                        )
+                        member = await self.premium_manager.get_member(payment_data.name)
                         if member:
                             await member_service.get_or_create_member(member)
-                            logger.info(
-                                f"Ensured member {member.display_name} exists in database"
-                            )
+                            logger.info(f"Ensured member {member.display_name} exists in database")
                     except Exception as e:
                         logger.error(f"Error ensuring member exists: {str(e)}")
                         continue
@@ -112,20 +103,14 @@ class OnPaymentEvent(commands.Cog):
                                 logger.error("Premium manager not initialized for payment processing")
                                 continue
                             # Process payment data first
-                            await self.premium_manager.process_data(
-                                session, payment_data
-                            )
+                            await self.premium_manager.process_data(session, payment_data)
                             # Then handle the payment (roles, wallet updates etc.)
                             await self.handle_payment(session, payment_data)
                             # Commit after each successful payment
                             await session.commit()
-                            logger.info(
-                                "Successfully processed payment: %s", payment_data
-                            )
+                            logger.info("Successfully processed payment: %s", payment_data)
                         except Exception as e:
-                            logger.error(
-                                "Error processing payment %s: %s", payment_data, str(e)
-                            )
+                            logger.error("Error processing payment %s: %s", payment_data, str(e))
                             # Rollback the current transaction state
                             await session.rollback()
                             continue
@@ -148,9 +133,7 @@ class OnPaymentEvent(commands.Cog):
             self.guild = self.bot.get_guild(self.bot.guild_id)
             if not self.guild:
                 retry_count += 1
-                logger.info(
-                    f"Waiting for guild to be set... (attempt {retry_count}/{max_retries})"
-                )
+                logger.info(f"Waiting for guild to be set... (attempt {retry_count}/{max_retries})")
                 await asyncio.sleep(1)
 
         if not self.guild:
@@ -201,19 +184,19 @@ class OnPaymentEvent(commands.Cog):
 
         if member is None:
             logger.error("Member not found: %s", payment_data.name)
-            
+
             # Check if user is banned (try with stripped name too)
             banned_user = await self.premium_manager.get_banned_member(payment_data.name)
             if not banned_user and payment_data.name.strip() != payment_data.name:
                 # Try with stripped name if original has spaces
                 banned_user = await self.premium_manager.get_banned_member(payment_data.name.strip())
-            
+
             if banned_user:
                 logger.info("Found banned user %s for payment %s", banned_user, payment_data.name)
                 # Unban the user
                 await self.guild.unban(banned_user)
                 await self.premium_manager.notify_unban(banned_user)
-                
+
                 # Update payment record with user ID
                 payment_repo = PaymentRepository(session)
                 payment_record = await payment_repo.get_payment_by_name_and_amount(
@@ -222,7 +205,7 @@ class OnPaymentEvent(commands.Cog):
                 if payment_record:
                     payment_record.member_id = banned_user.id
                     await session.commit()
-                
+
                 # Send notification
                 channel_id = self.bot.config["channels"]["donation"]
                 channel = self.bot.get_channel(channel_id)
@@ -239,13 +222,11 @@ class OnPaymentEvent(commands.Cog):
                     embed.timestamp = payment_data.paid_at
                     await channel.send(embed=embed)
                 return
-            
+
             # If not banned either, show the original error message
             # Try to find the payment record to get its ID for the admin command
             payment_repo = PaymentRepository(session)
-            payment_record = await payment_repo.get_payment_by_name_and_amount(
-                payment_data.name, payment_data.amount
-            )
+            payment_record = await payment_repo.get_payment_by_name_and_amount(payment_data.name, payment_data.amount)
             channel_id = self.bot.config["channels"]["donation"]
             channel = self.bot.get_channel(channel_id)
             if channel and payment_record:
@@ -275,9 +256,7 @@ class OnPaymentEvent(commands.Cog):
             member_service = await self.bot.get_service(IMemberService, session)
             await member_service.get_or_create_member(member)
             await session.flush()
-            logger.info(
-                f"Ensured member {member.display_name} exists in database before payment processing"
-            )
+            logger.info(f"Ensured member {member.display_name} exists in database before payment processing")
         except Exception as e:
             logger.error(f"Error ensuring member exists: {str(e)}")
             return
@@ -302,9 +281,7 @@ class OnPaymentEvent(commands.Cog):
                 # Initialize variables
                 original_amount = payment_data.amount
                 final_amount = (
-                    payment_data.converted_amount
-                    if payment_data.converted_amount is not None
-                    else original_amount
+                    payment_data.converted_amount if payment_data.converted_amount is not None else original_amount
                 )
                 logger.info(
                     f"Processing payment for {member.display_name} - original: {original_amount}, final: {final_amount}"
@@ -312,11 +289,7 @@ class OnPaymentEvent(commands.Cog):
 
                 # Get user's current highest premium role before processing
                 highest_role_name = self.role_manager.get_user_highest_role_name(member)
-                highest_role_priority = (
-                    PREMIUM_PRIORITY.get(highest_role_name, 0)
-                    if highest_role_name
-                    else 0
-                )
+                highest_role_priority = PREMIUM_PRIORITY.get(highest_role_name, 0) if highest_role_name else 0
 
                 # Check if the original amount (before legacy conversion) would result in a higher role
                 # than what the user currently has - if so, add to wallet instead
@@ -332,12 +305,8 @@ class OnPaymentEvent(commands.Cog):
                             break
 
                     # If no direct match, check legacy mapping
-                    if not target_role_for_original and self.bot.config.get(
-                        "legacy_system", {}
-                    ).get("enabled", False):
-                        legacy_amounts = self.bot.config.get("legacy_system", {}).get(
-                            "amounts", {}
-                        )
+                    if not target_role_for_original and self.bot.config.get("legacy_system", {}).get("enabled", False):
+                        legacy_amounts = self.bot.config.get("legacy_system", {}).get("amounts", {})
                         if original_amount in legacy_amounts:
                             converted_amount = legacy_amounts[original_amount]
                             # Find role that matches the converted amount
@@ -349,9 +318,7 @@ class OnPaymentEvent(commands.Cog):
                                     break
 
                     if target_role_for_original:
-                        target_role_priority = PREMIUM_PRIORITY.get(
-                            target_role_for_original, 0
-                        )
+                        target_role_priority = PREMIUM_PRIORITY.get(target_role_for_original, 0)
 
                         # If user has higher role, add to wallet
                         if highest_role_priority > target_role_priority:
@@ -384,9 +351,7 @@ class OnPaymentEvent(commands.Cog):
                                     role_name=highest_role_name,
                                     style=discord.ButtonStyle.success,
                                     label="Kup rangę",
-                                    emoji=self.bot.config.get("emojis", {}).get(
-                                        "mastercard", "💳"
-                                    ),
+                                    emoji=self.bot.config.get("emojis", {}).get("mastercard", "💳"),
                                 )
                             )
                             view.add_item(
@@ -397,9 +362,7 @@ class OnPaymentEvent(commands.Cog):
                                 )
                             )
 
-                            message = await channel.send(
-                                content=f"{member.mention}", embed=embed, view=view
-                            )
+                            message = await channel.send(content=f"{member.mention}", embed=embed, view=view)
                             if owner:
                                 await message.reply(f"{owner.mention}")
                             return
@@ -414,12 +377,8 @@ class OnPaymentEvent(commands.Cog):
                         elif highest_role_priority < target_role_priority:
                             # This is a potential upgrade, but check if it's through legacy conversion
                             # If original amount was converted by legacy system, it's not a real upgrade
-                            if self.bot.config.get("legacy_system", {}).get(
-                                "enabled", False
-                            ):
-                                legacy_amounts = self.bot.config.get(
-                                    "legacy_system", {}
-                                ).get("amounts", {})
+                            if self.bot.config.get("legacy_system", {}).get("enabled", False):
+                                legacy_amounts = self.bot.config.get("legacy_system", {}).get("amounts", {})
                                 if original_amount in legacy_amounts:
                                     # This is a legacy conversion - user didn't pay enough for real upgrade
                                     # Add original amount to wallet instead
@@ -440,9 +399,7 @@ class OnPaymentEvent(commands.Cog):
                                         f"Aby kupić rolę {target_role_for_original}, potrzebujesz więcej środków.",
                                         color=discord.Color.blue(),
                                     )
-                                    embed.set_image(
-                                        url=self.bot.config["gifs"]["donation"]
-                                    )
+                                    embed.set_image(url=self.bot.config["gifs"]["donation"])
 
                                     view = discord.ui.View()
                                     view.add_item(
@@ -452,9 +409,7 @@ class OnPaymentEvent(commands.Cog):
                                             role_name=target_role_for_original,
                                             style=discord.ButtonStyle.success,
                                             label="Kup rangę",
-                                            emoji=self.bot.config.get("emojis", {}).get(
-                                                "mastercard", "💳"
-                                            ),
+                                            emoji=self.bot.config.get("emojis", {}).get("mastercard", "💳"),
                                         )
                                     )
                                     view.add_item(
@@ -477,15 +432,11 @@ class OnPaymentEvent(commands.Cog):
                 # Initialize embed variables
                 embed = None
                 role_name = None
-                amount_to_add = (
-                    final_amount  # Default to adding full amount if no role is found
-                )
+                amount_to_add = final_amount  # Default to adding full amount if no role is found
 
                 # If amount >= 15, assign temporary roles based on original amount
                 if original_amount >= 15:
-                    await self.role_manager.assign_temporary_roles(
-                        session, member, original_amount
-                    )
+                    await self.role_manager.assign_temporary_roles(session, member, original_amount)
                     await session.flush()
 
                 # Try to find matching premium role
@@ -497,11 +448,7 @@ class OnPaymentEvent(commands.Cog):
                     if final_amount in [role_price, rounded_price]:
                         try:
                             # Use PremiumRoleManager to handle role assignment/extension
-                            (
-                                embed,
-                                refund,
-                                add_to_wallet,
-                            ) = await self.role_manager.assign_or_extend_premium_role(
+                            (embed, refund, add_to_wallet,) = await self.role_manager.assign_or_extend_premium_role(
                                 session=session,
                                 member=member,
                                 role_name=role_name,
@@ -518,9 +465,7 @@ class OnPaymentEvent(commands.Cog):
                             # Handle wallet balance - only add if not explicitly set to False
                             if add_to_wallet is not False:
                                 amount_to_add = final_amount
-                                if (
-                                    add_to_wallet is None
-                                ):  # Default behavior - add remainder
+                                if add_to_wallet is None:  # Default behavior - add remainder
                                     amount_to_add = final_amount - role_price
 
                                 if amount_to_add > 0:
@@ -584,9 +529,7 @@ class OnPaymentEvent(commands.Cog):
                     )
                 )
 
-                message = await channel.send(
-                    content=f"{member.mention}", embed=embed, view=view
-                )
+                message = await channel.send(content=f"{member.mention}", embed=embed, view=view)
                 if owner:
                     await message.reply(f"{owner.mention}")
 

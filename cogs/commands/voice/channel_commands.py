@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class ChannelCommands:
     """Voice channel management commands for join, limit, voicechat."""
-    
+
     def __init__(self, bot):
         """Initialize channel commands."""
         self.bot = bot
@@ -39,9 +39,7 @@ class ChannelCommands:
     @commands.hybrid_command(aliases=["l"])
     @PermissionChecker.voice_command()
     @PremiumChecker.requires_voice_access("limit")
-    @discord.app_commands.describe(
-        max_members="Maksymalna liczba członków (1-99 dla konkretnej wartości)"
-    )
+    @discord.app_commands.describe(max_members="Maksymalna liczba członków (1-99 dla konkretnej wartości)")
     async def limit(self, ctx, max_members: int):
         """Zmień maksymalną liczbę członków, którzy mogą dołączyć do bieżącego kanału głosowego."""
         await self.channel_manager.set_channel_limit(ctx, max_members)

@@ -60,41 +60,23 @@ class EmbedBuilderService(IEmbedBuilder):
 
         return embed
 
-    def create_success_embed(
-        self, title: str, description: str, **kwargs: Any
-    ) -> discord.Embed:
+    def create_success_embed(self, title: str, description: str, **kwargs: Any) -> discord.Embed:
         """Create a success-styled embed."""
-        return self.create_embed(
-            title=f"✅ {title}", description=description, color="success", **kwargs
-        )
+        return self.create_embed(title=f"✅ {title}", description=description, color="success", **kwargs)
 
-    def create_error_embed(
-        self, title: str, description: str, **kwargs: Any
-    ) -> discord.Embed:
+    def create_error_embed(self, title: str, description: str, **kwargs: Any) -> discord.Embed:
         """Create an error-styled embed."""
-        return self.create_embed(
-            title=f"❌ {title}", description=description, color="error", **kwargs
-        )
+        return self.create_embed(title=f"❌ {title}", description=description, color="error", **kwargs)
 
-    def create_info_embed(
-        self, title: str, description: str, **kwargs: Any
-    ) -> discord.Embed:
+    def create_info_embed(self, title: str, description: str, **kwargs: Any) -> discord.Embed:
         """Create an info-styled embed."""
-        return self.create_embed(
-            title=f"ℹ️ {title}", description=description, color="info", **kwargs
-        )
+        return self.create_embed(title=f"ℹ️ {title}", description=description, color="info", **kwargs)
 
-    def create_warning_embed(
-        self, title: str, description: str, **kwargs: Any
-    ) -> discord.Embed:
+    def create_warning_embed(self, title: str, description: str, **kwargs: Any) -> discord.Embed:
         """Create a warning-styled embed."""
-        return self.create_embed(
-            title=f"⚠️ {title}", description=description, color="warning", **kwargs
-        )
+        return self.create_embed(title=f"⚠️ {title}", description=description, color="warning", **kwargs)
 
-    def create_voice_info_embed(
-        self, channel: discord.VoiceChannel, **info: Any
-    ) -> discord.Embed:
+    def create_voice_info_embed(self, channel: discord.VoiceChannel, **info: Any) -> discord.Embed:
         """Create an embed with voice channel information."""
         embed = self.create_info_embed(
             title="Informacje o kanale głosowym",
@@ -114,9 +96,7 @@ class EmbedBuilderService(IEmbedBuilder):
             embed.add_field(name="Limit użytkowników", value=limit_text, inline=True)
 
         if "bitrate" in info:
-            embed.add_field(
-                name="Bitrate", value=f"{info['bitrate']} kbps", inline=True
-            )
+            embed.add_field(name="Bitrate", value=f"{info['bitrate']} kbps", inline=True)
 
         if "moderators" in info:
             mods = info["moderators"]
@@ -126,9 +106,7 @@ class EmbedBuilderService(IEmbedBuilder):
 
         return embed
 
-    def create_user_context_embed(
-        self, member: discord.Member, action: str, **context: Any
-    ) -> discord.Embed:
+    def create_user_context_embed(self, member: discord.Member, action: str, **context: Any) -> discord.Embed:
         """Create an embed with user context information."""
         embed = self.create_embed(
             title=f"Akcja: {action}",

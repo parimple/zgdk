@@ -1,11 +1,10 @@
 """Role service implementation with business logic."""
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 import discord
-
-import logging
 
 from core.interfaces.role_interfaces import IRoleRepository, IRoleService
 from datasources.models import MemberRole, Role
@@ -54,9 +53,7 @@ class RoleService(IRoleService):
                 return False
 
             # Add role to Discord
-            await member.add_roles(
-                role, reason=f"Role assignment via service ({role_type})"
-            )
+            await member.add_roles(role, reason=f"Role assignment via service ({role_type})")
 
             # Calculate duration for repository method
             duration = None
@@ -64,9 +61,7 @@ class RoleService(IRoleService):
                 duration = expiration_date - datetime.now(timezone.utc)
 
             # Add to database using repository
-            success = await self.role_repository.add_or_update_role_to_member(
-                member.id, role.id, duration
-            )
+            success = await self.role_repository.add_or_update_role_to_member(member.id, role.id, duration)
 
             if success:
                 self._log_operation(
@@ -89,14 +84,10 @@ class RoleService(IRoleService):
             )
             return False
         except Exception as e:
-            self._log_error(
-                "assign_role_to_member", e, member_id=member.id, role_id=role.id
-            )
+            self._log_error("assign_role_to_member", e, member_id=member.id, role_id=role.id)
             return False
 
-    async def remove_role_from_member(
-        self, member: discord.Member, role: discord.Role
-    ) -> bool:
+    async def remove_role_from_member(self, member: discord.Member, role: discord.Role) -> bool:
         """Remove a role from a member."""
         try:
             # Remove from Discord
@@ -106,9 +97,7 @@ class RoleService(IRoleService):
             success = await self.role_repository.delete_member_role(member.id, role.id)
 
             if success:
-                self._log_operation(
-                    "remove_role_from_member", member_id=member.id, role_id=role.id
-                )
+                self._log_operation("remove_role_from_member", member_id=member.id, role_id=role.id)
 
             return success
 
@@ -122,12 +111,12 @@ class RoleService(IRoleService):
             )
             return False
         except Exception as e:
-            self._log_error(
-                "remove_role_from_member", e, member_id=member.id, role_id=role.id
-            )
+            self._log_error("remove_role_from_member", e, member_id=member.id, role_id=role.id)
             return False
 
-    async def process_expired_roles(self, role_type: Optional[str] = None, role_ids: Optional[List[int]] = None) -> list[dict]:
+    async def process_expired_roles(
+        self, role_type: Optional[str] = None, role_ids: Optional[List[int]] = None
+    ) -> list[dict]:
         """Process all expired roles and remove them."""
         try:
             current_time = datetime.now(timezone.utc)
@@ -141,9 +130,7 @@ class RoleService(IRoleService):
                     processed_roles.append(role_data)
 
                     # Remove from database
-                    await self.role_repository.delete_member_role(
-                        role_data["member_id"], role_data["role_id"]
-                    )
+                    await self.role_repository.delete_member_role(role_data["member_id"], role_data["role_id"])
 
                 except Exception as e:
                     self._log_error(
@@ -153,18 +140,14 @@ class RoleService(IRoleService):
                         role_id=role_data["role_id"],
                     )
 
-            self._log_operation(
-                "process_expired_roles", processed_count=len(processed_roles)
-            )
+            self._log_operation("process_expired_roles", processed_count=len(processed_roles))
             return processed_roles
 
         except Exception as e:
             self._log_error("process_expired_roles", e)
             return []
 
-    async def extend_role_duration(
-        self, member_id: int, role_id: int, additional_time: int
-    ) -> bool:
+    async def extend_role_duration(self, member_id: int, role_id: int, additional_time: int) -> bool:
         """Extend role duration by specified time in seconds."""
         try:
             # Get current role
@@ -193,9 +176,7 @@ class RoleService(IRoleService):
                 new_expiry = datetime.now(timezone.utc) + timedelta(seconds=additional_time)
 
             # Update expiry
-            success = await self.role_repository.extend_role_expiry(
-                member_id, role_id, new_expiry
-            )
+            success = await self.role_repository.extend_role_expiry(member_id, role_id, new_expiry)
 
             if success:
                 self._log_operation(
@@ -209,18 +190,14 @@ class RoleService(IRoleService):
             return success
 
         except Exception as e:
-            self._log_error(
-                "extend_role_duration", e, member_id=member_id, role_id=role_id
-            )
+            self._log_error("extend_role_duration", e, member_id=member_id, role_id=role_id)
             return False
 
     async def get_member_role_info(self, member_id: int) -> list[dict]:
         """Get detailed role information for a member."""
         try:
             roles = await self.role_repository.get_roles_by_member_id(member_id)
-            self._log_operation(
-                "get_member_role_info", member_id=member_id, count=len(roles)
-            )
+            self._log_operation("get_member_role_info", member_id=member_id, count=len(roles))
             return roles
         except Exception as e:
             self._log_error("get_member_role_info", e, member_id=member_id)
@@ -231,10 +208,8 @@ class RoleService(IRoleService):
     ) -> bool:
         """Add a role to a member or update its expiration date if it already exists."""
         try:
-            success = await self.role_repository.add_or_update_role_to_member(
-                member_id, role_id, duration
-            )
-            
+            success = await self.role_repository.add_or_update_role_to_member(member_id, role_id, duration)
+
             if success:
                 self._log_operation(
                     "add_or_update_role_to_member",
@@ -242,7 +217,7 @@ class RoleService(IRoleService):
                     role_id=role_id,
                     duration=duration,
                 )
-            
+
             return success
         except Exception as e:
             self._log_error("add_or_update_role_to_member", e, member_id=member_id, role_id=role_id)
@@ -302,7 +277,9 @@ class RoleService(IRoleService):
         """Get roles expiring within the specified time."""
         try:
             roles = await self.role_repository.get_expiring_roles(reminder_time, role_type)
-            self._log_operation("get_expiring_roles", reminder_time=reminder_time, role_type=role_type, count=len(roles))
+            self._log_operation(
+                "get_expiring_roles", reminder_time=reminder_time, role_type=role_type, count=len(roles)
+            )
             return roles
         except Exception as e:
             self._log_error("get_expiring_roles", e, reminder_time=reminder_time)
@@ -314,7 +291,7 @@ class RoleService(IRoleService):
         """Update the expiration date of the role for the member."""
         try:
             role = await self.role_repository.update_role_expiration_date(member_id, role_id, duration)
-            
+
             if role:
                 self._log_operation(
                     "update_role_expiration_date",
@@ -323,21 +300,17 @@ class RoleService(IRoleService):
                     duration=duration,
                     new_expiry=role.expiration_date,
                 )
-            
+
             return role
         except Exception as e:
             self._log_error("update_role_expiration_date", e, member_id=member_id, role_id=role_id)
             return None
 
-    async def update_role_expiration_date_direct(
-        self, member_id: int, role_id: int, new_expiry: datetime
-    ) -> bool:
+    async def update_role_expiration_date_direct(self, member_id: int, role_id: int, new_expiry: datetime) -> bool:
         """Update role expiration date directly to a specific datetime."""
         try:
-            success = await self.role_repository.update_role_expiration_date_direct(
-                member_id, role_id, new_expiry
-            )
-            
+            success = await self.role_repository.update_role_expiration_date_direct(member_id, role_id, new_expiry)
+
             if success:
                 self._log_operation(
                     "update_role_expiration_date_direct",
@@ -345,7 +318,7 @@ class RoleService(IRoleService):
                     role_id=role_id,
                     new_expiry=new_expiry,
                 )
-            
+
             return success
         except Exception as e:
             self._log_error("update_role_expiration_date_direct", e, member_id=member_id, role_id=role_id)
@@ -375,10 +348,10 @@ class RoleService(IRoleService):
         """Delete a role from a member."""
         try:
             success = await self.role_repository.delete_member_role(member_id, role_id)
-            
+
             if success:
                 self._log_operation("delete_member_role", member_id=member_id, role_id=role_id)
-            
+
             return success
         except Exception as e:
             self._log_error("delete_member_role", e, member_id=member_id, role_id=role_id)
@@ -388,15 +361,15 @@ class RoleService(IRoleService):
         """Check if a member has a specific role."""
         try:
             role = await self.role_repository.get_member_role(member_id, role_id)
-            self._log_operation("check_member_has_role", member_id=member_id, role_id=role_id, has_role=role is not None)
+            self._log_operation(
+                "check_member_has_role", member_id=member_id, role_id=role_id, has_role=role is not None
+            )
             return role
         except Exception as e:
             self._log_error("check_member_has_role", e, member_id=member_id, role_id=role_id)
             return None
 
-    async def _can_assign_role(
-        self, member: discord.Member, role: discord.Role, role_type: str
-    ) -> bool:
+    async def _can_assign_role(self, member: discord.Member, role: discord.Role, role_type: str) -> bool:
         """Business logic to validate if role can be assigned."""
         # Check if member already has this role
         if role in member.roles:
@@ -405,9 +378,7 @@ class RoleService(IRoleService):
 
         # Check role hierarchy (bot must be higher than role)
         if member.guild.me.top_role.position <= role.position:
-            self.logger.warning(
-                f"Bot cannot assign role {role.id} - insufficient permissions"
-            )
+            self.logger.warning(f"Bot cannot assign role {role.id} - insufficient permissions")
             return False
 
         # Add more business rules as needed
@@ -427,12 +398,12 @@ class RoleService(IRoleService):
             for role_data in roles:
                 # Create MemberRole object from dict data
                 member_role = MemberRole(
-                    member_id=role_data.get('member_id', member_id),
-                    role_id=role_data.get('role_id'),
-                    expiration_date=role_data.get('expiration_date')
+                    member_id=role_data.get("member_id", member_id),
+                    role_id=role_data.get("role_id"),
+                    expiration_date=role_data.get("expiration_date"),
                 )
                 member_roles.append(member_role)
-            
+
             self._log_operation("get_member_roles", member_id=member_id, role_count=len(member_roles))
             return member_roles
         except Exception as e:

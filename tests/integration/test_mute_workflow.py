@@ -2,8 +2,9 @@
 Integration tests for complete mute/unmute workflows.
 """
 
-import unittest
 import asyncio
+import unittest
+
 from tests.base.test_base import CommandTestCase
 from tests.config import TEST_USER_ID
 from tests.utils.assertions import assert_mute_response_valid

@@ -29,9 +29,7 @@ class GenderManager:
         self.config = bot.config
         self.message_sender = MessageSender(bot)
 
-    async def assign_gender_role(
-        self, ctx: commands.Context, user: discord.Member, gender_type_name: str
-    ):
+    async def assign_gender_role(self, ctx: commands.Context, user: discord.Member, gender_type_name: str):
         """Assign gender role to a user.
 
         :param ctx: Command context.
@@ -46,13 +44,9 @@ class GenderManager:
             await ctx.send("❌ Nieprawidłowy typ roli płci.", ephemeral=True)
         except Exception as e:
             logger.error(f"Error in assign_gender_role: {e}", exc_info=True)
-            await ctx.send(
-                "❌ Wystąpił błąd podczas przypisywania roli płci.", ephemeral=True
-            )
+            await ctx.send("❌ Wystąpił błąd podczas przypisywania roli płci.", ephemeral=True)
 
-    async def _handle_gender_logic(
-        self, ctx: commands.Context, user: discord.Member, gender_type: GenderType
-    ):
+    async def _handle_gender_logic(self, ctx: commands.Context, user: discord.Member, gender_type: GenderType):
         """Handle the core gender role assignment logic.
 
         :param ctx: Command context.
@@ -92,9 +86,7 @@ class GenderManager:
             if target_role is None and hasattr(ctx.guild, "roles"):
                 target_role = discord.utils.get(ctx.guild.roles, name=target_role_name)
             if opposite_role is None and hasattr(ctx.guild, "roles"):
-                opposite_role = discord.utils.get(
-                    ctx.guild.roles, name=opposite_role_name
-                )
+                opposite_role = discord.utils.get(ctx.guild.roles, name=opposite_role_name)
 
             if not target_role:
                 await ctx.send(
@@ -159,14 +151,10 @@ class GenderManager:
 
                     # Remove opposite role from database if it exists
                     if has_opposite_role and opposite_role_id:
-                        await RoleQueries.delete_member_role(
-                            session, user.id, opposite_role_id
-                        )
+                        await RoleQueries.delete_member_role(session, user.id, opposite_role_id)
 
                     # Add new role to database (without duration for gender roles)
-                    await RoleQueries.add_or_update_role_to_member(
-                        session, user.id, target_role_id, duration=None
-                    )
+                    await RoleQueries.add_or_update_role_to_member(session, user.id, target_role_id, duration=None)
                     await session.commit()
 
             # Add premium info to message
@@ -184,9 +172,7 @@ class GenderManager:
             if action_type != "already_has":
                 await self._log_gender_action(ctx, user, gender_type, action_type)
 
-            logger.info(
-                f"Gender role {gender_type.type_name} assignment for user {user.id}: {action_type}"
-            )
+            logger.info(f"Gender role {gender_type.type_name} assignment for user {user.id}: {action_type}")
 
         except discord.Forbidden as e:
             logger.error(
@@ -242,9 +228,7 @@ class GenderManager:
                 color=discord.Color.blue(),
                 timestamp=ctx.message.created_at,
             )
-            embed.add_field(
-                name="👤 Użytkownik", value=f"{user.mention} (`{user.id}`)", inline=True
-            )
+            embed.add_field(name="👤 Użytkownik", value=f"{user.mention} (`{user.id}`)", inline=True)
             embed.add_field(
                 name="👮 Moderator",
                 value=f"{ctx.author.mention} (`{ctx.author.id}`)",
@@ -256,18 +240,14 @@ class GenderManager:
                 value=f"{gender_type.role_symbol} {gender_type.display_name}",
                 inline=True,
             )
-            embed.add_field(
-                name="📝 Komenda", value=f"`{ctx.message.content}`", inline=False
-            )
+            embed.add_field(name="📝 Komenda", value=f"`{ctx.message.content}`", inline=False)
 
             await mod_log_channel.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Error logging gender action: {e}", exc_info=True)
 
-    async def _ensure_gender_roles_exist(
-        self, session, target_role_id, target_role, opposite_role_id, opposite_role
-    ):
+    async def _ensure_gender_roles_exist(self, session, target_role_id, target_role, opposite_role_id, opposite_role):
         """Ensure gender roles exist in the database.
 
         :param session: Database session.
@@ -279,31 +259,17 @@ class GenderManager:
         try:
             # Check and add target role
             if target_role:
-                existing_role = await RoleQueries.get_role_by_id(
-                    session, target_role_id
-                )
+                existing_role = await RoleQueries.get_role_by_id(session, target_role_id)
                 if not existing_role:
-                    await RoleQueries.add_role(
-                        session, target_role_id, target_role.name, "gender"
-                    )
-                    logger.info(
-                        f"Added gender role to database: {target_role.name} ({target_role_id})"
-                    )
+                    await RoleQueries.add_role(session, target_role_id, target_role.name, "gender")
+                    logger.info(f"Added gender role to database: {target_role.name} ({target_role_id})")
 
             # Check and add opposite role
             if opposite_role and opposite_role_id:
-                existing_opposite = await RoleQueries.get_role_by_id(
-                    session, opposite_role_id
-                )
+                existing_opposite = await RoleQueries.get_role_by_id(session, opposite_role_id)
                 if not existing_opposite:
-                    await RoleQueries.add_role(
-                        session, opposite_role_id, opposite_role.name, "gender"
-                    )
-                    logger.info(
-                        f"Added gender role to database: {opposite_role.name} ({opposite_role_id})"
-                    )
+                    await RoleQueries.add_role(session, opposite_role_id, opposite_role.name, "gender")
+                    logger.info(f"Added gender role to database: {opposite_role.name} ({opposite_role_id})")
 
         except Exception as e:
-            logger.error(
-                f"Error ensuring gender roles exist in database: {e}", exc_info=True
-            )
+            logger.error(f"Error ensuring gender roles exist in database: {e}", exc_info=True)

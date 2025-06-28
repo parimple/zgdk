@@ -6,11 +6,7 @@ from typing import Optional
 
 import discord
 
-from core.interfaces.member_interfaces import (
-    IMemberRepository,
-    IModerationRepository,
-    IModerationService,
-)
+from core.interfaces.member_interfaces import IMemberRepository, IModerationRepository, IModerationService
 from core.services.base_service import BaseService
 from datasources.models import ModerationLog
 
@@ -20,12 +16,7 @@ logger = logging.getLogger(__name__)
 class ModerationService(BaseService, IModerationService):
     """Service for moderation operations."""
 
-    def __init__(
-        self,
-        moderation_repository: IModerationRepository,
-        member_repository: IMemberRepository,
-        **kwargs
-    ):
+    def __init__(self, moderation_repository: IModerationRepository, member_repository: IMemberRepository, **kwargs):
         super().__init__(**kwargs)
         self.moderation_repository = moderation_repository
         self.member_repository = member_repository
@@ -49,7 +40,7 @@ class ModerationService(BaseService, IModerationService):
             await self.member_repository.get_or_create(target.id)
             # Ensure moderator exists in database
             await self.member_repository.get_or_create(moderator.id)
-            
+
             expires_at = None
             if duration_seconds:
                 expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
@@ -95,7 +86,7 @@ class ModerationService(BaseService, IModerationService):
             await self.member_repository.get_or_create(target.id)
             # Ensure moderator exists in database
             await self.member_repository.get_or_create(moderator.id)
-            
+
             if channel_id is None:
                 channel_id = 0  # Default fallback
 
@@ -190,9 +181,7 @@ class ModerationService(BaseService, IModerationService):
     async def get_member_warnings(self, member_id: int) -> list[ModerationLog]:
         """Get all warnings for member."""
         try:
-            warnings = await self.moderation_repository.get_member_history(
-                member_id, action_type="mute"
-            )
+            warnings = await self.moderation_repository.get_member_history(member_id, action_type="mute")
 
             self._log_operation("get_member_warnings", member_id=member_id)
             return warnings
@@ -219,7 +208,7 @@ class ModerationService(BaseService, IModerationService):
         try:
             # Get all active mutes
             active_mutes = await self.moderation_repository.get_active_mutes()
-            
+
             current_time = datetime.now(timezone.utc)
             expired_mutes = []
 

@@ -23,9 +23,7 @@ class PermissionService(BaseService, IPermissionService):
         """Validate permission checking operation."""
         return self.bot is not None and hasattr(self.bot, "config")
 
-    def check_permission_level(
-        self, member: discord.Member, level: PermissionLevel
-    ) -> bool:
+    def check_permission_level(self, member: discord.Member, level: PermissionLevel) -> bool:
         """Check if a member has the required permission level."""
         if not self.bot or not hasattr(self.bot, "config"):
             self._log_error(
@@ -45,16 +43,12 @@ class PermissionService(BaseService, IPermissionService):
                 return member.id == self.bot.config["owner_id"]
 
             # Check admin role (from config)
-            has_admin = discord.utils.get(
-                member.roles, id=self.bot.config["admin_roles"]["admin"]
-            )
+            has_admin = discord.utils.get(member.roles, id=self.bot.config["admin_roles"]["admin"])
             if level == PermissionLevel.ADMIN:
                 return bool(has_admin)
 
             # Check mod role (from config)
-            has_mod = discord.utils.get(
-                member.roles, id=self.bot.config["admin_roles"]["mod"]
-            )
+            has_mod = discord.utils.get(member.roles, id=self.bot.config["admin_roles"]["mod"])
             if level == PermissionLevel.MOD:
                 return bool(has_mod)
 
@@ -119,13 +113,9 @@ class PermissionService(BaseService, IPermissionService):
 
         try:
             if require_all:
-                return all(
-                    self.check_permission_level(member, level) for level in levels
-                )
+                return all(self.check_permission_level(member, level) for level in levels)
             else:
-                return any(
-                    self.check_permission_level(member, level) for level in levels
-                )
+                return any(self.check_permission_level(member, level) for level in levels)
         except Exception as e:
             self._log_error(
                 "has_permission_levels",
@@ -152,14 +142,10 @@ class PermissionService(BaseService, IPermissionService):
                 return False
 
         async def app_predicate(interaction: discord.Interaction):
-            if self.has_permission_levels(
-                interaction.user, levels, require_all=require_all
-            ):
+            if self.has_permission_levels(interaction.user, levels, require_all=require_all):
                 return True
             else:
-                await interaction.response.send_message(
-                    "Nie masz uprawnień do użycia tej komendy!", ephemeral=True
-                )
+                await interaction.response.send_message("Nie masz uprawnień do użycia tej komendy!", ephemeral=True)
                 return False
 
         def decorator(func):
@@ -203,9 +189,7 @@ class PermissionService(BaseService, IPermissionService):
         """Decorator to check if a user has any premium role (from config)."""
         return self.create_permission_check(PermissionLevel.PREMIUM)
 
-    def requires_permissions(
-        self, *levels: PermissionLevel, require_all: bool = False
-    ):
+    def requires_permissions(self, *levels: PermissionLevel, require_all: bool = False):
         """
         Decorator to check if a user has multiple permission levels.
 

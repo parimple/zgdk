@@ -21,9 +21,7 @@ from core.services.base_service import BaseService
 from core.services.cache_service import CacheService
 
 
-class PremiumService(
-    BaseService, IPremiumService, IPremiumChecker, IPremiumRoleManager
-):
+class PremiumService(BaseService, IPremiumService, IPremiumChecker, IPremiumRoleManager):
     """Comprehensive premium service handling all premium-related operations."""
 
     # Premium role configurations
@@ -75,15 +73,11 @@ class PremiumService(
         """Check if member has any premium role (cached)."""
         try:
             # Try cache first
-            cached_result = await self.cache_service.get(
-                "premium", "has_premium_role", member_id=member.id
-            )
+            cached_result = await self.cache_service.get("premium", "has_premium_role", member_id=member.id)
             if cached_result is not None:
                 return cached_result
-            
-            premium_roles = await self.premium_repository.get_member_premium_roles(
-                member.id
-            )
+
+            premium_roles = await self.premium_repository.get_member_premium_roles(member.id)
 
             # Check if any premium role is still valid
             current_time = datetime.now(timezone.utc)
@@ -93,17 +87,17 @@ class PremiumService(
                 if expiry is None or expiry > current_time:
                     has_premium = True
                     break
-            
+
             # Cache result for 5 minutes with member tag for invalidation
             await self.cache_service.set(
-                "premium", 
+                "premium",
                 "has_premium_role",
                 has_premium,
                 ttl=300,
                 tags={f"member:{member.id}", "premium_roles"},
-                member_id=member.id
+                member_id=member.id,
             )
-            
+
             return has_premium
         except Exception as e:
             self._log_error("has_premium_role", e, member_id=member.id)
@@ -112,9 +106,7 @@ class PremiumService(
     async def get_member_premium_level(self, member: discord.Member) -> Optional[str]:
         """Get member's highest premium role level."""
         try:
-            premium_roles = await self.premium_repository.get_member_premium_roles(
-                member.id
-            )
+            premium_roles = await self.premium_repository.get_member_premium_roles(member.id)
             current_time = datetime.now(timezone.utc)
 
             highest_priority = 0
@@ -142,41 +134,35 @@ class PremiumService(
         """Get all premium roles for a member (cached)."""
         try:
             # Try cache first
-            cached_result = await self.cache_service.get(
-                "premium", "member_roles", member_id=member_id
-            )
+            cached_result = await self.cache_service.get("premium", "member_roles", member_id=member_id)
             if cached_result is not None:
                 return cached_result
-            
+
             premium_roles = await self.premium_repository.get_member_premium_roles(member_id)
-            
+
             # Cache for 5 minutes
             await self.cache_service.set(
                 "premium",
-                "member_roles", 
+                "member_roles",
                 premium_roles,
                 ttl=300,
                 tags={f"member:{member_id}", "premium_roles"},
-                member_id=member_id
+                member_id=member_id,
             )
-            
+
             return premium_roles
-            
+
         except Exception as e:
             self._log_error("get_member_premium_roles", e, member_id=member_id)
             return []
 
-    async def check_command_access(
-        self, member: discord.Member, command_name: str
-    ) -> tuple[bool, str]:
+    async def check_command_access(self, member: discord.Member, command_name: str) -> tuple[bool, str]:
         """Check if member can access a specific command."""
         try:
             command_tier = await self.get_command_tier(command_name)
             return await self.validate_premium_access(member, command_tier)
         except Exception as e:
-            self._log_error(
-                "check_command_access", e, member_id=member.id, command=command_name
-            )
+            self._log_error("check_command_access", e, member_id=member.id, command=command_name)
             return False, "Błąd sprawdzania uprawnień"
 
     async def get_command_tier(self, command_name: str) -> CommandTier:
@@ -237,10 +223,8 @@ class PremiumService(
                     new_expiry=None,
                     message="Guild nie jest ustawiony w premium service",
                 )
-            
-            discord_role = discord.utils.get(
-                self.guild.roles, id=role_data["discord_id"]
-            )
+
+            discord_role = discord.utils.get(self.guild.roles, id=role_data["discord_id"])
             if not discord_role:
                 return ExtensionResult(
                     success=False,
@@ -254,9 +238,7 @@ class PremiumService(
             expiration_date = datetime.now(timezone.utc) + timedelta(days=duration_days)
 
             # Add Discord role
-            await member.add_roles(
-                discord_role, reason=f"Premium role assignment: {role_name}"
-            )
+            await member.add_roles(discord_role, reason=f"Premium role assignment: {role_name}")
 
             # Add to database
             await self.premium_repository.create_member_role(
@@ -286,9 +268,7 @@ class PremiumService(
             )
 
         except Exception as e:
-            self._log_error(
-                "assign_premium_role", e, member_id=member.id, role_name=role_name
-            )
+            self._log_error("assign_premium_role", e, member_id=member.id, role_name=role_name)
             return ExtensionResult(
                 success=False,
                 extension_type=ExtensionType.NORMAL,
@@ -307,9 +287,7 @@ class PremiumService(
         """Extend an existing premium role."""
         try:
             # Get existing role
-            premium_roles = await self.premium_repository.get_member_premium_roles(
-                member.id
-            )
+            premium_roles = await self.premium_repository.get_member_premium_roles(member.id)
             existing_role = None
 
             for role_data in premium_roles:
@@ -319,9 +297,7 @@ class PremiumService(
 
             if not existing_role:
                 # If role doesn't exist, assign it
-                return await self.assign_premium_role(
-                    member, role_name, additional_days, payment_amount
-                )
+                return await self.assign_premium_role(member, role_name, additional_days, payment_amount)
 
             # Calculate new expiry time
             current_expiry = existing_role["expiration_date"]
@@ -356,9 +332,7 @@ class PremiumService(
             )
 
         except Exception as e:
-            self._log_error(
-                "extend_premium_role", e, member_id=member.id, role_name=role_name
-            )
+            self._log_error("extend_premium_role", e, member_id=member.id, role_name=role_name)
             return ExtensionResult(
                 success=False,
                 extension_type=ExtensionType.NORMAL,
@@ -399,21 +373,15 @@ class PremiumService(
             await self.remove_premium_role(member, from_role)
 
             # Calculate duration based on payment
-            duration_days = self._calculate_duration_from_payment(
-                payment_amount, to_role
-            )
+            duration_days = self._calculate_duration_from_payment(payment_amount, to_role)
 
-            result = await self.assign_premium_role(
-                member, to_role, duration_days, payment_amount
-            )
+            result = await self.assign_premium_role(member, to_role, duration_days, payment_amount)
 
             if result.success:
                 result.extension_type = ExtensionType.UPGRADE
                 result.upgraded_from = from_role
                 result.upgraded_to = to_role
-                result.message = (
-                    f"Upgrade z {from_role} do {to_role} zakończony sukcesem"
-                )
+                result.message = f"Upgrade z {from_role} do {to_role} zakończony sukcesem"
 
             return result
 
@@ -439,34 +407,22 @@ class PremiumService(
             if not self.guild:
                 self._log_error("remove_premium_role", Exception("Guild not set"), member_id=member.id)
                 return False
-                
-            discord_role = discord.utils.get(
-                self.guild.roles, id=role_data["discord_id"]
-            )
+
+            discord_role = discord.utils.get(self.guild.roles, id=role_data["discord_id"])
             if discord_role and discord_role in member.roles:
-                await member.remove_roles(
-                    discord_role, reason=f"Premium role removal: {role_name}"
-                )
+                await member.remove_roles(discord_role, reason=f"Premium role removal: {role_name}")
 
             # Remove from database
-            await self.premium_repository.remove_member_role(
-                member_id=member.id, role_id=role_data["id"]
-            )
+            await self.premium_repository.remove_member_role(member_id=member.id, role_id=role_data["id"])
 
-            self._log_operation(
-                "remove_premium_role", member_id=member.id, role_name=role_name
-            )
+            self._log_operation("remove_premium_role", member_id=member.id, role_name=role_name)
             return True
 
         except Exception as e:
-            self._log_error(
-                "remove_premium_role", e, member_id=member.id, role_name=role_name
-            )
+            self._log_error("remove_premium_role", e, member_id=member.id, role_name=role_name)
             return False
 
-    async def get_premium_role_info(
-        self, member: discord.Member
-    ) -> list[dict[str, Any]]:
+    async def get_premium_role_info(self, member: discord.Member) -> list[dict[str, Any]]:
         """Get premium role information for a member."""
         try:
             return await self.premium_repository.get_member_premium_roles(member.id)
@@ -478,15 +434,13 @@ class PremiumService(
         """Process all expired premium roles."""
         try:
             current_time = datetime.now(timezone.utc)
-            expired_roles = await self.premium_repository.get_expired_premium_roles(
-                current_time
-            )
+            expired_roles = await self.premium_repository.get_expired_premium_roles(current_time)
 
             processed = []
             if not self.guild:
                 self._log_error("process_expired_roles", Exception("Guild not set"))
                 return processed
-                
+
             for role_data in expired_roles:
                 try:
                     member = self.guild.get_member(role_data["member_id"])
@@ -496,9 +450,7 @@ class PremiumService(
                 except Exception as e:
                     self._log_error("process_expired_role", e, role_data=role_data)
 
-            self._log_operation(
-                "process_expired_premium_roles", processed_count=len(processed)
-            )
+            self._log_operation("process_expired_premium_roles", processed_count=len(processed))
             return processed
 
         except Exception as e:
@@ -506,9 +458,7 @@ class PremiumService(
             return []
 
     # IPremiumService implementation
-    async def validate_premium_access(
-        self, member: discord.Member, required_tier: CommandTier
-    ) -> tuple[bool, str]:
+    async def validate_premium_access(self, member: discord.Member, required_tier: CommandTier) -> tuple[bool, str]:
         """Validate if member has required premium access."""
         try:
             if required_tier == CommandTier.TIER_0:
@@ -551,9 +501,7 @@ class PremiumService(
             self._log_error("validate_premium_access", e, member_id=member.id)
             return False, "Błąd sprawdzania uprawnień"
 
-    async def handle_premium_payment(
-        self, payment: PaymentData
-    ) -> tuple[bool, str, Optional[discord.Member]]:
+    async def handle_premium_payment(self, payment: PaymentData) -> tuple[bool, str, Optional[discord.Member]]:
         """Handle a premium payment end-to-end."""
         try:
             # Extract member ID from payment name
@@ -571,7 +519,7 @@ class PremiumService(
                     "Guild nie jest ustawiony",
                     None,
                 )
-                
+
             member = self.guild.get_member(member_id)
             if not member:
                 return (
@@ -588,9 +536,7 @@ class PremiumService(
             role_name, duration_days = benefits
 
             # Assign or extend role
-            result = await self.extend_premium_role(
-                member, role_name, duration_days, payment.amount
-            )
+            result = await self.extend_premium_role(member, role_name, duration_days, payment.amount)
 
             if result.success:
                 return True, result.message, member
@@ -620,9 +566,7 @@ class PremiumService(
                     "tier_t": True,  # Assuming activity > 0
                     "tier_1": has_bypass or has_premium,
                     "tier_2": has_premium,
-                    "tier_3": premium_level in ["zG500", "zG1000"]
-                    if premium_level
-                    else False,
+                    "tier_3": premium_level in ["zG500", "zG1000"] if premium_level else False,
                 },
             }
 
@@ -644,9 +588,7 @@ class PremiumService(
             self._log_error("process_premium_maintenance", e)
             return {"error": 1}
 
-    async def calculate_role_value(
-        self, member: discord.Member, target_role: str
-    ) -> Optional[int]:
+    async def calculate_role_value(self, member: discord.Member, target_role: str) -> Optional[int]:
         """Calculate the value of a premium role for pricing."""
         if target_role not in self.PREMIUM_ROLES:
             return None

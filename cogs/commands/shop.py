@@ -23,11 +23,7 @@ class ShopCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.hybrid_command(
-        name="shop", 
-        aliases=["sklep"],
-        description="Wyświetla sklep z rolami."
-    )
+    @commands.hybrid_command(name="shop", aliases=["sklep"], description="Wyświetla sklep z rolami.")
     @is_zagadka_owner()
     async def shop(self, ctx: Context, member: discord.Member = None):
         viewer = ctx.author
@@ -37,7 +33,7 @@ class ShopCog(commands.Cog):
             # Use new service architecture
             member_service = await self.bot.get_service(IMemberService, session)
             premium_service = await self.bot.get_service(IPremiumService, session)
-            
+
             db_viewer = await member_service.get_or_create_member(viewer)
             balance = db_viewer.wallet_balance
             premium_roles = await premium_service.get_member_premium_roles(target_member.id)
@@ -74,9 +70,9 @@ class ShopCog(commands.Cog):
         )
 
         async with self.bot.get_db() as session:
-            # Use new service architecture  
+            # Use new service architecture
             member_service = await self.bot.get_service(IMemberService, session)
-            
+
             await HandledPaymentQueries.add_payment(
                 session,
                 user.id,
@@ -85,7 +81,7 @@ class ShopCog(commands.Cog):
                 payment_data.paid_at,
                 payment_data.payment_type,
             )
-            
+
             # Get or create member and update wallet balance
             db_member = await member_service.get_or_create_member(user)
             new_balance = db_member.wallet_balance + payment_data.amount
@@ -101,27 +97,21 @@ class ShopCog(commands.Cog):
         async with self.bot.get_db() as session:
             # Use new service architecture
             member_service = await self.bot.get_service(IMemberService, session)
-            
+
             payment = await HandledPaymentQueries.get_payment_by_id(session, payment_id)
 
             if payment:
                 payment.member_id = user.id
-                
+
                 # Get or create member and update wallet balance
                 db_member = await member_service.get_or_create_member(user)
                 new_balance = db_member.wallet_balance + payment.amount
                 await member_service.update_member_info(db_member, wallet_balance=new_balance)
-                
+
                 await session.commit()
 
-                msg1 = (
-                    "Proszę pamiętać o podawaniu swojego ID "
-                    "podczas dokonywania wpłat w przyszłości. Twoje ID to:"
-                )
-                msg2 = (
-                    f"Nie mogłem wysłać DM do {user.mention}. "
-                    f"Proszę przekazać mu te informacje ręcznie."
-                )
+                msg1 = "Proszę pamiętać o podawaniu swojego ID " "podczas dokonywania wpłat w przyszłości. Twoje ID to:"
+                msg2 = f"Nie mogłem wysłać DM do {user.mention}. " f"Proszę przekazać mu te informacje ręcznie."
 
                 try:
                     await user.send(msg1)
@@ -131,9 +121,7 @@ class ShopCog(commands.Cog):
             else:
                 await ctx.send(f"Nie znaleziono płatności o ID: {payment_id}")
 
-    @commands.hybrid_command(
-        name="payments", description="Wyświetla wszystkie płatności"
-    )
+    @commands.hybrid_command(name="payments", description="Wyświetla wszystkie płatności")
     @is_admin()
     async def all_payments(self, ctx: Context):
         """Fetch and display the initial set of payments."""
@@ -173,7 +161,7 @@ class ShopCog(commands.Cog):
         async with self.bot.get_db() as session:
             # Use new service architecture
             premium_service = await self.bot.get_service(IPremiumService, session)
-            
+
             premium_roles = await premium_service.get_member_premium_roles(member.id)
 
             if not premium_roles:
@@ -189,7 +177,7 @@ class ShopCog(commands.Cog):
             result = await premium_service.extend_premium_role(
                 member, role_name, 0, 0  # 0 days extension, just updating expiry
             )
-            
+
             if result.success:
                 await session.commit()
                 await ctx.reply(
@@ -212,14 +200,10 @@ class ShopCog(commands.Cog):
         count = 0
 
         # Pobierz konfigurację ról premium
-        premium_role_names = {
-            role["name"]: role for role in self.bot.config["premium_roles"]
-        }
+        premium_role_names = {role["name"]: role for role in self.bot.config["premium_roles"]}
 
         # Znajdź role premium na serwerze
-        premium_roles = [
-            role for role in ctx.guild.roles if role.name in premium_role_names
-        ]
+        premium_roles = [role for role in ctx.guild.roles if role.name in premium_role_names]
 
         # Dla każdej roli premium
         for role in premium_roles:
@@ -228,14 +212,14 @@ class ShopCog(commands.Cog):
                 async with self.bot.get_db() as session:
                     # Use new service architecture
                     premium_service = await self.bot.get_service(IPremiumService, session)
-                    
+
                     # Set guild context for premium service
                     premium_service.set_guild(ctx.guild)
-                    
+
                     # Check if member has valid premium role
                     has_valid_premium = await premium_service.has_premium_role(member)
                     premium_roles = await premium_service.get_member_premium_roles(member.id)
-                    
+
                     # Check if this specific role is expired
                     role_expired = True
                     for role_data in premium_roles:
@@ -249,17 +233,11 @@ class ShopCog(commands.Cog):
                         try:
                             await member.remove_roles(role)
                             count += 1
-                            logger.info(
-                                f"Removed role {role.name} from {member.display_name} - no DB entry or expired"
-                            )
+                            logger.info(f"Removed role {role.name} from {member.display_name} - no DB entry or expired")
                         except Exception as e:
-                            logger.error(
-                                f"Error removing role {role.name} from {member.display_name}: {str(e)}"
-                            )
+                            logger.error(f"Error removing role {role.name} from {member.display_name}: {str(e)}")
 
-        await ctx.reply(
-            f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne."
-        )
+        await ctx.reply(f"Sprawdzono i usunięto {count} ról, które nie powinny być aktywne.")
 
 
 async def setup(bot: commands.Bot):

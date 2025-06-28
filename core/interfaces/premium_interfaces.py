@@ -76,9 +76,7 @@ class IPremiumChecker(ABC):
         pass
 
     @abstractmethod
-    async def check_command_access(
-        self, member: discord.Member, command_name: str
-    ) -> tuple[bool, str]:
+    async def check_command_access(self, member: discord.Member, command_name: str) -> tuple[bool, str]:
         """Check if member can access a specific command."""
         pass
 
@@ -131,9 +129,7 @@ class IPremiumRoleManager(ABC):
         pass
 
     @abstractmethod
-    async def get_premium_role_info(
-        self, member: discord.Member
-    ) -> list[dict[str, Any]]:
+    async def get_premium_role_info(self, member: discord.Member) -> list[dict[str, Any]]:
         """Get premium role information for a member."""
         pass
 
@@ -181,16 +177,12 @@ class IPremiumService(ABC):
     """Main interface for premium system operations."""
 
     @abstractmethod
-    async def validate_premium_access(
-        self, member: discord.Member, required_tier: CommandTier
-    ) -> tuple[bool, str]:
+    async def validate_premium_access(self, member: discord.Member, required_tier: CommandTier) -> tuple[bool, str]:
         """Validate if member has required premium access."""
         pass
 
     @abstractmethod
-    async def handle_premium_payment(
-        self, payment: PaymentData
-    ) -> tuple[bool, str, Optional[discord.Member]]:
+    async def handle_premium_payment(self, payment: PaymentData) -> tuple[bool, str, Optional[discord.Member]]:
         """Handle a premium payment end-to-end."""
         pass
 
@@ -205,9 +197,7 @@ class IPremiumService(ABC):
         pass
 
     @abstractmethod
-    async def calculate_role_value(
-        self, member: discord.Member, target_role: str
-    ) -> Optional[int]:
+    async def calculate_role_value(self, member: discord.Member, target_role: str) -> Optional[int]:
         """Calculate the value of a premium role for pricing."""
         pass
 

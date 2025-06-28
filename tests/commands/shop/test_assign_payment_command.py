@@ -1,9 +1,10 @@
 """
 Tests for assign_payment command execution
 """
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Mock Discord before any imports
 sys.modules['discord'] = MagicMock()

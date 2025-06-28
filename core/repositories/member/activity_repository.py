@@ -87,9 +87,7 @@ class ActivityRepository(BaseRepository):
     ) -> int:
         """Get total points for a member."""
         try:
-            query = select(func.sum(Activity.points)).where(
-                Activity.member_id == member_id
-            )
+            query = select(func.sum(Activity.points)).where(Activity.member_id == member_id)
 
             if activity_type:
                 query = query.where(Activity.activity_type == activity_type)
@@ -133,47 +131,41 @@ class ActivityRepository(BaseRepository):
             self._log_error("get_leaderboard", e)
             return []
 
-    async def get_activity_leaderboard_optimized(
-        self, days: int = 30, limit: int = 10
-    ) -> list[dict]:
+    async def get_activity_leaderboard_optimized(self, days: int = 30, limit: int = 10) -> list[dict]:
         """Get activity leaderboard with optimized query."""
         try:
             start_date = datetime.now(timezone.utc) - timedelta(days=days)
-            
+
             result = await self.session.execute(
                 select(
                     Activity.member_id,
-                    func.sum(Activity.points).label('total_points'),
-                    func.sum(
-                        func.case(
-                            (Activity.activity_type == 'voice', Activity.points),
-                            else_=0
-                        )
-                    ).label('voice_points'),
-                    func.sum(
-                        func.case(
-                            (Activity.activity_type == 'text', Activity.points),
-                            else_=0
-                        )
-                    ).label('text_points')
+                    func.sum(Activity.points).label("total_points"),
+                    func.sum(func.case((Activity.activity_type == "voice", Activity.points), else_=0)).label(
+                        "voice_points"
+                    ),
+                    func.sum(func.case((Activity.activity_type == "text", Activity.points), else_=0)).label(
+                        "text_points"
+                    ),
                 )
                 .where(Activity.created_at >= start_date)
                 .group_by(Activity.member_id)
                 .order_by(func.sum(Activity.points).desc())
                 .limit(limit)
             )
-            
+
             leaderboard = []
             for row in result:
-                leaderboard.append({
-                    'member_id': row.member_id,
-                    'total_points': row.total_points,
-                    'voice_points': row.voice_points,
-                    'text_points': row.text_points
-                })
-            
+                leaderboard.append(
+                    {
+                        "member_id": row.member_id,
+                        "total_points": row.total_points,
+                        "voice_points": row.voice_points,
+                        "text_points": row.text_points,
+                    }
+                )
+
             return leaderboard
-            
+
         except Exception as e:
             self._log_error("get_activity_leaderboard_optimized", e)
             return []
@@ -222,22 +214,20 @@ class ActivityRepository(BaseRepository):
         """Clean up old activity records."""
         try:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
-            
+
             # Get count of records to delete
             count_result = await self.session.execute(
                 select(func.count(Activity.id)).where(Activity.created_at < cutoff_date)
             )
             count = count_result.scalar() or 0
-            
+
             if count > 0:
                 # Delete old records
-                await self.session.execute(
-                    Activity.__table__.delete().where(Activity.created_at < cutoff_date)
-                )
+                await self.session.execute(Activity.__table__.delete().where(Activity.created_at < cutoff_date))
                 await self.session.flush()
-                
+
                 self._log_operation("cleanup_old_activities", deleted_count=count)
-            
+
             return count
 
         except Exception as e:

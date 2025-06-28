@@ -13,18 +13,14 @@ from utils.message_sender import MessageSender
 from utils.premium_checker import PremiumChecker
 from utils.voice.autokick import AutoKickManager
 from utils.voice.channel import ChannelModManager, VoiceChannelManager
-from utils.voice.permissions import (
-    BasePermissionCommand,
-    PermissionChecker,
-    VoicePermissionManager,
-)
+from utils.voice.permissions import BasePermissionCommand, PermissionChecker, VoicePermissionManager
 
 logger = logging.getLogger(__name__)
 
 
 class PermissionCommands:
     """Voice permission commands for speak, view, connect, text, live, and mod."""
-    
+
     def __init__(self, bot):
         """Initialize permission commands."""
         self.bot = bot
@@ -44,17 +40,10 @@ class PermissionCommands:
         self.text_handler = BasePermissionCommand("send_messages", requires_owner=False)
         self.live_handler = BasePermissionCommand("stream", requires_owner=False)
         self.mod_handler = BasePermissionCommand(
-            "manage_messages",
-            requires_owner=True,
-            default_to_true=True,
-            toggle=True
+            "manage_messages", requires_owner=True, default_to_true=True, toggle=True
         )
         self.reset_handler = BasePermissionCommand(
-            "all",
-            requires_owner=True,
-            default_to_true=True,
-            toggle=False,
-            is_reset=True
+            "all", requires_owner=True, default_to_true=True, toggle=False, is_reset=True
         )
 
     @commands.hybrid_command(aliases=["s"])
@@ -74,13 +63,13 @@ class PermissionCommands:
         async with self.bot.get_db() as session:
             premium_service = await self.bot.get_service(IPremiumService, session)
             premium_service.set_guild(ctx.guild)
-            
+
             # Check if user has access to speak command
             has_access, message = await premium_service.check_command_access(ctx.author, "speak")
             if not has_access:
                 await self.message_sender.send_error(ctx, message)
                 return
-        
+
         await self.speak_handler.execute(self, ctx, target, can_speak)
 
     @commands.hybrid_command(aliases=["v"])
@@ -111,9 +100,7 @@ class PermissionCommands:
         can_connect: Optional[Literal["+", "-"]] = None,
     ):
         """Set the connect permission for the target."""
-        await self.connect_handler.execute(
-            self, ctx, target, can_connect
-        )
+        await self.connect_handler.execute(self, ctx, target, can_connect)
 
     @commands.hybrid_command(aliases=["t"])
     @PermissionChecker.voice_command()
@@ -178,17 +165,11 @@ class PermissionCommands:
             ]
             # Convert Member objects to mentions string with display names
             current_mods_mentions = (
-                ", ".join(
-                    f"{member.mention} ({member.display_name})"
-                    for member in current_mods
-                )
-                or "brak"
+                ", ".join(f"{member.mention} ({member.display_name})" for member in current_mods) or "brak"
             )
             remaining_slots = max(0, mod_limit - len(current_mods))
 
-            await self.message_sender.send_mod_info(
-                ctx, current_mods_mentions, mod_limit, remaining_slots
-            )
+            await self.message_sender.send_mod_info(ctx, current_mods_mentions, mod_limit, remaining_slots)
             return
 
         # Get mod limit from user's roles
@@ -201,7 +182,7 @@ class PermissionCommands:
         # Check if adding a mod would exceed the limit
         if can_manage == "+":
             voice_channel = ctx.author.voice.channel
-            
+
             # Count current mods (members with manage_messages permission)
             current_mods = []
             for target_obj, overwrite in voice_channel.overwrites.items():
@@ -209,7 +190,7 @@ class PermissionCommands:
                     if overwrite.manage_messages is True:
                         if not (overwrite.priority_speaker is True):
                             current_mods.append(target_obj)
-            
+
             if len(current_mods) >= mod_limit:
                 await self.message_sender.send_error(
                     ctx,

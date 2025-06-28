@@ -9,7 +9,7 @@ import discord
 import pytest
 
 from tests.base.base_command_test import BaseCommandTest
-from tests.config import TEST_USER_ID, SECONDARY_TEST_USER_ID
+from tests.config import SECONDARY_TEST_USER_ID, TEST_USER_ID
 from tests.utils.client import TestClient
 
 logger = logging.getLogger(__name__)
@@ -110,8 +110,8 @@ class TestShopPremiumWorkflow(BaseCommandTest):
             
             async def get_service(service_type, session):
                 from core.interfaces.member_interfaces import IMemberService
-                from core.interfaces.premium_interfaces import IPremiumService
                 from core.interfaces.payment_interfaces import IPaymentProcessor
+                from core.interfaces.premium_interfaces import IPremiumService
                 
                 if service_type == IMemberService:
                     return member_service

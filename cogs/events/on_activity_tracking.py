@@ -7,8 +7,8 @@ from typing import Dict, Set
 import discord
 from discord.ext import commands, tasks
 
-from core.interfaces.member_interfaces import IMemberService
 from core.interfaces.activity_interfaces import IActivityTrackingService
+from core.interfaces.member_interfaces import IMemberService
 from utils.permissions import is_zagadka_owner
 
 logger = logging.getLogger(__name__)
@@ -73,9 +73,7 @@ class OnActivityTracking(commands.Cog):
                 self.voice_members[after.channel.id] = set()
             self.voice_members[after.channel.id].add(member.id)
 
-        logger.debug(
-            f"Voice update: {member.display_name} - {len(self.voice_members)} channels active"
-        )
+        logger.debug(f"Voice update: {member.display_name} - {len(self.voice_members)} channels active")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -90,9 +88,7 @@ class OnActivityTracking(commands.Cog):
         try:
             async with self.bot.get_db() as session:
                 activity_service = await self.bot.get_service(IActivityTrackingService, session)
-                await activity_service.track_message_activity(
-                    message.author.id, message.content, message.channel.id
-                )
+                await activity_service.track_message_activity(message.author.id, message.content, message.channel.id)
                 await session.commit()
         except Exception as e:
             logger.error(f"Failed to track text activity for {message.author.id}: {e}")
@@ -131,18 +127,14 @@ class OnActivityTracking(commands.Cog):
                             continue
 
                         # Skip if muted or deafened
-                        if member.voice and (
-                            member.voice.self_mute or member.voice.self_deaf
-                        ):
+                        if member.voice and (member.voice.self_mute or member.voice.self_deaf):
                             continue
 
                         active_members.append(member_id)
 
                     # Remove non-existent members from the original set after iteration
                     if members_to_remove:
-                        self.voice_members[channel_id].difference_update(
-                            members_to_remove
-                        )
+                        self.voice_members[channel_id].difference_update(members_to_remove)
                         # Remove empty channel entries
                         if not self.voice_members[channel_id]:
                             del self.voice_members[channel_id]
@@ -152,11 +144,9 @@ class OnActivityTracking(commands.Cog):
 
                     # Use the new activity service
                     activity_service = await self.bot.get_service(IActivityTrackingService, session)
-                    
+
                     for member_id in active_members:
-                        await activity_service.track_voice_activity(
-                            member_id, channel_id, is_with_others
-                        )
+                        await activity_service.track_voice_activity(member_id, channel_id, is_with_others)
 
                     if active_members:
                         points_type = "with others" if is_with_others else "alone"
@@ -194,7 +184,7 @@ class OnActivityTracking(commands.Cog):
                     activity_service = await self.bot.get_service(IActivityTrackingService, session)
                     if not activity_service:
                         continue
-                        
+
                     # Check for promotion
                     if await activity_service.check_member_promotion_status(member):
                         current_promoters.add(member.id)
@@ -205,9 +195,7 @@ class OnActivityTracking(commands.Cog):
                     # Check for anti-promotion (promoting other servers)
                     if await activity_service.check_member_antipromo_status(member):
                         # Log but don't reset points automatically (as per user request)
-                        logger.debug(
-                            f"Member {member.display_name} ({member.id}) is promoting other servers"
-                        )
+                        logger.debug(f"Member {member.display_name} ({member.id}) is promoting other servers")
 
                 # Log promotion activity
                 new_promoters = current_promoters - self.promotion_members
@@ -252,13 +240,9 @@ class OnActivityTracking(commands.Cog):
         voice_info = []
         for channel_id, member_ids in self.voice_members.items():
             channel = self.bot.guild.get_channel(channel_id)
-            voice_info.append(
-                f"{channel.name if channel else channel_id}: {len(member_ids)} members"
-            )
+            voice_info.append(f"{channel.name if channel else channel_id}: {len(member_ids)} members")
 
-        embed = discord.Embed(
-            title="🔧 Activity Tracking Debug", color=discord.Color.orange()
-        )
+        embed = discord.Embed(title="🔧 Activity Tracking Debug", color=discord.Color.orange())
 
         embed.add_field(
             name="🎤 Voice Channels",
@@ -283,9 +267,7 @@ class OnActivityTracking(commands.Cog):
 
     @commands.hybrid_command(name="add_bonus_points")
     @is_zagadka_owner()
-    async def add_bonus_points(
-        self, ctx: commands.Context, member: discord.Member, points: int
-    ):
+    async def add_bonus_points(self, ctx: commands.Context, member: discord.Member, points: int):
         """Add bonus points to a member."""
         try:
             async with self.bot.get_db() as session:

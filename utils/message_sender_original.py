@@ -79,9 +79,7 @@ class MessageSender:
                 embed.set_author(name=ctx.display_name, icon_url=ctx.display_avatar.url)
             elif hasattr(ctx, "author"):
                 # If ctx is a Context object (from commands)
-                embed.set_author(
-                    name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url
-                )
+                embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
 
         return embed
 
@@ -100,9 +98,7 @@ class MessageSender:
             allowed_mentions = AllowedMentions(users=False, roles=False)
 
         if reply:
-            return await ctx.reply(
-                embed=embed, allowed_mentions=allowed_mentions, view=view
-            )
+            return await ctx.reply(embed=embed, allowed_mentions=allowed_mentions, view=view)
         return await ctx.send(embed=embed, allowed_mentions=allowed_mentions, view=view)
 
     @staticmethod
@@ -139,9 +135,7 @@ class MessageSender:
         and 'channel' if you want to mention a specific voice channel in the text.
         """
         description = MessageSender.build_description(base_text, ctx, channel)
-        embed = MessageSender._create_embed(
-            title=title, description=description, color=color, fields=fields, ctx=ctx
-        )
+        embed = MessageSender._create_embed(title=title, description=description, color=color, fields=fields, ctx=ctx)
 
         # Add channel info as the last field to ensure it appears at the bottom
         if channel:
@@ -154,9 +148,7 @@ class MessageSender:
     @staticmethod
     async def send_permission_update(ctx, target, permission_flag, new_value):
         """Sends a message about permission update."""
-        mention_str = (
-            target.mention if isinstance(target, discord.Member) else "wszystkich"
-        )
+        mention_str = target.mention if isinstance(target, discord.Member) else "wszystkich"
         value_str = "+" if new_value else "-"
         command_name = ctx.command.name if ctx.command else permission_flag
         base_text = f"Ustawiono `{command_name}` na `{value_str}` dla {mention_str}"
@@ -189,11 +181,7 @@ class MessageSender:
         """Sends a message when user is not in a voice channel."""
         if target:
             base_text = f"{target.mention} nie jest na żadnym kanale głosowym!"
-            channel = (
-                target.voice.channel
-                if (target.voice and target.voice.channel)
-                else None
-            )
+            channel = target.voice.channel if (target.voice and target.voice.channel) else None
         else:
             base_text = "Nie jesteś na żadnym kanale głosowym!"
             channel = ctx.author.voice.channel if (ctx.author.voice) else None
@@ -252,9 +240,7 @@ class MessageSender:
         has_zg1000 = any(role.name == "zG1000" for role in ctx.author.roles)
 
         current_mods_count = len(current_mods)
-        current_mods_mentions = (
-            ", ".join(member.mention for member in current_mods) or "brak"
-        )
+        current_mods_mentions = ", ".join(member.mention for member in current_mods) or "brak"
 
         if has_zg1000:
             base_text = f"Osiągnięto limit moderatorów ({current_mods_count}/{mod_limit}). Usuń któregoś z aktualnych moderatorów przed dodaniem nowego.\nModeratorzy: {current_mods_mentions}"
@@ -285,9 +271,7 @@ class MessageSender:
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
-    async def send_voice_channel_info(
-        ctx, channel, owner, mods, disabled_perms, target=None
-    ):
+    async def send_voice_channel_info(ctx, channel, owner, mods, disabled_perms, target=None):
         """Send voice channel information."""
         # Owner field
         owner_value = owner.mention if owner else "brak"
@@ -304,15 +288,15 @@ class MessageSender:
         }
 
         if disabled_perms:
-            converted_perms = [
-                f"`{perm_to_cmd.get(perm, perm)}`" for perm in disabled_perms
-            ]
+            converted_perms = [f"`{perm_to_cmd.get(perm, perm)}`" for perm in disabled_perms]
             perms_value = ", ".join(converted_perms)
         else:
             perms_value = "brak"
 
         # Tworzymy treść wiadomości
-        base_text = f"**Właściciel:** {owner_value} • **Moderatorzy:** {mods_value}\n**Wyłączone uprawnienia:** {perms_value}"
+        base_text = (
+            f"**Właściciel:** {owner_value} • **Moderatorzy:** {mods_value}\n**Wyłączone uprawnienia:** {perms_value}"
+        )
 
         # Tworzymy embed
         embed = MessageSender._create_embed(description=base_text, ctx=ctx)
@@ -328,17 +312,13 @@ class MessageSender:
     @staticmethod
     async def send_no_premium_role(ctx, premium_channel_id):
         """Sends a message when user has no premium role."""
-        base_text = (
-            "Nie posiadasz żadnej rangi premium. Możesz przypisać 0 channel modów."
-        )
+        base_text = "Nie posiadasz żadnej rangi premium. Możesz przypisać 0 channel modów."
         channel = ctx.author.voice.channel if ctx.author.voice else None
         if channel:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(
-            title="Brak Rangi Premium", description=base_text, color="warning", ctx=ctx
-        )
+        embed = MessageSender._create_embed(title="Brak Rangi Premium", description=base_text, color="warning", ctx=ctx)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
@@ -379,9 +359,7 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(
-            description=base_text, color="warning", ctx=ctx
-        )
+        embed = MessageSender._create_embed(description=base_text, color="warning", ctx=ctx)
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
@@ -393,9 +371,7 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(
-            description=base_text, ctx=ctx, color="warning"
-        )
+        embed = MessageSender._create_embed(description=base_text, ctx=ctx, color="warning")
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
@@ -407,9 +383,7 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(
-            description=base_text, ctx=ctx, color="success"
-        )
+        embed = MessageSender._create_embed(description=base_text, ctx=ctx, color="success")
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
@@ -421,9 +395,7 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(
-            description=base_text, ctx=ctx, color="error"
-        )
+        embed = MessageSender._create_embed(description=base_text, ctx=ctx, color="error")
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
@@ -435,9 +407,7 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(
-            description=base_text, ctx=ctx, color="success"
-        )
+        embed = MessageSender._create_embed(description=base_text, ctx=ctx, color="success")
         await MessageSender._send_embed(ctx, embed)
 
     @staticmethod
@@ -461,9 +431,7 @@ class MessageSender:
             for target_id in user_autokicks:
                 member = ctx.guild.get_member(target_id)
                 if member:
-                    bypass = await MemberQueries.get_voice_bypass_status(
-                        session, member.id
-                    )
+                    bypass = await MemberQueries.get_voice_bypass_status(session, member.id)
                     t_count = "0"
                     if bypass:
                         time_left = bypass - datetime.now(timezone.utc)
@@ -506,9 +474,7 @@ class MessageSender:
             base_text = f"{base_text}\n{channel_text}"
 
         embed = MessageSender._create_embed(description=base_text, ctx=owner)
-        await channel.send(
-            embed=embed, allowed_mentions=AllowedMentions(users=False, roles=False)
-        )
+        await channel.send(embed=embed, allowed_mentions=AllowedMentions(users=False, roles=False))
 
     @staticmethod
     async def send_cant_modify_owner_permissions(ctx):
@@ -544,9 +510,7 @@ class MessageSender:
                     # Extract just the mention part if it contains display name in parentheses
                     mention = mod_mention.split(" (")[0]
                     member_id = int(mention.split("@")[1].split(">")[0])
-                    bypass = await MemberQueries.get_voice_bypass_status(
-                        session, member_id
-                    )
+                    bypass = await MemberQueries.get_voice_bypass_status(session, member_id)
                     t_count = "0"
                     if bypass:
                         time_left = bypass - datetime.now(timezone.utc)
@@ -576,9 +540,7 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(
-            description=base_text, color="success", ctx=ctx
-        )
+        embed = MessageSender._create_embed(description=base_text, color="success", ctx=ctx)
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
@@ -590,9 +552,7 @@ class MessageSender:
             _, channel_text = MessageSender._get_premium_text(ctx, channel)
             if channel_text:
                 base_text = f"{base_text}\n{channel_text}"
-        embed = MessageSender._create_embed(
-            description=base_text, color="success", ctx=ctx
-        )
+        embed = MessageSender._create_embed(description=base_text, color="success", ctx=ctx)
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
@@ -606,15 +566,11 @@ class MessageSender:
     async def send_success(ctx, message: str):
         """Sends a success message."""
         channel = ctx.author.voice.channel if ctx.author.voice else None
-        embed = MessageSender._create_embed(
-            description=message, ctx=ctx, color="success"
-        )
+        embed = MessageSender._create_embed(description=message, ctx=ctx, color="success")
         await MessageSender._send_embed(ctx, embed, reply=True)
 
     @staticmethod
-    async def send_giveaway_results(
-        ctx, winners: list, channel: discord.TextChannel, winners_count: int
-    ):
+    async def send_giveaway_results(ctx, winners: list, channel: discord.TextChannel, winners_count: int):
         """Send giveaway results."""
         description = []
         for i, message in enumerate(winners, 1):
@@ -622,15 +578,11 @@ class MessageSender:
             if message.webhook_id:
                 author_text = f"Webhook ({message.author.name})"
             else:
-                author_text = (
-                    message.author.mention if message.author else "Nieznany użytkownik"
-                )
+                author_text = message.author.mention if message.author else "Nieznany użytkownik"
             description.append(f"{i}. {author_text} - [Link do wiadomości]({jump_url})")
 
         if len(winners) < winners_count:
-            description.append(
-                f"\n⚠️ Wylosowano tylko {len(winners)} wiadomości z {winners_count} żądanych."
-            )
+            description.append(f"\n⚠️ Wylosowano tylko {len(winners)} wiadomości z {winners_count} żądanych.")
 
         base_text = "\n".join(description)
         fields = [
@@ -688,9 +640,7 @@ class MessageSender:
 
         # Get T count for owner and mods
         async with ctx.bot.get_db() as session:
-            owner_bypass = await MemberQueries.get_voice_bypass_status(
-                session, owner.id
-            )
+            owner_bypass = await MemberQueries.get_voice_bypass_status(session, owner.id)
             owner_t = "0T"
             if owner_bypass:
                 time_left = owner_bypass - datetime.now(timezone.utc)
@@ -700,9 +650,7 @@ class MessageSender:
 
             mod_t_counts = []
             for mod in mods:
-                mod_bypass = await MemberQueries.get_voice_bypass_status(
-                    session, mod.id
-                )
+                mod_bypass = await MemberQueries.get_voice_bypass_status(session, mod.id)
                 mod_t = "0T"
                 if mod_bypass:
                     time_left = mod_bypass - datetime.now(timezone.utc)
@@ -722,9 +670,7 @@ class MessageSender:
             channel_info.append("**Moderatorzy:** brak")
 
         if disabled_perms:
-            channel_info.append(
-                f"**Wyłączone uprawnienia:** `{', '.join(disabled_perms)}`"
-            )
+            channel_info.append(f"**Wyłączone uprawnienia:** `{', '.join(disabled_perms)}`")
 
         embed.add_field(name="\u200b", value="\n".join(channel_info), inline=False)
 
@@ -747,9 +693,7 @@ class MessageSender:
                 available_services.append(service_text)
 
         if available_services:
-            embed.add_field(
-                name="💰 Odbierz T", value="\n".join(available_services), inline=False
-            )
+            embed.add_field(name="💰 Odbierz T", value="\n".join(available_services), inline=False)
 
         # Create view with buttons for voting services
         view = None
@@ -807,9 +751,7 @@ class MessageSender:
         available_services = []
 
         for service in services:
-            status = await BumpChecker(ctx.bot).get_service_status(
-                service, ctx.author.id
-            )
+            status = await BumpChecker(ctx.bot).get_service_status(service, ctx.author.id)
             if status["available"]:
                 available_services.append((service, status))
 
@@ -833,9 +775,7 @@ class MessageSender:
                 available_text.append(service_text)
 
             if available_text:
-                embed.add_field(
-                    name="💰 Odbierz T:", value="\n".join(available_text), inline=False
-                )
+                embed.add_field(name="💰 Odbierz T:", value="\n".join(available_text), inline=False)
 
         # Create view with buttons for voting services
         view = None
@@ -869,9 +809,7 @@ class MessageSender:
         available_services = []
 
         for service in services:
-            status = await BumpChecker(ctx.bot).get_service_status(
-                service, ctx.author.id
-            )
+            status = await BumpChecker(ctx.bot).get_service_status(service, ctx.author.id)
             if status["available"]:
                 available_services.append((service, status))
 
@@ -941,9 +879,7 @@ class MessageSender:
     @staticmethod
     async def send_specific_roles_required(ctx, allowed_roles):
         """Send message when specific premium roles are required."""
-        base_text = (
-            f"Ta komenda wymaga jednej z rang premium: {', '.join(allowed_roles)}."
-        )
+        base_text = f"Ta komenda wymaga jednej z rang premium: {', '.join(allowed_roles)}."
 
         # Add channel info directly to description
         channel = ctx.author.voice.channel if ctx.author.voice else None

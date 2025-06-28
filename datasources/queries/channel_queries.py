@@ -49,9 +49,7 @@ class ChannelPermissionQueries:
 
         # Count permissions excluding default ones (which are not in database)
         permissions_count = await session.scalar(
-            select(func.count())
-            .select_from(ChannelPermission)
-            .where(ChannelPermission.member_id == member_id)
+            select(func.count()).select_from(ChannelPermission).where(ChannelPermission.member_id == member_id)
         )
 
         # If we're about to exceed the limit
@@ -64,12 +62,7 @@ class ChannelPermissionQueries:
                 select(ChannelPermission)
                 .where(
                     (ChannelPermission.member_id == member_id)
-                    & (
-                        ChannelPermission.allow_permissions_value.bitwise_and(
-                            0x00002000
-                        )
-                        == 0
-                    )  # not manage_messages
+                    & (ChannelPermission.allow_permissions_value.bitwise_and(0x00002000) == 0)  # not manage_messages
                     & (ChannelPermission.target_id != guild_id)  # not @everyone
                 )
                 .order_by(ChannelPermission.last_updated_at.asc())
@@ -78,9 +71,7 @@ class ChannelPermissionQueries:
             oldest_permission = oldest_permission.scalar_one_or_none()
             if oldest_permission:
                 await session.delete(oldest_permission)
-                logger.info(
-                    f"Deleted oldest permission for member {member_id} (target: {oldest_permission.target_id})"
-                )
+                logger.info(f"Deleted oldest permission for member {member_id} (target: {oldest_permission.target_id})")
 
     @staticmethod
     async def remove_permission(session: AsyncSession, member_id: int, target_id: int):
@@ -88,29 +79,19 @@ class ChannelPermissionQueries:
         permission = await session.get(ChannelPermission, (member_id, target_id))
         if permission:
             await session.delete(permission)
-            logger.info(
-                f"Removed permission for member {member_id} and target {target_id}"
-            )
+            logger.info(f"Removed permission for member {member_id} and target {target_id}")
         else:
-            logger.warning(
-                f"No permission found for member {member_id} and target {target_id}"
-            )
+            logger.warning(f"No permission found for member {member_id} and target {target_id}")
 
     @staticmethod
-    async def get_permission(
-        session: AsyncSession, member_id: int, target_id: int
-    ) -> Optional[ChannelPermission]:
+    async def get_permission(session: AsyncSession, member_id: int, target_id: int) -> Optional[ChannelPermission]:
         """Get channel permissions for a specific member or role."""
         return await session.get(ChannelPermission, (member_id, target_id))
 
     @staticmethod
-    async def get_permissions_for_target(
-        session: AsyncSession, target_id: int
-    ) -> List[ChannelPermission]:
+    async def get_permissions_for_target(session: AsyncSession, target_id: int) -> List[ChannelPermission]:
         """Get all channel permissions for a specific target (member or role)."""
-        result = await session.execute(
-            select(ChannelPermission).where(ChannelPermission.target_id == target_id)
-        )
+        result = await session.execute(select(ChannelPermission).where(ChannelPermission.target_id == target_id))
         return result.scalars().all()
 
     @staticmethod
@@ -124,10 +105,7 @@ class ChannelPermissionQueries:
             .order_by(
                 case(
                     (
-                        ChannelPermission.allow_permissions_value.bitwise_and(
-                            0x00002000
-                        )
-                        != 0,
+                        ChannelPermission.allow_permissions_value.bitwise_and(0x00002000) != 0,
                         0,
                     ),  # manage_messages
                     (
@@ -145,9 +123,7 @@ class ChannelPermissionQueries:
     @staticmethod
     async def remove_all_permissions(session: AsyncSession, owner_id: int):
         """Remove all permissions for a specific owner."""
-        result = await session.execute(
-            select(ChannelPermission).where(ChannelPermission.member_id == owner_id)
-        )
+        result = await session.execute(select(ChannelPermission).where(ChannelPermission.member_id == owner_id))
         permissions = result.scalars().all()
 
         for permission in permissions:
@@ -156,9 +132,7 @@ class ChannelPermissionQueries:
         logger.info(f"Removed all {len(permissions)} permissions for owner {owner_id}")
 
     @staticmethod
-    async def remove_mod_permissions_granted_by_member(
-        session: AsyncSession, owner_id: int
-    ):
+    async def remove_mod_permissions_granted_by_member(session: AsyncSession, owner_id: int):
         """
         Remove only moderator permissions granted by a specific member.
 
@@ -173,9 +147,7 @@ class ChannelPermissionQueries:
             owner_id: The ID of the member who granted the permissions
         """
         # Znajdujemy wszystkie uprawnienia gdzie użytkownik jest właścicielem (member_id)
-        permissions = await session.execute(
-            select(ChannelPermission).where(ChannelPermission.member_id == owner_id)
-        )
+        permissions = await session.execute(select(ChannelPermission).where(ChannelPermission.member_id == owner_id))
         permissions = permissions.scalars().all()
 
         # Sprawdzamy każde uprawnienie, czy zawiera manage_messages (bit 15 w Discord Permissions)
@@ -186,13 +158,9 @@ class ChannelPermissionQueries:
                 # Usuń uprawnienie, które zawiera manage_messages
                 await session.delete(permission)
                 mod_permissions_removed += 1
-                logger.info(
-                    f"Removed moderator permission granted by {owner_id} to target {permission.target_id}"
-                )
+                logger.info(f"Removed moderator permission granted by {owner_id} to target {permission.target_id}")
 
-        logger.info(
-            f"Total moderator permissions removed for owner {owner_id}: {mod_permissions_removed}"
-        )
+        logger.info(f"Total moderator permissions removed for owner {owner_id}: {mod_permissions_removed}")
 
     @staticmethod
     async def remove_mod_permissions_for_target(session: AsyncSession, target_id: int):
@@ -207,9 +175,7 @@ class ChannelPermissionQueries:
             target_id: The ID of the user whose moderator permissions should be removed
         """
         # Znajdujemy wszystkie uprawnienia gdzie użytkownik jest celem (target_id)
-        permissions = await session.execute(
-            select(ChannelPermission).where(ChannelPermission.target_id == target_id)
-        )
+        permissions = await session.execute(select(ChannelPermission).where(ChannelPermission.target_id == target_id))
         permissions = permissions.scalars().all()
 
         # Sprawdzamy każde uprawnienie, czy zawiera manage_messages (bit 15 w Discord Permissions)
@@ -218,6 +184,4 @@ class ChannelPermissionQueries:
             if permission.allow_permissions_value & 0x00002000:
                 # Usuń uprawnienie, które zawiera manage_messages
                 await session.delete(permission)
-                logger.info(
-                    f"Removed moderator permission for target {target_id} from owner {permission.member_id}"
-                )
+                logger.info(f"Removed moderator permission for target {target_id} from owner {permission.member_id}")

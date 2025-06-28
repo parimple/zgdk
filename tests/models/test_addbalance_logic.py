@@ -1,13 +1,12 @@
 """
 Test addbalance command functionality without importing actual cog
 """
-import pytest
-from unittest.mock import MagicMock
 from datetime import datetime, timezone
+from unittest.mock import MagicMock
 
-from tests.data.test_constants import (
-    TEST_USER_1_ID, WALLET_BALANCES, BOT_CONFIG
-)
+import pytest
+
+from tests.data.test_constants import BOT_CONFIG, TEST_USER_1_ID, WALLET_BALANCES
 
 
 def test_addbalance_logic():

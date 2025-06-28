@@ -81,10 +81,10 @@ class PaymentRepository(BaseRepository):
         """Get last 'limit' payments of specific type."""
         try:
             query = select(HandledPayment)
-            
+
             if payment_type is not None:
                 query = query.where(HandledPayment.payment_type == payment_type)
-            
+
             query = query.order_by(HandledPayment.id.desc())
             query = query.offset(offset).limit(limit)
 
@@ -102,14 +102,10 @@ class PaymentRepository(BaseRepository):
             return payments
 
         except Exception as e:
-            self._log_error(
-                "get_last_payments", e, offset=offset, limit=limit, payment_type=payment_type
-            )
+            self._log_error("get_last_payments", e, offset=offset, limit=limit, payment_type=payment_type)
             return []
 
-    async def add_member_id_to_payment(
-        self, payment_id: int, member_id: int
-    ) -> Optional[HandledPayment]:
+    async def add_member_id_to_payment(self, payment_id: int, member_id: int) -> Optional[HandledPayment]:
         """Add member_id to an existing payment."""
         try:
             payment = await self.session.get(HandledPayment, payment_id)
@@ -135,14 +131,10 @@ class PaymentRepository(BaseRepository):
             return payment
 
         except Exception as e:
-            self._log_error(
-                "add_member_id_to_payment", e, payment_id=payment_id, member_id=member_id
-            )
+            self._log_error("add_member_id_to_payment", e, payment_id=payment_id, member_id=member_id)
             return None
 
-    async def get_payment_by_name_and_amount(
-        self, name: str, amount: int
-    ) -> Optional[HandledPayment]:
+    async def get_payment_by_name_and_amount(self, name: str, amount: int) -> Optional[HandledPayment]:
         """Get the last payment by name and amount."""
         try:
             result = await self.session.execute(
@@ -165,9 +157,7 @@ class PaymentRepository(BaseRepository):
             self._log_error("get_payment_by_name_and_amount", e, name=name, amount=amount)
             return None
 
-    async def get_payments_by_member(
-        self, member_id: int, limit: int = 10
-    ) -> list[HandledPayment]:
+    async def get_payments_by_member(self, member_id: int, limit: int = 10) -> list[HandledPayment]:
         """Get payments for a specific member."""
         try:
             result = await self.session.execute(
@@ -219,7 +209,5 @@ class PaymentRepository(BaseRepository):
             return total
 
         except Exception as e:
-            self._log_error(
-                "get_total_payment_amount", e, payment_type=payment_type, member_id=member_id
-            )
+            self._log_error("get_total_payment_amount", e, payment_type=payment_type, member_id=member_id)
             return 0

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 class ActivityType:
     """Activity types for point tracking."""
-    
+
     VOICE = "voice"
     TEXT = "text"
     PROMOTION = "promotion"  # For promoting server in status
@@ -20,37 +20,27 @@ class IActivityTrackingService(ABC):
     """Interface for activity tracking and ranking system."""
 
     @abstractmethod
-    async def add_voice_activity(
-        self, session: AsyncSession, member_id: int, is_with_others: bool = True
-    ) -> None:
+    async def add_voice_activity(self, session: AsyncSession, member_id: int, is_with_others: bool = True) -> None:
         """Add voice activity points for a member."""
         pass
 
     @abstractmethod
-    async def add_text_activity(
-        self, session: AsyncSession, member_id: int, message_content: str = ""
-    ) -> None:
+    async def add_text_activity(self, session: AsyncSession, member_id: int, message_content: str = "") -> None:
         """Add text activity points for a member based on word count."""
         pass
 
     @abstractmethod
-    async def add_promotion_activity(
-        self, session: AsyncSession, member_id: int
-    ) -> None:
+    async def add_promotion_activity(self, session: AsyncSession, member_id: int) -> None:
         """Add promotion activity points for a member."""
         pass
 
     @abstractmethod
-    async def add_bonus_activity(
-        self, session: AsyncSession, member_id: int, points: int
-    ) -> None:
+    async def add_bonus_activity(self, session: AsyncSession, member_id: int, points: int) -> None:
         """Add bonus activity points for a member."""
         pass
 
     @abstractmethod
-    async def get_member_stats(
-        self, session: AsyncSession, member_id: int, days_back: int = 7
-    ) -> Dict[str, any]:
+    async def get_member_stats(self, session: AsyncSession, member_id: int, days_back: int = 7) -> Dict[str, any]:
         """Get comprehensive stats for a member."""
         pass
 
@@ -72,9 +62,7 @@ class IActivityTrackingService(ABC):
         pass
 
     @abstractmethod
-    async def track_message_activity(
-        self, member_id: int, content: str, channel_id: int
-    ) -> None:
+    async def track_message_activity(self, member_id: int, content: str, channel_id: int) -> None:
         """Track message activity for points."""
         pass
 
@@ -90,16 +78,12 @@ class IActivityTrackingService(ABC):
         pass
 
     @abstractmethod
-    def format_member_stats_embed(
-        self, stats: Dict[str, any], member: discord.Member
-    ) -> discord.Embed:
+    def format_member_stats_embed(self, stats: Dict[str, any], member: discord.Member) -> discord.Embed:
         """Format member stats as Discord embed."""
         pass
 
     @abstractmethod
-    async def has_daily_activity_today(
-        self, session: AsyncSession, member_id: int, activity_type: str
-    ) -> bool:
+    async def has_daily_activity_today(self, session: AsyncSession, member_id: int, activity_type: str) -> bool:
         """Check if member already got points for this activity type today."""
         pass
 
@@ -111,9 +95,7 @@ class IActivityTrackingService(ABC):
         pass
 
     @abstractmethod
-    async def add_promotion_activity_daily(
-        self, session: AsyncSession, member_id: int
-    ) -> None:
+    async def add_promotion_activity_daily(self, session: AsyncSession, member_id: int) -> None:
         """Add promotion activity points once per day."""
         pass
 
@@ -128,9 +110,7 @@ class IActivityTrackingService(ABC):
         pass
 
     @abstractmethod
-    async def track_voice_activity(
-        self, member_id: int, channel_id: int, is_with_others: bool = True
-    ) -> None:
+    async def track_voice_activity(self, member_id: int, channel_id: int, is_with_others: bool = True) -> None:
         """Track voice activity for a member in a specific channel."""
         pass
 
@@ -140,8 +120,6 @@ class IActivityTrackingService(ABC):
         pass
 
     @abstractmethod
-    async def get_member_activity_summary(
-        self, member_id: int, days_back: int = 7
-    ) -> Dict[str, any]:
+    async def get_member_activity_summary(self, member_id: int, days_back: int = 7) -> Dict[str, any]:
         """Get a summary of member's activity for profile display."""
         pass

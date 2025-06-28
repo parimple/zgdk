@@ -18,30 +18,22 @@ class AutoKickQueries:
     """Class for AutoKick Queries"""
 
     @staticmethod
-    async def ensure_members_exist(
-        session: AsyncSession, owner_id: int, target_id: int
-    ) -> None:
+    async def ensure_members_exist(session: AsyncSession, owner_id: int, target_id: int) -> None:
         """Ensure both owner and target exist in members table"""
         # Check if owner exists
-        owner_exists = await session.scalar(
-            select(Member.id).where(Member.id == owner_id)
-        )
+        owner_exists = await session.scalar(select(Member.id).where(Member.id == owner_id))
         if not owner_exists:
             await session.merge(Member(id=owner_id))
 
         # Check if target exists
-        target_exists = await session.scalar(
-            select(Member.id).where(Member.id == target_id)
-        )
+        target_exists = await session.scalar(select(Member.id).where(Member.id == target_id))
         if not target_exists:
             await session.merge(Member(id=target_id))
 
         await session.commit()
 
     @staticmethod
-    async def add_autokick(
-        session: AsyncSession, owner_id: int, target_id: int
-    ) -> None:
+    async def add_autokick(session: AsyncSession, owner_id: int, target_id: int) -> None:
         """Add an autokick entry"""
         # Ensure both members exist
         await AutoKickQueries.ensure_members_exist(session, owner_id, target_id)
@@ -56,14 +48,10 @@ class AutoKickQueries:
         await session.commit()
 
     @staticmethod
-    async def remove_autokick(
-        session: AsyncSession, owner_id: int, target_id: int
-    ) -> None:
+    async def remove_autokick(session: AsyncSession, owner_id: int, target_id: int) -> None:
         """Remove an autokick entry"""
         await session.execute(
-            delete(AutoKick).where(
-                (AutoKick.owner_id == owner_id) & (AutoKick.target_id == target_id)
-            )
+            delete(AutoKick).where((AutoKick.owner_id == owner_id) & (AutoKick.target_id == target_id))
         )
         await session.commit()
 
@@ -74,21 +62,13 @@ class AutoKickQueries:
         return result.scalars().all()
 
     @staticmethod
-    async def get_owner_autokicks(
-        session: AsyncSession, owner_id: int
-    ) -> List[AutoKick]:
+    async def get_owner_autokicks(session: AsyncSession, owner_id: int) -> List[AutoKick]:
         """Get all autokicks for a specific owner"""
-        result = await session.execute(
-            select(AutoKick).where(AutoKick.owner_id == owner_id)
-        )
+        result = await session.execute(select(AutoKick).where(AutoKick.owner_id == owner_id))
         return result.scalars().all()
 
     @staticmethod
-    async def get_target_autokicks(
-        session: AsyncSession, target_id: int
-    ) -> List[AutoKick]:
+    async def get_target_autokicks(session: AsyncSession, target_id: int) -> List[AutoKick]:
         """Get all autokicks targeting a specific member"""
-        result = await session.execute(
-            select(AutoKick).where(AutoKick.target_id == target_id)
-        )
+        result = await session.execute(select(AutoKick).where(AutoKick.target_id == target_id))
         return result.scalars().all()

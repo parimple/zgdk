@@ -16,26 +16,13 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from core.containers.service_container import ServiceContainer
-from core.interfaces.messaging_interfaces import (
-    IEmbedBuilder,
-    IMessageFormatter,
-    IMessageSender,
-    INotificationService,
-)
-from core.interfaces.member_interfaces import (
-    IActivityService,
-    IInviteService,
-    IMemberService,
-    IModerationService,
-)
-from core.interfaces.premium_interfaces import (
-    IPaymentProcessor,
-    IPremiumService,
-)
-from core.interfaces.role_interfaces import IRoleService
 from core.interfaces.activity_interfaces import IActivityTrackingService
 from core.interfaces.currency_interfaces import ICurrencyService
+from core.interfaces.member_interfaces import IActivityService, IInviteService, IMemberService, IModerationService
+from core.interfaces.messaging_interfaces import IEmbedBuilder, IMessageFormatter, IMessageSender, INotificationService
 from core.interfaces.permission_interfaces import IPermissionService
+from core.interfaces.premium_interfaces import IPaymentProcessor, IPremiumService
+from core.interfaces.role_interfaces import IRoleService
 from core.interfaces.team_interfaces import ITeamManagementService
 from core.repositories.activity_repository import ActivityRepository
 from core.repositories.invite_repository import InviteRepository
@@ -43,26 +30,21 @@ from core.repositories.member_repository import MemberRepository
 from core.repositories.moderation_repository import ModerationRepository
 from core.repositories.premium_repository import PaymentRepository, PremiumRepository
 from core.repositories.role_repository import RoleRepository
+from core.services.activity_tracking_service import ActivityTrackingService
+from core.services.currency_service import CurrencyService
 from core.services.embed_builder_service import EmbedBuilderService
-from core.services.member_service import (
-    ActivityService,
-    InviteService,
-    MemberService,
-    ModerationService,
-)
+from core.services.member_service import ActivityService, InviteService, MemberService, ModerationService
 from core.services.message_formatter_service import MessageFormatterService
 from core.services.message_sender_service import MessageSenderService
 from core.services.notification_service import NotificationService
 from core.services.payment_processor_service import PaymentProcessorService
+from core.services.permission_service import PermissionService
 from core.services.premium_service import PremiumService
 from core.services.role_service import RoleService
-from core.services.activity_tracking_service import ActivityTrackingService
-from core.services.currency_service import CurrencyService
-from core.services.permission_service import PermissionService
 from core.services.team_management_service import TeamManagementService
 from datasources.models import Base
-from utils.premium import PaymentData
 from utils.health_check import HealthCheckServer
+from utils.premium import PaymentData
 
 intents = discord.Intents.all()
 
@@ -76,14 +58,10 @@ def cleanup_zombie_processes() -> None:
     """Cleanup zombie processes from previous Playwright sessions"""
     try:
         # Kill all headless_shell processes
-        subprocess.run(
-            ["pkill", "-f", "headless_shell"], capture_output=True, timeout=5
-        )
+        subprocess.run(["pkill", "-f", "headless_shell"], capture_output=True, timeout=5)
 
         # Kill orphaned Chrome processes
-        subprocess.run(
-            ["pkill", "-f", "chrome.*--headless"], capture_output=True, timeout=5
-        )
+        subprocess.run(["pkill", "-f", "chrome.*--headless"], capture_output=True, timeout=5)
 
         # Wait a moment for processes to terminate
         import time
@@ -91,12 +69,8 @@ def cleanup_zombie_processes() -> None:
         time.sleep(0.5)
 
         # Force kill if still running
-        subprocess.run(
-            ["pkill", "-9", "-f", "headless_shell"], capture_output=True, timeout=3
-        )
-        subprocess.run(
-            ["pkill", "-9", "-f", "chrome.*--headless"], capture_output=True, timeout=3
-        )
+        subprocess.run(["pkill", "-9", "-f", "headless_shell"], capture_output=True, timeout=3)
+        subprocess.run(["pkill", "-9", "-f", "chrome.*--headless"], capture_output=True, timeout=3)
 
         logging.info("Cleaned up zombie browser processes")
     except subprocess.TimeoutExpired:
@@ -122,7 +96,7 @@ class Zagadka(commands.Bot):
         if guild_id is None:
             raise ValueError("guild_id is required in config")
         self.guild_id: int = guild_id
-        
+
         self.donate_url: str = config.get("donate_url", "")
         self.channels: dict[str, int] = config.get("channels", {})
 
@@ -139,19 +113,17 @@ class Zagadka(commands.Bot):
             pool_recycle=1800,
             pool_pre_ping=True,
         )
-        self.SessionLocal = async_sessionmaker(
-            self.engine, class_=AsyncSession, expire_on_commit=False
-        )
+        self.SessionLocal = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
         self.base = Base
         self.payment_data_class = PaymentData
 
         # Initialize service container
         self.service_container = ServiceContainer()
         self._setup_services()
-        
+
         # Create service manager interface for cogs
         self.service_manager = self
-        
+
         # Initialize health check server
         self.health_server = HealthCheckServer(self)
 
@@ -174,11 +146,7 @@ class Zagadka(commands.Bot):
         postgres_port: str = os.environ.get("POSTGRES_PORT", "")
 
         return (
-            f"postgresql+asyncpg://"
-            f"{postgres_user}:"
-            f"{postgres_password}@db:"
-            f"{postgres_port}/"
-            f"{postgres_db}"
+            f"postgresql+asyncpg://" f"{postgres_user}:" f"{postgres_password}@db:" f"{postgres_port}/" f"{postgres_db}"
         )
 
     @asynccontextmanager
@@ -191,7 +159,7 @@ class Zagadka(commands.Bot):
                 await session.rollback()
                 logging.error(f"Database session error: {e}")
                 raise
-    
+
     @asynccontextmanager
     async def get_unit_of_work(self):
         """Get Unit of Work for comprehensive transaction management with service access."""
@@ -222,9 +190,7 @@ class Zagadka(commands.Bot):
         # Note: Repository and service factories are handled in get_service method
         # since they require session and complex dependency injection
 
-    async def get_service(
-        self, service_type: type, session: Optional[AsyncSession] = None
-    ) -> Any:
+    async def get_service(self, service_type: type, session: Optional[AsyncSession] = None) -> Any:
         """Get a service instance with optional database session."""
 
         # Services that don't need database session
@@ -233,9 +199,7 @@ class Zagadka(commands.Bot):
 
         # Services that need database session
         if session is None:
-            raise ValueError(
-                f"Service {service_type.__name__} requires a database session"
-            )
+            raise ValueError(f"Service {service_type.__name__} requires a database session")
 
         if service_type == IRoleService:
             # Create repository with session
@@ -243,9 +207,7 @@ class Zagadka(commands.Bot):
             # Create unit of work
             unit_of_work = self.service_container.create_unit_of_work(session)
             # Create service with dependencies
-            return RoleService(
-                role_repository=role_repository, unit_of_work=unit_of_work
-            )
+            return RoleService(role_repository=role_repository, unit_of_work=unit_of_work)
 
         elif service_type == IMessageSender:
             # Create unit of work (needed for BaseService)
@@ -360,8 +322,8 @@ class Zagadka(commands.Bot):
             activity_service = ActivityTrackingService(
                 activity_repository=activity_repository,
                 member_repository=member_repository,
-                guild=self.guild if hasattr(self, 'guild') else None,
-                unit_of_work=unit_of_work
+                guild=self.guild if hasattr(self, "guild") else None,
+                unit_of_work=unit_of_work,
             )
             return activity_service
 
@@ -369,10 +331,7 @@ class Zagadka(commands.Bot):
             # Create unit of work
             unit_of_work = self.service_container.create_unit_of_work(session)
             # Create team management service
-            team_service = TeamManagementService(
-                bot=self,
-                unit_of_work=unit_of_work
-            )
+            team_service = TeamManagementService(bot=self, unit_of_work=unit_of_work)
             return team_service
 
         # For other services, use the container
@@ -384,7 +343,7 @@ class Zagadka(commands.Bot):
             await self.health_server.stop()
         except Exception as e:
             logging.error(f"Error stopping health check server: {e}")
-        
+
         await self.engine.dispose()
         await super().close()
 
@@ -395,18 +354,16 @@ class Zagadka(commands.Bot):
             path = os.path.join(os.getcwd(), folder)
             for item in os.listdir(path):
                 item_path = os.path.join(path, item)
-                
+
                 # Skip the old info.py file if the info module exists
                 if item == "info.py" and os.path.isdir(os.path.join(path, "info")):
                     logging.info("Skipping info.py in favor of info module")
                     continue
-                
+
                 # Load .py files
                 if item.endswith(".py") and item != "__init__.py":
                     try:
-                        await self.load_extension(
-                            f"{folder.replace('/', '.')}.{item[:-3]}"
-                        )
+                        await self.load_extension(f"{folder.replace('/', '.')}.{item[:-3]}")
                         logging.info("Loaded cog: %s", item)
                     except commands.ExtensionAlreadyLoaded:
                         logging.warning("Cog %s is already loaded", item)
@@ -418,13 +375,11 @@ class Zagadka(commands.Bot):
                         logging.error("Failed to load cog %s: %s", item, error)
                     except Exception as error:
                         logging.error("Unexpected error loading cog %s: %s", item, error)
-                
+
                 # Load modules (directories with __init__.py)
                 elif os.path.isdir(item_path) and os.path.exists(os.path.join(item_path, "__init__.py")):
                     try:
-                        await self.load_extension(
-                            f"{folder.replace('/', '.')}.{item}"
-                        )
+                        await self.load_extension(f"{folder.replace('/', '.')}.{item}")
                         logging.info("Loaded cog module: %s", item)
                     except commands.ExtensionAlreadyLoaded:
                         logging.warning("Cog module %s is already loaded", item)
@@ -441,17 +396,18 @@ class Zagadka(commands.Bot):
         """Setup hook."""
         if not self.test:
             await self.load_cogs()
-            
+
             # Start health check server
             try:
                 await self.health_server.start()
             except Exception as e:
                 logging.error(f"Failed to start health check server: {e}")
-            
+
             # Setup hot reload in development
-            if os.getenv('DEV_MODE', 'false').lower() == 'true':
+            if os.getenv("DEV_MODE", "false").lower() == "true":
                 try:
                     from utils.hot_reload import setup_hot_reload
+
                     await setup_hot_reload(self)
                 except Exception as e:
                     logging.error(f"Failed to setup hot reload: {e}")
@@ -462,7 +418,7 @@ class Zagadka(commands.Bot):
             await self.mcp_server.run()
         except Exception as e:
             logging.error(f"MCP server error: {e}")
-    
+
     async def on_ready(self) -> None:
         """On ready event"""
         logging.info("Event on_ready started")
@@ -475,17 +431,14 @@ class Zagadka(commands.Bot):
 
         logging.info("Database create_all completed")
 
-        await self.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.playing, name="zaGadka bot"
-            )
-        )
+        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name="zaGadka bot"))
         logging.info("Event change_presence completed")
-        
+
         # Start MCP server if enabled
         if os.getenv("ENABLE_MCP", "false").lower() == "true":
             try:
                 from mcp.zgdk_mcp_server import connect_to_bot
+
                 self.mcp_server = connect_to_bot(self)
                 asyncio.create_task(self._run_mcp_server())
                 logging.info("MCP server started for bot communication")
@@ -510,13 +463,13 @@ class Zagadka(commands.Bot):
     async def on_command_error(self, ctx, error):
         """Handle command errors with detailed logging."""
         from utils.error_logger import error_logger
-        
+
         # Log the error with full context
         error_logger.log_command_error(error, ctx)
-        
+
         # Also log to console for immediate visibility
         logging.error(f"An error occurred while executing command '{ctx.command}': {error}")
-        
+
         # You can add user-friendly error responses here if needed
         # For now, let the default error handling continue
 
@@ -524,9 +477,7 @@ class Zagadka(commands.Bot):
         """Run the bot"""
         token = os.environ.get("ZAGADKA_TOKEN")
         if token is None:
-            raise ValueError(
-                "Missing bot token. Ensure that ZAGADKA_TOKEN is set in the environment variables."
-            )
+            raise ValueError("Missing bot token. Ensure that ZAGADKA_TOKEN is set in the environment variables.")
         super().run(token, reconnect=True)
 
     @property

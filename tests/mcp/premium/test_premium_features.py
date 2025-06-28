@@ -1,8 +1,9 @@
 """Test premium features workflow."""
 
 import asyncio
-import aiohttp
 import json
+
+import aiohttp
 
 
 async def test_premium_workflow():

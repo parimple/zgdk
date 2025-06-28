@@ -37,16 +37,12 @@ class IMemberRepository(IRepository):
         pass
 
     @abstractmethod
-    async def update_voice_bypass(
-        self, member_id: int, bypass_until: Optional[datetime]
-    ) -> bool:
+    async def update_voice_bypass(self, member_id: int, bypass_until: Optional[datetime]) -> bool:
         """Update member's voice bypass expiration."""
         pass
 
     @abstractmethod
-    async def update_inviter(
-        self, member_id: int, new_inviter_id: Optional[int], update_current: bool = True
-    ) -> bool:
+    async def update_inviter(self, member_id: int, new_inviter_id: Optional[int], update_current: bool = True) -> bool:
         """Update member's inviter (current or first)."""
         pass
 
@@ -165,9 +161,7 @@ class IModerationRepository(IRepository):
         pass
 
     @abstractmethod
-    async def get_member_history(
-        self, member_id: int, action_type: Optional[str] = None
-    ) -> list[ModerationLog]:
+    async def get_member_history(self, member_id: int, action_type: Optional[str] = None) -> list[ModerationLog]:
         """Get moderation history for member."""
         pass
 
@@ -217,9 +211,7 @@ class IMemberService(IService):
     """Service interface for comprehensive member management."""
 
     @abstractmethod
-    async def get_or_create_member(
-        self, discord_user: discord.Member | discord.User
-    ) -> Member:
+    async def get_or_create_member(self, discord_user: discord.Member | discord.User) -> Member:
         """Get existing member or create new one."""
         pass
 
@@ -264,16 +256,12 @@ class IActivityService(IService):
     """Service interface for activity tracking and management."""
 
     @abstractmethod
-    async def track_activity(
-        self, member: Member, activity_type: str, points: int
-    ) -> Activity:
+    async def track_activity(self, member: Member, activity_type: str, points: int) -> Activity:
         """Track member activity and award points."""
         pass
 
     @abstractmethod
-    async def get_member_activity_summary(
-        self, member_id: int, days: int = 30
-    ) -> dict[str, Any]:
+    async def get_member_activity_summary(self, member_id: int, days: int = 30) -> dict[str, Any]:
         """Get member activity summary for specified period."""
         pass
 
@@ -285,9 +273,7 @@ class IActivityService(IService):
         pass
 
     @abstractmethod
-    async def award_bonus_points(
-        self, member: Member, points: int, reason: str = "bonus"
-    ) -> Activity:
+    async def award_bonus_points(self, member: Member, points: int, reason: str = "bonus") -> Activity:
         """Award bonus points to member."""
         pass
 
@@ -297,16 +283,12 @@ class IActivityService(IService):
         pass
 
     @abstractmethod
-    async def track_message_activity(
-        self, member_id: int, message_content: str, channel_id: int
-    ) -> Activity:
+    async def track_message_activity(self, member_id: int, message_content: str, channel_id: int) -> Activity:
         """Track text message activity."""
         pass
 
     @abstractmethod
-    async def track_voice_activity(
-        self, member_id: int, channel_id: int, is_with_others: bool
-    ) -> Activity:
+    async def track_voice_activity(self, member_id: int, channel_id: int, is_with_others: bool) -> Activity:
         """Track voice channel activity."""
         pass
 
@@ -403,9 +385,7 @@ class IInviteService(IService):
         pass
 
     @abstractmethod
-    async def create_tracked_invite(
-        self, invite: discord.Invite, creator: discord.Member
-    ) -> Optional[Invite]:
+    async def create_tracked_invite(self, invite: discord.Invite, creator: discord.Member) -> Optional[Invite]:
         """Create tracked invite in database."""
         pass
 

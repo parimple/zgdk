@@ -2,9 +2,10 @@
 """Test voice commands via MCP with proper channel support."""
 
 import asyncio
-import sys
-from mcp_client import call_mcp_tool
 import json
+import sys
+
+from mcp_client import call_mcp_tool
 
 # Test channel ID where bot has permissions
 TEST_CHANNEL_ID = 1387864734002446407

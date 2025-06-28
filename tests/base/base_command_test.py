@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import discord
 import pytest
 
-
 logger = logging.getLogger(__name__)
 
 

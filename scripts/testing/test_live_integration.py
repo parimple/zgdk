@@ -1,14 +1,15 @@
 """Live integration test using bot API."""
 
 import asyncio
-import aiohttp
 import json
+
+import aiohttp
 
 
 async def test_bot_api():
     """Test bot API endpoints."""
     base_url = "http://localhost:8089"
-    
+
     async with aiohttp.ClientSession() as session:
         # Test 1: Check status
         print("1. Testing /status endpoint...")
@@ -21,56 +22,48 @@ async def test_bot_api():
         except Exception as e:
             print(f"   ❌ Error: {e}")
             return
-        
+
         # Test 2: Execute shop command
         print("\n2. Testing shop command...")
         try:
-            command_data = {
-                "command": "shop",
-                "channel_id": "960665315426226216",
-                "author_id": "489328381972971520"
-            }
-            
+            command_data = {"command": "shop", "channel_id": "960665315426226216", "author_id": "489328381972971520"}
+
             async with session.post(
-                f"{base_url}/execute",
-                json=command_data,
-                timeout=aiohttp.ClientTimeout(total=10)
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
                 data = await response.json()
                 print(f"   Response: {json.dumps(data, indent=2)}")
-                
+
                 if data.get("success"):
                     print("   ✅ Shop command executed successfully")
                 else:
                     print(f"   ❌ Shop command failed: {data.get('error')}")
         except Exception as e:
             print(f"   ❌ Error executing shop: {e}")
-        
+
         # Test 3: Execute addbalance command
         print("\n3. Testing addbalance command...")
         try:
             command_data = {
                 "command": "addbalance",
                 "args": "<@489328381972971520> 1000",
-                "channel_id": "960665315426226216", 
-                "author_id": "956602391891947592"  # Owner ID
+                "channel_id": "960665315426226216",
+                "author_id": "956602391891947592",  # Owner ID
             }
-            
+
             async with session.post(
-                f"{base_url}/execute",
-                json=command_data,
-                timeout=aiohttp.ClientTimeout(total=10)
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
                 data = await response.json()
                 print(f"   Response: {json.dumps(data, indent=2)}")
-                
+
                 if data.get("success"):
                     print("   ✅ Addbalance command executed successfully")
                 else:
                     print(f"   ❌ Addbalance command failed: {data.get('error')}")
         except Exception as e:
             print(f"   ❌ Error executing addbalance: {e}")
-        
+
         # Test 4: Test voice commands
         print("\n4. Testing voice commands...")
         try:
@@ -80,17 +73,15 @@ async def test_bot_api():
                 "args": "@everyone -",
                 "channel_id": "960665315426226216",
                 "author_id": "489328381972971520",
-                "voice_channel_id": "960665316894568459"  # Simulate being in voice
+                "voice_channel_id": "960665316894568459",  # Simulate being in voice
             }
-            
+
             async with session.post(
-                f"{base_url}/execute",
-                json=command_data,
-                timeout=aiohttp.ClientTimeout(total=10)
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
                 data = await response.json()
                 print(f"   Response: {json.dumps(data, indent=2)}")
-                
+
                 if "nie jesteś na kanale głosowym" in str(data):
                     print("   ✅ Voice command correctly requires voice channel")
                 elif data.get("success"):
@@ -99,24 +90,18 @@ async def test_bot_api():
                     print(f"   ⚠️  Voice command result: {data}")
         except Exception as e:
             print(f"   ❌ Error executing voice command: {e}")
-        
+
         # Test 5: Test team commands
         print("\n5. Testing team commands...")
         try:
-            command_data = {
-                "command": "team",
-                "channel_id": "960665315426226216",
-                "author_id": "489328381972971520"
-            }
-            
+            command_data = {"command": "team", "channel_id": "960665315426226216", "author_id": "489328381972971520"}
+
             async with session.post(
-                f"{base_url}/execute",
-                json=command_data,
-                timeout=aiohttp.ClientTimeout(total=10)
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
                 data = await response.json()
                 print(f"   Response: {json.dumps(data, indent=2)}")
-                
+
                 if data.get("success") or "premium" in str(data).lower():
                     print("   ✅ Team command executed (may require premium)")
                 else:

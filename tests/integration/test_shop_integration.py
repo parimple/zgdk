@@ -4,9 +4,9 @@ Integration tests for Discord bot shop functionality
 import asyncio
 import logging
 import time
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from tests.test_config import TEST_CONFIG, TEST_SCENARIOS, COMMANDS_TO_TEST
+from tests.test_config import COMMANDS_TO_TEST, TEST_CONFIG, TEST_SCENARIOS
 
 logger = logging.getLogger(__name__)
 

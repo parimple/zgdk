@@ -24,9 +24,7 @@ from core.services.premium import (
 logger = logging.getLogger(__name__)
 
 
-class ConsolidatedPremiumService(
-    BaseService, IPremiumService, IPremiumChecker, IPremiumRoleManager
-):
+class ConsolidatedPremiumService(BaseService, IPremiumService, IPremiumChecker, IPremiumRoleManager):
     """Consolidated premium service that delegates to specialized services."""
 
     def __init__(
@@ -39,25 +37,13 @@ class ConsolidatedPremiumService(
         super().__init__(**kwargs)
         self.bot = bot
         self.guild: Optional[discord.Guild] = None
-        
+
         # Initialize specialized services
         self.checker_service = PremiumCheckerService(bot=bot, **kwargs)
-        self.role_service = PremiumRoleService(
-            premium_repository=premium_repository,
-            bot=bot,
-            **kwargs
-        )
-        self.payment_service = PremiumPaymentService(
-            payment_repository=payment_repository,
-            bot=bot,
-            **kwargs
-        )
-        self.maintenance_service = PremiumMaintenanceService(
-            premium_repository=premium_repository,
-            bot=bot,
-            **kwargs
-        )
-        
+        self.role_service = PremiumRoleService(premium_repository=premium_repository, bot=bot, **kwargs)
+        self.payment_service = PremiumPaymentService(payment_repository=payment_repository, bot=bot, **kwargs)
+        self.maintenance_service = PremiumMaintenanceService(premium_repository=premium_repository, bot=bot, **kwargs)
+
         # Keep references for backward compatibility
         self.premium_repository = premium_repository
         self.payment_repository = payment_repository
@@ -113,9 +99,7 @@ class ConsolidatedPremiumService(
         """Delegate to checker service."""
         return await self.checker_service.get_command_tier(command_name)
 
-    async def has_bypass_permissions(
-        self, member: discord.Member, command_name: Optional[str] = None
-    ) -> bool:
+    async def has_bypass_permissions(self, member: discord.Member, command_name: Optional[str] = None) -> bool:
         """Delegate to checker service."""
         return await self.checker_service.has_bypass_permissions(member, command_name)
 
@@ -148,9 +132,7 @@ class ConsolidatedPremiumService(
         source: str = "purchase",
     ) -> Tuple[bool, Optional[str]]:
         """Delegate to role service."""
-        return await self.role_service.assign_premium_role(
-            member, role_name, duration_days, source
-        )
+        return await self.role_service.assign_premium_role(member, role_name, duration_days, source)
 
     async def extend_premium_role(
         self,
@@ -160,9 +142,7 @@ class ConsolidatedPremiumService(
         source: str = "extension",
     ) -> ExtensionResult:
         """Delegate to role service."""
-        return await self.role_service.extend_premium_role(
-            member, role_name, additional_days, source
-        )
+        return await self.role_service.extend_premium_role(member, role_name, additional_days, source)
 
     async def remove_premium_role(self, member: discord.Member, role_name: str) -> bool:
         """Delegate to role service."""

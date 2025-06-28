@@ -19,13 +19,9 @@ class PaymentsView(discord.ui.View):
         """Display the payments."""
         self.current_offset = max(0, self.current_offset)
         async with self.bot.get_db() as session:
-            payments = await HandledPaymentQueries.get_last_payments(
-                session, offset=self.current_offset, limit=10
-            )
+            payments = await HandledPaymentQueries.get_last_payments(session, offset=self.current_offset, limit=10)
 
-        embed = MessageSender._create_embed(
-            title="Wszystkie płatności", ctx=self.ctx.author
-        )
+        embed = MessageSender._create_embed(title="Wszystkie płatności", ctx=self.ctx.author)
         for payment in payments:
             name = f"ID płatności: {payment.id}"
             value = (
@@ -39,17 +35,13 @@ class PaymentsView(discord.ui.View):
         await interaction.response.edit_message(embed=embed)
 
     @discord.ui.button(label="Nowsze", style=discord.ButtonStyle.primary)
-    async def newer_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def newer_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Go to the newer payments."""
         self.current_offset -= 10
         await self.display_payments(interaction)
 
     @discord.ui.button(label="Starsze", style=discord.ButtonStyle.primary)
-    async def older_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def older_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Go to the older payments."""
         self.current_offset += 10
         await self.display_payments(interaction)

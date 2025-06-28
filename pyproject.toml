@@ -30,4 +30,3 @@ ensure_newline_before_comments = true
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-v --tb=short"
-EOF < /dev/null

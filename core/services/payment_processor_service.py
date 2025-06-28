@@ -29,9 +29,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
     def __init__(self, payment_repository: PaymentRepository, **kwargs):
         super().__init__(**kwargs)
         self.payment_repository = payment_repository
-        self.premium_service = (
-            None  # Will be set externally to avoid circular dependency
-        )
+        self.premium_service = None  # Will be set externally to avoid circular dependency
 
     async def validate_operation(self, *args, **kwargs) -> bool:
         """Validate payment processing operations."""
@@ -112,9 +110,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
 
         try:
             # Look for payment elements (adjust selectors based on actual HTML structure)
-            payment_elements = soup.find_all(
-                "div", class_="payment-item"
-            )  # Example selector
+            payment_elements = soup.find_all("div", class_="payment-item")  # Example selector
 
             for element in payment_elements:
                 try:
@@ -213,9 +209,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
             ) = await self.premium_service.handle_premium_payment(payment)
 
             # Mark as handled regardless of success/failure
-            await self.mark_payment_as_handled(
-                payment, processing_result="success" if success else "failed"
-            )
+            await self.mark_payment_as_handled(payment, processing_result="success" if success else "failed")
 
             member_id = member.id if member else None
             self._log_operation(
@@ -237,16 +231,12 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
     async def is_payment_handled(self, payment: PaymentData) -> bool:
         """Check if payment has already been processed."""
         try:
-            return await self.payment_repository.is_payment_handled(
-                payment.name, payment.amount, payment.paid_at
-            )
+            return await self.payment_repository.is_payment_handled(payment.name, payment.amount, payment.paid_at)
         except Exception as e:
             self._log_error("is_payment_handled", e, payment_name=payment.name)
             return False
 
-    async def mark_payment_as_handled(
-        self, payment: PaymentData, processing_result: str = "success"
-    ) -> bool:
+    async def mark_payment_as_handled(self, payment: PaymentData, processing_result: str = "success") -> bool:
         """Mark payment as processed."""
         try:
             member_id = self.extract_member_id(payment.name)
@@ -269,9 +259,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
             match = re.search(r"\b(\d{17,19})\b", payment_name)
             if match:
                 member_id = int(match.group(1))
-                self._log_operation(
-                    "extract_member_id", payment_name=payment_name, member_id=member_id
-                )
+                self._log_operation("extract_member_id", payment_name=payment_name, member_id=member_id)
                 return member_id
 
             self._log_operation("extract_member_id_failed", payment_name=payment_name)
@@ -295,9 +283,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
             # Check for exact matches first
             if amount in premium_mappings:
                 role, days = premium_mappings[amount]
-                self._log_operation(
-                    "calculate_premium_benefits", amount=amount, role=role, days=days
-                )
+                self._log_operation("calculate_premium_benefits", amount=amount, role=role, days=days)
                 return role, days
 
             # Check for partial payments or custom amounts
@@ -349,9 +335,7 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
                     await asyncio.sleep(0.1)
 
                 except Exception as e:
-                    self._log_error(
-                        "process_payment_in_batch", e, payment_name=payment.name
-                    )
+                    self._log_error("process_payment_in_batch", e, payment_name=payment.name)
                     failed += 1
 
             result = {

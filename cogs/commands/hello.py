@@ -1,16 +1,17 @@
 """Simple hello command for testing hot reload."""
 
 import time
+
 from discord.ext import commands
 
 
 class HelloCog(commands.Cog):
     """Test cog for hot reload verification."""
-    
+
     def __init__(self, bot):
         self.bot = bot
         self.created_at = time.time()
-    
+
     @commands.hybrid_command(name="hello")
     async def hello(self, ctx):
         """Simple hello world command."""

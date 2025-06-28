@@ -22,13 +22,13 @@ class PremiumMessageSender(BaseMessageSender):
             description = f"Ta funkcja **{feature}** wymaga roli premium!"
         else:
             description = "Ta funkcja wymaga roli premium!"
-        
+
         embed = self._create_embed(
             title="💎 Premium wymagane",
             description=description,
             color="warning",
         )
-        
+
         # Add premium benefits
         embed.add_field(
             name="🎁 Korzyści z Premium",
@@ -41,17 +41,14 @@ class PremiumMessageSender(BaseMessageSender):
             ),
             inline=False,
         )
-        
+
         # Add how to get premium
         embed.add_field(
             name="🛒 Jak zdobyć Premium?",
-            value=(
-                "Użyj komendy </premium shop:1315400801102909451> "
-                "aby zobaczyć dostępne pakiety premium!"
-            ),
+            value=("Użyj komendy </premium shop:1315400801102909451> " "aby zobaczyć dostępne pakiety premium!"),
             inline=False,
         )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
 
     async def send_no_premium_role(
@@ -65,7 +62,7 @@ class PremiumMessageSender(BaseMessageSender):
             description="Nie posiadasz żadnej roli premium!",
             color="error",
         )
-        
+
         embed.add_field(
             name="🛒 Kup Premium",
             value=(
@@ -74,7 +71,7 @@ class PremiumMessageSender(BaseMessageSender):
             ),
             inline=False,
         )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
 
     async def send_tier_t_bypass_required(
@@ -86,7 +83,7 @@ class PremiumMessageSender(BaseMessageSender):
     ) -> Optional[discord.Message]:
         """Send tier T bypass required message."""
         missing_hours = required_hours - current_hours
-        
+
         embed = self._create_embed(
             title="⏱️ Wymagany czas bypass",
             description=(
@@ -96,7 +93,7 @@ class PremiumMessageSender(BaseMessageSender):
             ),
             color="warning",
         )
-        
+
         # Add how to get T
         embed.add_field(
             name="💰 Jak zdobyć T?",
@@ -108,7 +105,7 @@ class PremiumMessageSender(BaseMessageSender):
             ),
             inline=False,
         )
-        
+
         # Add premium info
         embed.add_field(
             name="💎 Premium = Brak limitów",
@@ -118,7 +115,7 @@ class PremiumMessageSender(BaseMessageSender):
             ),
             inline=False,
         )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
 
     async def send_bypass_expired(
@@ -129,13 +126,10 @@ class PremiumMessageSender(BaseMessageSender):
         """Send bypass expired message."""
         embed = self._create_embed(
             title="⏱️ Czas bypass wygasł",
-            description=(
-                "Twój czas bypass wygasł!\n"
-                "Musisz zdobyć więcej T, aby korzystać z tej funkcji."
-            ),
+            description=("Twój czas bypass wygasł!\n" "Musisz zdobyć więcej T, aby korzystać z tej funkcji."),
             color="error",
         )
-        
+
         # Add quick actions
         embed.add_field(
             name="🚀 Szybkie akcje",
@@ -146,7 +140,7 @@ class PremiumMessageSender(BaseMessageSender):
             ),
             inline=False,
         )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
 
     async def send_specific_roles_required(
@@ -157,22 +151,19 @@ class PremiumMessageSender(BaseMessageSender):
     ) -> Optional[discord.Message]:
         """Send specific roles required message."""
         roles_text = ", ".join([f"`{role}`" for role in required_roles])
-        
+
         embed = self._create_embed(
             title="🎭 Wymagane role",
             description=f"Ta funkcja wymaga jednej z następujących ról: {roles_text}",
             color="warning",
         )
-        
+
         # Check if these are premium roles
         if any("premium" in role.lower() for role in required_roles):
             embed.add_field(
                 name="💎 To są role premium!",
-                value=(
-                    "Użyj </premium shop:1315400801102909451> "
-                    "aby kupić jedną z tych ról."
-                ),
+                value=("Użyj </premium shop:1315400801102909451> " "aby kupić jedną z tych ról."),
                 inline=False,
             )
-        
+
         return await self._send_embed(ctx=ctx, embed=embed, ephemeral=ephemeral)
