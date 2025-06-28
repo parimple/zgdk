@@ -1,0 +1,25 @@
+extends: default
+
+rules:
+  line-length:
+    max: 150
+    level: warning
+  
+  comments:
+    min-spaces-from-content: 2
+  
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off']
+  
+  document-start:
+    present: false
+  
+  brackets:
+    max-spaces-inside: 1
+  
+  braces:
+    max-spaces-inside: 1

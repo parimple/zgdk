@@ -1,0 +1,64 @@
+name: Lint and Code Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black isort flake8 mypy yamllint
+          pip install types-requests types-PyYAML
+
+      - name: Run Black
+        run: |
+          echo "🎨 Running Black formatter..."
+          black --check --line-length=120 .
+
+      - name: Run isort
+        run: |
+          echo "📦 Checking import sorting..."
+          isort --check-only --profile black --line-length=120 .
+
+      - name: Run Flake8
+        run: |
+          echo "🔍 Running Flake8 linter..."
+          flake8 . --config=.flake8
+
+      - name: Run MyPy
+        run: |
+          echo "🔎 Running MyPy type checker..."
+          mypy . --ignore-missing-imports --no-strict-optional || true
+
+      - name: Lint YAML files
+        run: |
+          echo "📋 Checking YAML files..."
+          yamllint -c .yamllint .github/workflows/*.yml docker-compose*.yml
+
+      - name: Check for security issues
+        run: |
+          echo "🔒 Checking for security vulnerabilities..."
+          pip install safety
+          safety check --json || true

@@ -1,83 +1,89 @@
-.PHONY: dev prod test reload logs shell clean
+# ZGDK Development Makefile
 
-# Development mode with hot reload
-dev:
-	docker-compose -f docker-compose.yml -f docker/docker-compose.dev.yml up
+.PHONY: help format lint test install clean docker-up docker-down
 
-# Production mode
-prod:
-	docker-compose up -d
+help: ## Show this help message
+	@echo "ZGDK Development Commands:"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# Quick test without Docker
-test-local:
-	python -m pytest tests/ -v
+format: ## Auto-format code with Black and isort
+	@echo "🎨 Formatting Python code with Black..."
+	black --line-length=120 .
+	@echo "📦 Sorting imports with isort..."
+	isort --profile black --line-length=120 .
+	@echo "✅ Code formatting complete!"
 
-# Test specific command
-test-cmd:
-	@echo "Usage: make test-cmd CMD=command_name"
-	python scripts/testing/test_command.py $(CMD)
+lint: ## Run all linters
+	@echo "🔍 Running linters..."
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🎨 Black (check only)..."
+	black --check --line-length=120 .
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📦 isort (check only)..."
+	isort --check-only --profile black --line-length=120 .
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔍 Flake8..."
+	flake8 . --config=.flake8
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔎 MyPy..."
+	mypy . --ignore-missing-imports --no-strict-optional || true
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📋 YAML lint..."
+	yamllint -c .yamllint .
+	@echo "✅ All linters complete!"
 
-# Reload all cogs (via MCP)
-reload:
-	curl -X POST http://localhost:8089/execute -H "Content-Type: application/json" -d '{"command": "reload"}'
+test: ## Run tests
+	@echo "🧪 Running tests..."
+	pytest tests/ -v
 
-# View logs
-logs:
-	docker-compose logs -f app --tail=100
+install: ## Install development dependencies
+	@echo "📦 Installing dependencies..."
+	pip install -r requirements.txt
+	pip install pre-commit black isort flake8 mypy yamllint pytest
+	pre-commit install
+	@echo "✅ Dependencies installed!"
 
-# Shell into container
-shell:
-	docker-compose exec app /bin/bash
+pre-commit: ## Run pre-commit on all files
+	@echo "🪝 Running pre-commit hooks..."
+	pre-commit run --all-files
 
-# Clean everything
-clean:
-	docker-compose down -v
-	find . -type d -name "__pycache__" -exec rm -rf {} +
+clean: ## Clean up cache and temporary files
+	@echo "🧹 Cleaning up..."
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
+	find . -type f -name ".coverage" -delete
+	@echo "✅ Cleanup complete!"
 
-# Quick restart (tylko app, nie DB)
-restart:
-	docker-compose restart app
+docker-up: ## Start Docker containers
+	@echo "🚀 Starting Docker containers..."
+	docker-compose up -d
+	@echo "✅ Containers started!"
 
-# Install dev dependencies
-install-dev:
-	pip install watchdog pytest-asyncio httpx
+docker-down: ## Stop Docker containers
+	@echo "🛑 Stopping Docker containers..."
+	docker-compose down
+	@echo "✅ Containers stopped!"
 
-# === Kubernetes Commands ===
+docker-logs: ## Show Docker logs
+	docker-compose logs -f --tail=100
 
-# Start local k8s development with Skaffold
-k8s-dev:
-	skaffold dev --port-forward
+docker-shell: ## Open shell in app container
+	docker-compose exec app bash
 
-# Deploy to staging
-k8s-staging:
-	skaffold run -p staging
+check-health: ## Check container health status
+	@docker-compose ps
+	@echo ""
+	@echo "Health endpoint status:"
+	@curl -s http://localhost:8091/health || echo "Health endpoint not responding"
 
-# Deploy to production
-k8s-prod:
-	kubectl apply -k k8s/overlays/production
+fix-all: format ## Fix all auto-fixable issues
+	@echo "🔧 Fixing all auto-fixable issues..."
+	@echo "✅ All fixes applied!"
 
-# Scale AI agents
-k8s-scale-ai:
-	kubectl scale deployment ai-agents --replicas=$(REPLICAS)
+# Development workflow shortcuts
+dev: docker-up docker-logs ## Start development environment
 
-# View logs
-k8s-logs:
-	kubectl logs -f deployment/zgdk-bot -n zgdk-dev
-
-# Get pod status
-k8s-status:
-	kubectl get pods -n zgdk-dev
-
-# Port forward to local
-k8s-forward:
-	kubectl port-forward deployment/zgdk-bot 8089:8089 -n zgdk-dev
-
-# Run integration tests in k8s
-k8s-test:
-	kubectl apply -f k8s/jobs/test-job.yaml
-	kubectl wait --for=condition=complete job/integration-tests -n zgdk-dev --timeout=300s
-
-# Clean up k8s resources
-k8s-clean:
-	kubectl delete namespace zgdk-dev
+stop: docker-down ## Stop development environment
