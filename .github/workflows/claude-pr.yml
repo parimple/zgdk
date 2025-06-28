@@ -1,0 +1,22 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  claude-pr-review:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for better context
+
+    - name: Run Claude PR Action
+      uses: grll/claude-code-action@beta
+      with:
+        use_oauth: true
+        claude_access_token: ${{ secrets.CLAUDE_ACCESS_TOKEN }}
+        claude_refresh_token: ${{ secrets.CLAUDE_REFRESH_TOKEN }}
+        claude_expires_at: ${{ secrets.CLAUDE_EXPIRES_AT }}

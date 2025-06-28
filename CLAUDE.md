@@ -244,11 +244,6 @@ python -m pytest tests/commands/test_mute_commands.py -v
 
 **Important**: Tests use MCP (Model Context Protocol) to execute real commands through API, ensuring real functionality is tested.
 
-## Notification System
-
-🔔 **ALWAYS notify user when task is completed** 🔔
-
-This will emit a terminal bell sound to notify user via SSH.
 
 ## Future Maintenance
 

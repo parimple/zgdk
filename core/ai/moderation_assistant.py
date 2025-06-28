@@ -422,4 +422,3 @@ class ModerationAssistant:
             reason="No concerning behavior patterns",
             confidence=0.9,
         )
-
