@@ -6,16 +6,18 @@ Provides decision logging, feature extraction, and explanation generation.
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 import asyncio
 from collections import defaultdict
 
-import discord
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from pydantic_ai.models.gemini import GeminiModel
+
+if TYPE_CHECKING:
+    import discord
+    from discord.ext import commands
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,7 @@ class DecisionLogger:
         confidence: float,
         reasoning: str,
         execution_time_ms: float,
-        context: Optional[discord.ext.commands.Context] = None
+        context: Optional['commands.Context'] = None
     ):
         """Log an AI decision with full context."""
         trace = DecisionTrace(
@@ -226,8 +228,10 @@ class ModelExplainer:
         self.extractor = FeatureExtractor()
         
         if gemini_api_key:
+            import os
+            os.environ['GOOGLE_API_KEY'] = gemini_api_key
             self.explanation_agent = Agent(
-                model=GeminiModel("gemini-1.5-flash", api_key=gemini_api_key),
+                model="gemini-1.5-flash",
                 system_prompt="""You are an AI explainability assistant for a Discord bot.
                 Your task is to explain AI decisions in simple, understandable terms.
                 Focus on what features influenced the decision and why.
@@ -384,7 +388,7 @@ async def log_and_explain(
     confidence: float,
     reasoning: str,
     execution_time_ms: float,
-    context: Optional[discord.ext.commands.Context] = None,
+    context: Optional['commands.Context'] = None,
     auto_explain: bool = False
 ) -> Optional[str]:
     """
