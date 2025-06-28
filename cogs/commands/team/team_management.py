@@ -110,7 +110,6 @@ class TeamManagementCommands:
         return await ctx.send(embed=embed)
 
     @commands.group(invoke_without_command=True)
-    @is_zagadka_owner()
     async def team(self, ctx):
         """Team (clan) management."""
         # Get the owner's team role
