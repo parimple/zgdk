@@ -178,7 +178,9 @@ class RoleManager:
                             # nawet gdy użytkownik opuścił serwer (zombie teams cleanup)
                             if role_type == "premium":
                                 try:
-                                    from cogs.commands.info.admin.helpers import remove_premium_role_mod_permissions
+                                    from cogs.commands.info.admin.helpers import (
+                                        remove_premium_role_mod_permissions,
+                                    )
 
                                     await remove_premium_role_mod_permissions(session, self.bot, member_role.member_id)
                                     logger.info(
@@ -245,7 +247,9 @@ class RoleManager:
                         # Jeśli to była rola premium, wyczyść również uprawnienia i teamy
                         if role_type == "premium":
                             try:
-                                from cogs.commands.info.admin.helpers import remove_premium_role_mod_permissions
+                                from cogs.commands.info.admin.helpers import (
+                                    remove_premium_role_mod_permissions,
+                                )
 
                                 await remove_premium_role_mod_permissions(session, self.bot, member.id)
                                 logger.info(

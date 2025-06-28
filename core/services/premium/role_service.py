@@ -6,7 +6,12 @@ from typing import Any, Optional, Tuple
 
 import discord
 
-from core.interfaces.premium_interfaces import ExtensionResult, ExtensionType, IPremiumRoleManager, PremiumRoleConfig
+from core.interfaces.premium_interfaces import (
+    ExtensionResult,
+    ExtensionType,
+    IPremiumRoleManager,
+    PremiumRoleConfig,
+)
 from core.repositories.premium_repository import PremiumRepository
 from core.services.base_service import BaseService
 

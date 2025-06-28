@@ -8,28 +8,28 @@ from pathlib import Path
 def fix_unused_variable(file_path, line_num, var_name):
     """Fix an unused variable in a specific file and line."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
-            
+
         if 0 <= line_num - 1 < len(lines):
             line = lines[line_num - 1]
             # Replace variable assignment with underscore prefix
             # Handle various assignment patterns
             patterns = [
-                (rf'\b{var_name}\s*=', f'_{var_name} ='),
-                (rf'for\s+{var_name}\s+in', f'for _{var_name} in'),
-                (rf'except\s+.*\s+as\s+{var_name}:', f'except Exception:'),  # For except clauses
+                (rf"\b{var_name}\s*=", f"_{var_name} ="),
+                (rf"for\s+{var_name}\s+in", f"for _{var_name} in"),
+                (rf"except\s+.*\s+as\s+{var_name}:", f"except Exception:"),  # For except clauses
             ]
-            
+
             new_line = line
             for pattern, replacement in patterns:
                 if re.search(pattern, line):
                     new_line = re.sub(pattern, replacement, line)
                     break
-                    
+
             if new_line != line:
                 lines[line_num - 1] = new_line
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     f.writelines(lines)
                 return True
     except Exception as e:
@@ -82,14 +82,14 @@ def main():
         ("tests/models/test_shop_business_logic.py", 122, "user_id"),
         ("tests/models/test_shop_data_models.py", 125, "premium_role_data"),
     ]
-    
+
     fixed_count = 0
     for file_path, line_num, var_name in unused_vars:
         if Path(file_path).exists():
             if fix_unused_variable(file_path, line_num, var_name):
                 print(f"Fixed unused variable '{var_name}' in {file_path}:{line_num}")
                 fixed_count += 1
-                
+
     print(f"\nFixed {fixed_count} unused variables")
 
 

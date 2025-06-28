@@ -10,7 +10,13 @@ from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 
 from .constants import DISBOARD, DISCADIA, DISCORDSERVERS, DSME, DZIK
-from .handlers import DisboardHandler, DiscadiaHandler, DiscordServersHandler, DSMEHandler, DzikHandler
+from .handlers import (
+    DisboardHandler,
+    DiscadiaHandler,
+    DiscordServersHandler,
+    DSMEHandler,
+    DzikHandler,
+)
 from .status import BumpStatusHandler
 
 logger = logging.getLogger(__name__)
@@ -273,10 +279,10 @@ class OnBumpEvent(commands.Cog):
             db_member = await MemberQueries.get_or_add_member(session, member.id)
 
             current_time = datetime.now(timezone.utc)
-            if db_member.bypass_expiry and db_member.bypass_expiry > current_time:
-                db_member.bypass_expiry = db_member.bypass_expiry + timedelta(hours=hours)
+            if db_member.voice_bypass_until and db_member.voice_bypass_until > current_time:
+                db_member.voice_bypass_until = db_member.voice_bypass_until + timedelta(hours=hours)
             else:
-                db_member.bypass_expiry = current_time + timedelta(hours=hours)
+                db_member.voice_bypass_until = current_time + timedelta(hours=hours)
 
             await session.commit()
 

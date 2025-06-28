@@ -30,17 +30,17 @@ class BumpHandler:
 
                 # Calculate new bypass expiry
                 current_time = datetime.now(timezone.utc)
-                if db_member.bypass_expiry and db_member.bypass_expiry > current_time:
+                if db_member.voice_bypass_until and db_member.voice_bypass_until > current_time:
                     # Extend existing bypass
-                    db_member.bypass_expiry = db_member.bypass_expiry + timedelta(hours=hours)
+                    db_member.voice_bypass_until = db_member.voice_bypass_until + timedelta(hours=hours)
                 else:
                     # Set new bypass
-                    db_member.bypass_expiry = current_time + timedelta(hours=hours)
+                    db_member.voice_bypass_until = current_time + timedelta(hours=hours)
 
                 await session.commit()
                 logger.info(
                     f"Added {hours}h bypass time for {member.display_name} on {service}. "
-                    f"New expiry: {db_member.bypass_expiry}"
+                    f"New expiry: {db_member.voice_bypass_until}"
                 )
         except Exception as e:
             logger.error(f"Error adding bypass time: {e}", exc_info=True)

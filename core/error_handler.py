@@ -22,8 +22,8 @@ from .exceptions import (
     ValidationError,
     ValidationException,
 )
-from .exceptions.database import DatabaseError as DatabaseException
 from .exceptions.base import PermissionError as PermissionException
+from .exceptions.database import DatabaseError as DatabaseException
 
 logger = logging.getLogger(__name__)
 

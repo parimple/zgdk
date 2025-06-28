@@ -5,7 +5,12 @@ from .activity_interfaces import ActivityType, IActivityTrackingService
 from .base import IService
 from .currency_interfaces import ICurrencyService
 from .member_interfaces import IMemberService, IModerationService
-from .messaging_interfaces import IEmbedBuilder, IMessageFormatter, IMessageSender, INotificationService
+from .messaging_interfaces import (
+    IEmbedBuilder,
+    IMessageFormatter,
+    IMessageSender,
+    INotificationService,
+)
 from .permission_interfaces import IPermissionService, PermissionLevel
 from .premium_interfaces import IPremiumService
 from .role_interfaces import IRoleService

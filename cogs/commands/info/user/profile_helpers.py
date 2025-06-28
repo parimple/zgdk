@@ -20,7 +20,9 @@ async def get_profile_data(member: discord.Member, session, ctx: commands.Contex
     try:
         # Get member data from database
         logger.info(f"Getting member from database: {member.id}")
-        db_member = await MemberQueries.get_or_add_member(session, member.id, wallet_balance=0, joined_at=member.joined_at)
+        db_member = await MemberQueries.get_or_add_member(
+            session, member.id, wallet_balance=0, joined_at=member.joined_at
+        )
         logger.info(f"Got db_member: {db_member.member_id if db_member else None}")
 
         # Get services
@@ -28,7 +30,9 @@ async def get_profile_data(member: discord.Member, session, ctx: commands.Contex
         _member_service = await bot.get_service(IMemberService, session)
         activity_service = await bot.get_service(IActivityService, session)
         premium_service = await bot.get_service(IPremiumService, session)
-        logger.info(f"Services retrieved: member={bool(_member_service)}, activity={bool(activity_service)}, premium={bool(premium_service)}")
+        logger.info(
+            f"Services retrieved: member={bool(_member_service)}, activity={bool(activity_service)}, premium={bool(premium_service)}"
+        )
 
         # Get basic data
         invite_repo = InviteRepository(session)

@@ -9,22 +9,22 @@ from pathlib import Path
 def fix_bare_except(file_path):
     """Fix bare except clauses in a Python file."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
-            
+
         # Fix bare except with simple regex
         # Match "except:" with optional whitespace and comment
-        pattern = r'(\s*)except\s*:(.*)'
-        
+        pattern = r"(\s*)except\s*:(.*)"
+
         def replacer(match):
             indent = match.group(1)
             rest = match.group(2)
-            return f'{indent}except Exception:{rest}'
-            
+            return f"{indent}except Exception:{rest}"
+
         new_content = re.sub(pattern, replacer, content)
-        
+
         if new_content != content:
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(new_content)
             print(f"Fixed bare except in {file_path}")
             return True
@@ -50,13 +50,13 @@ def main():
         "utils/message_senders/base.py",
         "utils/role_sale.py",
     ]
-    
+
     fixed_count = 0
     for file_path in files_with_bare_except:
         if Path(file_path).exists():
             if fix_bare_except(file_path):
                 fixed_count += 1
-                
+
     print(f"\nFixed {fixed_count} files with bare except clauses")
 
 

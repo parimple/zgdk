@@ -12,7 +12,11 @@ from datasources.queries import MemberQueries, RoleQueries
 from utils.refund import calculate_refund
 
 from ..admin.helpers import remove_premium_role_mod_permissions
-from .embed_builders import create_role_sale_embed, create_sale_confirmation_embed, create_sale_success_embed
+from .embed_builders import (
+    create_role_sale_embed,
+    create_sale_confirmation_embed,
+    create_sale_success_embed,
+)
 
 # Currency constant
 CURRENCY_UNIT = CurrencyService.CURRENCY_UNIT

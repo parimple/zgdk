@@ -14,7 +14,13 @@ from .base import (
 )
 from .database import ConnectionError, DatabaseError, EntityNotFoundError, IntegrityError
 from .discord import CommandError, DiscordError, InteractionError, RateLimitError
-from .domain import BusinessRuleViolation, CooldownError, DomainError, InsufficientBalanceError, LimitExceededError
+from .domain import (
+    BusinessRuleViolation,
+    CooldownError,
+    DomainError,
+    InsufficientBalanceError,
+    LimitExceededError,
+)
 from .service import CooldownException, InsufficientFundsException, RateLimitException
 
 __all__ = [

@@ -10,7 +10,13 @@ from sqlalchemy.orm import sessionmaker
 
 from datasources.models import Activity, HandledPayment, Invite, Member, MemberRole, Role
 from datasources.models.base import Base
-from tests.data.test_constants import ROLE_ZG50_ID, ROLE_ZG100_ID, TEST_USER_1_ID, TEST_USER_2_ID, WALLET_BALANCES
+from tests.data.test_constants import (
+    ROLE_ZG50_ID,
+    ROLE_ZG100_ID,
+    TEST_USER_1_ID,
+    TEST_USER_2_ID,
+    WALLET_BALANCES,
+)
 
 
 @pytest.fixture

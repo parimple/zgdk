@@ -10,6 +10,7 @@ from typing import Optional
 import discord
 import httpx
 from bs4 import BeautifulSoup
+
 # from playwright.async_api import async_playwright  # pylint: disable=import-error  # Not used
 from sqlalchemy.exc import IntegrityError
 
