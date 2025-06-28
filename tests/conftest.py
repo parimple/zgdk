@@ -8,12 +8,27 @@ from unittest.mock import AsyncMock, MagicMock
 # Following your brilliant solution A - stub only what we need, leave commands alone
 discord_mock = types.ModuleType("discord")          # bare module
 discord_ext_mock = types.ModuleType("discord.ext")
+discord_ext_commands_mock = types.ModuleType("discord.ext.commands")
 discord_ui_mock = types.ModuleType("discord.ui")
 discord_ui_mock.View = MagicMock()                   # shop_views needs it
+
+# Add commands module attributes
+discord_ext_commands_mock.Cog = MagicMock
+discord_ext_commands_mock.command = MagicMock
+discord_ext_commands_mock.hybrid_command = MagicMock
+discord_ext_commands_mock.Context = MagicMock
+discord_ext_mock.commands = discord_ext_commands_mock
 
 # Add essential discord attributes
 discord_mock.Member = MagicMock
 discord_mock.User = MagicMock
+discord_mock.Role = MagicMock
+discord_mock.Guild = MagicMock
+discord_mock.Channel = MagicMock
+discord_mock.TextChannel = MagicMock
+discord_mock.VoiceChannel = MagicMock
+discord_mock.Message = MagicMock
+discord_mock.Interaction = MagicMock
 discord_mock.Color = MagicMock()
 discord_mock.Color.blue = MagicMock(return_value=MagicMock())
 discord_mock.Color.green = MagicMock(return_value=MagicMock())
@@ -21,13 +36,15 @@ discord_mock.Color.red = MagicMock(return_value=MagicMock())
 discord_mock.Color.yellow = MagicMock(return_value=MagicMock())
 discord_mock.Embed = MagicMock
 discord_mock.Forbidden = Exception
+discord_mock.AllowedMentions = MagicMock
 discord_mock.utils = MagicMock()
 discord_mock.ui = discord_ui_mock
+discord_mock.app_commands = MagicMock()  # Add app_commands mock
 
 sys.modules["discord"] = discord_mock
 sys.modules["discord.ext"] = discord_ext_mock
+sys.modules["discord.ext.commands"] = discord_ext_commands_mock
 sys.modules["discord.ui"] = discord_ui_mock
-# ← no sys.modules["discord.ext.commands"] assignment here!
 
 # Mock other problematic modules
 sys.modules['utils.permissions'] = MagicMock()

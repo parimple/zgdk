@@ -21,7 +21,6 @@ pytest-cov
 pytest-mock
 pytest-html
 pytest-metadata
-discord.py-self
 dpytest
 pip-audit
 bandit
