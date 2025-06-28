@@ -100,16 +100,25 @@ class InviteManager:
             if inviter_id:
                 db_member = await member_service.get_or_create_member(member)
                 if not db_member.first_inviter_id:
-                    await member_service.update_member_inviter(
-                        member_id=member.id,
-                        inviter_id=inviter_id,
-                        is_first=True
+                    # Set both first and current inviter
+                    await member_service.update_member_info(
+                        db_member,
+                        current_inviter_id=inviter_id
+                    )
+                    # Need to update first_inviter_id directly via repository
+                    from core.repositories import MemberRepository
+                    member_repo = MemberRepository(session)
+                    await member_repo.update_inviter(
+                        member.id,
+                        inviter_id,
+                        update_current=True,
+                        update_first=True
                     )
                 else:
-                    await member_service.update_member_inviter(
-                        member_id=member.id,
-                        inviter_id=inviter_id,
-                        is_first=False
+                    # Only update current inviter
+                    await member_service.update_member_info(
+                        db_member,
+                        current_inviter_id=inviter_id
                     )
             
             await session.commit()
@@ -127,10 +136,18 @@ class InviteManager:
             
             # Set unknown inviter (using guild ID as placeholder)
             if not db_member.first_inviter_id:
-                await member_service.update_member_inviter(
-                    member_id=member.id,
-                    inviter_id=self.guild.id,  # Guild ID as "unknown" inviter
-                    is_first=True
+                await member_service.update_member_info(
+                    db_member,
+                    current_inviter_id=self.guild.id  # Guild ID as "unknown" inviter
+                )
+                # Update first_inviter_id via repository
+                from core.repositories import MemberRepository
+                member_repo = MemberRepository(session)
+                await member_repo.update_inviter(
+                    member.id,
+                    self.guild.id,
+                    update_current=True,
+                    update_first=True
                 )
             
             await session.commit()

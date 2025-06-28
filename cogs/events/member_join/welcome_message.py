@@ -18,7 +18,7 @@ class WelcomeMessageSender:
         self.bot = bot
         self.guild = guild
         self.welcome_channel: Optional[discord.TextChannel] = None
-        self.force_channel_notifications = True  # Default to channel notifications
+        self.force_channel_notifications = False  # Default to channel notifications (False = use channel)
     
     async def setup_welcome_channel(self) -> None:
         """Setup the welcome channel from config."""
@@ -43,13 +43,7 @@ class WelcomeMessageSender:
             # Create welcome embed
             embed = self._create_welcome_embed(member, inviter, restored_roles, is_returning)
             
-            # Try to send via DM first (unless forced to channel)
-            if not self.force_channel_notifications:
-                sent_dm = await self._send_welcome_dm(member, embed, inviter)
-                if sent_dm:
-                    return True
-            
-            # Send to welcome channel
+            # Always send to welcome channel
             if self.welcome_channel:
                 await self._send_welcome_channel(member, embed, inviter)
                 return True
