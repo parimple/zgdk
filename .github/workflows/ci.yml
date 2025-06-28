@@ -158,6 +158,9 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
+          # Configure git to use HTTPS with token
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          
           git add helm/zgdk/values.yaml helm/zgdk/Chart.yaml
           
           # Check if there are changes to commit
@@ -165,7 +168,7 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore: update image tag to main-${GITHUB_SHA:0:7} [skip ci]"
-            git push
+            git push origin HEAD:main
           fi
           
   helm-lint:
