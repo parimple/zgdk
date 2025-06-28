@@ -108,11 +108,17 @@ class InviteManager:
                     # Need to update first_inviter_id directly via repository
                     from core.repositories import MemberRepository
                     member_repo = MemberRepository(session)
+                    # Update first_inviter_id
                     await member_repo.update_inviter(
                         member.id,
                         inviter_id,
-                        update_current=True,
-                        update_first=True
+                        update_current=False
+                    )
+                    # Also update current_inviter_id
+                    await member_repo.update_inviter(
+                        member.id,
+                        inviter_id,
+                        update_current=True
                     )
                 else:
                     # Only update current inviter
@@ -143,11 +149,17 @@ class InviteManager:
                 # Update first_inviter_id via repository
                 from core.repositories import MemberRepository
                 member_repo = MemberRepository(session)
+                # Update first_inviter_id
                 await member_repo.update_inviter(
                     member.id,
                     self.guild.id,
-                    update_current=True,
-                    update_first=True
+                    update_current=False
+                )
+                # Also update current_inviter_id
+                await member_repo.update_inviter(
+                    member.id,
+                    self.guild.id,
+                    update_current=True
                 )
             
             await session.commit()
