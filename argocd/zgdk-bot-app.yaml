@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zgdk-bot
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/parimple/zgdk
+    targetRevision: main
+    path: helm/zgdk
+    helm:
+      valueFiles:
+      - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zgdk
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+  revisionHistoryLimit: 3
