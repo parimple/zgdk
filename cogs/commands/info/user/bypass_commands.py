@@ -6,7 +6,7 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from datasources.queries import MemberQueries
+from core.repositories import MemberRepository
 from utils.permissions import is_admin
 
 logger = logging.getLogger(__name__)
@@ -31,22 +31,28 @@ class BypassCommands(commands.Cog):
     ):
         """Zarządzaj czasem obejścia (T) dla użytkowników."""
         async with self.bot.get_db() as session:
+            member_repo = MemberRepository(session)
+            
             if action == "add":
                 if hours is None or hours <= 0:
                     await ctx.send("Musisz podać liczbę godzin większą od 0.")
                     return
 
-                updated_member = await MemberQueries.add_bypass_time(
-                    session, member.id, hours
+                updated_member = await member_repo.add_bypass_time(
+                    member.id, hours
                 )
                 await session.commit()
-                await ctx.send(
-                    f"✅ Dodano {hours} godzin czasu T dla {member.mention}. Wygasa: {updated_member.voice_bypass_until}"
-                )
+                
+                if updated_member:
+                    await ctx.send(
+                        f"✅ Dodano {hours} godzin czasu T dla {member.mention}. Wygasa: {updated_member.voice_bypass_until}"
+                    )
+                else:
+                    await ctx.send(f"❌ Nie udało się dodać czasu T dla {member.mention}.")
 
             elif action == "check":
-                bypass_until = await MemberQueries.get_voice_bypass_status(
-                    session, member.id
+                bypass_until = await member_repo.get_voice_bypass_status(
+                    member.id
                 )
                 if bypass_until:
                     await ctx.send(f"⏰ {member.mention} ma czas T do: {bypass_until}")

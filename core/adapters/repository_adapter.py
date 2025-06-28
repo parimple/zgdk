@@ -104,37 +104,60 @@ class RepositoryAdapter:
         """Add MemberQueries compatible methods."""
         
         @staticmethod
-        async def get_or_add_member(session: AsyncSession, member_id: int):
+        async def get_or_add_member(session: AsyncSession, member_id: int, **kwargs):
             repo = MemberRepository(session)
-            return await repo.get_or_create(member_id)
+            return await repo.get_or_add_member(member_id, **kwargs)
         
         @staticmethod
         async def get_member(session: AsyncSession, member_id: int):
             repo = MemberRepository(session)
-            return await repo.get_by_id(member_id)
+            return await repo.get_member(member_id)
         
         @staticmethod
         async def add_member(session: AsyncSession, member_id: int):
             repo = MemberRepository(session)
-            return await repo.create({"id": member_id})
+            return await repo.create_member(discord_id=member_id)
         
         @staticmethod
-        async def get_member_balance(session: AsyncSession, member_id: int):
+        async def add_to_wallet_balance(session: AsyncSession, member_id: int, amount: int):
             repo = MemberRepository(session)
-            member = await repo.get_by_id(member_id)
-            return member.balance if member else 0
+            return await repo.add_to_wallet_balance(member_id, amount)
         
         @staticmethod
-        async def update_member_balance(session: AsyncSession, member_id: int, amount: int):
+        async def get_voice_bypass_status(session: AsyncSession, member_id: int):
             repo = MemberRepository(session)
-            return await repo.update_balance(member_id, amount)
+            return await repo.get_voice_bypass_status(member_id)
+        
+        @staticmethod
+        async def add_bypass_time(session: AsyncSession, member_id: int, hours: int):
+            repo = MemberRepository(session)
+            return await repo.add_bypass_time(member_id, hours)
+        
+        @staticmethod
+        async def extend_voice_bypass(session: AsyncSession, member_id: int, duration):
+            repo = MemberRepository(session)
+            return await repo.extend_voice_bypass(member_id, duration)
+        
+        @staticmethod
+        async def clear_voice_bypass(session: AsyncSession, member_id: int):
+            repo = MemberRepository(session)
+            return await repo.clear_voice_bypass(member_id)
+        
+        @staticmethod
+        async def get_all_members(session: AsyncSession):
+            repo = MemberRepository(session)
+            return await repo.get_all_members()
         
         # Add methods to adapter class
         adapter_class.get_or_add_member = get_or_add_member
         adapter_class.get_member = get_member
         adapter_class.add_member = add_member
-        adapter_class.get_member_balance = get_member_balance
-        adapter_class.update_member_balance = update_member_balance
+        adapter_class.add_to_wallet_balance = add_to_wallet_balance
+        adapter_class.get_voice_bypass_status = get_voice_bypass_status
+        adapter_class.add_bypass_time = add_bypass_time
+        adapter_class.extend_voice_bypass = extend_voice_bypass
+        adapter_class.clear_voice_bypass = clear_voice_bypass
+        adapter_class.get_all_members = get_all_members
     
     @staticmethod
     def _add_role_query_methods(adapter_class):

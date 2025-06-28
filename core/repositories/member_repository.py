@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import func, select
@@ -197,6 +197,155 @@ class MemberRepository(BaseRepository):
         except Exception as e:
             self._log_error("get_member_count", e)
             return 0
+
+
+    async def get_or_add_member(
+        self,
+        member_id: int,
+        wallet_balance: int = 0,
+        first_inviter_id: Optional[int] = None,
+        current_inviter_id: Optional[int] = None,
+        joined_at: Optional[datetime] = None,
+        rejoined_at: Optional[datetime] = None,
+    ) -> Member:
+        """Legacy compatibility method for MemberQueries.get_or_add_member."""
+        try:
+            member = await self.get_by_discord_id(member_id)
+            if member is None:
+                member = await self.create_member(
+                    discord_id=member_id,
+                    wallet_balance=wallet_balance,
+                    first_inviter_id=first_inviter_id,
+                    current_inviter_id=current_inviter_id,
+                    joined_at=joined_at,
+                    rejoined_at=rejoined_at,
+                )
+            else:
+                # Update fields for existing members
+                if current_inviter_id is not None:
+                    member.current_inviter_id = current_inviter_id
+                if rejoined_at is not None:
+                    member.rejoined_at = rejoined_at
+                await self.session.flush()
+                
+            return member
+            
+        except Exception as e:
+            self._log_error("get_or_add_member", e, member_id=member_id)
+            raise
+
+    async def add_to_wallet_balance(self, member_id: int, amount: int) -> None:
+        """Legacy compatibility method for MemberQueries.add_to_wallet_balance."""
+        try:
+            from sqlalchemy import update
+            await self.session.execute(
+                update(Member)
+                .where(Member.id == member_id)
+                .values(wallet_balance=Member.wallet_balance + amount)
+            )
+            await self.session.flush()
+            
+            self._log_operation(
+                "add_to_wallet_balance",
+                member_id=member_id,
+                amount=amount
+            )
+            
+        except Exception as e:
+            self._log_error("add_to_wallet_balance", e, member_id=member_id)
+            raise
+
+    async def get_voice_bypass_status(self, member_id: int) -> Optional[datetime]:
+        """Get the current voice bypass expiration datetime for a member."""
+        try:
+            member = await self.get_by_discord_id(member_id)
+            if not member or not member.voice_bypass_until:
+                return None
+            
+            now = datetime.now(timezone.utc)
+            return member.voice_bypass_until if member.voice_bypass_until > now else None
+            
+        except Exception as e:
+            self._log_error("get_voice_bypass_status", e, member_id=member_id)
+            return None
+
+    async def add_bypass_time(self, member_id: int, hours: int) -> Optional[Member]:
+        """Add bypass time to a member."""
+        try:
+            member = await self.get_by_discord_id(member_id)
+            if not member:
+                return None
+            
+            now = datetime.now(timezone.utc)
+            if not member.voice_bypass_until or member.voice_bypass_until < now:
+                member.voice_bypass_until = now + timedelta(hours=hours)
+            else:
+                member.voice_bypass_until += timedelta(hours=hours)
+            
+            await self.session.flush()
+            
+            self._log_operation(
+                "add_bypass_time",
+                member_id=member_id,
+                hours=hours,
+                new_expiry=member.voice_bypass_until
+            )
+            
+            return member
+            
+        except Exception as e:
+            self._log_error("add_bypass_time", e, member_id=member_id)
+            return None
+
+    async def extend_voice_bypass(self, member_id: int, duration: timedelta) -> Optional[datetime]:
+        """Extend the voice bypass duration for a member."""
+        try:
+            member = await self.get_or_add_member(member_id)
+            now = datetime.now(timezone.utc)
+            
+            if member.voice_bypass_until is None or member.voice_bypass_until < now:
+                member.voice_bypass_until = now + duration
+            else:
+                member.voice_bypass_until += duration
+            
+            await self.session.flush()
+            
+            self._log_operation(
+                "extend_voice_bypass",
+                member_id=member_id,
+                duration=str(duration),
+                new_expiry=member.voice_bypass_until
+            )
+            
+            return member.voice_bypass_until
+            
+        except Exception as e:
+            self._log_error("extend_voice_bypass", e, member_id=member_id)
+            return None
+
+    async def clear_voice_bypass(self, member_id: int) -> bool:
+        """Clear the voice bypass for a member."""
+        try:
+            member = await self.get_by_discord_id(member_id)
+            if member:
+                member.voice_bypass_until = None
+                await self.session.flush()
+                
+                self._log_operation("clear_voice_bypass", member_id=member_id)
+                return True
+            return False
+            
+        except Exception as e:
+            self._log_error("clear_voice_bypass", e, member_id=member_id)
+            return False
+
+    async def get_member(self, member_id: int) -> Optional[Member]:
+        """Legacy compatibility method for MemberQueries.get_member."""
+        return await self.get_by_discord_id(member_id)
+
+    async def get_all_members(self) -> list[Member]:
+        """Get all members from database."""
+        return await self.get_all()
 
 
 class ActivityRepository(BaseRepository):
