@@ -3,6 +3,7 @@ AI-enhanced color parsing using PydanticAI.
 """
 
 import re
+import time
 from typing import Optional, Tuple
 
 from pydantic import BaseModel, Field
@@ -10,6 +11,7 @@ import logging
 from pydantic_ai import Agent
 
 from ..models.command import ColorInput
+from utils.ai.interpretability import log_and_explain, FeatureExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -172,12 +174,29 @@ class ColorParser:
     
     async def parse(self, color_str: str) -> EnhancedColorInput:
         """Parse color string with AI enhancement."""
+        start_time = time.time()
         color_str = color_str.strip()
+        
+        # Extract features for interpretability
+        features = await FeatureExtractor.extract_color_features(color_str)
         
         # First try traditional parsing
         try:
             basic_color = self._parse_traditional(color_str)
             if basic_color:
+                # Log successful traditional parsing
+                execution_time = (time.time() - start_time) * 1000
+                await log_and_explain(
+                    module="color_parser",
+                    input_data={"text": color_str},
+                    features=features,
+                    output=basic_color.hex_color,
+                    decision=basic_color.hex_color,
+                    confidence=1.0,
+                    reasoning="Standard hex/RGB format",
+                    execution_time_ms=execution_time
+                )
+                
                 return EnhancedColorInput.from_color_input(
                     basic_color,
                     interpretation="Standardowy format",
@@ -190,6 +209,20 @@ class ColorParser:
         lower_str = color_str.lower()
         if lower_str in self.NAMED_COLORS:
             basic_color = ColorInput.parse(self.NAMED_COLORS[lower_str])
+            
+            # Log named color match
+            execution_time = (time.time() - start_time) * 1000
+            await log_and_explain(
+                module="color_parser",
+                input_data={"text": color_str},
+                features=features,
+                output=self.NAMED_COLORS[lower_str],
+                decision=self.NAMED_COLORS[lower_str],
+                confidence=1.0,
+                reasoning=f"Named color match: {lower_str}",
+                execution_time_ms=execution_time
+            )
+            
             return EnhancedColorInput.from_color_input(
                 basic_color,
                 interpretation=f"Rozpoznany kolor: {lower_str}",
@@ -199,7 +232,7 @@ class ColorParser:
         
         # If traditional parsing fails and AI is enabled, use AI
         if self.use_ai:
-            return await self._parse_with_ai(color_str)
+            return await self._parse_with_ai(color_str, features, start_time)
         else:
             raise ValueError(f"Cannot parse color: {color_str}")
     
@@ -211,8 +244,13 @@ class ColorParser:
         except:
             return None
     
-    async def _parse_with_ai(self, color_str: str) -> EnhancedColorInput:
+    async def _parse_with_ai(self, color_str: str, features: Optional[dict] = None, start_time: Optional[float] = None) -> EnhancedColorInput:
         """Parse using AI for natural language understanding."""
+        if start_time is None:
+            start_time = time.time()
+        if features is None:
+            features = await FeatureExtractor.extract_color_features(color_str)
+        
         try:
             # Get AI interpretation
             result = await self.agent.run(
@@ -232,6 +270,19 @@ class ColorParser:
             # Find closest named color
             closest_named = self._find_closest_named_color(hex_color)
             
+            # Log AI decision
+            execution_time = (time.time() - start_time) * 1000
+            await log_and_explain(
+                module="color_parser",
+                input_data={"text": color_str},
+                features=features,
+                output=result.data,
+                decision=hex_color,
+                confidence=0.85,
+                reasoning=f"AI interpreted as {hex_color} ({closest_named or 'custom'})",
+                execution_time_ms=execution_time
+            )
+            
             return EnhancedColorInput.from_color_input(
                 basic_color,
                 interpretation=f"AI zinterpretowało '{color_str}' jako {hex_color}",
@@ -240,6 +291,18 @@ class ColorParser:
             )
             
         except Exception as e:
+            # Log failed parsing
+            execution_time = (time.time() - start_time) * 1000
+            await log_and_explain(
+                module="color_parser",
+                input_data={"text": color_str},
+                features=features,
+                output=str(e),
+                decision=None,
+                confidence=0.0,
+                reasoning=f"Parsing failed: {str(e)}",
+                execution_time_ms=execution_time
+            )
             raise ValueError(f"AI color parsing failed: {str(e)}")
     
     def _find_closest_named_color(self, hex_color: str) -> Optional[str]:
