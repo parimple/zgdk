@@ -66,8 +66,17 @@ jobs:
           echo "prefix: ','" >> config.yml
           echo "channels: {}" >> config.yml
           
-          # Run tests
+          # Run tests with coverage
           python -m pytest tests/ -v --cov=cogs --cov=core --cov=utils --cov-report=xml --cov-report=term || true
+          
+          # Check if coverage file exists
+          if [ -f coverage.xml ]; then
+            echo "Coverage file generated successfully"
+          else
+            echo "Warning: Coverage file not generated"
+            # Create empty coverage file to prevent upload errors
+            echo '<?xml version="1.0" ?><coverage></coverage>' > coverage.xml
+          fi
         continue-on-error: true  # Don't fail build on test failures for now
         
       - name: Upload test results
@@ -80,12 +89,13 @@ jobs:
             .coverage
           retention-days: 7
           
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+      # Codecov disabled until token is configured
+      # - name: Upload coverage
+      #   uses: codecov/codecov-action@v4
+      #   with:
+      #     file: ./coverage.xml
+      #     fail_ci_if_error: false
+      #     token: ${{ secrets.CODECOV_TOKEN }}
 
   build-and-push:
     name: Build and Push Docker Image

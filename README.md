@@ -152,3 +152,17 @@ The system status badge in this README shows the overall health of the system:
 - 🔴 **Down** - Critical services are down
 
 # Pipeline Test Sat 28 Jun 2025 07:51:53 PM UTC
+
+## CI/CD Configuration
+
+### Codecov Setup (Optional)
+To enable code coverage reporting:
+1. Go to [codecov.io](https://codecov.io)
+2. Sign in with GitHub
+3. Add the `zgdk` repository
+4. Copy the upload token
+5. Add it as a GitHub secret named `CODECOV_TOKEN`:
+   - Go to Settings → Secrets and variables → Actions
+   - Add new repository secret
+   - Name: `CODECOV_TOKEN`
+   - Value: Your token from Codecov
