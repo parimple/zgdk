@@ -79,7 +79,7 @@ class AgentBuilder:
             "agent": agent_file,
             "test": test_file,
             "k8s": k8s_files["deployment"],  # Return just the deployment file to match expected type
-            "docs": doc_file
+            "docs": doc_file,
         }
 
     def _generate_agent_code(self, name: str, config: AgentConfig) -> Path:
