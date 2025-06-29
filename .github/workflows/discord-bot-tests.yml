@@ -132,9 +132,9 @@ jobs:
           name: test-results
           path: |
             test_results.md
-          pytest-report.xml
-          coverage.xml
-        retention-days: 30
+            pytest-report.xml
+            coverage.xml
+          retention-days: 30
 
   security-scan:
     runs-on: ubuntu-latest
@@ -143,15 +143,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-    - name: Run security scan
-      continue-on-error: true
-      uses: github/super-linter@v5
-      env:
-        DEFAULT_BRANCH: main
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        VALIDATE_PYTHON_BLACK: false
-        VALIDATE_PYTHON_PYLINT: false
-        VALIDATE_DOCKERFILE: true
-        VALIDATE_YAML: true
-        VALIDATE_JSON: true
-        FILTER_REGEX_EXCLUDE: .*test.*|.*tests.*
+      - name: Run security scan
+        continue-on-error: true
+        uses: github/super-linter@v5
+        env:
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_PYTHON_BLACK: false
+          VALIDATE_PYTHON_PYLINT: false
+          VALIDATE_DOCKERFILE: true
+          VALIDATE_YAML: true
+          VALIDATE_JSON: true
+          FILTER_REGEX_EXCLUDE: .*test.*|.*tests.*
