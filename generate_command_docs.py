@@ -59,7 +59,7 @@ class CommandDocGenerator:
                         func_pattern = r"def\s+(\w+)\s*\(.*?\):"
                         func_matches = list(re.finditer(func_pattern, content[match.end() :]))
                         if func_matches:
-                            func_name = func_matches[0].group(1)
+                            func_matches[0].group(1)
 
                             # Try to extract parameters
                             func_start = match.end() + func_matches[0].start()

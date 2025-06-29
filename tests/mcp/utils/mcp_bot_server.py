@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Bot API configuration
-import os
+import os  # noqa: E402
 
 # Use command_tester API on port 8090 instead of owner_utils
 API_BASE_URL = os.getenv("API_BASE_URL", "http://app:8090")

@@ -11,7 +11,7 @@ sys.modules["utils.premium"] = MagicMock()
 sys.modules["core.interfaces.member_interfaces"] = MagicMock()
 sys.modules["datasources.queries"] = MagicMock()
 
-from cogs.commands.shop import ShopCog
+from cogs.commands.shop import ShopCog  # noqa: E402
 
 
 async def debug_test():
@@ -57,7 +57,7 @@ async def debug_test():
 
             from datasources.models.payment_data import PaymentData
 
-            payment_data = PaymentData(
+            PaymentData(
                 name=mock_ctx.author.display_name,
                 amount=500,
                 paid_at=datetime.now(timezone.utc),
@@ -70,7 +70,7 @@ async def debug_test():
                 print("Got database session")
 
                 print("3. Getting member service...")
-                member_service = await mock_bot.get_service("IMemberService", session)
+                await mock_bot.get_service("IMemberService", session)
                 print("Got member service")
 
                 print("4. Test finished - the issue is elsewhere")

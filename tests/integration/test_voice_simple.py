@@ -54,7 +54,7 @@ async def test_mock_cog():
 
     # Try to create cog (this will test imports)
     try:
-        cog = VoiceCog(bot)
+        VoiceCog(bot)
         print("✅ Voice cog created successfully!")
     except Exception as e:
         print(f"❌ Failed to create voice cog: {e}")

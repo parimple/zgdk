@@ -241,7 +241,6 @@ def test_command_name_and_description():
     """Test command name and description"""
     # Arrange
     command_name = "shop_force_check_roles"
-    description_keywords = ["force", "check", "roles", "premium"]
 
     # Act & Assert
     assert isinstance(command_name, str)

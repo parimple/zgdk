@@ -14,7 +14,7 @@ sys.modules["utils.permissions"] = MagicMock()
 sys.modules["core.interfaces.member_interfaces"] = MagicMock()
 sys.modules["datasources.queries"] = MagicMock()
 
-from cogs.commands.shop import ShopCog
+from cogs.commands.shop import ShopCog  # noqa: E402
 
 
 @pytest.mark.asyncio

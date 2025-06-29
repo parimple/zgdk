@@ -11,7 +11,7 @@ if "discord.ext.commands" in sys.modules:
     print(f"Cog: {getattr(cmd_mod, 'Cog', 'MISSING')}")
 
 # Install stub
-from tests.utils import install_commands_stub
+from tests.utils import install_commands_stub  # noqa: E402
 
 stub = install_commands_stub()
 
@@ -23,7 +23,7 @@ print(f"Same object? {stub is sys.modules['discord.ext.commands']}")
 
 # Try importing ShopCog
 print("\n=== IMPORTING SHOPCOG ===")
-from cogs.commands.shop import ShopCog
+from cogs.commands.shop import ShopCog  # noqa: E402
 
 print(f"ShopCog: {ShopCog}")
 print(f"ShopCog.__bases__: {ShopCog.__bases__}")

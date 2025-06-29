@@ -297,7 +297,7 @@ async def test_giveawayr_three_roles_combination(
     # Arrange
     mock_admin_context.guild = mock_guild_with_members
 
-    with patch("discord.utils.get") as mock_discord_get, patch("random.choice") as mock_random:
+    with patch("discord.utils.get") as mock_discord_get, patch("random.choice"):
 
         mock_discord_get.return_value = mock_admin_context.author.roles[0]
 

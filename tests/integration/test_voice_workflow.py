@@ -10,8 +10,8 @@ from tests.base.base_command_test import BaseCommandTest
 from tests.config import TEST_USER_ID
 
 pytest_plugins = ("pytest_asyncio",)
-from tests.utils.assertions import VoiceAssertions
-from tests.utils.client import TestClient
+from tests.utils.assertions import VoiceAssertions  # noqa: E402
+from tests.utils.client import TestClient  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

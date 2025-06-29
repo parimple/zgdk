@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 sys.modules["core.interfaces.member_interfaces"] = MagicMock()
 
 # Now import
-from core.interfaces.member_interfaces import IMemberService
+from core.interfaces.member_interfaces import IMemberService  # noqa: E402
 
 print(f"IMemberService: {IMemberService}")
 print(f"IMemberService type: {type(IMemberService)}")

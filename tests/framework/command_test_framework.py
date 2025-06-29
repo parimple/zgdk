@@ -305,7 +305,7 @@ class BumpCommandTest(CommandTestCase):
 
     async def test_bump_success(self):
         """Test successful bump execution."""
-        result = await self.assert_command_success("bump", expected_response="Status")
+        await self.assert_command_success("bump", expected_response="Status")
         print("✅ Bump command executed successfully")
 
     async def test_bump_cooldown(self):
@@ -339,7 +339,7 @@ class ShopCommandTest(CommandTestCase):
 
     async def test_shop_display(self):
         """Test shop display."""
-        result = await self.assert_command_success("shop", expected_response="Shop")
+        await self.assert_command_success("shop", expected_response="Shop")
         print("✅ Shop displays correctly")
 
     async def test_buy_item(self):

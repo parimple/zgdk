@@ -151,19 +151,11 @@ def mock_service_manager():
     premium_service.has_premium_role = AsyncMock(return_value=True)
 
     activity_service = AsyncMock()
-    moderation_service = AsyncMock()
-    invite_service = AsyncMock()
-    notification_service = AsyncMock()
+    AsyncMock()
+    AsyncMock()
+    AsyncMock()
 
     # Map service interfaces to implementations
-    service_map = {
-        "IMemberService": member_service,
-        "IPremiumService": premium_service,
-        "IActivityService": activity_service,
-        "IModerationService": moderation_service,
-        "IInviteService": invite_service,
-        "INotificationService": notification_service,
-    }
 
     async def get_service(interface, session=None):
         # Simple interface matching - just return member_service for any interface containing "Member"

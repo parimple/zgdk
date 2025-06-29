@@ -14,7 +14,7 @@ sys.modules["utils.permissions"] = MagicMock()
 sys.modules["core.interfaces.member_interfaces"] = MagicMock()
 sys.modules["datasources.queries"] = MagicMock()
 
-import types
+import types  # noqa: E402
 
 # Mock utils.premium but allow PaymentData import
 
@@ -40,7 +40,7 @@ mock_utils.PremiumManager = MagicMock()
 mock_utils.TipplyDataProvider = MagicMock()
 sys.modules["utils"] = mock_utils
 
-from cogs.commands.shop import ShopCog
+from cogs.commands.shop import ShopCog  # noqa: E402
 
 
 @pytest.mark.asyncio

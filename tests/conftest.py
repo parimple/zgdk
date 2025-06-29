@@ -118,8 +118,8 @@ mock_premium.TipplyDataProvider = MagicMock()
 sys.modules["utils.premium"] = mock_premium
 
 # Now safe to import
-import discord
-import pytest
+import discord  # noqa: E402
+import pytest  # noqa: E402
 
 # Import fixture modules
 from tests.fixtures.database_fixtures import *  # noqa

@@ -11,11 +11,11 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from core.ai.color_parser import ColorParser
-from core.ai.command_classifier import CommandIntentClassifier
+from core.ai.color_parser import ColorParser  # noqa: E402
+from core.ai.command_classifier import CommandIntentClassifier  # noqa: E402
 
 # Import AI modules
-from core.ai.duration_parser import DurationParser
+from core.ai.duration_parser import DurationParser  # noqa: E402
 
 
 async def test_duration_parser():

@@ -50,7 +50,7 @@ permissions_mock.is_zagadka_owner = is_zagadka_owner
 permissions_mock.is_admin = is_admin
 sys.modules["utils.permissions"] = permissions_mock
 
-from tests.data.test_constants import (
+from tests.data.test_constants import (  # noqa: E402
     BOT_CONFIG,
     GUILD_ID,
     TEST_CHANNEL_ID,

@@ -156,7 +156,7 @@ def perform_maintenance() -> None:
     log_message("Starting error maintenance...")
 
     # 1. Clean up old sessions
-    removed = cleanup_old_sessions()
+    cleanup_old_sessions()
 
     # 2. Verify fixed errors
     verification = verify_fixed_errors()
