@@ -8,7 +8,13 @@ from typing import Optional
 
 import httpx
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
+
+try:
+    from playwright.async_api import async_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    async_playwright = None
 
 from core.interfaces.premium_interfaces import IPaymentProcessor, PaymentData
 from core.repositories.premium_repository import PaymentRepository
@@ -72,6 +78,10 @@ class PaymentProcessorService(BaseService, IPaymentProcessor):
 
     async def _fetch_payments_via_browser(self) -> list[PaymentData]:
         """Fetch payments using browser automation (fallback)."""
+        if not PLAYWRIGHT_AVAILABLE:
+            self.logger.warning("Playwright not available, browser automation disabled")
+            return []
+            
         try:
             async with async_playwright() as playwright:
                 browser = await playwright.chromium.launch(
