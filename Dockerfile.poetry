@@ -1,0 +1,28 @@
+FROM python:3.10-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN pip install poetry==2.1.3
+
+# Set work directory
+WORKDIR /app
+
+# Copy Poetry files
+COPY pyproject.toml poetry.lock ./
+
+# Configure poetry
+RUN poetry config virtualenvs.create false
+
+# Install dependencies
+RUN poetry install --no-dev --no-interaction --no-ansi
+
+# Copy project files
+COPY . .
+
+# Run the bot
+CMD ["python", "main.py"]
