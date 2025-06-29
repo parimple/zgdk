@@ -6,7 +6,7 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from utils.message_sender import MessageSender
+from core.base_cog import ServiceCog
 from utils.moderation.mute_manager import MuteManager
 from utils.permissions import is_mod_or_admin
 
@@ -15,13 +15,12 @@ from .utils import parse_duration
 logger = logging.getLogger(__name__)
 
 
-class MuteCommands(commands.Cog):
+class MuteCommands(ServiceCog):
     """Commands for muting and unmuting users."""
 
     def __init__(self, bot):
         """Initialize mute commands."""
-        self.bot = bot
-        self.message_sender = MessageSender(bot)
+        super().__init__(bot)
         self.mute_manager = MuteManager(bot)
         self.parse_duration = parse_duration
 
@@ -29,13 +28,13 @@ class MuteCommands(commands.Cog):
         """Display help for group commands with premium info."""
         base_text = "Użyj jednej z podkomend: nick, img, txt, live, rank"
 
-        # Add premium info
-        _, premium_text = self.message_sender._get_premium_text(ctx)
-        if premium_text:
-            base_text = f"{base_text}\n{premium_text}"
+        # Add premium info if using old message sender
+        if hasattr(self.message_sender, '_get_premium_text'):
+            _, premium_text = self.message_sender._get_premium_text(ctx)
+            if premium_text:
+                base_text = f"{base_text}\n{premium_text}"
 
-        embed = self.message_sender._create_embed(description=base_text, ctx=ctx)
-        await self.message_sender._send_embed(ctx, embed, reply=True)
+        await self.send_info(ctx, f"Pomoc - {command_name}", base_text)
         logger.debug(f"Sent subcommand help for {command_name}")
 
     @commands.hybrid_group(name="mute", description="Komendy związane z wyciszaniem użytkowników.")

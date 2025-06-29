@@ -8,20 +8,19 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.commands.premium.utils import emoji_to_icon, emoji_validator
+from core.base_cog import ServiceCog
 from core.interfaces.premium_interfaces import IPremiumService
 from core.interfaces.role_interfaces import IRoleService
-from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
 
 
-class TeamManagementCommands:
+class TeamManagementCommands(ServiceCog):
     """Team creation and management commands."""
 
     def __init__(self, bot):
         """Initialize team management commands."""
-        self.bot = bot
-        self.message_sender = MessageSender(bot)
+        super().__init__(bot)
 
         # Team configuration
         team_config = self.bot.config.get("team", {})
@@ -90,8 +89,6 @@ class TeamManagementCommands:
         self, ctx, description: str, color: int = 0x00FF00, title: str = "Team Management"
     ) -> Optional[discord.Message]:
         """Send an embed message with premium information if applicable."""
-        embed = discord.Embed(title=f"{self.team_symbol} {title}", description=description, color=color)
-
         # Add premium information if user doesn't have premium
         premium_text = ""
         async with self.bot.get_db() as session:
@@ -103,10 +100,27 @@ class TeamManagementCommands:
                 if not has_premium:
                     premium_text = "\n\n💎 **Funkcja Premium**\nDostępna dla: <@&1027629813788106814>, <@&1027629916951326761>, <@&1027630008227659826>"
 
-        if premium_text:
-            embed.description = description + premium_text
-
-        return await ctx.send(embed=embed)
+        final_description = description + premium_text if premium_text else description
+        
+        # Use service methods
+        embed_builder = await self.get_embed_builder()
+        message_service = await self.get_message_service()
+        
+        if embed_builder and message_service:
+            embed = discord.Embed(
+                title=f"{self.team_symbol} {title}",
+                description=final_description,
+                color=color
+            )
+            return await message_service.send_embed(ctx, embed)
+        else:
+            # Fallback to basic embed
+            embed = discord.Embed(
+                title=f"{self.team_symbol} {title}",
+                description=final_description,
+                color=color
+            )
+            return await ctx.send(embed=embed)
 
     @commands.group(invoke_without_command=True)
     async def team(self, ctx):

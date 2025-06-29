@@ -6,9 +6,9 @@ import discord
 from discord.ext.commands import Context
 
 from cogs.ui.shop_embeds import create_shop_embed
+from core.base_view import ServiceView
 from core.interfaces.premium_interfaces import IPremiumService
 from datasources.queries import MemberQueries
-from utils.message_sender import MessageSender
 from utils.premium_logic import PremiumRoleManager
 
 from .role_description_view import RoleDescriptionView
@@ -18,7 +18,7 @@ from .role_shop_helpers import RoleShopFormatting, RoleShopPricing
 logger = logging.getLogger(__name__)
 
 
-class RoleShopView(discord.ui.View):
+class RoleShopView(ServiceView):
     """View for displaying and handling the purchase of roles in the shop."""
 
     def __init__(
@@ -31,18 +31,15 @@ class RoleShopView(discord.ui.View):
         viewer: discord.Member = None,
         member: discord.Member = None,
     ):
-        super().__init__()
+        super().__init__(bot)
         self.ctx = ctx
         self.guild = bot.guild
-        self.bot = bot
         self.balance = balance
         self.page = page
         self.viewer = viewer
         self.member = member
         self.premium_roles = premium_roles
         self.premium_manager = PremiumRoleManager(bot, self.guild)
-        # Initialize MessageSender with bot instance for consistency
-        self.message_sender = MessageSender(bot)
 
         # Initialize purchase handler
         self.purchase_handler = RolePurchaseHandler(bot, self.guild, self.premium_manager)

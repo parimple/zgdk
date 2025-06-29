@@ -6,8 +6,8 @@ from datetime import datetime, timedelta, timezone
 import discord
 from discord.ext import commands
 
+from core.base_cog import ServiceCog
 from datasources.queries import MemberQueries
-from utils.message_sender import MessageSender
 
 from .constants import DISBOARD, DISCADIA, DISCORDSERVERS, DSME, DZIK
 from .handlers import DisboardHandler, DiscadiaHandler, DiscordServersHandler, DSMEHandler, DzikHandler
@@ -16,12 +16,11 @@ from .status import BumpStatusHandler
 logger = logging.getLogger(__name__)
 
 
-class OnBumpEvent(commands.Cog):
+class OnBumpEvent(ServiceCog):
     """Class for handling bump-related events."""
 
     def __init__(self, bot):
-        self.bot = bot
-        self.message_sender = MessageSender(bot)
+        super().__init__(bot)
 
         # Initialize handlers
         self.disboard_handler = DisboardHandler(bot, self.message_sender)
