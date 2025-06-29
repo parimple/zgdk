@@ -162,7 +162,7 @@ asyncio.run(main())
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)
             return self.container in result.stdout
-        except:
+        except Exception:
             return False
 
     def get_error_logs(self, lines: int = 30) -> List[str]:
@@ -178,7 +178,7 @@ asyncio.run(main())
                     errors.append(line.strip())
 
             return errors[-10:]  # Last 10 errors
-        except:
+        except Exception:
             return []
 
     def generate_report(self) -> str:

@@ -81,7 +81,7 @@ def load_existing_errors() -> Dict[str, List[Dict]]:
         try:
             with open(ERROR_LOG_FILE, "r") as f:
                 return json.load(f)
-        except:
+        except Exception:
             return {}
     return {}
 
@@ -93,7 +93,7 @@ def load_fixed_errors() -> Set[str]:
             with open(FIXED_ERRORS_FILE, "r") as f:
                 data = json.load(f)
                 return set(data.get("fixed_errors", []))
-        except:
+        except Exception:
             return set()
     return set()
 

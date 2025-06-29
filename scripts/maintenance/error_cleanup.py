@@ -30,7 +30,7 @@ def load_errors() -> Dict[str, List[Dict]]:
         try:
             with open(ERROR_LOG_FILE, "r") as f:
                 return json.load(f)
-        except:
+        except Exception:
             return {}
     return {}
 
@@ -42,7 +42,7 @@ def load_fixed_errors() -> Set[str]:
             with open(FIXED_ERRORS_FILE, "r") as f:
                 data = json.load(f)
                 return set(data.get("fixed_errors", []))
-        except:
+        except Exception:
             return set()
     return set()
 
@@ -59,7 +59,7 @@ def parse_session_timestamp(session_key: str) -> datetime:
         # Format: session_YYYYMMDD_HHMMSS
         timestamp_str = session_key.replace("session_", "")
         return datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
-    except:
+    except Exception:
         return datetime.now()
 
 
@@ -95,7 +95,7 @@ def verify_fixed_errors() -> Dict[str, bool]:
             ["docker-compose", "logs", "app", "--tail=100"], capture_output=True, text=True, timeout=10
         )
         current_logs = result.stdout
-    except:
+    except Exception:
         log_message("Failed to get Docker logs for verification")
         return {}
 

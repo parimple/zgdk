@@ -264,7 +264,7 @@ async def main():
             from core.config import config
 
             bot_token = config["discord"]["token"]
-        except:
+        except Exception:
             logger.error("Bot token not found in environment or config")
             return
 

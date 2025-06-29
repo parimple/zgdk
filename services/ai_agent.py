@@ -118,7 +118,7 @@ async def readiness_check():
     try:
         await service.redis_client.ping()
         return {"status": "ready"}
-    except:
+    except Exception:
         raise HTTPException(status_code=503, detail="Not ready")
 
 

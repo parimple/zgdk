@@ -111,7 +111,7 @@ class MigrationRunner:
             # Record failed migration
             try:
                 await conn.execute("INSERT INTO migrations (filename, success) VALUES ($1, $2)", filename, False)
-            except:
+            except Exception:
                 pass  # Don't fail if we can't record the failure
 
             return False
