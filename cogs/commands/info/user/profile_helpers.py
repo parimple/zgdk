@@ -23,7 +23,7 @@ async def get_profile_data(member: discord.Member, session, ctx: commands.Contex
         db_member = await MemberQueries.get_or_add_member(
             session, member.id, wallet_balance=0, joined_at=member.joined_at
         )
-        logger.info(f"Got db_member: {db_member.member_id if db_member else None}")
+        logger.info(f"Got db_member: {db_member.id if db_member else None}")
 
         # Get services
         logger.info("Getting services")
