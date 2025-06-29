@@ -25,12 +25,14 @@ from core.interfaces.permission_interfaces import IPermissionService
 from core.interfaces.premium_interfaces import IPaymentProcessor, IPremiumService
 from core.interfaces.role_interfaces import IRoleService
 from core.interfaces.team_interfaces import ITeamManagementService
+from core.interfaces.voice_interfaces import IVoiceChannelService, IAutoKickService
 from core.repositories.activity_repository import ActivityRepository
 from core.repositories.invite_repository import InviteRepository
 from core.repositories.member_repository import MemberRepository
 from core.repositories.moderation_repository import ModerationRepository
 from core.repositories.premium_repository import PaymentRepository, PremiumRepository
 from core.repositories.role_repository import RoleRepository
+from core.repositories.channel_repository import ChannelRepository
 from core.services.activity_tracking_service import ActivityTrackingService
 from core.services.currency_service import CurrencyService
 from core.services.embed_builder_service import EmbedBuilderService
@@ -43,6 +45,8 @@ from core.services.permission_service import PermissionService
 from core.services.premium_service import PremiumService
 from core.services.role_service import RoleService
 from core.services.team_management_service import TeamManagementService
+from core.services.voice_channel_service import VoiceChannelService
+from core.services.autokick_service import AutoKickService
 from datasources.models import Base
 from utils.health_check import HealthCheckServer
 from utils.premium import PaymentData
@@ -333,6 +337,29 @@ class Zagadka(commands.Bot):
             # Create team management service
             team_service = TeamManagementService(bot=self, unit_of_work=unit_of_work)
             return team_service
+
+        elif service_type == IVoiceChannelService:
+            # Create repository with session
+            channel_repository = ChannelRepository(session)
+            # Create unit of work
+            unit_of_work = self.service_container.create_unit_of_work(session)
+            # Create service with dependencies
+            return VoiceChannelService(
+                channel_repository=channel_repository,
+                bot=self,
+                unit_of_work=unit_of_work
+            )
+
+        elif service_type == IAutoKickService:
+            # Create repository with session
+            channel_repository = ChannelRepository(session)
+            # Create unit of work
+            unit_of_work = self.service_container.create_unit_of_work(session)
+            # Create service with dependencies
+            return AutoKickService(
+                channel_repository=channel_repository,
+                unit_of_work=unit_of_work
+            )
 
         # For other services, use the container
         return self.service_container.get_service(service_type)

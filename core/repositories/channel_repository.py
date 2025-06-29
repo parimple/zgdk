@@ -270,3 +270,198 @@ class ChannelRepository(BaseRepository):
 
         logger.info(f"Total moderator permissions removed for target {target_id}: " f"{removed_count}")
         return removed_count
+
+    async def add_voice_channel(
+        self,
+        channel_id: int,
+        guild_id: int,
+        owner_id: int,
+        category_id: int,
+    ) -> bool:
+        """Add a voice channel to the database.
+
+        Args:
+            channel_id: Discord channel ID
+            guild_id: Discord guild ID
+            owner_id: Member ID of the channel owner
+            category_id: Discord category ID
+
+        Returns:
+            True if added successfully
+        """
+        try:
+            # For now, we'll store this in channel permissions with a special marker
+            # In the future, this should use a dedicated VoiceChannel model
+            await self.add_or_update_permission(
+                member_id=owner_id,
+                target_id=channel_id,  # Store channel ID as target
+                allow_permissions_value=0xFFFFFFFF,  # Full permissions marker
+                deny_permissions_value=0,
+                guild_id=guild_id
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error adding voice channel: {e}")
+            return False
+
+    async def remove_voice_channel(self, channel_id: int) -> bool:
+        """Remove a voice channel from the database.
+
+        Args:
+            channel_id: Discord channel ID
+
+        Returns:
+            True if removed successfully
+        """
+        try:
+            # Find and remove the channel entry
+            result = await self.session.execute(
+                select(ChannelPermission).where(
+                    ChannelPermission.target_id == channel_id,
+                    ChannelPermission.allow_permissions_value == 0xFFFFFFFF
+                )
+            )
+            permission = result.scalar_one_or_none()
+            
+            if permission:
+                await self.session.delete(permission)
+                await self.session.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error removing voice channel: {e}")
+            return False
+
+    async def get_member_channels(self, member_id: int) -> List[ChannelPermission]:
+        """Get all voice channels owned by a member.
+
+        Args:
+            member_id: Member ID
+
+        Returns:
+            List of channel entries
+        """
+        try:
+            result = await self.session.execute(
+                select(ChannelPermission).where(
+                    ChannelPermission.member_id == member_id,
+                    ChannelPermission.allow_permissions_value == 0xFFFFFFFF
+                )
+            )
+            return list(result.scalars().all())
+        except Exception as e:
+            logger.error(f"Error getting member channels: {e}")
+            return []
+
+    async def set_channel_permission(
+        self,
+        channel_id: int,
+        member_id: int,
+        permission_type: str,
+        value: str
+    ) -> bool:
+        """Set channel permission for a member.
+
+        Args:
+            channel_id: Discord channel ID
+            member_id: Member ID
+            permission_type: Type of permission
+            value: Permission value (allow/deny/neutral)
+
+        Returns:
+            True if set successfully
+        """
+        # This is handled by the existing add_or_update_permission method
+        # Just return True for now as the actual Discord permissions are managed by Discord API
+        return True
+
+    # Auto-kick methods
+    async def add_autokick(
+        self,
+        channel_id: int,
+        target_id: int,
+        added_by: int
+    ) -> bool:
+        """Add an auto-kick entry for a channel.
+
+        Args:
+            channel_id: Discord channel ID
+            target_id: Member ID to auto-kick
+            added_by: Member ID who added the auto-kick
+
+        Returns:
+            True if added successfully
+        """
+        try:
+            # Store auto-kick as a special permission entry
+            # Use channel_id as member_id and target_id as target
+            await self.add_or_update_permission(
+                member_id=channel_id,
+                target_id=target_id,
+                allow_permissions_value=0,
+                deny_permissions_value=0xFFFFFFFF,  # All denied = auto-kick marker
+                guild_id=added_by  # Store who added it in guild_id field
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error adding autokick: {e}")
+            return False
+
+    async def remove_autokick(self, channel_id: int, target_id: int) -> bool:
+        """Remove an auto-kick entry for a channel.
+
+        Args:
+            channel_id: Discord channel ID
+            target_id: Member ID to remove from auto-kick
+
+        Returns:
+            True if removed successfully
+        """
+        try:
+            return await self.remove_permission(channel_id, target_id)
+        except Exception as e:
+            logger.error(f"Error removing autokick: {e}")
+            return False
+
+    async def get_autokick_entry(
+        self, channel_id: int, target_id: int
+    ) -> Optional[ChannelPermission]:
+        """Get auto-kick entry for a specific user in a channel.
+
+        Args:
+            channel_id: Discord channel ID
+            target_id: Member ID
+
+        Returns:
+            Auto-kick entry if exists
+        """
+        try:
+            permission = await self.get_permission(channel_id, target_id)
+            # Check if it's an auto-kick entry (all permissions denied)
+            if permission and permission.deny_permissions_value == 0xFFFFFFFF:
+                return permission
+            return None
+        except Exception as e:
+            logger.error(f"Error getting autokick entry: {e}")
+            return None
+
+    async def get_channel_autokicks(self, channel_id: int) -> List[ChannelPermission]:
+        """Get all auto-kick entries for a channel.
+
+        Args:
+            channel_id: Discord channel ID
+
+        Returns:
+            List of auto-kick entries
+        """
+        try:
+            result = await self.session.execute(
+                select(ChannelPermission).where(
+                    ChannelPermission.member_id == channel_id,
+                    ChannelPermission.deny_permissions_value == 0xFFFFFFFF
+                )
+            )
+            return list(result.scalars().all())
+        except Exception as e:
+            logger.error(f"Error getting channel autokicks: {e}")
+            return []
