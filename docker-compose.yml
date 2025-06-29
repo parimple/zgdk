@@ -40,7 +40,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     # Temporarily disabled pg_log mount due to permission issues
-    #- ./pg_log:/var/lib/postgresql/data/pg_log
+    # - ./pg_log:/var/lib/postgresql/data/pg_log
     # command: ["postgres", "-c", "logging_collector=on", "-c", "log_min_messages=warning",
     #          "-c", "log_directory=pg_log", "-c", "log_filename=postgresql-%Y-%m-%d.log"]
 

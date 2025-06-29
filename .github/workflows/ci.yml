@@ -90,8 +90,8 @@ jobs:
           retention-days: 7
 
       # Codecov disabled until token is configured
-      #- name: Upload coverage
-      #  uses: codecov/codecov-action@v4
+      # - name: Upload coverage
+      #   uses: codecov/codecov-action@v4
       #   with:
       #     file: ./coverage.xml
       #     fail_ci_if_error: false

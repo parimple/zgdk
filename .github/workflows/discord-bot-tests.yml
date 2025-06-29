@@ -92,7 +92,7 @@ jobs:
           POSTGRES_DB: postgres_test
           POSTGRES_PORT: 5432
           ZAGADKA_TOKEN: test_token_for_ci
-          run: |
+        run: |
           python -m pytest tests/ -v --tb=short || true
 
       - name: Run linting
