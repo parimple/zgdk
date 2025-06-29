@@ -68,6 +68,10 @@ jobs:
           # Try both docker compose and docker-compose commands
           docker_compose_valid = False
           try:
+              # Create empty .env file if it doesn't exist
+              if not os.path.exists('.env'):
+                  open('.env', 'w').close()
+              
               # Try new syntax first
               if os.system('docker compose config > /dev/null 2>&1') == 0:
                   docker_compose_valid = True
