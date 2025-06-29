@@ -3,7 +3,7 @@ replicaCount: 2
 
 image:
   repository: ppyzel/zgdk
-  tag: main-3e866f0
+  tag: main-907df43
   pullPolicy: IfNotPresent
 
 agents:
