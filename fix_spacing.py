@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Script to fix spacing issues (E302, E306, E402, E128)."""
 
-import re
 from pathlib import Path
 
 
@@ -66,7 +65,7 @@ def main():
     # Fix E306 error
     if Path("tests/utils/commands_stub.py").exists():
         if fix_e306("tests/utils/commands_stub.py", 96):
-            print(f"Fixed E306 in tests/utils/commands_stub.py:96")
+            print("Fixed E306 in tests/utils/commands_stub.py:96")
             fixed_count += 1
 
     print(f"\nFixed {fixed_count} spacing issues")

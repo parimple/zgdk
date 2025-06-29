@@ -11,7 +11,6 @@ from cogs.commands.premium.utils import emoji_to_icon, emoji_validator
 from core.interfaces.premium_interfaces import IPremiumService
 from core.interfaces.role_interfaces import IRoleService
 from utils.message_sender import MessageSender
-from utils.permissions import is_zagadka_owner
 
 logger = logging.getLogger(__name__)
 

@@ -108,7 +108,6 @@ class ColorParser:
         # Additional colors - Polish
         "cyjan": "#00FFFF",
         "turkusowy": "#40E0D0",
-        "magenta": "#FF00FF",
         "limonkowy": "#00FF00",
         "granatowy": "#000080",
         "morski": "#008080",

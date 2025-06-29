@@ -188,7 +188,7 @@ class PermissionCommands:
             for target_obj, overwrite in voice_channel.overwrites.items():
                 if isinstance(target_obj, discord.Member):
                     if overwrite.manage_messages is True:
-                        if not (overwrite.priority_speaker is True):
+                        if overwrite.priority_speaker is not True:
                             current_mods.append(target_obj)
 
             if len(current_mods) >= mod_limit:

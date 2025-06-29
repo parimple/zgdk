@@ -326,7 +326,7 @@ class OnPaymentEvent(commands.Cog):
                             # Add original amount to wallet and don't process legacy conversion
                             member_service = await self.bot.get_service(IMemberService, session)
                             db_member = await member_service.get_or_create_member(member)
-                            updated_member = await member_service.update_member_info(
+                            await member_service.update_member_info(
                                 db_member, wallet_balance=db_member.wallet_balance + original_amount
                             )
                             await session.flush()
@@ -384,7 +384,7 @@ class OnPaymentEvent(commands.Cog):
                                     # Add original amount to wallet instead
                                     member_service = await self.bot.get_service(IMemberService, session)
                                     db_member = await member_service.get_or_create_member(member)
-                                    updated_member = await member_service.update_member_info(
+                                    await member_service.update_member_info(
                                         db_member, wallet_balance=db_member.wallet_balance + original_amount
                                     )
                                     await session.flush()
@@ -471,7 +471,7 @@ class OnPaymentEvent(commands.Cog):
                                 if amount_to_add > 0:
                                     member_service = await self.bot.get_service(IMemberService, session)
                                     db_member = await member_service.get_or_create_member(member)
-                                    updated_member = await member_service.update_member_info(
+                                    await member_service.update_member_info(
                                         db_member, wallet_balance=db_member.wallet_balance + amount_to_add
                                     )
                                     await session.flush()

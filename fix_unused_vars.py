@@ -18,7 +18,7 @@ def fix_unused_variable(file_path, line_num, var_name):
             patterns = [
                 (rf"\b{var_name}\s*=", f"_{var_name} ="),
                 (rf"for\s+{var_name}\s+in", f"for _{var_name} in"),
-                (rf"except\s+.*\s+as\s+{var_name}:", f"except Exception:"),  # For except clauses
+                (rf"except\s+.*\s+as\s+{var_name}:", "except Exception:"),  # For except clauses
             ]
 
             new_line = line

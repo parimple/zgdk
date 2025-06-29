@@ -64,22 +64,21 @@ class AIModerationCommands(commands.Cog):
                 user = message.author
 
             # Build user context
-            async with self.bot.get_db() as session:
-                # Get user moderation history from database
-                # This is simplified - would need actual queries
-                user_context = UserContext(
-                    user_id=str(user.id),
-                    username=str(user),
-                    join_date=user.joined_at or datetime.utcnow(),
-                    previous_violations=0,  # Would fetch from DB
-                    previous_warnings=0,
-                    previous_mutes=0,
-                    previous_bans=0,
-                    is_new_user=(datetime.utcnow() - (user.joined_at or datetime.utcnow())).days < 7,
-                    is_repeat_offender=False,  # Would check DB
-                    recent_messages=[],  # Would fetch recent messages
-                    roles=[role.name for role in user.roles],
-                )
+            # Get user moderation history from database
+            # This is simplified - would need actual queries
+            user_context = UserContext(
+                user_id=str(user.id),
+                username=str(user),
+                join_date=user.joined_at or datetime.utcnow(),
+                previous_violations=0,  # Would fetch from DB
+                previous_warnings=0,
+                previous_mutes=0,
+                previous_bans=0,
+                is_new_user=(datetime.utcnow() - (user.joined_at or datetime.utcnow())).days < 7,
+                is_repeat_offender=False,  # Would check DB
+                recent_messages=[],  # Would fetch recent messages
+                roles=[role.name for role in user.roles],
+            )
 
             # Analyze the message
             result = await self.assistant.analyze_message(

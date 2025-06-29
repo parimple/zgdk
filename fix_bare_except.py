@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Script to fix bare except clauses (E722)."""
 
-import ast
 import re
 from pathlib import Path
 
