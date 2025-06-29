@@ -10,7 +10,14 @@ import os
 import signal
 from typing import Optional
 
-from playwright.async_api import Browser, Page, async_playwright
+try:
+    from playwright.async_api import Browser, Page, async_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    Browser = None
+    Page = None
+    async_playwright = None
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +31,8 @@ class BrowserManager:
 
     async def __aenter__(self):
         """Start browser with proper settings."""
+        if not PLAYWRIGHT_AVAILABLE:
+            raise ImportError("Playwright is not installed. Browser automation is disabled.")
         self._playwright = await async_playwright().start()
         self.browser = await self._playwright.chromium.launch(
             headless=True,

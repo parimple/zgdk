@@ -17,7 +17,12 @@ from sqlalchemy.exc import IntegrityError
 from core.interfaces.member_interfaces import IMemberService
 from core.interfaces.premium_interfaces import IPremiumService
 from core.repositories import PaymentRepository
-from utils.browser_manager import BrowserManager
+try:
+    from utils.browser_manager import BrowserManager
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    BrowserManager = None
+    PLAYWRIGHT_AVAILABLE = False
 
 TIPPLY_API_URL = (
     "https://widgets.tipply.pl/LATEST_MESSAGES/"
@@ -307,6 +312,10 @@ class TipplyDataProvider(DataProvider):
 
     async def fetch_payments(self) -> list[PaymentData]:
         """Fetch Payments from the Tipply widget"""
+        if not PLAYWRIGHT_AVAILABLE:
+            self.logger.warning("Playwright not available, cannot fetch Tipply payments")
+            return []
+            
         try:
             async with BrowserManager() as browser_manager:
                 page = await browser_manager.new_page()
