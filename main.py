@@ -19,18 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from core.containers.service_container import ServiceContainer
 from core.interfaces.activity_interfaces import IActivityTrackingService
 from core.interfaces.currency_interfaces import ICurrencyService
-from core.interfaces.member_interfaces import (
-    IActivityService,
-    IInviteService,
-    IMemberService,
-    IModerationService,
-)
-from core.interfaces.messaging_interfaces import (
-    IEmbedBuilder,
-    IMessageFormatter,
-    IMessageSender,
-    INotificationService,
-)
+from core.interfaces.member_interfaces import IActivityService, IInviteService, IMemberService, IModerationService
+from core.interfaces.messaging_interfaces import IEmbedBuilder, IMessageFormatter, IMessageSender, INotificationService
 from core.interfaces.permission_interfaces import IPermissionService
 from core.interfaces.premium_interfaces import IPaymentProcessor, IPremiumService
 from core.interfaces.role_interfaces import IRoleService

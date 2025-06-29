@@ -12,9 +12,7 @@ except ImportError:
     # Fallback to original if adapter not available
     from .autokick_queries import AutoKickQueries
 try:
-    from core.adapters.query_to_repository_adapter import (
-        ChannelPermissionQueriesAdapter as ChannelPermissionQueries,
-    )
+    from core.adapters.query_to_repository_adapter import ChannelPermissionQueriesAdapter as ChannelPermissionQueries
 except ImportError:
     # Fallback to original if adapter not available
     from .channel_queries import ChannelPermissionQueries
@@ -26,14 +24,10 @@ except ImportError:
 
 # Use adapters for migrated queries
 try:
-    from core.adapters.query_to_repository_adapter import (
-        HandledPaymentQueriesAdapter as HandledPaymentQueries,
-    )
+    from core.adapters.query_to_repository_adapter import HandledPaymentQueriesAdapter as HandledPaymentQueries
     from core.adapters.query_to_repository_adapter import MemberQueriesAdapter as MemberQueries
     from core.adapters.query_to_repository_adapter import MessageQueriesAdapter as MessageQueries
-    from core.adapters.query_to_repository_adapter import (
-        ModerationLogQueriesAdapter as ModerationLogQueries,
-    )
+    from core.adapters.query_to_repository_adapter import ModerationLogQueriesAdapter as ModerationLogQueries
     from core.adapters.query_to_repository_adapter import RoleQueriesAdapter as RoleQueries
 except ImportError:
     # Fallback to original if adapter not available

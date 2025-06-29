@@ -6,11 +6,7 @@ from typing import Optional
 
 import discord
 
-from core.interfaces.member_interfaces import (
-    IMemberRepository,
-    IModerationRepository,
-    IModerationService,
-)
+from core.interfaces.member_interfaces import IMemberRepository, IModerationRepository, IModerationService
 from core.services.base_service import BaseService
 from datasources.models import ModerationLog
 
