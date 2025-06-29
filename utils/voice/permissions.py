@@ -7,7 +7,7 @@ import discord
 from discord import PermissionOverwrite
 from discord.ext import commands
 
-from datasources.queries import ChannelPermissionQueries
+from core.repositories.channel_repository import ChannelRepository
 from utils.channel_permissions import ChannelPermissionManager
 from utils.message_sender import MessageSender
 
@@ -79,6 +79,23 @@ class BasePermissionCommand:
                 return
 
             permission_value = permission_value or "+"  # domyślnie dodajemy do listy
+            
+            # Try using new adapter if available
+            if hasattr(cog, 'voice_adapter'):
+                try:
+                    success = await cog.voice_adapter.autokick(ctx, target, permission_value)
+                    if success:
+                        # Send appropriate message
+                        if permission_value == "+":
+                            await cog.message_sender.send_autokick_added(ctx, target)
+                        else:
+                            await cog.message_sender.send_autokick_removed(ctx, target)
+                        self.logger.info(f"Used new adapter for autokick: {permission_value} {target}")
+                        return
+                except Exception as e:
+                    self.logger.warning(f"Failed to use voice adapter: {e}")
+            
+            # Fallback to old method
             if permission_value == "+":
                 await cog.autokick_manager.add_autokick(ctx, target)
             elif permission_value == "-":
@@ -617,25 +634,24 @@ class VoicePermissionManager:
 
         try:
             async with self.bot.get_db() as session:
+                channel_repo = ChannelRepository(session)
                 # Dla uprawnienia manage_messages, usuwamy z bazy gdy jest None
                 if permission_name == "manage_messages" and getattr(current_perms, "manage_messages", None) is None:
                     self.logger.info(f"Removing mod permissions from database for target={target.id}")
-                    await ChannelPermissionQueries.remove_permission(session, ctx.author.id, target.id)
+                    await channel_repo.remove_permission(ctx.author.id, target.id)
                 else:
                     # Dla wszystkich innych przypadków aktualizujemy uprawnienia
                     self.logger.info(
                         f"Updating permissions in database for target={target.id} "
                         f"with allow={allow_bits.value}, deny={deny_bits.value}"
                     )
-                    await ChannelPermissionQueries.add_or_update_permission(
-                        session,
+                    await channel_repo.add_or_update_permission(
                         ctx.author.id,
                         target.id,
                         allow_bits.value,
                         deny_bits.value,
                         ctx.guild.id,
                     )
-                await session.commit()
                 self.logger.info("Successfully committed database changes")
         except Exception as e:
             self.logger.error(f"Error in _update_channel_permission: {str(e)}", exc_info=True)
@@ -718,8 +734,9 @@ class VoicePermissionManager:
 
         # Dla kanałów prywatnych synchronizujemy uprawnienia z bazy
         async with self.bot.get_db() as session:
+            channel_repo = ChannelRepository(session)
             # Pobierz wszystkie uprawnienia z bazy dla tego właściciela
-            db_permissions = await ChannelPermissionQueries.get_permissions_for_member(session, ctx.author.id)
+            db_permissions = await channel_repo.get_permissions_for_member(ctx.author.id)
 
             # Dla każdego uprawnienia w bazie
             for perm in db_permissions:
@@ -768,7 +785,8 @@ class VoicePermissionManager:
         """
         remaining_overwrites = {}
         async with self.bot.get_db() as session:
-            member_permissions = await ChannelPermissionQueries.get_permissions_for_member(session, member_id, limit=95)
+            channel_repo = ChannelRepository(session)
+            member_permissions = await channel_repo.get_permissions_for_member(member_id, limit=95)
             self.logger.info(f"Found {len(member_permissions)} permissions in database for member {member_id}")
 
         for permission in member_permissions:

@@ -7,6 +7,7 @@ import random
 import discord
 from discord.ext import commands
 
+from core.adapters.voice_channel_adapter import VoiceChannelAdapter
 from utils.message_sender import MessageSender
 from utils.voice.autokick import AutoKickManager
 from utils.voice.permissions import VoicePermissionManager
@@ -32,6 +33,7 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         self.message_sender = MessageSender(bot)
         self.permission_manager = VoicePermissionManager(bot)
         self.autokick_manager = AutoKickManager(bot)
+        self.voice_adapter = VoiceChannelAdapter(bot)
 
         self.channels_create = self.bot.config["channels_create"]
         self.vc_categories = self.bot.config["vc_categories"]
@@ -163,12 +165,17 @@ class OnVoiceStateUpdateEvent(commands.Cog):
         if channel.id == self.bot.config["channels_voice"]["afk"]:
             return
 
-        # self.logger.info(f"Checking autokick for member {member.id} in channel {channel.id}")
-
-        # Check if member should be autokicked using AutoKickManager
+        # Try using the new service first
+        kicked = await self.voice_adapter.check_autokick(channel, member)
+        
+        if kicked:
+            self.metrics["autokicks_executed"] += 1
+            logger.info(f"Autokicked {member.display_name} using new service")
+            return
+            
+        # Fallback to old method for compatibility
         should_kick, matching_owners = await self.autokick_manager.check_autokick(member, channel)
-        # self.logger.info(f"Should kick member {member.id}: {should_kick}")
-
+        
         if should_kick and matching_owners:
             self.metrics["autokicks_queued"] += 1
             await self.autokick_queue.put((member, channel, matching_owners))
@@ -351,16 +358,30 @@ class OnVoiceStateUpdateEvent(commands.Cog):
                 logger.error(f"Failed to send channel creation info to existing channel: {e}", exc_info=True)
             return
 
-        # Utwórz nowy kanał
+        # Utwórz nowy kanał używając adaptera
         self.metrics["channels_created"] += 1
-        new_channel = await self.guild.create_voice_channel(
-            channel_name,
-            category=category,
-            bitrate=self.guild.bitrate_limit,
-            user_limit=user_limit,
-            overwrites=permission_overwrites,
-        )
-        logger.info(f"Created new channel: {channel_name} with limit={user_limit}")
+        
+        # Try to use the new service first
+        new_channel = await self.voice_adapter.create_voice_channel(member, category, channel_name)
+        
+        # Fallback to old method if service fails
+        if not new_channel:
+            new_channel = await self.guild.create_voice_channel(
+                channel_name,
+                category=category,
+                bitrate=self.guild.bitrate_limit,
+                user_limit=user_limit,
+                overwrites=permission_overwrites,
+            )
+            logger.info(f"Created new channel (fallback): {channel_name} with limit={user_limit}")
+        else:
+            logger.info(f"Created new channel (service): {channel_name}")
+            # Apply additional permissions if needed
+            if user_limit != 0:
+                await new_channel.edit(user_limit=user_limit)
+            if db_overwrites:
+                for target, overwrite in db_overwrites.items():
+                    await new_channel.set_permissions(target, overwrite=overwrite)
 
         # Move member to the new channel
         await member.move_to(new_channel)

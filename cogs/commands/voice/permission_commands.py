@@ -7,6 +7,7 @@ import discord
 from discord import Member
 from discord.ext import commands
 
+from core.adapters.voice_command_adapter import VoiceCommandAdapter
 from core.interfaces.premium_interfaces import IPremiumService
 from utils.database.voice_manager import DatabaseManager
 from utils.message_sender import MessageSender
@@ -32,6 +33,7 @@ class PermissionCommands:
         self.permission_checker = PermissionChecker(bot)
         self.autokick_manager = AutoKickManager(bot)
         self.premium_checker = PremiumChecker(bot)
+        self.voice_adapter = VoiceCommandAdapter(bot)
 
         # Initialize permission command handlers
         self.speak_handler = BasePermissionCommand("speak", requires_owner=False)

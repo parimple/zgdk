@@ -5,7 +5,7 @@ import logging
 import discord
 from discord import Member, PermissionOverwrite
 
-from datasources.queries import ChannelPermissionQueries
+from core.repositories.channel_repository import ChannelRepository
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,8 @@ class ChannelPermissionManager:
 
         # Remove permissions from database
         async with self.bot.get_db() as session:
-            await ChannelPermissionQueries.remove_permission(session, owner.id, target.id)
+            channel_repo = ChannelRepository(session)
+            await channel_repo.remove_permission(owner.id, target.id)
 
     async def reset_channel_permissions(self, channel: discord.VoiceChannel, owner: Member):
         """
@@ -92,7 +93,8 @@ class ChannelPermissionManager:
 
         # Clear database permissions for this channel owner
         async with self.bot.get_db() as session:
-            await ChannelPermissionQueries.remove_all_permissions(session, owner.id)
+            channel_repo = ChannelRepository(session)
+            await channel_repo.remove_all_permissions(owner.id)
 
     async def add_db_overwrites_to_permissions(
         self, guild: discord.Guild, member_id: int, permission_overwrites: dict
@@ -110,7 +112,8 @@ class ChannelPermissionManager:
         """
         remaining_overwrites = {}
         async with self.bot.get_db() as session:
-            member_permissions = await ChannelPermissionQueries.get_permissions_for_member(session, member_id, limit=95)
+            channel_repo = ChannelRepository(session)
+            member_permissions = await channel_repo.get_permissions_for_member(member_id, limit=95)
             self.logger.info(f"Found {len(member_permissions)} permissions in database for member {member_id}")
 
         for permission in member_permissions:

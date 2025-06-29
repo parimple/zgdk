@@ -7,6 +7,7 @@ import discord
 from discord import Member
 from discord.ext import commands
 
+from core.adapters.voice_command_adapter import VoiceCommandAdapter
 from utils.database.voice_manager import DatabaseManager
 from utils.message_sender import MessageSender
 from utils.premium_checker import PremiumChecker
@@ -28,6 +29,7 @@ class ChannelCommands:
         self.db_manager = DatabaseManager(bot)
         self.permission_checker = PermissionChecker(bot)
         self.premium_checker = PremiumChecker(bot)
+        self.voice_adapter = VoiceCommandAdapter(bot)
 
     @commands.hybrid_command(aliases=["j"])
     @commands.has_permissions(administrator=True)

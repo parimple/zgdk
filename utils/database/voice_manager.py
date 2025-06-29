@@ -7,7 +7,7 @@ import discord
 from discord import Permissions
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from datasources.queries import ChannelPermissionQueries
+from core.repositories.channel_repository import ChannelRepository
 
 logger = logging.getLogger(__name__)
 
@@ -55,19 +55,22 @@ class DatabaseManager:
             return
 
         try:
+            channel_repo = ChannelRepository(session)
             if update_db == "+":
                 self.logger.info(f"Adding/updating permission: member_id={member_id}, target_id={target_id}")
-                await ChannelPermissionQueries.add_or_update_permission(
-                    session,
+                # Note: add_or_update_permission needs guild_id parameter
+                # For now, pass 0 as we don't have guild_id in this context
+                await channel_repo.add_or_update_permission(
                     member_id,
                     target_id,
                     allow_permissions_value,
                     deny_permissions_value,
+                    guild_id=0,  # TODO: Pass actual guild_id
                 )
                 self.logger.info("Permission successfully added/updated in database")
             elif update_db == "-":
                 self.logger.info(f"Removing permission: member_id={member_id}, target_id={target_id}")
-                await ChannelPermissionQueries.remove_permission(session, member_id, target_id)
+                await channel_repo.remove_permission(member_id, target_id)
                 self.logger.info("Permission successfully removed from database")
         except Exception as e:
             self.logger.error(f"Error updating permission in database: {str(e)}", exc_info=True)
@@ -77,7 +80,8 @@ class DatabaseManager:
         """Retrieves permissions for a member from the database."""
         self.logger.info(f"Retrieving permissions for member_id={member_id}")
         try:
-            permissions = await ChannelPermissionQueries.get_permissions_for_member(session, member_id)
+            channel_repo = ChannelRepository(session)
+            permissions = await channel_repo.get_permissions_for_member(member_id)
             self.logger.info(f"Retrieved {len(permissions) if permissions else 0} permissions for member")
             return permissions
         except Exception as e:
