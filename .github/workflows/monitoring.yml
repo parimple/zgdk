@@ -48,7 +48,8 @@ jobs:
               'config.yml',
               'pyproject.toml',
               'docker-compose.yml',
-              'docker/app/Dockerfile'
+              'docker/app/Dockerfile',
+              'healthcheck.py'
           ]
 
           all_files_exist = True
