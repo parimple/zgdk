@@ -3,7 +3,7 @@ replicaCount: 2
 
 image:
   repository: ppyzel/zgdk
-  tag: main-b737f70
+  tag: main-64ddac9
   pullPolicy: IfNotPresent
 
 agents:
