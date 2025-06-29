@@ -24,7 +24,7 @@ services:
       retries: 3
       start_period: 60s
     restart: unless-stopped
-    
+
   db:
     image: postgres:15.2
     environment:

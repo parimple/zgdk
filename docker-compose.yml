@@ -2,7 +2,7 @@ version: "3.9"
 services:
   app:
     image: ppyzel/zgdk:latest
-    # build: 
+    # build:
     #   context: .
     #   dockerfile: docker/app/Dockerfile
     command: python main.py

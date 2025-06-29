@@ -7,7 +7,7 @@ services:
       - "8090:8090"  # Command Tester API port
     environment:
       - TEST_WEBHOOK_URL=https://discord.com/api/webhooks/1388092789958508605/DeDpEp0mnXu8P5d6mzQDae80-fbHMBkVBqRL8kXKOodmCp_Nz1s1sRXST4coI6S6Q4cK
-      
+
   mcp:
     build:
       context: .

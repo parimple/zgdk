@@ -21,7 +21,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:15
@@ -36,22 +36,22 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov
-          
+
       - name: Run tests
         env:
           POSTGRES_USER: postgres
@@ -65,10 +65,10 @@ jobs:
           echo "guild_id: 123456789" > config.yml
           echo "prefix: ','" >> config.yml
           echo "channels: {}" >> config.yml
-          
+
           # Run tests with coverage
           python -m pytest tests/ -v --cov=cogs --cov=core --cov=utils --cov-report=xml --cov-report=term || true
-          
+
           # Check if coverage file exists
           if [ -f coverage.xml ]; then
             echo "Coverage file generated successfully"
@@ -78,7 +78,7 @@ jobs:
             echo '<?xml version="1.0" ?><coverage></coverage>' > coverage.xml
           fi
         continue-on-error: true  # Don't fail build on test failures for now
-        
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -88,7 +88,7 @@ jobs:
             coverage.xml
             .coverage
           retention-days: 7
-          
+
       # Codecov disabled until token is configured
       # - name: Upload coverage
       #   uses: codecov/codecov-action@v4
@@ -102,20 +102,20 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          
+
       - name: Generate metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -125,7 +125,7 @@ jobs:
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
-            
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -137,57 +137,57 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
-          
+
   update-helm-values:
     name: Update Helm Values
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN }}
-          
+
       - name: Update image tag in Helm values
         run: |
           # Get the short SHA
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           IMAGE_TAG="main-${SHORT_SHA}"
-          
+
           echo "Updating image tag to: ${IMAGE_TAG}"
-          
+
           # Check current values
           echo "Current values.yaml tag:"
           grep "tag:" helm/zgdk/values.yaml || true
-          
+
           echo "Current Chart.yaml appVersion:"
           grep "appVersion:" helm/zgdk/Chart.yaml || true
-          
+
           # Update the image tag in values.yaml
           sed -i "s/tag: .*/tag: ${IMAGE_TAG}/" helm/zgdk/values.yaml
-          
+
           # Update the appVersion in Chart.yaml
           sed -i "s/appVersion: .*/appVersion: \"${IMAGE_TAG}\"/" helm/zgdk/Chart.yaml
-          
+
           # Verify changes
           echo "Updated values.yaml tag:"
           grep "tag:" helm/zgdk/values.yaml || true
-          
+
           echo "Updated Chart.yaml appVersion:"
           grep "appVersion:" helm/zgdk/Chart.yaml || true
-          
+
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
+
           # Configure git to use HTTPS with PAT token
           git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}
-          
+
           git add helm/zgdk/values.yaml helm/zgdk/Chart.yaml
-          
+
           # Check if there are changes to commit
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -195,30 +195,30 @@ jobs:
             git commit -m "chore: update image tag to main-${GITHUB_SHA:0:7} [skip ci]"
             git push origin HEAD:main
           fi
-          
+
   helm-lint:
     name: Helm Chart Validation
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
           version: 'v3.13.0'
-          
+
       - name: Add Helm repositories
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm repo update
-          
+
       - name: Lint Helm chart
         run: |
           helm dependency update helm/zgdk
           helm lint helm/zgdk
-          
+
       - name: Template Helm chart
         run: |
           helm template zgdk helm/zgdk --values helm/zgdk/values.yaml

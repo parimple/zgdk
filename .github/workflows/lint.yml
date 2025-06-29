@@ -50,7 +50,7 @@ jobs:
       - name: Run MyPy
         run: |
           echo "🔎 Running MyPy type checker..."
-          mypy . --ignore-missing-imports --no-strict-optional || true
+          mypy . --ignore-missing-imports --no-strict-optional --explicit-package-bases || true
 
       - name: Lint YAML files
         run: |

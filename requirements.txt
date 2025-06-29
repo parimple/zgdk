@@ -48,3 +48,4 @@ watchdog==3.0.0
 # CrewAI with Gemini (no Anthropic API needed)
 # crewai==0.130.0  # Temporarily disabled - has many dependencies
 # faiss-cpu==1.7.4  # Temporarily disabled - depends on crewai
+types-redis==4.6.0.20240903

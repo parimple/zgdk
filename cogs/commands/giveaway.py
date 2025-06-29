@@ -21,7 +21,7 @@ class GiveawayCog(commands.Cog):
         self.message_sender = MessageSender()
 
     @commands.hybrid_command(aliases=["gws"])
-    @commands.has_permissions(administrator=True)
+    @app_commands.default_permissions(administrator=True)
     @discord.app_commands.describe(
         winners_count="Liczba wygranych do wylosowania",
         channel="Kanał z którego losować wiadomości (opcjonalnie)",

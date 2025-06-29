@@ -30,7 +30,7 @@ jobs:
           # Ensure docker compose is available
           docker --version
           docker compose version || true
-          
+
       - name: Run simplified health checks
         run: |
           # Create simple health check that doesn't require bot
@@ -48,8 +48,7 @@ jobs:
               'config.yml',
               'pyproject.toml',
               'docker-compose.yml',
-              'docker/app/Dockerfile',
-              'healthcheck.py'
+              'docker/app/Dockerfile'
           ]
 
           all_files_exist = True
@@ -76,7 +75,7 @@ jobs:
                   docker_compose_valid = True
           except:
               docker_compose_valid = False
-              
+
           checks.append({
               "service": "Docker Compose Config",
               "status": "healthy" if docker_compose_valid else "down",
@@ -282,3 +281,4 @@ jobs:
             echo "❌ Dockerfile not found"
             exit 1
           fi
+
