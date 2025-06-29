@@ -1,9 +1,10 @@
-"""Premium commands module for premium features like role colors."""
+"""Premium commands module for premium features like role colors and activity customization."""
 
 import logging
 
 from discord.ext import commands
 
+from .activity_customization import ActivityCustomization
 from .color_commands import ColorCommands
 
 logger = logging.getLogger(__name__)
@@ -31,3 +32,4 @@ class PremiumCog(ColorCommands):
 async def setup(bot: commands.Bot):
     """Setup function to add cog to bot."""
     await bot.add_cog(PremiumCog(bot))
+    await bot.add_cog(ActivityCustomization(bot))

@@ -209,7 +209,12 @@ class PremiumRoleManager:
         if not (MONTHLY_DURATION - 1 <= days_left <= MONTHLY_DURATION):
             return None
 
-        current_role_name = current_role.role.name
+        # Get role name - always use Discord to avoid lazy loading issues
+        role = member.guild.get_role(current_role.role_id)
+        if not role:
+            return None
+        current_role_name = role.name
+            
         if current_role_name in UPGRADE_PATHS:
             upgrade_info = UPGRADE_PATHS[current_role_name]
             if new_role_name in upgrade_info:

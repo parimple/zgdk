@@ -458,6 +458,25 @@ class Zagadka(commands.Bot):
             await self.tree.sync(guild=discord.Object(id=self.guild_id))
             logging.info("Slash commands synchronized")
 
+        # Setup test category if configured
+        if self.guild and self.config.get("test_category"):
+            try:
+                from utils.setup.test_category import TestCategorySetup
+                setup = TestCategorySetup(self)
+                await setup.setup_test_category(self.guild)
+                logging.info("Test category setup completed")
+                
+                # Setup performance monitoring for 100k+ users
+                from utils.monitoring.performance_monitor import PerformanceMonitor
+                self.performance_monitor = PerformanceMonitor(self)
+                # Set analytics channel if test channels were created
+                if "test_channels" in self.config and "analytics" in self.config["test_channels"]:
+                    self.performance_monitor.analytics_channel_id = self.config["test_channels"]["analytics"]
+                await self.performance_monitor.start()
+                logging.info("Performance monitoring started")
+            except Exception as e:
+                logging.error(f"Failed to setup test category: {e}", exc_info=True)
+
         logging.info("Ready")
 
     async def on_command_error(self, ctx, error):

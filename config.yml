@@ -41,6 +41,16 @@ channels:
   unmute_logs: 1379568677623562300  # Kanał do logowania odciszeń (unmute) - obecnie ten sam co mute_logs
   test_channel: 1387864734002446407  # Kanał do testowania komend
 
+# Kategoria testowa zaGadka
+test_category:
+  name: "🧪 zaGadka Testing"
+  channels:
+    commands: "zagadka-commands"     # Kanał do testowania komend
+    logs: "zagadka-logs"             # Logi bota
+    errors: "zagadka-errors"         # Błędy i wyjątki
+    analytics: "zagadka-analytics"   # Statystyki użycia
+    voice_create: "➕ Stwórz kanał"  # Kanał do tworzenia kanałów głosowych
+
 gifs:
   donation: "https://media1.tenor.com/m/tn_MOQB9pV4AAAAd/tony-tonylife.gif"
 
@@ -228,6 +238,31 @@ admin_roles:
 gender_roles:
   male: 960665311701528599  # ID roli mężczyzny
   female: 960665311701528600  # ID roli kobiety
+
+# Rangi za aktywność - domyślnie 2 proste rangi
+activity_ranks:
+  enabled: true
+  default_count: 2  # Domyślna liczba rang (bez premium)
+  max_count: 99     # Maksymalna liczba rang (z premium)
+  
+  # Domyślne rangi - proste numery, łatwe do zmiany przez admina
+  default_ranks:
+    - name: "1"
+      points_required: 1000
+      color: "#FFD700"  # Złoty
+    - name: "2" 
+      points_required: 5000
+      color: "#FF69B4"  # Różowy
+  
+  # Opcje premium dla personalizacji rang
+  premium_customization:
+    enabled: true
+    required_role: "zG500"  # Minimalna ranga premium do personalizacji
+    features:
+      - "Własne nazwy dla rang aktywności (1-99)"
+      - "Własne kolory dla każdej rangi"
+      - "Własne progi punktowe"
+      - "Emotki w nazwach rang"
 
 premium_roles:
   - name: "zG50"

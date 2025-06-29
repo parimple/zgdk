@@ -113,6 +113,29 @@ class OnPaymentEvent(commands.Cog):
                             logger.error("Error processing payment %s: %s", payment_data, str(e))
                             # Rollback the current transaction state
                             await session.rollback()
+                            
+                            # Still save the payment as handled to prevent reprocessing
+                            # This prevents the same failed payment from being processed repeatedly
+                            try:
+                                async with self.bot.get_db() as error_session:
+                                    payment_repo = PaymentRepository(error_session)
+                                    # Check if payment already exists
+                                    existing = await payment_repo.get_payment_by_name_and_amount(
+                                        payment_data.name, payment_data.amount
+                                    )
+                                    if not existing:
+                                        # Save with NULL member_id if user not found
+                                        await payment_repo.add_payment(
+                                            member_id=None,
+                                            name=payment_data.name,
+                                            amount=payment_data.amount,
+                                            paid_at=payment_data.paid_at,
+                                            payment_type=payment_data.payment_type
+                                        )
+                                        await error_session.commit()
+                                        logger.info(f"Saved failed payment to prevent reprocessing: {payment_data.name}")
+                            except Exception as save_error:
+                                logger.error(f"Failed to save error payment: {save_error}")
                             continue
 
                     logger.info("Finished processing all payments")
@@ -248,7 +271,13 @@ class OnPaymentEvent(commands.Cog):
                 )
                 embed.set_footer(text=f"ID Wpłaty: {payment_record.id}")
                 embed.timestamp = payment_data.paid_at
-                await channel.send(embed=embed)
+                # Ping owner only for unhandled payments that need manual intervention
+                owner_id = self.bot.config.get("owner_id")
+                owner = self.guild.get_member(owner_id) if self.guild else None
+                if owner:
+                    await channel.send(content=f"{owner.mention}", embed=embed)
+                else:
+                    await channel.send(embed=embed)
                 return
 
         # Ensure member exists in database before proceeding
@@ -362,9 +391,7 @@ class OnPaymentEvent(commands.Cog):
                                 )
                             )
 
-                            message = await channel.send(content=f"{member.mention}", embed=embed, view=view)
-                            if owner:
-                                await message.reply(f"{owner.mention}")
+                            await channel.send(content=f"{member.mention}", embed=embed, view=view)
                             return
 
                         # If user has equal role, allow normal processing (role extension)
@@ -420,13 +447,11 @@ class OnPaymentEvent(commands.Cog):
                                         )
                                     )
 
-                                    message = await channel.send(
+                                    await channel.send(
                                         content=f"{member.mention}",
                                         embed=embed,
                                         view=view,
                                     )
-                                    if owner:
-                                        await message.reply(f"{owner.mention}")
                                     return
 
                 # Initialize embed variables
@@ -533,9 +558,7 @@ class OnPaymentEvent(commands.Cog):
                     )
                 )
 
-                message = await channel.send(content=f"{member.mention}", embed=embed, view=view)
-                if owner:
-                    await message.reply(f"{owner.mention}")
+                await channel.send(content=f"{member.mention}", embed=embed, view=view)
 
             except Exception as e:
                 logger.error(f"Error in handle_payment: {str(e)}")
