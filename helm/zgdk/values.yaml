@@ -8,19 +8,19 @@ image:
 
 agents:
   intake:
-    replicas: 2
+    replicas: 0  # Disabled until dependencies fixed
     memory: "256Mi"
     cpu: "100m"
   faq:
-    replicas: 3
+    replicas: 0  # Disabled until dependencies fixed
     memory: "512Mi"
     cpu: "200m"
   complaint:
-    replicas: 1
+    replicas: 0  # Disabled until dependencies fixed
     memory: "256Mi"
     cpu: "100m"
   escalation:
-    replicas: 1
+    replicas: 0  # Disabled until dependencies fixed
     memory: "256Mi"
     cpu: "100m"
 
