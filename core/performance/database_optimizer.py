@@ -24,7 +24,7 @@ class QueryPerformanceMonitor:
 
     def __init__(self):
         self.query_stats = defaultdict(
-            lambda: {"count": 0, "total_time": 0.0, "min_time": float("in"), "max_time": 0.0, "last_executed": None}
+            lambda: {"count": 0, "total_time": 0.0, "min_time": float("inf"), "max_time": 0.0, "last_executed": None}
         )
         self.slow_query_threshold = 1.0  # seconds
         self.slow_queries = []
