@@ -153,10 +153,11 @@ class Zagadka(commands.Bot):
         postgres_user: str = os.environ.get("POSTGRES_USER", "")
         postgres_password: str = os.environ.get("POSTGRES_PASSWORD", "")
         postgres_db: str = os.environ.get("POSTGRES_DB", "")
-        postgres_port: str = os.environ.get("POSTGRES_PORT", "")
+        postgres_host: str = os.environ.get("POSTGRES_HOST", "db")
+        postgres_port: str = os.environ.get("POSTGRES_PORT", "5432")
 
         return (
-            "postgresql+asyncpg://" f"{postgres_user}:" f"{postgres_password}@db:" f"{postgres_port}/" f"{postgres_db}"
+            f"postgresql+asyncpg://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
         )
 
     @asynccontextmanager
