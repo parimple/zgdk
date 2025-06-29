@@ -457,9 +457,6 @@ class ConsolidatedPremiumService(BaseService, IPremiumService, IPremiumChecker, 
             if highest_role_name:
                 role_to_extend = discord.utils.get(self.guild.roles, name=highest_role_name)
                 if role_to_extend:
-                    # Get the role database entry
-                    db_role = await RoleQueries.get_member_role(session, member.id, role_to_extend.id)
-
                     # Calculate days to extend based on highest role
                     days_to_add = {
                         "zG50": self.ZG50_EXTENSION,

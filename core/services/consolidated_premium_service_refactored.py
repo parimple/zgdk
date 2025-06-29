@@ -6,6 +6,7 @@ from typing import Any, Optional, Tuple
 import discord
 
 from core.interfaces.premium_interfaces import (
+    CommandTier,
     ExtensionResult,
     IPremiumChecker,
     IPremiumRoleManager,

@@ -3,6 +3,7 @@
 import logging
 import re
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import discord
 
@@ -45,10 +46,11 @@ class BumpHandler:
         except Exception as e:
             logger.error(f"Error adding bypass time: {e}", exc_info=True)
 
-    async def check_cooldown(self, session, user_id: int, service: str, cooldown_hours: int) -> bool:
+    async def check_cooldown(self, session, user_id: int, service: str, cooldown_hours: int, guild_id: Optional[int] = None) -> bool:
         """Check if user is on cooldown for a service."""
         # For global services like disboard, use guild_id
-        guild_id = self.bot.guild_id if hasattr(self.bot, "guild_id") else None
+        if guild_id is None:
+            guild_id = self.bot.guild_id if hasattr(self.bot, "guild_id") else None
         notification_repo = NotificationRepository(session)
         last_notification = await notification_repo.get_service_notification_log(service, guild_id, user_id)
 
@@ -61,11 +63,14 @@ class BumpHandler:
 
         return False  # Not on cooldown
 
-    async def log_notification(self, session, user_id: int, service: str) -> None:
+    async def log_notification(self, session, user_id: int, service: str, guild_id: Optional[int] = None) -> None:
         """Log a notification for cooldown tracking."""
-        _guild_id = self.bot.guild_id if hasattr(self.bot, "guild_id") else None
+        if guild_id is None:
+            guild_id = self.bot.guild_id if hasattr(self.bot, "guild_id") else None
         notification_repo = NotificationRepository(session)
-        await notification_repo.add_or_update_notification_log(user_id, service)
+        # For global services, use guild_id as member_id
+        member_id = guild_id if service in NotificationRepository.GLOBAL_SERVICES else user_id
+        await notification_repo.add_or_update_notification_log(member_id, service)
 
 
 class DisboardHandler(BumpHandler):
@@ -119,7 +124,8 @@ class DisboardHandler(BumpHandler):
 
         async with self.bot.get_db() as session:
             # Check if user is on cooldown
-            if await self.check_cooldown(session, user.id, "disboard", SERVICE_COOLDOWNS["disboard"]):
+            guild_id = message.guild.id if message.guild else None
+            if await self.check_cooldown(session, user.id, "disboard", SERVICE_COOLDOWNS["disboard"], guild_id):
                 logger.info(f"User {user.name} is on cooldown for Disboard")
                 return
 
@@ -130,7 +136,7 @@ class DisboardHandler(BumpHandler):
             await self.add_bypass_time(user, BYPASS_DURATIONS["disboard"], "disboard")
 
             # Log the notification
-            await self.log_notification(session, user.id, "disboard")
+            await self.log_notification(session, user.id, "disboard", guild_id)
 
             # Update bump count
             member.bump_count = (member.bump_count or 0) + 1
@@ -179,7 +185,8 @@ class DzikHandler(BumpHandler):
 
         async with self.bot.get_db() as session:
             # Check if user is on cooldown
-            if await self.check_cooldown(session, user.id, "dzik", SERVICE_COOLDOWNS["dzik"]):
+            guild_id = message.guild.id if message.guild else None
+            if await self.check_cooldown(session, user.id, "dzik", SERVICE_COOLDOWNS["dzik"], guild_id):
                 logger.info(f"User {user.name} is on cooldown for Dzik")
                 return
 
@@ -190,7 +197,7 @@ class DzikHandler(BumpHandler):
             await self.add_bypass_time(user, BYPASS_DURATIONS["dzik"], "dzik")
 
             # Log the notification
-            await self.log_notification(session, user.id, "dzik")
+            await self.log_notification(session, user.id, "dzik", guild_id)
 
             # Update bump count
             member.bump_count = (member.bump_count or 0) + 1
@@ -249,7 +256,8 @@ class DiscadiaHandler(BumpHandler):
 
         async with self.bot.get_db() as session:
             # Check if user is on cooldown
-            if await self.check_cooldown(session, user.id, "discadia", SERVICE_COOLDOWNS["discadia"]):
+            guild_id = message.guild.id if message.guild else None
+            if await self.check_cooldown(session, user.id, "discadia", SERVICE_COOLDOWNS["discadia"], guild_id):
                 logger.info(f"User {user.name} is on cooldown for Discadia")
                 return
 
@@ -260,7 +268,7 @@ class DiscadiaHandler(BumpHandler):
             await self.add_bypass_time(user, BYPASS_DURATIONS["discadia"], "discadia")
 
             # Log the notification
-            await self.log_notification(session, user.id, "discadia")
+            await self.log_notification(session, user.id, "discadia", guild_id)
 
             await session.commit()
 
@@ -302,7 +310,8 @@ class DiscordServersHandler(BumpHandler):
 
         async with self.bot.get_db() as session:
             # Check if user is on cooldown
-            if await self.check_cooldown(session, user.id, "discordservers", SERVICE_COOLDOWNS["discordservers"]):
+            guild_id = message.guild.id if message.guild else None
+            if await self.check_cooldown(session, user.id, "discordservers", SERVICE_COOLDOWNS["discordservers"], guild_id):
                 logger.info(f"User {user.name} is on cooldown for DiscordServers")
                 return
 
@@ -313,7 +322,7 @@ class DiscordServersHandler(BumpHandler):
             await self.add_bypass_time(user, BYPASS_DURATIONS["discordservers"], "discordservers")
 
             # Log the notification
-            await self.log_notification(session, user.id, "discordservers")
+            await self.log_notification(session, user.id, "discordservers", guild_id)
 
             await session.commit()
 
@@ -360,7 +369,8 @@ class DSMEHandler(BumpHandler):
 
         async with self.bot.get_db() as session:
             # Check if user is on cooldown
-            if await self.check_cooldown(session, user.id, "dsme", SERVICE_COOLDOWNS["dsme"]):
+            guild_id = message.guild.id if message.guild else None
+            if await self.check_cooldown(session, user.id, "dsme", SERVICE_COOLDOWNS["dsme"], guild_id):
                 logger.info(f"User {user.name} is on cooldown for DSME")
                 return
 
@@ -371,7 +381,7 @@ class DSMEHandler(BumpHandler):
             await self.add_bypass_time(user, BYPASS_DURATIONS["dsme"], "dsme")
 
             # Log the notification
-            await self.log_notification(session, user.id, "dsme")
+            await self.log_notification(session, user.id, "dsme", guild_id)
 
             await session.commit()
 

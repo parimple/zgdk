@@ -559,28 +559,6 @@ class ActivityService(BaseService, IActivityService):
             self._log_error("get_server_activity_stats", e)
             return {}
 
-    async def award_bonus_points(self, member: Member, points: int, reason: str = "bonus") -> Activity:
-        """Award bonus points to member."""
-        try:
-            activity = await self.activity_repository.add_activity(
-                member_id=member.id,
-                points=points,
-                activity_type="bonus",
-            )
-
-            self._log_operation(
-                "award_bonus_points",
-                member_id=member.id,
-                points=points,
-                reason=reason,
-            )
-
-            return activity
-
-        except Exception as e:
-            self._log_error("award_bonus_points", e, member_id=member.id)
-            raise
-
     async def get_server_activity_stats(self, days: int = 30) -> dict[str, Any]:
         """Get overall server activity statistics."""
         try:

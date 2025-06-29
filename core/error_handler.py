@@ -175,7 +175,7 @@ def handle_errors(log_errors: bool = True, raise_on: Optional[tuple] = None, def
                     raise
 
                 # Wrap other exceptions
-                raise BotError(f"Error in {func.__name__}: {str(e)}", error_code=ErrorCodes.INTERNAL) from e
+                raise BotError(f"Error in {func.__name__}: {str(e)}") from e
 
         return wrapper
 

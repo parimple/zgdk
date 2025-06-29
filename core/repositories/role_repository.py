@@ -291,14 +291,6 @@ class RoleRepository(BaseRepository):
             )
             return False
 
-    async def get_member_role(self, member_id: int, role_id: int) -> Optional[MemberRole]:
-        """Get a specific member role."""
-        try:
-            return await self.session.get(MemberRole, (member_id, role_id))
-        except Exception as e:
-            self.logger.error(f"Error getting member role for member {member_id}, role {role_id}: {e}")
-            raise
-
     async def delete_member_role(self, member_id: int, role_id: int) -> bool:
         """Delete a role from a member using raw SQL for safety."""
         try:
