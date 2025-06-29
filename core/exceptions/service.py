@@ -1,6 +1,6 @@
 """Service-specific exceptions."""
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from .base import BotError
 
@@ -44,11 +44,11 @@ class CooldownException(BotError):
         user_message: Optional[str] = None,
     ):
         """Initialize cooldown error."""
-        details = {
+        details: Dict[str, Any] = {
             "cooldown_seconds": cooldown_seconds,
         }
         if action:
-            details["action"] = str(action)
+            details["action"] = action
 
         if not user_message:
             user_message = f"⏱️ Musisz poczekać {cooldown_seconds} sekund przed ponownym użyciem."

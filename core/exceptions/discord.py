@@ -1,6 +1,6 @@
 """Discord-related exceptions."""
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from .base import BotError
 
@@ -71,9 +71,9 @@ class RateLimitError(DiscordError):
         user_message: Optional[str] = None,
     ):
         """Initialize rate limit error."""
-        details = {"retry_after": retry_after}
+        details: Dict[str, Any] = {"retry_after": retry_after}
         if endpoint:
-            details["endpoint"] = str(endpoint)
+            details["endpoint"] = endpoint
 
         super().__init__(
             message=f"Rate limited for {retry_after}s",

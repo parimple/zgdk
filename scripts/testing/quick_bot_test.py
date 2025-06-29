@@ -21,9 +21,9 @@ def test_bot_command(command: str, check_patterns: Optional[List[str]] = None) -
     print(f"\n🔍 Testing {command} command...")
 
     # Get Docker logs
-    result = subprocess.run(["docker-compose", "logs", "app", "--tail=100"], capture_output=True, text=True)
+    docker_result = subprocess.run(["docker-compose", "logs", "app", "--tail=100"], capture_output=True, text=True)
 
-    logs = result.stdout
+    logs = docker_result.stdout
 
     # Check if command was executed
     command_patterns = [f"User .* requested {command}", f"!{command}", f"/{command}", f"simulate {command}"]

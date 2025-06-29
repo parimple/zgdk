@@ -75,7 +75,12 @@ class AgentBuilder:
         # Generate documentation
         doc_file = self._generate_documentation(agent_name, config)
 
-        return {"agent": agent_file, "test": test_file, "k8s": k8s_files, "docs": doc_file}
+        return {
+            "agent": agent_file,
+            "test": test_file,
+            "k8s": k8s_files["deployment"],  # Return just the deployment file to match expected type
+            "docs": doc_file
+        }
 
     def _generate_agent_code(self, name: str, config: AgentConfig) -> Path:
         """Generate Python code for the agent."""
