@@ -46,7 +46,7 @@ jobs:
           critical_files = [
               'main.py',
               'config.yml',
-              'requirements.txt',
+              'pyproject.toml',
               'docker-compose.yml',
               'docker/app/Dockerfile',
               'healthcheck.py'
