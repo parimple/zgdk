@@ -1,0 +1,183 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keel
+  namespace: keel
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: keel
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - watch
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - ""
+  - extensions
+  - apps
+  resources:
+  - pods
+  - replicasets
+  - replicationcontrollers
+  - statefulsets
+  - deployments
+  - daemonsets
+  verbs:
+  - get
+  - delete
+  - watch
+  - list
+  - update
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  - cronjobs
+  verbs:
+  - get
+  - delete
+  - watch
+  - list
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: keel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: keel
+subjects:
+- kind: ServiceAccount
+  name: keel
+  namespace: keel
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keel
+  namespace: keel
+data:
+  config.yaml: |
+    # Webhook configuration
+    webhook:
+      enabled: false
+    
+    # Basic authentication
+    basicauth:
+      enabled: false
+    
+    # Helm configuration
+    helm:
+      enabled: false
+    
+    # Polling configuration
+    poll:
+      defaultSchedule: "@every 1m"
+    
+    # Notification configuration
+    slack:
+      enabled: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keel
+  namespace: keel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keel
+  template:
+    metadata:
+      labels:
+        app: keel
+    spec:
+      serviceAccountName: keel
+      containers:
+      - name: keel
+        image: keelhq/keel:arm64
+        imagePullPolicy: Always
+        command: ["/bin/keel"]
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POLL
+          value: "1"
+        - name: HELM_PROVIDER
+          value: "0"
+        - name: PROJECT_ID
+          value: "zgdk"
+        - name: WEBHOOK_ENDPOINT
+          value: ""
+        - name: BASIC_AUTH_USER
+          value: ""
+        - name: BASIC_AUTH_PASSWORD
+          value: ""
+        - name: AUTHENTICATED_WEBHOOKS
+          value: "false"
+        - name: SLACK_CHANNELS
+          value: ""
+        - name: SLACK_APPROVALS_CHANNEL
+          value: ""
+        - name: SLACK_TOKEN
+          value: ""
+        - name: LEVEL
+          value: "info"
+        - name: INSECURE_REGISTRY
+          value: "false"
+        ports:
+        - containerPort: 9300
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 9300
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        volumeMounts:
+        - mountPath: /cfg
+          name: keel-config
+      volumes:
+      - name: keel-config
+        configMap:
+          name: keel
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keel
+  namespace: keel
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9300
+    targetPort: 9300
+    protocol: TCP
+    name: http
+  selector:
+    app: keel
+  sessionAffinity: None

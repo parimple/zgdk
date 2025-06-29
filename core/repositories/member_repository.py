@@ -9,8 +9,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from core.performance import CacheKeyBuilder, cache, optimize_query
-
 # Interfaces are now Protocols - no need to import for inheritance
 from core.repositories.base_repository import BaseRepository
 from datasources.models import Activity, AutoKick, Invite, Member, ModerationLog
@@ -22,8 +20,6 @@ class MemberRepository(BaseRepository):
     def __init__(self, session: AsyncSession):
         super().__init__(Member, session)
 
-    @cache(namespace="members", ttl=300, key_func=lambda self, discord_id: CacheKeyBuilder.member_key(discord_id))
-    @optimize_query
     async def get_by_discord_id(self, discord_id: int) -> Optional[Member]:
         """Get member by Discord ID."""
         try:

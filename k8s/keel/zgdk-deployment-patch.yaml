@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zgdk-discord-bot
+  namespace: zgdk
+  annotations:
+    keel.sh/policy: "glob:main-*"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 1m"
+spec:
+  template:
+    metadata:
+      annotations:
+        keel.sh/policy: "glob:main-*"
+        keel.sh/trigger: poll

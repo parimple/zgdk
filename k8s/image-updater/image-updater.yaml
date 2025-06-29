@@ -1,0 +1,132 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: image-updater
+  namespace: image-updater
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: image-updater
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "patch", "update"]
+- apiGroups: ["apps"]
+  resources: ["deployments/status"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: image-updater
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: image-updater
+subjects:
+- kind: ServiceAccount
+  name: image-updater
+  namespace: image-updater
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: update-script
+  namespace: image-updater
+data:
+  update.sh: |
+    #!/bin/sh
+    set -e
+
+    # Configuration
+    NAMESPACE="zgdk"
+    DEPLOYMENT="zgdk-discord-bot"
+    CONTAINER="bot"
+    REGISTRY="docker.io"
+    IMAGE="ppyzel/zgdk"
+    TAG_PATTERN="main-"
+
+    echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Checking for new image updates..."
+
+    # Get current image
+    CURRENT_IMAGE=$(kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o jsonpath="{.spec.template.spec.containers[?(@.name=='${CONTAINER}')].image}")
+    echo "Current image: ${CURRENT_IMAGE}"
+
+    # Extract current tag
+    CURRENT_TAG=$(echo ${CURRENT_IMAGE} | cut -d: -f2)
+    echo "Current tag: ${CURRENT_TAG}"
+
+    # Get latest tag from Docker Hub API
+    # Using wget since curl might not be available in minimal images
+    LATEST_TAG=$(wget -qO- "https://hub.docker.com/v2/repositories/${IMAGE}/tags?page_size=100" | \
+      grep -o '"name":"[^"]*"' | \
+      grep "${TAG_PATTERN}" | \
+      cut -d'"' -f4 | \
+      grep "^${TAG_PATTERN}" | \
+      head -1)
+
+    if [ -z "${LATEST_TAG}" ]; then
+      echo "No tags found matching pattern: ${TAG_PATTERN}"
+      exit 0
+    fi
+
+    echo "Latest tag: ${LATEST_TAG}"
+
+    # Compare tags
+    if [ "${CURRENT_TAG}" = "${LATEST_TAG}" ]; then
+      echo "Already running latest version"
+      exit 0
+    fi
+
+    # Update deployment
+    NEW_IMAGE="${REGISTRY}/${IMAGE}:${LATEST_TAG}"
+    echo "Updating deployment to: ${NEW_IMAGE}"
+
+    kubectl set image deployment/${DEPLOYMENT} ${CONTAINER}=${NEW_IMAGE} -n ${NAMESPACE}
+
+    # Wait for rollout to complete
+    echo "Waiting for rollout to complete..."
+    kubectl rollout status deployment/${DEPLOYMENT} -n ${NAMESPACE} --timeout=300s
+
+    echo "Update completed successfully!"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: zgdk-image-updater
+  namespace: image-updater
+spec:
+  schedule: "*/5 * * * *"  # Run every 5 minutes
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: image-updater
+          restartPolicy: OnFailure
+          containers:
+          - name: updater
+            image: alpine/k8s:1.29.0  # Lightweight image with kubectl and wget
+            command: ["/bin/sh"]
+            args: ["/scripts/update.sh"]
+            volumeMounts:
+            - name: script
+              mountPath: /scripts
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
+          volumes:
+          - name: script
+            configMap:
+              name: update-script
+              defaultMode: 0755

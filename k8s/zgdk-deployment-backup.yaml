@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "9"
+    meta.helm.sh/release-name: zgdk
+    meta.helm.sh/release-namespace: zgdk
+  creationTimestamp: "2025-06-29T00:14:05Z"
+  generation: 9
+  labels:
+    app: zgdk
+    app.kubernetes.io/managed-by: Helm
+    component: discord-bot
+  name: zgdk-discord-bot
+  namespace: zgdk
+  resourceVersion: "19713"
+  uid: 62777e45-4944-40b2-8078-3673eb49723d
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: zgdk
+      component: discord-bot
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2025-06-29T00:17:36Z"
+      creationTimestamp: null
+      labels:
+        app: zgdk
+        component: discord-bot
+    spec:
+      containers:
+      - env:
+        - name: DISCORD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: DISCORD_TOKEN
+              name: discord-secrets
+        - name: ZAGADKA_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: DISCORD_TOKEN
+              name: discord-secrets
+        - name: POSTGRES_HOST
+          value: postgres-service
+        - name: POSTGRES_USER
+          value: zagadka
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: POSTGRES_PASSWORD
+              name: postgres-secrets
+        - name: POSTGRES_DB
+          value: zagadka
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: REDIS_HOST
+          value: redis-service
+        - name: REDIS_PORT
+          value: "6379"
+        image: ppyzel/zgdk:main-32272e3
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8091
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 10
+        name: bot
+        ports:
+        - containerPort: 8091
+          name: health
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /ready
+            port: 8091
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /startup
+            port: 8091
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /app/config.yml
+          name: config
+          readOnly: true
+          subPath: config.yml
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: zgdk-config
+        name: config
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2025-06-29T01:17:30Z"
+    lastUpdateTime: "2025-06-29T01:17:30Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-06-29T00:59:35Z"
+    lastUpdateTime: "2025-06-29T08:05:29Z"
+    message: ReplicaSet "zgdk-discord-bot-6b69d88d74" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 9
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
