@@ -11,10 +11,7 @@ async def test_simple_voice():
     """Simple test to verify basic functionality."""
     # Create mock bot
     bot = MagicMock()
-    bot.config = {
-        "premium_roles": [],
-        "mute_roles": []
-    }
+    bot.config = {"premium_roles": [], "mute_roles": []}
 
     # Create mock guild
     guild = MagicMock(spec=discord.Guild)
@@ -51,12 +48,7 @@ async def test_mock_cog():
 
     # Create mock bot
     bot = MagicMock()
-    bot.config = {
-        "premium_roles": [],
-        "mute_roles": [],
-        "team": {},
-        "channels_voice": {"afk": 12345}
-    }
+    bot.config = {"premium_roles": [], "mute_roles": [], "team": {}, "channels_voice": {"afk": 12345}}
     bot.get_db = MagicMock()
     bot.get_service = AsyncMock()
 

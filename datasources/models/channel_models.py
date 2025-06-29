@@ -2,12 +2,18 @@
 Channel-related SQLAlchemy models.
 """
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import MEMBER_ID, Base
+
+if TYPE_CHECKING:
+    from .member_models import Member
 
 
 class ChannelPermission(Base):

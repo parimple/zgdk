@@ -12,9 +12,7 @@ class TestInfoCommands(CommandTestCase):
 
     def test_profile_command(self):
         """Test profile command."""
-        result = self.run_async(
-            self.execute_command("profile", "")
-        )
+        result = self.run_async(self.execute_command("profile", ""))
 
         self.assert_command_success(result)
 
@@ -29,9 +27,7 @@ class TestInfoCommands(CommandTestCase):
 
     def test_help_command(self):
         """Test help command."""
-        result = self.run_async(
-            self.execute_command("help", "")
-        )
+        result = self.run_async(self.execute_command("help", ""))
 
         self.assert_command_success(result)
 
@@ -42,9 +38,7 @@ class TestInfoCommands(CommandTestCase):
 
     def test_games_command(self):
         """Test games command."""
-        result = self.run_async(
-            self.execute_command("games", "")
-        )
+        result = self.run_async(self.execute_command("games", ""))
 
         self.assert_command_success(result)
 
@@ -58,9 +52,7 @@ class TestInfoCommands(CommandTestCase):
 
     def test_ping_command(self):
         """Test ping command."""
-        result = self.run_async(
-            self.execute_command("ping", "")
-        )
+        result = self.run_async(self.execute_command("ping", ""))
 
         self.assert_command_success(result)
 
@@ -78,9 +70,7 @@ class TestInfoCommands(CommandTestCase):
 
     def test_serverinfo_command(self):
         """Test serverinfo command."""
-        result = self.run_async(
-            self.execute_command("serverinfo", "")
-        )
+        result = self.run_async(self.execute_command("serverinfo", ""))
 
         self.assert_command_success(result)
 
@@ -94,9 +84,7 @@ class TestInfoCommands(CommandTestCase):
 
     def test_roles_command(self):
         """Test roles command."""
-        result = self.run_async(
-            self.execute_command("roles", "")
-        )
+        result = self.run_async(self.execute_command("roles", ""))
 
         self.assert_command_success(result)
 
@@ -110,9 +98,7 @@ class TestInfoCommands(CommandTestCase):
 
     def test_invites_command(self):
         """Test invites command."""
-        result = self.run_async(
-            self.execute_command("invites", "")
-        )
+        result = self.run_async(self.execute_command("invites", ""))
 
         self.assert_command_success(result)
 

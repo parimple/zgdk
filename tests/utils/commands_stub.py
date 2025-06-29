@@ -64,12 +64,15 @@ def install_commands_stub():
 
     def passthrough_decorator(*args, **kwargs):
         """Pass-through decorator that preserves coroutine nature"""
+
         def wrap(fn):
             return fn
+
         return wrap
 
     class _Cog:
         """Ultra-light Cog base class that keeps .bot attribute"""
+
         def __init__(self, bot):
             self.bot = bot
 
@@ -85,13 +88,13 @@ def install_commands_stub():
     commands_stub.has_permissions = passthrough_decorator
 
     # Mock other required modules if not already mocked
-    if 'utils.permissions' not in sys.modules:
+    if "utils.permissions" not in sys.modules:
         permissions_mock = MagicMock()
         permissions_mock.is_zagadka_owner = passthrough_decorator
         permissions_mock.is_admin = passthrough_decorator
-        sys.modules['utils.permissions'] = permissions_mock
+        sys.modules["utils.permissions"] = permissions_mock
 
-    if 'utils.premium' not in sys.modules:
+    if "utils.premium" not in sys.modules:
         premium_mock = MagicMock()
 
         class PaymentData:
@@ -100,43 +103,41 @@ def install_commands_stub():
                 self.amount = amount
                 self.paid_at = paid_at
                 self.payment_type = payment_type
+
         premium_mock.PaymentData = PaymentData
-        sys.modules['utils.premium'] = premium_mock
+        sys.modules["utils.premium"] = premium_mock
 
-    if 'core.interfaces.member_interfaces' not in sys.modules:
-        sys.modules['core.interfaces.member_interfaces'] = MagicMock()
+    if "core.interfaces.member_interfaces" not in sys.modules:
+        sys.modules["core.interfaces.member_interfaces"] = MagicMock()
 
-    if 'core.interfaces.premium_interfaces' not in sys.modules:
-        sys.modules['core.interfaces.premium_interfaces'] = MagicMock()
+    if "core.interfaces.premium_interfaces" not in sys.modules:
+        sys.modules["core.interfaces.premium_interfaces"] = MagicMock()
 
-    if 'cogs.ui.shop_embeds' not in sys.modules:
-        sys.modules['cogs.ui.shop_embeds'] = MagicMock()
+    if "cogs.ui.shop_embeds" not in sys.modules:
+        sys.modules["cogs.ui.shop_embeds"] = MagicMock()
 
-    if 'cogs.views.shop_views' not in sys.modules:
+    if "cogs.views.shop_views" not in sys.modules:
         views_mock = MagicMock()
         views_mock.PaymentsView = MagicMock
         views_mock.RoleShopView = MagicMock
-        sys.modules['cogs.views.shop_views'] = views_mock
+        sys.modules["cogs.views.shop_views"] = views_mock
 
-    if 'datasources.queries' not in sys.modules:
+    if "datasources.queries" not in sys.modules:
         queries_mock = MagicMock()
         queries_mock.HandledPaymentQueries = MagicMock()
         queries_mock.HandledPaymentQueries.add_payment = AsyncMock()
-        sys.modules['datasources.queries'] = queries_mock
+        sys.modules["datasources.queries"] = queries_mock
 
     # Install the stub
     sys.modules["discord.ext.commands"] = commands_stub
 
     # Reload any modules that might have already imported the old mock
-    modules_to_reload = [
-        "cogs.commands.shop",
-        "cogs.commands"
-    ]
+    modules_to_reload = ["cogs.commands.shop", "cogs.commands"]
     for module_name in modules_to_reload:
         if module_name in sys.modules:
             module = sys.modules[module_name]
             # Only reload real modules, not MagicMocks
-            if hasattr(module, '__spec__') and hasattr(module, '__name__'):
+            if hasattr(module, "__spec__") and hasattr(module, "__name__"):
                 importlib.reload(module)
             else:
                 # Remove mock module so it gets re-imported fresh

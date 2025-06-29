@@ -34,9 +34,7 @@ async def test_team_create_when_user_is_already_team_owner():
     # Mock database session to return existing team
     session = AsyncMock()
     session_result = AsyncMock()
-    session_result.scalar_one_or_none.return_value = (
-        existing_team_db  # User is already an owner
-    )
+    session_result.scalar_one_or_none.return_value = existing_team_db  # User is already an owner
     session.execute.return_value = session_result
 
     # Setup bot.get_db context manager

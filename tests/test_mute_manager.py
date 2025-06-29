@@ -72,27 +72,17 @@ class TestMuteManager(unittest.TestCase):
         mute_type = MagicMock()
 
         # Setup properties for the code to use
-        mute_type.success_message_add = (
-            "{user_mention} {duration_text} {action_name} {premium_channel}"
-        )
+        mute_type.success_message_add = "{user_mention} {duration_text} {action_name} {premium_channel}"
         mute_type.action_name = "test_action"
         mute_type.role_index = 1
 
         # Extract duration text from what would be sent
         # This is a bit hacky but allows us to test the internal formatting without exposing it
-        with patch.object(
-            self.mute_manager, "_handle_mute_logic", new=self._extract_duration_text
-        ):
-            result = asyncio.run(
-                self.mute_manager._handle_mute_logic(
-                    ctx, user, mute_type, duration, unmute=False
-                )
-            )
+        with patch.object(self.mute_manager, "_handle_mute_logic", new=self._extract_duration_text):
+            result = asyncio.run(self.mute_manager._handle_mute_logic(ctx, user, mute_type, duration, unmute=False))
             self.assertEqual(result, expected)
 
-    async def _extract_duration_text(
-        self, ctx, user, mute_type, duration, unmute=False
-    ):
+    async def _extract_duration_text(self, ctx, user, mute_type, duration, unmute=False):
         """Mock implementation to extract formatted duration text"""
         if duration is None:
             return "stałe"
@@ -110,9 +100,7 @@ class TestMuteManager(unittest.TestCase):
             if minutes > 0:
                 parts.append(f"{minutes}m")
 
-            if (
-                seconds > 0 and not parts
-            ):  # Pokazuj sekundy tylko jeśli nie ma innych jednostek
+            if seconds > 0 and not parts:  # Pokazuj sekundy tylko jeśli nie ma innych jednostek
                 parts.append(f"{seconds}s")
 
             return " ".join(parts) if parts else "mniej niż 1m"

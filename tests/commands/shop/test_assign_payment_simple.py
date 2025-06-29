@@ -37,7 +37,9 @@ async def test_assign_payment_success_simple():
     mock_user.send = AsyncMock()
 
     # Act - simulate assign_payment core logic
-    with patch('datasources.queries.HandledPaymentQueries.get_payment_by_id', new_callable=AsyncMock) as mock_get_payment:
+    with patch(
+        "datasources.queries.HandledPaymentQueries.get_payment_by_id", new_callable=AsyncMock
+    ) as mock_get_payment:
         mock_get_payment.return_value = mock_payment
 
         # Core logic
@@ -53,16 +55,16 @@ async def test_assign_payment_success_simple():
             await mock_session.commit()
 
             # Send DM messages
-            await mock_user.send("Proszę pamiętać o podawaniu swojego ID podczas dokonywania wpłat w przyszłości. Twoje ID to:")
+            await mock_user.send(
+                "Proszę pamiętać o podawaniu swojego ID podczas dokonywania wpłat w przyszłości. Twoje ID to:"
+            )
             await mock_user.send(f"```{user_id}```")
 
     # Assert
     mock_get_payment.assert_called_once_with(mock_session, payment_id)
     assert mock_payment.member_id == user_id
     mock_member_service.get_or_create_member.assert_called_once_with(mock_user)
-    mock_member_service.update_member_info.assert_called_once_with(
-        mock_db_member, wallet_balance=1500
-    )
+    mock_member_service.update_member_info.assert_called_once_with(mock_db_member, wallet_balance=1500)
     mock_session.commit.assert_called_once()
     assert mock_user.send.call_count == 2
 
@@ -75,7 +77,9 @@ async def test_assign_payment_not_found_simple():
     mock_session = AsyncMock()
 
     # Act
-    with patch('datasources.queries.HandledPaymentQueries.get_payment_by_id', new_callable=AsyncMock) as mock_get_payment:
+    with patch(
+        "datasources.queries.HandledPaymentQueries.get_payment_by_id", new_callable=AsyncMock
+    ) as mock_get_payment:
         mock_get_payment.return_value = None
 
         payment = await mock_get_payment(mock_session, payment_id)
@@ -114,7 +118,9 @@ async def test_assign_payment_dm_forbidden_simple():
     mock_ctx.send = AsyncMock()
 
     # Act - simulate DM failure handling
-    with patch('datasources.queries.HandledPaymentQueries.get_payment_by_id', new_callable=AsyncMock) as mock_get_payment:
+    with patch(
+        "datasources.queries.HandledPaymentQueries.get_payment_by_id", new_callable=AsyncMock
+    ) as mock_get_payment:
         mock_get_payment.return_value = mock_payment
 
         payment = await mock_get_payment(MagicMock(), payment_id)
@@ -125,7 +131,9 @@ async def test_assign_payment_dm_forbidden_simple():
                 await mock_user.send("Test message")
             except MockForbidden:
                 # Send fallback message
-                fallback_msg = f"Nie mogłem wysłać DM do {mock_user.mention}. Proszę przekazać mu te informacje ręcznie."
+                fallback_msg = (
+                    f"Nie mogłem wysłać DM do {mock_user.mention}. Proszę przekazać mu te informacje ręcznie."
+                )
                 await mock_ctx.send(fallback_msg)
 
     # Assert
@@ -162,7 +170,9 @@ async def test_assign_payment_large_amount_simple():
     mock_user.send = AsyncMock()
 
     # Act
-    with patch('datasources.queries.HandledPaymentQueries.get_payment_by_id', new_callable=AsyncMock) as mock_get_payment:
+    with patch(
+        "datasources.queries.HandledPaymentQueries.get_payment_by_id", new_callable=AsyncMock
+    ) as mock_get_payment:
         mock_get_payment.return_value = mock_payment
 
         payment = await mock_get_payment(MagicMock(), payment_id)
@@ -175,9 +185,7 @@ async def test_assign_payment_large_amount_simple():
 
     # Assert
     assert mock_payment.member_id == user_id
-    mock_member_service.update_member_info.assert_called_once_with(
-        mock_db_member, wallet_balance=large_amount
-    )
+    mock_member_service.update_member_info.assert_called_once_with(mock_db_member, wallet_balance=large_amount)
 
 
 @pytest.mark.asyncio
@@ -196,7 +204,9 @@ async def test_assign_payment_database_transaction_simple():
     mock_payment.member_id = None
 
     # Act
-    with patch('datasources.queries.HandledPaymentQueries.get_payment_by_id', new_callable=AsyncMock) as mock_get_payment:
+    with patch(
+        "datasources.queries.HandledPaymentQueries.get_payment_by_id", new_callable=AsyncMock
+    ) as mock_get_payment:
         mock_get_payment.return_value = mock_payment
 
         payment = await mock_get_payment(mock_session, payment_id)

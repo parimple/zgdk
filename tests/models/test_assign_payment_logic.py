@@ -107,7 +107,7 @@ def test_payment_assignment_workflow():
         "get_or_create_member",
         "update_member_balance",
         "send_dm_to_user",
-        "handle_dm_failure"
+        "handle_dm_failure",
     ]
 
     # Verify workflow elements exist
@@ -119,12 +119,7 @@ def test_payment_assignment_workflow():
 def test_payment_data_validation():
     """Test payment data structure validation"""
     # Mock payment with required fields
-    payment = {
-        "id": 123,
-        "member_id": None,
-        "amount": WALLET_BALANCES["zg50_price"],
-        "payment_type": "role_purchase"
-    }
+    payment = {"id": 123, "member_id": None, "amount": WALLET_BALANCES["zg50_price"], "payment_type": "role_purchase"}
 
     # Test validation
     assert "id" in payment

@@ -9,10 +9,7 @@ import aiohttp
 async def test_command(command: str, params: dict = None):
     """Test a single command."""
     async with aiohttp.ClientSession() as session:
-        payload = {
-            "command": command,
-            "user_id": "956602391891947592"
-        }
+        payload = {"command": command, "user_id": "956602391891947592"}
         if params:
             payload.update(params)
 
@@ -46,19 +43,15 @@ async def main():
         ("help", {}),
         ("ping", {}),
         ("info", {}),
-
         # User info commands
         ("profile", {}),
         ("balance", {}),
         ("top", {}),
-
         # Shop commands
         ("shop", {}),
         ("daily", {}),
-
         # Voice commands
         ("voice", {}),
-
         # Team commands
         ("team", {}),
     ]
@@ -69,6 +62,7 @@ async def main():
             await asyncio.sleep(1)  # Avoid rate limiting
         except Exception as e:
             print(f"❌ Failed to test {cmd}: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -7,16 +7,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Mock Discord before any imports
-sys.modules['discord'] = MagicMock()
-sys.modules['discord.ext'] = MagicMock()
-sys.modules['discord.ext.commands'] = MagicMock()
-sys.modules['cogs.views.shop_views'] = MagicMock()
-sys.modules['cogs.ui.shop_embeds'] = MagicMock()
-sys.modules['utils.permissions'] = MagicMock()
-sys.modules['utils.premium'] = MagicMock()
-sys.modules['core.interfaces.member_interfaces'] = MagicMock()
-sys.modules['core.interfaces.premium_interfaces'] = MagicMock()
-sys.modules['datasources.queries'] = MagicMock()
+sys.modules["discord"] = MagicMock()
+sys.modules["discord.ext"] = MagicMock()
+sys.modules["discord.ext.commands"] = MagicMock()
+sys.modules["cogs.views.shop_views"] = MagicMock()
+sys.modules["cogs.ui.shop_embeds"] = MagicMock()
+sys.modules["utils.permissions"] = MagicMock()
+sys.modules["utils.premium"] = MagicMock()
+sys.modules["core.interfaces.member_interfaces"] = MagicMock()
+sys.modules["core.interfaces.premium_interfaces"] = MagicMock()
+sys.modules["datasources.queries"] = MagicMock()
 
 from cogs.commands.shop import ShopCog
 
@@ -25,8 +25,9 @@ from cogs.commands.shop import ShopCog
 async def test_shop_command_execution(mock_bot_with_services, mock_discord_context):
     """Test shop command executes without errors"""
     # Arrange
-    with patch('cogs.commands.shop.RoleShopView') as mock_view, \
-         patch('cogs.commands.shop.create_shop_embed') as mock_embed:
+    with patch("cogs.commands.shop.RoleShopView") as mock_view, patch(
+        "cogs.commands.shop.create_shop_embed"
+    ) as mock_embed:
 
         mock_view.return_value = MagicMock()
         mock_view.return_value.role_price_map = {}
@@ -48,7 +49,7 @@ async def test_addbalance_command_execution(mock_bot_with_services, mock_discord
     # Arrange
     amount = 500
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.add_payment") as mock_add_payment:
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
@@ -64,7 +65,7 @@ async def test_assign_payment_command_execution(mock_bot_with_services, mock_dis
     # Arrange
     payment_id = 123
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         # Setup mock payment
         mock_payment = MagicMock()
         mock_payment.id = payment_id
@@ -85,8 +86,9 @@ async def test_assign_payment_command_execution(mock_bot_with_services, mock_dis
 async def test_payments_command_execution(mock_bot_with_services, mock_discord_context):
     """Test payments command executes without errors"""
     # Arrange
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_last_payments') as mock_get_payments, \
-         patch('cogs.commands.shop.PaymentsView') as mock_view:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_last_payments") as mock_get_payments, patch(
+        "cogs.commands.shop.PaymentsView"
+    ) as mock_view:
 
         # Setup mock payments
         mock_payments = [MagicMock(id=1, member_id=123, name="Test", amount=100, payment_type="test")]
@@ -137,17 +139,18 @@ def test_shop_cog_initialization(mock_bot_with_services):
 
     # Assert
     assert shop_cog.bot == mock_bot_with_services
-    assert hasattr(shop_cog, 'shop')
-    assert hasattr(shop_cog, 'add_balance')
-    assert hasattr(shop_cog, 'assign_payment')
-    assert hasattr(shop_cog, 'all_payments')
-    assert hasattr(shop_cog, 'set_role_expiry')
-    assert hasattr(shop_cog, 'force_check_roles')
+    assert hasattr(shop_cog, "shop")
+    assert hasattr(shop_cog, "add_balance")
+    assert hasattr(shop_cog, "assign_payment")
+    assert hasattr(shop_cog, "all_payments")
+    assert hasattr(shop_cog, "set_role_expiry")
+    assert hasattr(shop_cog, "force_check_roles")
 
 
 def test_shop_cog_setup_function():
     """Test cog setup function exists"""
     from cogs.commands.shop import setup
+
     assert callable(setup)
 
 
@@ -155,8 +158,9 @@ def test_shop_cog_setup_function():
 async def test_shop_command_with_member_parameter(mock_bot_with_services, mock_discord_context, mock_discord_member):
     """Test shop command with specific member parameter"""
     # Arrange
-    with patch('cogs.commands.shop.RoleShopView') as mock_view, \
-         patch('cogs.commands.shop.create_shop_embed') as mock_embed:
+    with patch("cogs.commands.shop.RoleShopView") as mock_view, patch(
+        "cogs.commands.shop.create_shop_embed"
+    ) as mock_embed:
 
         mock_view.return_value = MagicMock()
         mock_view.return_value.role_price_map = {}
@@ -178,7 +182,7 @@ async def test_assign_payment_not_found(mock_bot_with_services, mock_discord_con
     # Arrange
     payment_id = 999
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         mock_get_payment.return_value = None  # Payment not found
 
         # Act

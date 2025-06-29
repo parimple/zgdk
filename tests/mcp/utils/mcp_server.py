@@ -44,11 +44,7 @@ class BotCommandExecutor:
         intents.guilds = True
         intents.presences = True
 
-        self.bot = commands.Bot(
-            command_prefix="!",
-            intents=intents,
-            help_command=None
-        )
+        self.bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
         # Add config and database
         self.bot.config = self.config
@@ -61,6 +57,7 @@ class BotCommandExecutor:
         # Add service getter
         async def get_service(interface, session):
             from core.service_container import ServiceContainer
+
             container = ServiceContainer(self.bot)
             return await container.get_service(interface, session)
 
@@ -90,10 +87,10 @@ class BotCommandExecutor:
         # Get all Python files in cogs directory
         for root, dirs, files in os.walk(cogs_dir):
             for file in files:
-                if file.endswith('.py') and not file.startswith('__'):
+                if file.endswith(".py") and not file.startswith("__"):
                     # Convert file path to module path
                     rel_path = os.path.relpath(os.path.join(root, file), os.path.dirname(__file__))
-                    module_path = rel_path.replace(os.sep, '.')[:-3]  # Remove .py
+                    module_path = rel_path.replace(os.sep, ".")[:-3]  # Remove .py
 
                     try:
                         await self.bot.load_extension(module_path)
@@ -113,10 +110,7 @@ class BotCommandExecutor:
             Dict with execution results
         """
         if not all([self.bot, self.guild, self.channel, self.owner]):
-            return {
-                "success": False,
-                "error": "Bot not properly initialized"
-            }
+            return {"success": False, "error": "Bot not properly initialized"}
 
         # Build command string
         command_str = command
@@ -125,11 +119,7 @@ class BotCommandExecutor:
 
         # Create fake message
         fake_message = FakeMessage(
-            content=f"!{command_str}",
-            author=self.owner,
-            channel=self.channel,
-            guild=self.guild,
-            bot=self.bot
+            content=f"!{command_str}", author=self.owner, channel=self.channel, guild=self.guild, bot=self.bot
         )
 
         # Capture responses
@@ -138,11 +128,7 @@ class BotCommandExecutor:
 
         async def capture_send(content=None, **kwargs):
             """Capture channel.send calls."""
-            response = {
-                "content": content,
-                "embeds": [],
-                "components": []
-            }
+            response = {"content": content, "embeds": [], "components": []}
 
             if "embed" in kwargs:
                 response["embeds"].append(kwargs["embed"].to_dict())
@@ -163,26 +149,15 @@ class BotCommandExecutor:
             ctx = await self.bot.get_context(fake_message)
 
             if not ctx.valid:
-                return {
-                    "success": False,
-                    "error": f"Invalid command: {command}"
-                }
+                return {"success": False, "error": f"Invalid command: {command}"}
 
             # Execute command
             await self.bot.invoke(ctx)
 
-            return {
-                "success": True,
-                "command": command_str,
-                "responses": responses
-            }
+            return {"success": True, "command": command_str, "responses": responses}
 
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "command": command_str
-            }
+            return {"success": False, "error": str(e), "command": command_str}
         finally:
             # Restore original send
             self.channel.send = original_send
@@ -196,15 +171,21 @@ class BotCommandExecutor:
             "channel_name": self.channel.name if self.channel else "Not found",
             "owner_name": str(self.owner) if self.owner else "Not found",
             "cogs_loaded": len(self.bot.cogs) if self.bot else 0,
-            "commands_available": len(self.bot.commands) if self.bot else 0
+            "commands_available": len(self.bot.commands) if self.bot else 0,
         }
 
 
 class FakeMessage:
     """Fake message object for command simulation."""
 
-    def __init__(self, content: str, author: discord.Member, channel: discord.TextChannel,
-                 guild: discord.Guild, bot: commands.Bot):
+    def __init__(
+        self,
+        content: str,
+        author: discord.Member,
+        channel: discord.TextChannel,
+        guild: discord.Guild,
+        bot: commands.Bot,
+    ):
         self.content = content
         self.author = author
         self.channel = channel
@@ -254,26 +235,16 @@ async def list_tools() -> List[Tool]:
             input_schema={
                 "type": "object",
                 "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The command to execute (without prefix)"
-                    },
-                    "args": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Optional command arguments"
-                    }
+                    "command": {"type": "string", "description": "The command to execute (without prefix)"},
+                    "args": {"type": "array", "items": {"type": "string"}, "description": "Optional command arguments"},
                 },
-                "required": ["command"]
-            }
+                "required": ["command"],
+            },
         ),
         Tool(
             name="get_bot_status",
             description="Get current bot status and connection info",
-            input_schema={
-                "type": "object",
-                "properties": {}
-            }
+            input_schema={"type": "object", "properties": {}},
         ),
         Tool(
             name="test_profile",
@@ -281,21 +252,15 @@ async def list_tools() -> List[Tool]:
             input_schema={
                 "type": "object",
                 "properties": {
-                    "user_mention": {
-                        "type": "string",
-                        "description": "Optional user mention (e.g., @username)"
-                    }
-                }
-            }
+                    "user_mention": {"type": "string", "description": "Optional user mention (e.g., @username)"}
+                },
+            },
         ),
         Tool(
             name="test_shop",
             description="Quick test of the shop command",
-            input_schema={
-                "type": "object",
-                "properties": {}
-            }
-        )
+            input_schema={"type": "object", "properties": {}},
+        ),
     ]
 
 

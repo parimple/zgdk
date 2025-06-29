@@ -32,12 +32,9 @@ class TestPremiumService:
     @pytest.fixture
     def premium_service(self, mock_session, mock_premium_repo):
         """Create premium service with mocked dependencies"""
-        with patch('core.services.premium_service.PaymentRepository'):
+        with patch("core.services.premium_service.PaymentRepository"):
             service = PremiumService(
-                premium_repository=mock_premium_repo,
-                payment_repository=Mock(),
-                bot=Mock(),
-                unit_of_work=Mock()
+                premium_repository=mock_premium_repo, payment_repository=Mock(), bot=Mock(), unit_of_work=Mock()
             )
         return service
 
@@ -139,7 +136,7 @@ class TestShopFunctionality:
             "expiration_date": datetime.now(timezone.utc),
             "member_id": 12345,
             "role_id": 1,
-            "role_type": "premium"
+            "role_type": "premium",
         }
 
         # Should be able to access via .get() method

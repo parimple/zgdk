@@ -41,9 +41,7 @@ async def execute_and_log(session, base_url, command_data, description):
 
     try:
         async with session.post(
-            f"{base_url}/execute",
-            json=command_data,
-            timeout=aiohttp.ClientTimeout(total=10)
+            f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
         ) as response:
             data = await response.json()
 
@@ -86,54 +84,40 @@ async def test_premium_workflow():
 
         # Test 1: Color command without premium
         await execute_and_log(
-            session, base_url,
-            {
-                "command": "color",
-                "args": "#FF0000",
-                "channel_id": channel_id,
-                "author_id": test_user_id
-            },
-            "Testing COLOR command (expecting premium requirement)"
+            session,
+            base_url,
+            {"command": "color", "args": "#FF0000", "channel_id": channel_id, "author_id": test_user_id},
+            "Testing COLOR command (expecting premium requirement)",
         )
 
         await asyncio.sleep(1)
 
         # Test 2: Team create without premium
         await execute_and_log(
-            session, base_url,
-            {
-                "command": "team",
-                "args": "create TestTeam",
-                "channel_id": channel_id,
-                "author_id": test_user_id
-            },
-            "Testing TEAM CREATE command (expecting premium requirement)"
+            session,
+            base_url,
+            {"command": "team", "args": "create TestTeam", "channel_id": channel_id, "author_id": test_user_id},
+            "Testing TEAM CREATE command (expecting premium requirement)",
         )
 
         await asyncio.sleep(1)
 
         # Test 3: Check team status
         await execute_and_log(
-            session, base_url,
-            {
-                "command": "team",
-                "channel_id": channel_id,
-                "author_id": test_user_id
-            },
-            "Testing TEAM command (check current status)"
+            session,
+            base_url,
+            {"command": "team", "channel_id": channel_id, "author_id": test_user_id},
+            "Testing TEAM command (check current status)",
         )
 
         await asyncio.sleep(1)
 
         # Test 4: Shop command
         await execute_and_log(
-            session, base_url,
-            {
-                "command": "shop",
-                "channel_id": channel_id,
-                "author_id": test_user_id
-            },
-            "Testing SHOP command"
+            session,
+            base_url,
+            {"command": "shop", "channel_id": channel_id, "author_id": test_user_id},
+            "Testing SHOP command",
         )
 
         print("\n" + "=" * 60)

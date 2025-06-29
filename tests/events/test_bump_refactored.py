@@ -60,9 +60,7 @@ class TestBumpHandlers:
         with patch("cogs.events.bump.handlers.NotificationLogQueries") as mock_queries:
             # Test no previous notification (not on cooldown)
             mock_queries.get_last_notification.return_value = None
-            is_on_cooldown = await handler.check_cooldown(
-                mock_session, 123456, "dzik", SERVICE_COOLDOWNS["dzik"]
-            )
+            is_on_cooldown = await handler.check_cooldown(mock_session, 123456, "dzik", SERVICE_COOLDOWNS["dzik"])
             assert not is_on_cooldown
 
             # Test recent notification (on cooldown)
@@ -70,9 +68,7 @@ class TestBumpHandlers:
             mock_notification.timestamp = datetime.now(timezone.utc) - timedelta(hours=1)
             mock_queries.get_last_notification.return_value = mock_notification
 
-            is_on_cooldown = await handler.check_cooldown(
-                mock_session, 123456, "dzik", SERVICE_COOLDOWNS["dzik"]
-            )
+            is_on_cooldown = await handler.check_cooldown(mock_session, 123456, "dzik", SERVICE_COOLDOWNS["dzik"])
             assert is_on_cooldown  # Should be on cooldown (3 hour cooldown, only 1 hour passed)
 
 

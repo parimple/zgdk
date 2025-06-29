@@ -19,6 +19,7 @@ from tests.utils.client import TestClient
 
 def check_bot_connection() -> bool:
     """Check if bot is running and accessible."""
+
     async def check():
         client = TestClient()
         status = await client.check_status()
@@ -53,8 +54,7 @@ def discover_tests(test_modules: Optional[List[str]] = None) -> unittest.TestSui
         return loader.discover(start_dir, pattern="test_*.py")
 
 
-def run_tests(verbosity: int = 2, failfast: bool = False,
-              test_modules: Optional[List[str]] = None) -> bool:
+def run_tests(verbosity: int = 2, failfast: bool = False, test_modules: Optional[List[str]] = None) -> bool:
     """Run the test suite."""
     # Check bot connection first
     print("Checking bot connection...")
@@ -69,17 +69,14 @@ def run_tests(verbosity: int = 2, failfast: bool = False,
     suite = discover_tests(test_modules)
 
     # Run tests
-    runner = unittest.TextTestRunner(
-        verbosity=verbosity,
-        failfast=failfast
-    )
+    runner = unittest.TextTestRunner(verbosity=verbosity, failfast=failfast)
 
     result = runner.run(suite)
 
     # Print summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST SUMMARY")
-    print("="*70)
+    print("=" * 70)
     print(f"Tests run: {result.testsRun}")
     print(f"Failures: {len(result.failures)}")
     print(f"Errors: {len(result.errors)}")
@@ -96,14 +93,10 @@ def run_tests(verbosity: int = 2, failfast: bool = False,
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Run Discord bot tests")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                       help="Increase verbosity")
-    parser.add_argument("-q", "--quiet", action="store_true",
-                       help="Decrease verbosity")
-    parser.add_argument("-", "--failfast", action="store_true",
-                       help="Stop on first failure")
-    parser.add_argument("modules", nargs="*",
-                       help="Specific test modules to run (e.g., commands.test_mute_commands)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Increase verbosity")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Decrease verbosity")
+    parser.add_argument("-", "--failfast", action="store_true", help="Stop on first failure")
+    parser.add_argument("modules", nargs="*", help="Specific test modules to run (e.g., commands.test_mute_commands)")
 
     args = parser.parse_args()
 
@@ -116,9 +109,7 @@ def main():
 
     # Run tests
     success = run_tests(
-        verbosity=verbosity,
-        failfast=args.failfast,
-        test_modules=args.modules if args.modules else None
+        verbosity=verbosity, failfast=args.failfast, test_modules=args.modules if args.modules else None
     )
 
     # Exit with appropriate code

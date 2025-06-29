@@ -23,10 +23,7 @@ async def test_voice_command(command: str, args: str = "", channel_id: int = TES
     print(f"{'='*60}")
 
     try:
-        result = await call_mcp_tool("execute_command", {
-            "command": command,
-            "args": args
-        })
+        result = await call_mcp_tool("execute_command", {"command": command, "args": args})
 
         if result and result.get("result"):
             content = result["result"].get("content", [])
@@ -38,22 +35,24 @@ async def test_voice_command(command: str, args: str = "", channel_id: int = TES
                         print("\nSuccess: Command executed")
 
                         # Parse response
-                        if 'content' in data:
+                        if "content" in data:
                             print(f"Content: {data['content']}")
 
-                        if 'embeds' in data and data['embeds']:
-                            for i, embed in enumerate(data['embeds']):
+                        if "embeds" in data and data["embeds"]:
+                            for i, embed in enumerate(data["embeds"]):
                                 print(f"\nEmbed {i+1}:")
-                                if embed.get('title'):
+                                if embed.get("title"):
                                     print(f"  Title: {embed['title']}")
-                                if embed.get('description'):
+                                if embed.get("description"):
                                     print(f"  Description: {embed['description'][:200]}...")
-                                if embed.get('fields'):
+                                if embed.get("fields"):
                                     print(f"  Fields: {len(embed['fields'])}")
-                                    for field in embed['fields'][:3]:
-                                        print(f"    - {field.get('name', 'No name')}: {field.get('value', 'No value')[:50]}...")
+                                    for field in embed["fields"][:3]:
+                                        print(
+                                            f"    - {field.get('name', 'No name')}: {field.get('value', 'No value')[:50]}..."
+                                        )
 
-                        if 'error' in data:
+                        if "error" in data:
                             print(f"\nError: {data['error']}")
 
                     except json.JSONDecodeError:
@@ -78,7 +77,7 @@ async def main():
         # Test common voice commands
         commands = [
             ("vc", ""),  # Show voice channel info
-            ("c", ""),   # Toggle connect permission
+            ("c", ""),  # Toggle connect permission
             ("voicechat", ""),  # Full command name
             ("voice", "info"),  # Voice info subcommand
             ("voice", "limit 5"),  # Set member limit
@@ -88,6 +87,7 @@ async def main():
         for cmd, args in commands:
             await test_voice_command(cmd, args)
             await asyncio.sleep(2)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

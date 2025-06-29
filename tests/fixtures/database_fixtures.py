@@ -28,11 +28,7 @@ def database_url():
 @pytest.fixture
 async def async_engine(database_url):
     """Create async engine for testing"""
-    engine = create_async_engine(
-        database_url,
-        echo=False,  # Set to True for SQL debugging
-        future=True
-    )
+    engine = create_async_engine(database_url, echo=False, future=True)  # Set to True for SQL debugging
 
     # Create all tables
     async with engine.begin() as conn:
@@ -47,11 +43,7 @@ async def async_engine(database_url):
 @pytest.fixture
 async def async_session_factory(async_engine):
     """Create async session factory"""
-    return sessionmaker(
-        bind=async_engine,
-        class_=AsyncSession,
-        expire_on_commit=False
-    )
+    return sessionmaker(bind=async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 @pytest.fixture
@@ -93,7 +85,7 @@ def default_database_items():
         wallet_balance=WALLET_BALANCES["medium"],
         first_inviter_id=None,
         current_inviter_id=None,
-        joined_at=now
+        joined_at=now,
     )
     items.append(member1)
 
@@ -102,48 +94,28 @@ def default_database_items():
         wallet_balance=WALLET_BALANCES["high"],
         first_inviter_id=TEST_USER_1_ID,
         current_inviter_id=TEST_USER_1_ID,
-        joined_at=now
+        joined_at=now,
     )
     items.append(member2)
 
     # Create test roles
-    role1 = Role(
-        id=ROLE_ZG50_ID,
-        name="zG50",
-        role_type="premium"
-    )
+    role1 = Role(id=ROLE_ZG50_ID, name="zG50", role_type="premium")
     items.append(role1)
 
-    role2 = Role(
-        id=ROLE_ZG100_ID,
-        name="zG100",
-        role_type="premium"
-    )
+    role2 = Role(id=ROLE_ZG100_ID, name="zG100", role_type="premium")
     items.append(role2)
 
     # Create test member roles (premium assignments)
     member_role1 = MemberRole(
-        member_id=TEST_USER_1_ID,
-        role_id=ROLE_ZG50_ID,
-        expiration_date=datetime(2025, 12, 31, tzinfo=timezone.utc)
+        member_id=TEST_USER_1_ID, role_id=ROLE_ZG50_ID, expiration_date=datetime(2025, 12, 31, tzinfo=timezone.utc)
     )
     items.append(member_role1)
 
     # Create test activities
-    activity1 = Activity(
-        member_id=TEST_USER_1_ID,
-        date=now,
-        activity_type="text",
-        points=500
-    )
+    activity1 = Activity(member_id=TEST_USER_1_ID, date=now, activity_type="text", points=500)
     items.append(activity1)
 
-    activity2 = Activity(
-        member_id=TEST_USER_2_ID,
-        date=now,
-        activity_type="voice",
-        points=800
-    )
+    activity2 = Activity(member_id=TEST_USER_2_ID, date=now, activity_type="voice", points=800)
     items.append(activity2)
 
     # Create test payment
@@ -152,18 +124,12 @@ def default_database_items():
         name="Test Payment",
         amount=WALLET_BALANCES["zg50_price"],
         paid_at=now,
-        payment_type="role_purchase"
+        payment_type="role_purchase",
     )
     items.append(payment1)
 
     # Create test invite
-    invite1 = Invite(
-        id="TEST123",
-        creator_id=TEST_USER_1_ID,
-        uses=5,
-        created_at=now,
-        last_used_at=None
-    )
+    invite1 = Invite(id="TEST123", creator_id=TEST_USER_1_ID, uses=5, created_at=now, last_used_at=None)
     items.append(invite1)
 
     return items
@@ -202,7 +168,7 @@ def sample_member_data():
         "id": TEST_USER_1_ID,
         "wallet_balance": WALLET_BALANCES["medium"],
         "first_inviter_id": None,
-        "current_inviter_id": None
+        "current_inviter_id": None,
     }
 
 
@@ -214,7 +180,7 @@ def sample_payment_data():
         "name": "Test Payment",
         "amount": 500,
         "payment_type": "role_purchase",
-        "paid_at": datetime.now(timezone.utc)
+        "paid_at": datetime.now(timezone.utc),
     }
 
 
@@ -222,12 +188,8 @@ def sample_payment_data():
 def sample_activity_data():
     """Sample activity data for testing"""
     from datetime import datetime, timezone
-    return {
-        "member_id": TEST_USER_1_ID,
-        "date": datetime.now(timezone.utc),
-        "activity_type": "text",
-        "points": 100
-    }
+
+    return {"member_id": TEST_USER_1_ID, "date": datetime.now(timezone.utc), "activity_type": "text", "points": 100}
 
 
 @pytest.fixture
@@ -236,7 +198,7 @@ def sample_premium_role_data():
     return {
         "member_id": TEST_USER_1_ID,
         "role_id": ROLE_ZG50_ID,
-        "expiration_date": datetime(2025, 12, 31, tzinfo=timezone.utc)
+        "expiration_date": datetime(2025, 12, 31, tzinfo=timezone.utc),
     }
 
 
@@ -294,7 +256,7 @@ def mock_role_queries():
         "role_id": ROLE_ZG50_ID,
         "role_name": "zG50",
         "expiration_date": datetime(2025, 12, 31, tzinfo=timezone.utc),
-        "is_active": True
+        "is_active": True,
     }
     queries.get_member_premium_roles = AsyncMock(return_value=[role_data])
 

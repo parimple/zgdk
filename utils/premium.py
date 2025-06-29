@@ -359,7 +359,7 @@ class TipplyDataProvider(DataProvider):
 
             # Create a set of last handled payments for efficient lookup
             last_handled_set = set(last_handled_tuples)
-            
+
             # Find truly new payments by checking which ones aren't in the last handled set
             new_payments = []
             for payment in all_payments:

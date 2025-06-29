@@ -29,18 +29,19 @@ class TestTeamWorkflow(BaseCommandTest):
         self.bot.config["team"] = {
             "symbol": "☫",
             "base_role_id": 960665311730868240,
-            "category_id": 1344105013357842522
+            "category_id": 1344105013357842522,
         }
 
         # Set up premium roles config
         self.bot.config["premium_roles"] = [
             {"name": "zG100", "team_members": 5},
             {"name": "zG500", "team_members": 10},
-            {"name": "zG1000", "team_members": 15}
+            {"name": "zG1000", "team_members": 15},
         ]
 
         # Mock role creation
         self.created_roles = []
+
         async def create_role(**kwargs):
             role = MagicMock(spec=discord.Role)
             role.id = len(self.created_roles) + 1000
@@ -74,7 +75,7 @@ class TestTeamWorkflow(BaseCommandTest):
         client = TestClient(self.bot)
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock role service
             role_service = AsyncMock()
             role_service.create_role = AsyncMock()
@@ -113,9 +114,7 @@ class TestTeamWorkflow(BaseCommandTest):
 
             # Check database was updated
             role_service.create_role.assert_called_once_with(
-                discord_id=self.created_roles[0].id,
-                name=str(self.author.id),
-                role_type="team"
+                discord_id=self.created_roles[0].id, name=str(self.author.id), role_type="team"
             )
 
     @pytest.mark.asyncio
@@ -134,7 +133,7 @@ class TestTeamWorkflow(BaseCommandTest):
         self.author.roles.append(emoji_role)
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock services
             role_service = AsyncMock()
             role_service.create_role = AsyncMock()
@@ -186,7 +185,7 @@ class TestTeamWorkflow(BaseCommandTest):
         test_member.remove_roles = AsyncMock()
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock role service with ownership
             role_service = AsyncMock()
             db_role = MagicMock()
@@ -282,7 +281,7 @@ class TestTeamWorkflow(BaseCommandTest):
         new_owner.roles.append(premium_role)
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock role service
             role_service = AsyncMock()
             db_role = MagicMock()
@@ -310,7 +309,7 @@ class TestTeamWorkflow(BaseCommandTest):
             mock_get_service.side_effect = get_service
 
             # Mock get_db context manager
-            with patch.object(self.bot, 'get_db') as mock_get_db:
+            with patch.object(self.bot, "get_db") as mock_get_db:
                 mock_get_db.return_value.__aenter__.return_value = session
                 mock_get_db.return_value.__aexit__.return_value = None
 
@@ -340,7 +339,7 @@ class TestTeamWorkflow(BaseCommandTest):
         self.author.roles.append(team_role)
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock role service
             role_service = AsyncMock()
             db_role = MagicMock()
@@ -362,7 +361,7 @@ class TestTeamWorkflow(BaseCommandTest):
             mock_get_service.side_effect = get_service
 
             # Mock get_db context manager
-            with patch.object(self.bot, 'get_db') as mock_get_db:
+            with patch.object(self.bot, "get_db") as mock_get_db:
                 mock_get_db.return_value.__aenter__.return_value = session
                 mock_get_db.return_value.__aexit__.return_value = None
 
@@ -398,7 +397,7 @@ class TestTeamWorkflow(BaseCommandTest):
         self.author.roles = self.author.roles[:-1]  # Remove premium role
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock premium service
             premium_service = AsyncMock()
             premium_service.set_guild = MagicMock()
@@ -422,7 +421,7 @@ class TestTeamWorkflow(BaseCommandTest):
         premium_role.name = "zG100"
         self.author.roles.append(premium_role)
 
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock services to allow creation
             role_service = AsyncMock()
             role_service.get_role_by_discord_id = AsyncMock(return_value=None)

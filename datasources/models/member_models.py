@@ -2,12 +2,19 @@
 Member-related SQLAlchemy models.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import MEMBER_ID, ROLE_ID, Base
+
+if TYPE_CHECKING:
+    from .invite_models import Invite
+    from .role_models import Role
 
 
 class Member(Base):

@@ -37,25 +37,16 @@ async def list_tools() -> List[Tool]:
             input_schema={
                 "type": "object",
                 "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The command to execute (e.g., 'profile', 'shop')"
-                    },
-                    "args": {
-                        "type": "string",
-                        "description": "Optional command arguments"
-                    }
+                    "command": {"type": "string", "description": "The command to execute (e.g., 'profile', 'shop')"},
+                    "args": {"type": "string", "description": "Optional command arguments"},
                 },
-                "required": ["command"]
-            }
+                "required": ["command"],
+            },
         ),
         Tool(
             name="bot_status",
             description="Check if the bot API is running",
-            input_schema={
-                "type": "object",
-                "properties": {}
-            }
+            input_schema={"type": "object", "properties": {}},
         ),
         Tool(
             name="last_response",
@@ -63,14 +54,11 @@ async def list_tools() -> List[Tool]:
             input_schema={
                 "type": "object",
                 "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The command to get the last response for"
-                    }
+                    "command": {"type": "string", "description": "The command to get the last response for"}
                 },
-                "required": ["command"]
-            }
-        )
+                "required": ["command"],
+            },
+        ),
     ]
 
 

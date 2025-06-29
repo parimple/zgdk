@@ -57,9 +57,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
 
         # Member has both roles
         member.roles = [role1, role2]
-        guild.get_role.side_effect = (
-            lambda id: role1 if id == 789 else role2 if id == 101 else None
-        )
+        guild.get_role.side_effect = lambda id: role1 if id == 789 else role2 if id == 101 else None
 
         # Make remove_roles a coroutine mock
         member.remove_roles = AsyncMock()
@@ -78,18 +76,14 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         notification_handler = AsyncMock()
 
         # Call the method
-        removed_count = await self.role_manager.check_expired_roles(
-            notification_handler=notification_handler
-        )
+        removed_count = await self.role_manager.check_expired_roles(notification_handler=notification_handler)
 
         # Verify only role1 was removed
         member.remove_roles.assert_called_once()
         self.assertEqual(member.remove_roles.call_count, 1)
 
         # Verify database operations
-        mock_role_queries.delete_member_role.assert_called_with(
-            self.session, member.id, role1.id
-        )
+        mock_role_queries.delete_member_role.assert_called_with(self.session, member.id, role1.id)
 
         # Verify notification was sent
         notification_handler.assert_called_once()
@@ -100,9 +94,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
     @patch("utils.role_manager.NotificationLogQueries")
     @patch("utils.role_manager.RoleQueries")
     @patch("utils.role_manager.logger")
-    async def test_batch_processing_of_expired_roles(
-        self, mock_logger, mock_role_queries, mock_notif_queries
-    ):
+    async def test_batch_processing_of_expired_roles(self, mock_logger, mock_role_queries, mock_notif_queries):
         """Test that multiple roles for the same user are processed in batch"""
         # Setup mocks
         guild = MagicMock()
@@ -172,9 +164,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         notification_handler = AsyncMock()
 
         # Call the method
-        removed_count = await self.role_manager.check_expired_roles(
-            notification_handler=notification_handler
-        )
+        removed_count = await self.role_manager.check_expired_roles(notification_handler=notification_handler)
 
         # Verify roles were removed
         self.assertEqual(member.remove_roles.call_count, 1)
@@ -191,9 +181,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
     @patch("utils.role_manager.NotificationLogQueries")
     @patch("utils.role_manager.RoleQueries")
     @patch("utils.role_manager.logger")
-    async def test_notifications_sent_after_commit_success(
-        self, mock_logger, mock_role_queries, mock_notif_queries
-    ):
+    async def test_notifications_sent_after_commit_success(self, mock_logger, mock_role_queries, mock_notif_queries):
         """Test that notifications are sent only after successful database commit"""
         # Setup mocks
         guild = MagicMock()
@@ -245,16 +233,12 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         track_notification_mock = AsyncMock(side_effect=track_notification)
 
         # Call the method
-        removed_count = await self.role_manager.check_expired_roles(
-            notification_handler=track_notification_mock
-        )
+        removed_count = await self.role_manager.check_expired_roles(notification_handler=track_notification_mock)
 
         # Debug: print what actually happened
         print(f"Debug: call_order = {call_order}")
         print(f"Debug: removed_count = {removed_count}")
-        print(
-            f"Debug: track_notification_mock.call_count = {track_notification_mock.call_count}"
-        )
+        print(f"Debug: track_notification_mock.call_count = {track_notification_mock.call_count}")
 
         # Verify notification was called after commit
         self.assertEqual(call_order, ["commit", "notification"])
@@ -264,9 +248,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
     @patch("utils.role_manager.NotificationLogQueries")
     @patch("utils.role_manager.RoleQueries")
     @patch("utils.role_manager.logger")
-    async def test_no_notifications_sent_when_commit_fails(
-        self, mock_logger, mock_role_queries, mock_notif_queries
-    ):
+    async def test_no_notifications_sent_when_commit_fails(self, mock_logger, mock_role_queries, mock_notif_queries):
         """Test that no notifications are sent when database commit fails"""
         # Setup mocks
         guild = MagicMock()
@@ -303,9 +285,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         notification_handler = AsyncMock()
 
         # Call the method - should handle commit failure gracefully
-        removed_count = await self.role_manager.check_expired_roles(
-            notification_handler=notification_handler
-        )
+        removed_count = await self.role_manager.check_expired_roles(notification_handler=notification_handler)
 
         # Verify no notification was sent due to commit failure
         notification_handler.assert_not_called()
@@ -314,9 +294,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
     @patch("utils.role_manager.NotificationLogQueries")
     @patch("utils.role_manager.RoleQueries")
     @patch("utils.role_manager.logger")
-    async def test_role_in_db_but_not_on_discord_cleanup(
-        self, mock_logger, mock_role_queries, mock_notif_queries
-    ):
+    async def test_role_in_db_but_not_on_discord_cleanup(self, mock_logger, mock_role_queries, mock_notif_queries):
         """Test that roles in DB but not assigned on Discord are cleaned up WITH notification"""
         # Setup mocks
         guild = MagicMock()
@@ -344,9 +322,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         expired_role.role_id = 789
         expired_role.expiration_date = datetime.now() - timedelta(days=1)
 
-        print(
-            f"Debug: Setting up expired_role with member_id={expired_role.member_id}, role_id={expired_role.role_id}"
-        )
+        print(f"Debug: Setting up expired_role with member_id={expired_role.member_id}, role_id={expired_role.role_id}")
         mock_role_queries.get_expired_roles = AsyncMock(return_value=[expired_role])
         mock_role_queries.delete_member_role = AsyncMock()
         mock_notif_queries.add_or_update_notification_log = AsyncMock()
@@ -355,24 +331,18 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         notification_handler = AsyncMock()
 
         # Call the method
-        removed_count = await self.role_manager.check_expired_roles(
-            notification_handler=notification_handler
-        )
+        removed_count = await self.role_manager.check_expired_roles(notification_handler=notification_handler)
 
         # Debug: print what actually happened
         print(f"Debug: removed_count = {removed_count}")
-        print(
-            f"Debug: delete_member_role call count = {mock_role_queries.delete_member_role.call_count}"
-        )
+        print(f"Debug: delete_member_role call count = {mock_role_queries.delete_member_role.call_count}")
         print(f"Debug: remove_roles call count = {member.remove_roles.call_count}")
 
         # Verify role was NOT removed from Discord (since user doesn't have it)
         member.remove_roles.assert_not_called()
 
         # Verify database cleanup happened
-        mock_role_queries.delete_member_role.assert_called_once_with(
-            self.session, member.id, role.id
-        )
+        mock_role_queries.delete_member_role.assert_called_once_with(self.session, member.id, role.id)
 
         # Verify notification WAS sent (new behavior)
         notification_handler.assert_called_once()
@@ -383,9 +353,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
     @patch("utils.role_manager.NotificationLogQueries")
     @patch("utils.role_manager.RoleQueries")
     @patch("utils.role_manager.logger")
-    async def test_member_left_server_cleanup(
-        self, mock_logger, mock_role_queries, mock_notif_queries
-    ):
+    async def test_member_left_server_cleanup(self, mock_logger, mock_role_queries, mock_notif_queries):
         """Test that expired roles for members who left the server are cleaned up without notification"""
         # Setup mocks
         guild = MagicMock()
@@ -393,9 +361,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         self.bot.guild = guild
 
         # Member left server - fetch_member raises NotFound
-        guild.fetch_member = AsyncMock(
-            side_effect=discord.NotFound(MagicMock(), "Member not found")
-        )
+        guild.fetch_member = AsyncMock(side_effect=discord.NotFound(MagicMock(), "Member not found"))
 
         # Create expired role in DB for missing member
         expired_role = MagicMock()
@@ -411,9 +377,7 @@ class TestRoleManager(unittest.IsolatedAsyncioTestCase):
         notification_handler = AsyncMock()
 
         # Call the method
-        removed_count = await self.role_manager.check_expired_roles(
-            notification_handler=notification_handler
-        )
+        removed_count = await self.role_manager.check_expired_roles(notification_handler=notification_handler)
 
         # Verify database cleanup happened
         mock_role_queries.delete_member_role.assert_called_once_with(

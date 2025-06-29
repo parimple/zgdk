@@ -27,43 +27,43 @@ async def test_debug_premium():
                 "command": "team",
                 "args": "create TestTeam",
                 "author_id": test_user_id,
-                "expected": "Should fail - no premium role"
+                "expected": "Should fail - no premium role",
             },
             {
                 "description": "2. Testing team info command",
                 "command": "team",
                 "args": "",
                 "author_id": test_user_id,
-                "expected": "Should show 'no team' message"
+                "expected": "Should show 'no team' message",
             },
             {
                 "description": "3. Testing color command",
                 "command": "color",
                 "args": "#FF0000",
                 "author_id": test_user_id,
-                "expected": "Should fail - no premium role"
+                "expected": "Should fail - no premium role",
             },
             {
                 "description": "4. Testing profile command",
                 "command": "profile",
                 "args": "",
                 "author_id": test_user_id,
-                "expected": "Should work for everyone"
+                "expected": "Should work for everyone",
             },
             {
                 "description": "5. Testing balance command",
                 "command": "balance",
                 "args": "",
                 "author_id": test_user_id,
-                "expected": "Should show current balance"
+                "expected": "Should show current balance",
             },
             {
                 "description": "6. Testing voice mod command",
                 "command": "mod",
                 "args": f"<@{test_user_id}>",
                 "author_id": test_user_id,
-                "expected": "Should fail - requires premium"
-            }
+                "expected": "Should fail - requires premium",
+            },
         ]
 
         for test in test_cases:
@@ -73,20 +73,14 @@ async def test_debug_premium():
             print(f"Command: ,{test['command']} {test['args']}")
             print(f"Expected: {test['expected']}")
 
-            command_data = {
-                "command": test["command"],
-                "channel_id": channel_id,
-                "author_id": test["author_id"]
-            }
+            command_data = {"command": test["command"], "channel_id": channel_id, "author_id": test["author_id"]}
 
             if test["args"]:
                 command_data["args"] = test["args"]
 
             try:
                 async with session.post(
-                    f"{base_url}/execute",
-                    json=command_data,
-                    timeout=aiohttp.ClientTimeout(total=10)
+                    f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     data = await response.json()
                     print(f"Result: {'✅ Command accepted' if data.get('success') else '❌ Command failed'}")

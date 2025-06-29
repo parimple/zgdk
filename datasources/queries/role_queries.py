@@ -328,7 +328,7 @@ class RoleQueries:
         try:
             # Użyj delete() zamiast surowego SQL
             stmt = delete(MemberRole).where((MemberRole.member_id == member_id) & (MemberRole.role_id == role_id))
-            result = await session.execute(stmt)
+            await session.execute(stmt)
             await session.flush()
             logger.info(f"ORM deletion of role {role_id} for member {member_id} succeeded")
             return True

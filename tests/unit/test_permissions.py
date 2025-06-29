@@ -15,10 +15,7 @@ class TestPermissionSystem:
         """Test owner permission with owner_ids list."""
         # Mock bot and config
         bot = Mock()
-        bot.config = {
-            "owner_ids": [123456789, 987654321],
-            "owner_id": 123456789
-        }
+        bot.config = {"owner_ids": [123456789, 987654321], "owner_id": 123456789}
 
         # Mock member
         member = Mock()
@@ -32,10 +29,7 @@ class TestPermissionSystem:
     def test_non_owner_permission(self):
         """Test non-owner user."""
         bot = Mock()
-        bot.config = {
-            "owner_ids": [123456789],
-            "owner_id": 123456789
-        }
+        bot.config = {"owner_ids": [123456789], "owner_id": 123456789}
 
         member = Mock()
         member.id = 555555555  # Not in owner list

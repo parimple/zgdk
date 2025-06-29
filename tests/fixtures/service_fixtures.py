@@ -34,12 +34,14 @@ def mock_premium_service():
     service = AsyncMock()
 
     # Mock premium roles data
-    premium_roles = [{
-        "role_id": ROLE_ZG50_ID,
-        "role_name": "zG50",
-        "expiration_date": datetime(2025, 12, 31, tzinfo=timezone.utc),
-        "is_active": True
-    }]
+    premium_roles = [
+        {
+            "role_id": ROLE_ZG50_ID,
+            "role_name": "zG50",
+            "expiration_date": datetime(2025, 12, 31, tzinfo=timezone.utc),
+            "is_active": True,
+        }
+    ]
 
     service.get_member_premium_roles = AsyncMock(return_value=premium_roles)
     service.has_premium_role = AsyncMock(return_value=True)
@@ -66,7 +68,7 @@ def mock_activity_service():
     leaderboard = [
         {"member_id": TEST_USER_1_ID, "points": 1000, "rank": 1},
         {"member_id": TEST_USER_1_ID + 1, "points": 800, "rank": 2},
-        {"member_id": TEST_USER_1_ID + 2, "points": 600, "rank": 3}
+        {"member_id": TEST_USER_1_ID + 2, "points": 600, "rank": 3},
     ]
 
     service.get_leaderboard = AsyncMock(return_value=leaderboard)
@@ -98,12 +100,7 @@ def mock_invite_service():
     service = AsyncMock()
 
     # Mock invite data
-    invite_data = {
-        "code": "TEST123",
-        "creator_id": TEST_USER_1_ID,
-        "uses": 5,
-        "max_uses": 10
-    }
+    invite_data = {"code": "TEST123", "creator_id": TEST_USER_1_ID, "uses": 5, "max_uses": 10}
 
     service.get_invite_by_code = AsyncMock(return_value=invite_data)
     service.create_invite = AsyncMock(return_value=invite_data)
@@ -142,12 +139,14 @@ def mock_service_manager():
     member_service.update_member_info = AsyncMock()
 
     premium_service = AsyncMock()
-    premium_roles = [{
-        "role_id": ROLE_ZG50_ID,
-        "role_name": "zG50",
-        "expiration_date": datetime(2025, 12, 31, tzinfo=timezone.utc),
-        "is_active": True
-    }]
+    premium_roles = [
+        {
+            "role_id": ROLE_ZG50_ID,
+            "role_name": "zG50",
+            "expiration_date": datetime(2025, 12, 31, tzinfo=timezone.utc),
+            "is_active": True,
+        }
+    ]
     premium_service.get_member_premium_roles = AsyncMock(return_value=premium_roles)
     premium_service.has_premium_role = AsyncMock(return_value=True)
 
@@ -158,22 +157,22 @@ def mock_service_manager():
 
     # Map service interfaces to implementations
     service_map = {
-        'IMemberService': member_service,
-        'IPremiumService': premium_service,
-        'IActivityService': activity_service,
-        'IModerationService': moderation_service,
-        'IInviteService': invite_service,
-        'INotificationService': notification_service
+        "IMemberService": member_service,
+        "IPremiumService": premium_service,
+        "IActivityService": activity_service,
+        "IModerationService": moderation_service,
+        "IInviteService": invite_service,
+        "INotificationService": notification_service,
     }
 
     async def get_service(interface, session=None):
         # Simple interface matching - just return member_service for any interface containing "Member"
         interface_str = str(interface)
-        if 'IMemberService' in interface_str or 'Member' in interface_str:
+        if "IMemberService" in interface_str or "Member" in interface_str:
             return member_service
-        elif 'IPremiumService' in interface_str or 'Premium' in interface_str:
+        elif "IPremiumService" in interface_str or "Premium" in interface_str:
             return premium_service
-        elif 'IActivityService' in interface_str or 'Activity' in interface_str:
+        elif "IActivityService" in interface_str or "Activity" in interface_str:
             return activity_service
         else:
             return AsyncMock()
@@ -194,17 +193,10 @@ def mock_bot_with_services(mock_service_manager, mock_database_context_manager):
             {"name": "zG50", "price": 49, "duration": 30},
             {"name": "zG100", "price": 99, "duration": 30},
             {"name": "zG500", "price": 499, "duration": 30},
-            {"name": "zG1000", "price": 999, "duration": 30}
+            {"name": "zG1000", "price": 999, "duration": 30},
         ],
-        "emojis": {
-            "success": "✅",
-            "error": "❌",
-            "mastercard": "💳"
-        },
-        "channels": {
-            "premium_info": 123456789,
-            "mute_logs": 987654321
-        }
+        "emojis": {"success": "✅", "error": "❌", "mastercard": "💳"},
+        "channels": {"premium_info": 123456789, "mute_logs": 987654321},
     }
 
     # Database and services
@@ -274,8 +266,4 @@ def mock_discord_member(mock_discord_user):
 @pytest.fixture
 def integration_test_setup(mock_bot_with_services, mock_discord_context):
     """Complete setup for integration testing"""
-    return {
-        "bot": mock_bot_with_services,
-        "ctx": mock_discord_context,
-        "user": mock_discord_context.author
-    }
+    return {"bot": mock_bot_with_services, "ctx": mock_discord_context, "user": mock_discord_context.author}

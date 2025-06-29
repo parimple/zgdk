@@ -34,7 +34,9 @@ class TestVoicePermissionCommands(BaseCommandTest):
             self.voice_channel.overwrites[target] = overwrite
 
         self.voice_channel.set_permissions = AsyncMock(side_effect=set_permissions)
-        self.voice_channel.overwrites_for = lambda t: self.voice_channel.overwrites.get(t, discord.PermissionOverwrite())
+        self.voice_channel.overwrites_for = lambda t: self.voice_channel.overwrites.get(
+            t, discord.PermissionOverwrite()
+        )
 
         yield
 
@@ -48,14 +50,14 @@ class TestVoicePermissionCommands(BaseCommandTest):
         self.voice_channel.overwrites[self.author] = mod_perms
 
         # Mock premium service
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             premium_service = AsyncMock()
             premium_service.check_command_access.return_value = (True, "Access granted")
             mock_get_service.return_value = premium_service
 
             # Test toggling speak permission
             ctx = self.create_context("speak @everyone")
-            cog = self.bot.get_cog('VoiceCog')
+            cog = self.bot.get_cog("VoiceCog")
             await cog.speak(ctx)
 
             # Check permission was set
@@ -76,7 +78,7 @@ class TestVoicePermissionCommands(BaseCommandTest):
         ctx = self.create_context(f"view <@{TEST_USER_ID}> +")
         ctx.author = self.author
 
-        cog = self.bot.get_cog('VoiceCog')
+        cog = self.bot.get_cog("VoiceCog")
         await cog.view(ctx, test_member, "+")
 
         # Check permission was set
@@ -96,7 +98,7 @@ class TestVoicePermissionCommands(BaseCommandTest):
         ctx = self.create_context(f"connect <@{TEST_USER_ID}> -")
         ctx.author = self.author
 
-        cog = self.bot.get_cog('VoiceCog')
+        cog = self.bot.get_cog("VoiceCog")
         await cog.connect(ctx, test_member, "-")
 
         # Check permission was set
@@ -115,7 +117,7 @@ class TestVoicePermissionCommands(BaseCommandTest):
         ctx = self.create_context("text @everyone +")
         ctx.author = self.author
 
-        cog = self.bot.get_cog('VoiceCog')
+        cog = self.bot.get_cog("VoiceCog")
         await cog.text(ctx, self.guild.default_role, "+")
 
         # Check permission was set
@@ -131,7 +133,7 @@ class TestVoicePermissionCommands(BaseCommandTest):
         self.voice_channel.overwrites[self.author] = mod_perms
 
         # Mock premium service
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             premium_service = AsyncMock()
             premium_service.check_command_access.return_value = (True, "Access granted")
             mock_get_service.return_value = premium_service
@@ -141,7 +143,7 @@ class TestVoicePermissionCommands(BaseCommandTest):
             ctx = self.create_context(f"live <@{TEST_USER_ID}> +")
             ctx.author = self.author
 
-            cog = self.bot.get_cog('VoiceCog')
+            cog = self.bot.get_cog("VoiceCog")
             await cog.live(ctx, test_member, "+")
 
             # Check permission was set
@@ -167,7 +169,7 @@ class TestVoicePermissionCommands(BaseCommandTest):
         ctx = self.create_context(f"mod <@{TEST_USER_ID}> +")
         ctx.author = self.author
 
-        cog = self.bot.get_cog('VoiceCog')
+        cog = self.bot.get_cog("VoiceCog")
         await cog.mod(ctx, test_member, "+")
 
         # Check permission was set
@@ -209,7 +211,7 @@ class TestVoiceChannelCommands(BaseCommandTest):
 
         voice_channel.connect = AsyncMock(side_effect=mock_connect)
 
-        cog = self.bot.get_cog('VoiceCog')
+        cog = self.bot.get_cog("VoiceCog")
         await cog.join(ctx)
 
         # Check bot connected
@@ -233,11 +235,11 @@ class TestVoiceChannelCommands(BaseCommandTest):
         voice_channel.overwrites_for = lambda t: mod_perms if t == self.author else discord.PermissionOverwrite()
 
         # Mock premium check
-        with patch.object(self.bot.cogs['VoiceCog'].premium_checker, 'check_voice_access', return_value=(True, None)):
+        with patch.object(self.bot.cogs["VoiceCog"].premium_checker, "check_voice_access", return_value=(True, None)):
             ctx = self.create_context("limit 10")
             ctx.author = self.author
 
-            cog = self.bot.get_cog('VoiceCog')
+            cog = self.bot.get_cog("VoiceCog")
             await cog.limit(ctx, 10)
 
             # Check limit was set
@@ -258,17 +260,17 @@ class TestVoiceChannelCommands(BaseCommandTest):
         self.author.voice = voice_state
 
         # Mock premium check
-        with patch.object(self.bot.cogs['VoiceCog'].premium_checker, 'check_voice_access', return_value=(True, None)):
+        with patch.object(self.bot.cogs["VoiceCog"].premium_checker, "check_voice_access", return_value=(True, None)):
             ctx = self.create_context("voicechat")
             ctx.author = self.author
 
-            cog = self.bot.get_cog('VoiceCog')
+            cog = self.bot.get_cog("VoiceCog")
             await cog.voicechat(ctx)
 
             # Check response sent
             ctx.send.assert_called()
-            if hasattr(ctx.send.call_args[1], 'embed'):
-                embed = ctx.send.call_args[1]['embed']
+            if hasattr(ctx.send.call_args[1], "embed"):
+                embed = ctx.send.call_args[1]["embed"]
                 assert voice_channel.name in embed.title
 
 
@@ -295,7 +297,9 @@ class TestVoiceAdminCommands(BaseCommandTest):
 
         # Mock channel methods
         self.voice_channel.set_permissions = AsyncMock()
-        self.voice_channel.overwrites_for = lambda t: self.voice_channel.overwrites.get(t, discord.PermissionOverwrite())
+        self.voice_channel.overwrites_for = lambda t: self.voice_channel.overwrites.get(
+            t, discord.PermissionOverwrite()
+        )
 
         yield
 
@@ -305,31 +309,31 @@ class TestVoiceAdminCommands(BaseCommandTest):
     async def test_autokick_command(self):
         """Test autokick command."""
         # Mock premium tier check
-        with patch.object(self.bot.cogs['VoiceCog'].premium_checker, 'check_premium_tier', return_value=(True, None)):
+        with patch.object(self.bot.cogs["VoiceCog"].premium_checker, "check_premium_tier", return_value=(True, None)):
             # Test listing empty autokick
             ctx = self.create_context("autokick")
             ctx.author = self.author
 
-            cog = self.bot.get_cog('VoiceCog')
+            cog = self.bot.get_cog("VoiceCog")
             await cog.autokick(ctx)
 
             # Check embed sent
             ctx.send.assert_called()
             embed_call = ctx.send.call_args[1]
-            if 'embed' in embed_call:
-                embed = embed_call['embed']
+            if "embed" in embed_call:
+                embed = embed_call["embed"]
                 assert "Lista autokick" in embed.title
 
     @pytest.mark.asyncio
     async def test_reset_command(self):
         """Test reset command."""
         # Mock premium access check
-        with patch.object(self.bot.cogs['VoiceCog'].premium_checker, 'check_voice_access', return_value=(True, None)):
+        with patch.object(self.bot.cogs["VoiceCog"].premium_checker, "check_voice_access", return_value=(True, None)):
             # Test reset all permissions
             ctx = self.create_context("reset")
             ctx.author = self.author
 
-            cog = self.bot.get_cog('VoiceCog')
+            cog = self.bot.get_cog("VoiceCog")
             await cog.reset(ctx)
 
             # Check response sent
@@ -343,8 +347,10 @@ class TestVoiceAdminCommands(BaseCommandTest):
         ctx.author = self.author
 
         # Mock debug method
-        with patch.object(self.bot.cogs['VoiceCog'].premium_checker, 'debug_alternative_access', return_value="Debug info"):
-            cog = self.bot.get_cog('VoiceCog')
+        with patch.object(
+            self.bot.cogs["VoiceCog"].premium_checker, "debug_alternative_access", return_value="Debug info"
+        ):
+            cog = self.bot.get_cog("VoiceCog")
             await cog.debug_access(ctx)
 
             # Check response sent
@@ -371,21 +377,21 @@ class TestVoiceAdminCommands(BaseCommandTest):
             "errors": 2,
             "avg_processing_time": 15.5,
             "cache_hits": 80,
-            "cache_misses": 20
+            "cache_misses": 20,
         }
 
         # Add to bot cogs
-        self.bot.cogs['VoiceEvent'] = voice_event
+        self.bot.cogs["VoiceEvent"] = voice_event
 
         ctx = self.create_context("voice_stats")
         ctx.author = self.author
 
-        cog = self.bot.get_cog('VoiceCog')
+        cog = self.bot.get_cog("VoiceCog")
         await cog.voice_stats(ctx)
 
         # Check embed sent
         ctx.send.assert_called()
         embed_call = ctx.send.call_args[1]
-        if 'embed' in embed_call:
-            embed = embed_call['embed']
+        if "embed" in embed_call:
+            embed = embed_call["embed"]
             assert "Voice System Statistics" in embed.title

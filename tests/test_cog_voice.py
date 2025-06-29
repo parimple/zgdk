@@ -16,9 +16,7 @@ def voice_cog(bot) -> VoiceCog:
 
 
 @pytest.mark.asyncio
-async def test_limit_command(
-    voice_cog: VoiceCog, ctx: commands.Context
-):  # pylint: disable=redefined-outer-name
+async def test_limit_command(voice_cog: VoiceCog, ctx: commands.Context):  # pylint: disable=redefined-outer-name
     """Test the limit command."""
     limit_command = get_command(voice_cog, "limit")
 

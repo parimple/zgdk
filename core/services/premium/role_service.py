@@ -114,7 +114,7 @@ class PremiumRoleService(BaseService, IPremiumRoleManager):
     async def get_member_premium_roles(self, member_id: int) -> list[dict]:
         """Get all premium roles for a member with expiration info."""
         try:
-            async with self.bot.get_db() as session:
+            async with self.bot.get_db():
                 premium_roles = await self.premium_repository.get_member_premium_roles(member_id)
 
                 roles_info = []
@@ -277,7 +277,7 @@ class PremiumRoleService(BaseService, IPremiumRoleManager):
         try:
             expired_roles = []
 
-            async with self.bot.get_db() as session:
+            async with self.bot.get_db():
                 # Get all expired roles
                 expired = await self.premium_repository.get_expired_premium_roles()
 

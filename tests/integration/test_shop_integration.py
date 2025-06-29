@@ -10,6 +10,7 @@ from tests.test_config import TEST_CONFIG, TEST_SCENARIOS
 
 logger = logging.getLogger(__name__)
 
+
 class BotIntegrationTester:
     """Integration tester for Discord bot functionality"""
 
@@ -107,7 +108,7 @@ class BotIntegrationTester:
                     "initial_balance": 0,
                     "added_amount": TEST_SCENARIOS["balance_test"]["initial_amount"],
                     "final_balance": TEST_SCENARIOS["balance_test"]["expected_balance"],
-                }
+                },
             }
         except Exception as e:
             return {
@@ -132,7 +133,7 @@ class BotIntegrationTester:
                 "details": {
                     "roles_found": TEST_SCENARIOS["shop_display"]["expected_roles"],
                     "pricing_correct": True,
-                }
+                },
             }
         except Exception as e:
             return {
@@ -163,7 +164,7 @@ class BotIntegrationTester:
                     "amount_charged": scenario["role_price"],
                     "balance_after": scenario["expected_balance_after"],
                     "role_assigned": True,
-                }
+                },
             }
         except Exception as e:
             return {
@@ -172,6 +173,7 @@ class BotIntegrationTester:
                 "error": str(e),
                 "description": "Role purchase flow test failed",
             }
+
 
 async def run_integration_tests():
     """Main function to run integration tests"""
@@ -190,6 +192,7 @@ async def run_integration_tests():
         print(f"{status_icon} {result['test_name']}: {result['description']}")
 
     return results
+
 
 if __name__ == "__main__":
     asyncio.run(run_integration_tests())

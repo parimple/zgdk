@@ -5,19 +5,18 @@ Professional test implementation with proper fixtures and mocking
 from unittest.mock import patch
 
 
-async def test_giveawayss_success_current_channel(giveaway_cog, mock_ctx, mock_regular_messages, mock_channel_with_history):
+async def test_giveawayss_success_current_channel(
+    giveaway_cog, mock_ctx, mock_regular_messages, mock_channel_with_history
+):
     """Test successful giveaway in current channel with proper winner selection"""
     # Arrange
     mock_channel_with_history(mock_regular_messages)
 
-    with patch('random.choice') as mock_random, \
-         patch.object(giveaway_cog.message_sender, 'send_giveaway_results') as mock_send_results:
+    with patch("random.choice") as mock_random, patch.object(
+        giveaway_cog.message_sender, "send_giveaway_results"
+    ) as mock_send_results:
 
-        mock_random.side_effect = [
-            mock_regular_messages[0],
-            mock_regular_messages[2],
-            mock_regular_messages[4]
-        ]
+        mock_random.side_effect = [mock_regular_messages[0], mock_regular_messages[2], mock_regular_messages[4]]
 
         # Act
         await giveaway_cog.giveawayss(mock_ctx, 3)
@@ -44,8 +43,9 @@ async def test_giveawayss_success_specific_channel(giveaway_cog, mock_ctx, mock_
 
     target_channel.history.return_value.__aiter__ = async_iter
 
-    with patch('random.choice') as mock_random, \
-         patch.object(giveaway_cog.message_sender, 'send_giveaway_results') as mock_send_results:
+    with patch("random.choice") as mock_random, patch.object(
+        giveaway_cog.message_sender, "send_giveaway_results"
+    ) as mock_send_results:
 
         mock_random.return_value = mock_regular_messages[0]
 
@@ -59,16 +59,17 @@ async def test_giveawayss_success_specific_channel(giveaway_cog, mock_ctx, mock_
         assert args[2] == target_channel  # correct target channel used
 
 
-async def test_giveawayss_filters_bot_messages_excludes_webhooks(giveaway_cog, mock_ctx, mock_regular_messages,
-                                                               mock_bot_messages, mock_webhook_messages,
-                                                               mock_channel_with_history):
+async def test_giveawayss_filters_bot_messages_excludes_webhooks(
+    giveaway_cog, mock_ctx, mock_regular_messages, mock_bot_messages, mock_webhook_messages, mock_channel_with_history
+):
     """Test that bot messages are filtered out but webhook messages are included"""
     # Arrange
     all_messages = mock_regular_messages + mock_bot_messages + mock_webhook_messages
     mock_channel_with_history(all_messages)
 
-    with patch('random.choice') as mock_random, \
-         patch.object(giveaway_cog.message_sender, 'send_giveaway_results') as mock_send_results:
+    with patch("random.choice") as mock_random, patch.object(
+        giveaway_cog.message_sender, "send_giveaway_results"
+    ) as mock_send_results:
 
         # Mock to return a webhook message to verify it's included
         mock_random.return_value = mock_webhook_messages[0]
@@ -86,12 +87,14 @@ async def test_giveawayss_filters_bot_messages_excludes_webhooks(giveaway_cog, m
         assert winners[0].webhook_id is not None
 
 
-async def test_giveawayss_enforces_unique_authors(giveaway_cog, mock_ctx, mock_messages_same_author, mock_channel_with_history):
+async def test_giveawayss_enforces_unique_authors(
+    giveaway_cog, mock_ctx, mock_messages_same_author, mock_channel_with_history
+):
     """Test that only one message per author is selected (uniqueness constraint)"""
     # Arrange
     mock_channel_with_history(mock_messages_same_author)
 
-    with patch.object(giveaway_cog.message_sender, 'send_giveaway_results') as mock_send_results:
+    with patch.object(giveaway_cog.message_sender, "send_giveaway_results") as mock_send_results:
 
         # Act
         await giveaway_cog.giveawayss(mock_ctx, 3)  # Request 3 winners from same author
@@ -106,8 +109,9 @@ async def test_giveawayss_enforces_unique_authors(giveaway_cog, mock_ctx, mock_m
         assert all(w.author.id == mock_messages_same_author[0].author.id for w in winners)
 
 
-async def test_giveawayss_webhook_messages_bypass_unique_constraint(giveaway_cog, mock_ctx, mock_webhook_messages,
-                                                                   mock_channel_with_history, test_constants):
+async def test_giveawayss_webhook_messages_bypass_unique_constraint(
+    giveaway_cog, mock_ctx, mock_webhook_messages, mock_channel_with_history, test_constants
+):
     """Test that webhook messages don't have unique author constraint"""
     # Arrange - All webhook messages have same author but different webhook_ids
     for msg in mock_webhook_messages:
@@ -115,8 +119,9 @@ async def test_giveawayss_webhook_messages_bypass_unique_constraint(giveaway_cog
 
     mock_channel_with_history(mock_webhook_messages)
 
-    with patch('random.choice') as mock_random, \
-         patch.object(giveaway_cog.message_sender, 'send_giveaway_results') as mock_send_results:
+    with patch("random.choice") as mock_random, patch.object(
+        giveaway_cog.message_sender, "send_giveaway_results"
+    ) as mock_send_results:
 
         mock_random.side_effect = mock_webhook_messages
 
@@ -136,7 +141,7 @@ async def test_giveawayss_webhook_messages_bypass_unique_constraint(giveaway_cog
 async def test_giveawayss_invalid_winners_count_zero(giveaway_cog, mock_ctx):
     """Test giveaway with zero winners count returns error"""
     # Arrange & Act
-    with patch.object(giveaway_cog.message_sender, 'send_error') as mock_send_error:
+    with patch.object(giveaway_cog.message_sender, "send_error") as mock_send_error:
         await giveaway_cog.giveawayss(mock_ctx, 0)
 
         # Assert
@@ -148,7 +153,7 @@ async def test_giveawayss_invalid_winners_count_zero(giveaway_cog, mock_ctx):
 async def test_giveawayss_invalid_winners_count_negative(giveaway_cog, mock_ctx):
     """Test giveaway with negative winners count returns error"""
     # Arrange & Act
-    with patch.object(giveaway_cog.message_sender, 'send_error') as mock_send_error:
+    with patch.object(giveaway_cog.message_sender, "send_error") as mock_send_error:
         await giveaway_cog.giveawayss(mock_ctx, -5)
 
         # Assert
@@ -160,7 +165,7 @@ async def test_giveawayss_no_messages_in_channel(giveaway_cog, mock_ctx, mock_ch
     # Arrange
     mock_channel_with_history([])  # Empty channel
 
-    with patch.object(giveaway_cog.message_sender, 'send_error') as mock_send_error:
+    with patch.object(giveaway_cog.message_sender, "send_error") as mock_send_error:
 
         # Act
         await giveaway_cog.giveawayss(mock_ctx, 3)
@@ -171,12 +176,14 @@ async def test_giveawayss_no_messages_in_channel(giveaway_cog, mock_ctx, mock_ch
         assert "Brak wiadomości do wylosowania" in error_message
 
 
-async def test_giveawayss_only_bot_messages_no_webhooks(giveaway_cog, mock_ctx, mock_bot_messages, mock_channel_with_history):
+async def test_giveawayss_only_bot_messages_no_webhooks(
+    giveaway_cog, mock_ctx, mock_bot_messages, mock_channel_with_history
+):
     """Test giveaway when channel has only bot messages (no webhooks)"""
     # Arrange
     mock_channel_with_history(mock_bot_messages)
 
-    with patch.object(giveaway_cog.message_sender, 'send_error') as mock_send_error:
+    with patch.object(giveaway_cog.message_sender, "send_error") as mock_send_error:
 
         # Act
         await giveaway_cog.giveawayss(mock_ctx, 3)
@@ -187,8 +194,9 @@ async def test_giveawayss_only_bot_messages_no_webhooks(giveaway_cog, mock_ctx, 
         assert "Brak wiadomości do wylosowania" in error_message
 
 
-async def test_giveawayss_insufficient_unique_authors(giveaway_cog, mock_ctx, mock_channel_with_history,
-                                                     mock_message_factory, test_constants):
+async def test_giveawayss_insufficient_unique_authors(
+    giveaway_cog, mock_ctx, mock_channel_with_history, mock_message_factory, test_constants
+):
     """Test when fewer unique authors exist than requested winners"""
     # Arrange - Create messages from only 2 unique authors
     messages = []
@@ -199,13 +207,13 @@ async def test_giveawayss_insufficient_unique_authors(giveaway_cog, mock_ctx, mo
             message = mock_message_factory.create_message(
                 message_id=test_constants.MESSAGE_BASE_ID + author_id + i,
                 author_id=author_id,
-                content=f"Message from {author_id}"
+                content=f"Message from {author_id}",
             )
             messages.append(message)
 
     mock_channel_with_history(messages)
 
-    with patch.object(giveaway_cog.message_sender, 'send_giveaway_results') as mock_send_results:
+    with patch.object(giveaway_cog.message_sender, "send_giveaway_results") as mock_send_results:
 
         # Act
         await giveaway_cog.giveawayss(mock_ctx, 5)  # Request more than unique authors
@@ -223,20 +231,20 @@ async def test_giveawayss_insufficient_unique_authors(giveaway_cog, mock_ctx, mo
         assert len(winner_author_ids) == len(winners)
 
 
-async def test_giveawayss_algorithm_exhaustion_handling(giveaway_cog, mock_ctx, mock_channel_with_history,
-                                                       mock_message_factory, test_constants):
+async def test_giveawayss_algorithm_exhaustion_handling(
+    giveaway_cog, mock_ctx, mock_channel_with_history, mock_message_factory, test_constants
+):
     """Test algorithm behavior when it can't find enough unique winners"""
     # Arrange - Edge case: very few messages, complex author distribution
     messages = [
         mock_message_factory.create_message(
-            message_id=test_constants.MESSAGE_BASE_ID + 1,
-            author_id=test_constants.TEST_USER_1_ID
+            message_id=test_constants.MESSAGE_BASE_ID + 1, author_id=test_constants.TEST_USER_1_ID
         )
     ]
 
     mock_channel_with_history(messages)
 
-    with patch.object(giveaway_cog.message_sender, 'send_giveaway_results') as mock_send_results:
+    with patch.object(giveaway_cog.message_sender, "send_giveaway_results") as mock_send_results:
 
         # Act
         await giveaway_cog.giveawayss(mock_ctx, 3)  # Request more than possible
@@ -250,13 +258,16 @@ async def test_giveawayss_algorithm_exhaustion_handling(giveaway_cog, mock_ctx, 
         assert len(winners) <= 1
 
 
-async def test_giveawayss_random_selection_distribution(giveaway_cog, mock_ctx, mock_regular_messages, mock_channel_with_history):
+async def test_giveawayss_random_selection_distribution(
+    giveaway_cog, mock_ctx, mock_regular_messages, mock_channel_with_history
+):
     """Test that random selection properly uses random.choice"""
     # Arrange
     mock_channel_with_history(mock_regular_messages)
 
-    with patch('random.choice') as mock_random, \
-         patch.object(giveaway_cog.message_sender, 'send_giveaway_results') as mock_send_results:
+    with patch("random.choice") as mock_random, patch.object(
+        giveaway_cog.message_sender, "send_giveaway_results"
+    ) as mock_send_results:
 
         expected_winners = [mock_regular_messages[1], mock_regular_messages[3]]
         mock_random.side_effect = expected_winners
@@ -278,14 +289,15 @@ async def test_giveawayss_permission_enforcement(giveaway_cog, mock_ctx):
     """Test that giveawayss command has administrator permission requirement"""
     # Arrange & Assert
     # Verify command has permission decorator
-    assert hasattr(giveaway_cog.giveawayss, '__wrapped__')
+    assert hasattr(giveaway_cog.giveawayss, "__wrapped__")
 
     # The actual permission checking is handled by Discord.py decorator
     # This test ensures the decorator is properly applied
 
 
-async def test_giveawayss_large_channel_performance(giveaway_cog, mock_ctx, mock_channel_with_history,
-                                                   mock_message_factory, test_constants):
+async def test_giveawayss_large_channel_performance(
+    giveaway_cog, mock_ctx, mock_channel_with_history, mock_message_factory, test_constants
+):
     """Test giveaway performance with large number of messages"""
     # Arrange - Simulate large channel
     large_message_set = []
@@ -293,13 +305,13 @@ async def test_giveawayss_large_channel_performance(giveaway_cog, mock_ctx, mock
         message = mock_message_factory.create_message(
             message_id=test_constants.MESSAGE_BASE_ID + i,
             author_id=test_constants.TEST_USER_1_ID + (i % 20),  # 20 unique authors
-            content=f"Large channel message {i}"
+            content=f"Large channel message {i}",
         )
         large_message_set.append(message)
 
     mock_channel_with_history(large_message_set)
 
-    with patch.object(giveaway_cog.message_sender, 'send_giveaway_results') as mock_send_results:
+    with patch.object(giveaway_cog.message_sender, "send_giveaway_results") as mock_send_results:
 
         # Act
         await giveaway_cog.giveawayss(mock_ctx, 10)

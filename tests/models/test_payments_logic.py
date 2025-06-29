@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 from tests.data.test_constants import SAMPLE_PAYMENT_DATA, TEST_USER_1_ID, WALLET_BALANCES
 
 
-@patch('discord.utils.format_dt')
-@patch('discord.Embed')
+@patch("discord.utils.format_dt")
+@patch("discord.Embed")
 def test_payments_embed_structure(mock_embed_class, mock_format_dt):
     """Test payments embed structure and content"""
     # Arrange
@@ -24,7 +24,7 @@ def test_payments_embed_structure(mock_embed_class, mock_format_dt):
             name="TestUser1",
             amount=WALLET_BALANCES["zg50_price"],
             paid_at=datetime.now(timezone.utc),
-            payment_type="role_purchase"
+            payment_type="role_purchase",
         ),
         MagicMock(
             id=2,
@@ -32,8 +32,8 @@ def test_payments_embed_structure(mock_embed_class, mock_format_dt):
             name="TestUser2",
             amount=WALLET_BALANCES["zg100_price"],
             paid_at=datetime.now(timezone.utc),
-            payment_type="balance_add"
-        )
+            payment_type="balance_add",
+        ),
     ]
 
     # Act - Create embed manually as the real command does
@@ -76,7 +76,7 @@ def test_payment_amount_ranges():
         WALLET_BALANCES["zg50_price"],
         WALLET_BALANCES["zg100_price"],
         WALLET_BALANCES["zg500_price"],
-        WALLET_BALANCES["zg1000_price"]
+        WALLET_BALANCES["zg1000_price"],
     ]
 
     # Act & Assert
@@ -102,14 +102,14 @@ def test_payment_query_limit_default():
     assert isinstance(default_limit, int)
 
 
-@patch('discord.utils.format_dt', return_value="2024-01-01")
+@patch("discord.utils.format_dt", return_value="2024-01-01")
 def test_payment_date_formatting(mock_format_dt):
     """Test payment date is properly formatted"""
     # Arrange
     test_date = datetime.now(timezone.utc)
 
     # Act
-    formatted_date = mock_format_dt(test_date, 'D')
+    formatted_date = mock_format_dt(test_date, "D")
 
     # Assert - verify it returns a string (actual Discord formatting)
     assert isinstance(formatted_date, str)

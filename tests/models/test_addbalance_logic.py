@@ -72,7 +72,7 @@ def test_payment_data_structure_complete():
         "name": expected_name,
         "amount": expected_amount,
         "paid_at": expected_timestamp,
-        "payment_type": expected_type
+        "payment_type": expected_type,
     }
 
     # Verify structure

@@ -14,10 +14,7 @@ async def test_bump_status_command():
 
     # Create mock bot
     bot = MagicMock()
-    bot.config = {
-        "prefix": ",",
-        "owner_id": 123456789
-    }
+    bot.config = {"prefix": ",", "owner_id": 123456789}
     bot.get_db = AsyncMock()
 
     # Create mock context
@@ -36,7 +33,7 @@ async def test_bump_status_command():
     cog = OnBumpEvent(bot)
 
     # Mock the status handler to avoid database calls
-    with patch.object(cog.status_handler, 'show_status', new_callable=AsyncMock) as mock_show_status:
+    with patch.object(cog.status_handler, "show_status", new_callable=AsyncMock) as mock_show_status:
         # Call the command
         await cog.bump_status(ctx)
 
@@ -49,9 +46,9 @@ async def test_bump_status_command():
         member = call_args[1]
 
         # Verify fake interaction has required attributes
-        assert hasattr(fake_interaction, 'response')
-        assert hasattr(fake_interaction.response, 'defer')
-        assert hasattr(fake_interaction, 'user')
+        assert hasattr(fake_interaction, "response")
+        assert hasattr(fake_interaction.response, "defer")
+        assert hasattr(fake_interaction, "user")
         assert fake_interaction.user == ctx.author
         assert member == ctx.author
 
@@ -91,7 +88,7 @@ async def test_disboard_bump_detection():
     cog = OnBumpEvent(bot)
 
     # Mock the handler
-    with patch.object(cog.disboard_handler, 'handle', new_callable=AsyncMock) as mock_handle:
+    with patch.object(cog.disboard_handler, "handle", new_callable=AsyncMock) as mock_handle:
         # Process the message
         await cog.on_message(message)
 

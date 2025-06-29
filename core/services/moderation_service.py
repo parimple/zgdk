@@ -1,7 +1,7 @@
 """Moderation service for managing server moderation actions."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 import discord
@@ -44,10 +44,6 @@ class ModerationService(BaseService, IModerationService):
             await self.member_repository.get_or_create(target.id)
             # Ensure moderator exists in database
             await self.member_repository.get_or_create(moderator.id)
-
-            expires_at = None
-            if duration_seconds:
-                expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
 
             if channel_id is None:
                 channel_id = 0  # Default fallback

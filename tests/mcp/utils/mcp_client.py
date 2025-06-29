@@ -15,23 +15,19 @@ async def call_mcp_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, 
     """Call an MCP tool and return the result."""
 
     # Prepare the request
-    request = {
-        "jsonrpc": "2.0",
-        "method": "tools/call",
-        "params": {
-            "name": tool_name,
-            "arguments": arguments
-        },
-        "id": 1
-    }
+    request = {"jsonrpc": "2.0", "method": "tools/call", "params": {"name": tool_name, "arguments": arguments}, "id": 1}
 
     # Convert to JSON
     _request_json = json.dumps(request)
 
     # Call MCP server through docker exec
     cmd = [
-        "docker", "exec", "-i", "zgdk-mcp-1",
-        "python", "-c",
+        "docker",
+        "exec",
+        "-i",
+        "zgdk-mcp-1",
+        "python",
+        "-c",
         """
 import sys
 import json
@@ -53,7 +49,7 @@ async def main():
     print(json.dumps(response))
 
 asyncio.run(main())
-"""
+""",
     ]
 
     try:
@@ -82,10 +78,7 @@ class MCPBotClient:
 
     async def execute_command(self, command: str, args: str = "", send_to_channel: bool = False) -> str:
         """Execute a Discord bot command."""
-        response = await call_mcp_tool("execute_command", {
-            "command": command,
-            "args": args
-        })
+        response = await call_mcp_tool("execute_command", {"command": command, "args": args})
         if "result" in response:
             return response["result"]["content"][0]["text"]
         return f"Error: {response.get('error', 'Unknown error')}"

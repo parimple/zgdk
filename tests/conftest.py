@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 # Mock Discord modules BEFORE any imports (gentler approach)
 # Following your brilliant solution A - stub only what we need, leave commands alone
-discord_mock = types.ModuleType("discord")          # bare module
+discord_mock = types.ModuleType("discord")  # bare module
 discord_ext_mock = types.ModuleType("discord.ext")
 discord_ext_commands_mock = types.ModuleType("discord.ext.commands")
 discord_ui_mock = types.ModuleType("discord.ui")
-discord_ui_mock.View = MagicMock()                   # shop_views needs it
+discord_ui_mock.View = MagicMock()  # shop_views needs it
 
 # Add commands module attributes
 discord_ext_commands_mock.Cog = MagicMock
@@ -47,22 +47,26 @@ sys.modules["discord.ext.commands"] = discord_ext_commands_mock
 sys.modules["discord.ui"] = discord_ui_mock
 
 # Mock other problematic modules
-sys.modules['utils.permissions'] = MagicMock()
-sys.modules['utils.currency'] = MagicMock()
-sys.modules['core.interfaces.member_interfaces'] = MagicMock()
-sys.modules['core.interfaces.premium_interfaces'] = MagicMock()
-sys.modules['cogs.ui.shop_embeds'] = MagicMock()
-sys.modules['cogs.views.shop_views'] = MagicMock()
+sys.modules["utils.permissions"] = MagicMock()
+sys.modules["utils.currency"] = MagicMock()
+sys.modules["core.interfaces.member_interfaces"] = MagicMock()
+sys.modules["core.interfaces.premium_interfaces"] = MagicMock()
+sys.modules["cogs.ui.shop_embeds"] = MagicMock()
+sys.modules["cogs.views.shop_views"] = MagicMock()
 
 # Mock datasources and its submodules properly
 datasources_mod = types.ModuleType("datasources")
 
 # Mock datasources.queries
 queries_mod = types.ModuleType("datasources.queries")
+
+
 class _HPQ:  # HandledPaymentQueries
     add_payment = AsyncMock()
     get_payment_by_id = AsyncMock()
     get_last_payments = AsyncMock()
+
+
 queries_mod.HandledPaymentQueries = _HPQ
 
 # Mock datasources.models
@@ -72,9 +76,19 @@ models_base_mod.Base = MagicMock()
 models_mod.base = models_base_mod
 
 # Mock all model classes
-for model_name in ['Member', 'MemberRole', 'Activity', 'Role', 'HandledPayment',
-                   'Invite', 'AutoKick', 'ModerationLog', 'ChannelPermission',
-                   'Message', 'NotificationLog']:
+for model_name in [
+    "Member",
+    "MemberRole",
+    "Activity",
+    "Role",
+    "HandledPayment",
+    "Invite",
+    "AutoKick",
+    "ModerationLog",
+    "ChannelPermission",
+    "Message",
+    "NotificationLog",
+]:
     setattr(models_mod, model_name, MagicMock())
 
 # Set up module hierarchy
@@ -87,17 +101,21 @@ sys.modules["datasources.models"] = models_mod
 sys.modules["datasources.models.base"] = models_base_mod
 
 # Mock utils.premium with working PaymentData
-mock_premium = types.ModuleType('utils.premium')
+mock_premium = types.ModuleType("utils.premium")
+
+
 class PaymentData:
     def __init__(self, name, amount, paid_at, payment_type):
         self.name = name
         self.amount = amount
         self.paid_at = paid_at
         self.payment_type = payment_type
+
+
 mock_premium.PaymentData = PaymentData
 mock_premium.PremiumManager = MagicMock()
 mock_premium.TipplyDataProvider = MagicMock()
-sys.modules['utils.premium'] = mock_premium
+sys.modules["utils.premium"] = mock_premium
 
 # Now safe to import
 import discord
@@ -108,7 +126,6 @@ from tests.fixtures.database_fixtures import *  # noqa
 from tests.fixtures.service_fixtures import *  # noqa
 
 # Note: discord.ext.commands is now stubbed per-test for flexibility
-
 
 
 @pytest.fixture

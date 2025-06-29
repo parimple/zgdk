@@ -42,11 +42,7 @@ async def test_wallet_balance_calculation():
 def test_role_configuration_validation():
     """Test role configuration structure"""
     # Arrange
-    role_config = {
-        "name": "zG50",
-        "price": 500,
-        "duration": 30
-    }
+    role_config = {"name": "zG50", "price": 500, "duration": 30}
 
     # Act & Assert
     assert role_config["name"] == "zG50"
@@ -62,7 +58,7 @@ def test_premium_role_data_structure():
         "role_id": 123456,
         "role_name": "zG50",
         "expiration_date": datetime.now(timezone.utc),
-        "is_active": True
+        "is_active": True,
     }
 
     # Act & Assert
@@ -98,7 +94,7 @@ def test_payment_data_structure():
         "name": "TestUser",
         "amount": 1000,
         "paid_at": datetime.now(timezone.utc),
-        "payment_type": "command"
+        "payment_type": "command",
     }
 
     # Act & Assert

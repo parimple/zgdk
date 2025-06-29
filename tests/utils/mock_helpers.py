@@ -27,9 +27,7 @@ def make_mock_bot():
 
     # Member service with async methods
     member_service = AsyncMock()
-    member_service.get_or_create_member = AsyncMock(
-        return_value=AsyncMock(wallet_balance=1000)
-    )
+    member_service.get_or_create_member = AsyncMock(return_value=AsyncMock(wallet_balance=1000))
     member_service.update_member_info = AsyncMock()
 
     # Premium service with async methods
@@ -41,9 +39,9 @@ def make_mock_bot():
     # Service mapping
     def get_service_mock(interface, session=None):
         interface_str = str(interface)
-        if 'Member' in interface_str:
+        if "Member" in interface_str:
             return member_service
-        elif 'Premium' in interface_str:
+        elif "Premium" in interface_str:
             return premium_service
         else:
             return AsyncMock()
@@ -62,7 +60,7 @@ def make_mock_bot():
         },
         "channels": {
             "premium_info": 123456789,
-        }
+        },
     }
 
     return bot
@@ -116,9 +114,9 @@ def make_mock_member(user_id=123456789):
 def patch_shop_queries():
     """Return dict of common shop query patches"""
     return {
-        'cogs.commands.shop.HandledPaymentQueries.add_payment': AsyncMock,
-        'cogs.commands.shop.HandledPaymentQueries.get_payment_by_id': AsyncMock,
-        'cogs.commands.shop.HandledPaymentQueries.get_last_payments': AsyncMock,
+        "cogs.commands.shop.HandledPaymentQueries.add_payment": AsyncMock,
+        "cogs.commands.shop.HandledPaymentQueries.get_payment_by_id": AsyncMock,
+        "cogs.commands.shop.HandledPaymentQueries.get_last_payments": AsyncMock,
     }
 
 

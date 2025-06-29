@@ -69,9 +69,7 @@ async def test_delete_user_teams_with_teams():
     team_role2 = MagicMock(spec=discord.Role)
     team_role2.id = 222
 
-    bot.guild.get_role.side_effect = lambda id: {111: team_role1, 222: team_role2}.get(
-        id
-    )
+    bot.guild.get_role.side_effect = lambda id: {111: team_role1, 222: team_role2}.get(id)
 
     # Mock channels
     channel1 = MagicMock(spec=discord.TextChannel)

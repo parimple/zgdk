@@ -53,9 +53,7 @@ class TestRoleSaleManager:
     """Test cases for RoleSaleManager."""
 
     @pytest.mark.asyncio
-    async def test_sell_role_success(
-        self, mock_bot, mock_member, mock_role, mock_interaction
-    ):
+    async def test_sell_role_success(self, mock_bot, mock_member, mock_role, mock_interaction):
         """Test successful role sale."""
         # Setup
         sale_manager = RoleSaleManager(mock_bot)
@@ -76,9 +74,7 @@ class TestRoleSaleManager:
         # Mock all the async operations
         with patch("utils.role_sale.RoleQueries") as mock_role_queries, patch(
             "utils.role_sale.MemberQueries"
-        ) as mock_member_queries, patch(
-            "utils.role_sale.calculate_refund", return_value=50
-        ):
+        ) as mock_member_queries, patch("utils.role_sale.calculate_refund", return_value=50):
             # Setup the database mock - get_db powinno być funkcją zwracającą context manager
             mock_bot.get_db = MagicMock(return_value=mock_context_manager)
 
@@ -98,9 +94,7 @@ class TestRoleSaleManager:
             sale_manager._remove_premium_privileges = AsyncMock()
 
             # Execute
-            success, message, refund = await sale_manager.sell_role(
-                mock_member, mock_role, mock_interaction
-            )
+            success, message, refund = await sale_manager.sell_role(mock_member, mock_role, mock_interaction)
 
             # Assert
             assert success is True
@@ -109,33 +103,25 @@ class TestRoleSaleManager:
 
             # Verify calls
             mock_member.remove_roles.assert_called_once_with(mock_role)
-            mock_member_queries.add_to_wallet_balance.assert_called_once_with(
-                mock_session, mock_member.id, 50
-            )
+            mock_member_queries.add_to_wallet_balance.assert_called_once_with(mock_session, mock_member.id, 50)
             mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_sell_role_user_doesnt_have_role(
-        self, mock_bot, mock_member, mock_role, mock_interaction
-    ):
+    async def test_sell_role_user_doesnt_have_role(self, mock_bot, mock_member, mock_role, mock_interaction):
         """Test selling role when user doesn't have it."""
         sale_manager = RoleSaleManager(mock_bot)
 
         # Member doesn't have the role
         mock_member.roles = []
 
-        success, message, refund = await sale_manager.sell_role(
-            mock_member, mock_role, mock_interaction
-        )
+        success, message, refund = await sale_manager.sell_role(mock_member, mock_role, mock_interaction)
 
         assert success is False
         assert "Nie posiadasz tej roli na Discord" in message
         assert refund is None
 
     @pytest.mark.asyncio
-    async def test_sell_role_not_in_database(
-        self, mock_bot, mock_member, mock_role, mock_interaction
-    ):
+    async def test_sell_role_not_in_database(self, mock_bot, mock_member, mock_role, mock_interaction):
         """Test selling role when it's not in database."""
         sale_manager = RoleSaleManager(mock_bot)
 
@@ -155,18 +141,14 @@ class TestRoleSaleManager:
             # Role not in database - mock as AsyncMock
             mock_role_queries.get_member_role = AsyncMock(return_value=None)
 
-            success, message, refund = await sale_manager.sell_role(
-                mock_member, mock_role, mock_interaction
-            )
+            success, message, refund = await sale_manager.sell_role(mock_member, mock_role, mock_interaction)
 
             assert success is False
             assert "Nie posiadasz tej roli w bazie danych" in message
             assert refund is None
 
     @pytest.mark.asyncio
-    async def test_sell_role_database_error_rollback(
-        self, mock_bot, mock_member, mock_role, mock_interaction
-    ):
+    async def test_sell_role_database_error_rollback(self, mock_bot, mock_member, mock_role, mock_interaction):
         """Test role sale with database error and rollback."""
         sale_manager = RoleSaleManager(mock_bot)
 
@@ -201,9 +183,7 @@ class TestRoleSaleManager:
             mock_session.commit = AsyncMock()
             mock_session.rollback = AsyncMock()
 
-            success, message, refund = await sale_manager.sell_role(
-                mock_member, mock_role, mock_interaction
-            )
+            success, message, refund = await sale_manager.sell_role(mock_member, mock_role, mock_interaction)
 
             assert success is False
             assert "Nie udało się usunąć roli z bazy danych" in message
@@ -218,23 +198,17 @@ class TestRoleSaleManager:
         sale_manager = RoleSaleManager(mock_bot)
 
         # Test with None member
-        success, message, refund = await sale_manager.sell_role(
-            None, MagicMock(), mock_interaction
-        )
+        success, message, refund = await sale_manager.sell_role(None, MagicMock(), mock_interaction)
         assert success is False
         assert "Nieprawidłowe dane wejściowe" in message
 
         # Test with None role
-        success, message, refund = await sale_manager.sell_role(
-            MagicMock(), None, mock_interaction
-        )
+        success, message, refund = await sale_manager.sell_role(MagicMock(), None, mock_interaction)
         assert success is False
         assert "Nieprawidłowe dane wejściowe" in message
 
     @pytest.mark.asyncio
-    async def test_sell_role_config_not_found(
-        self, mock_bot, mock_member, mock_role, mock_interaction
-    ):
+    async def test_sell_role_config_not_found(self, mock_bot, mock_member, mock_role, mock_interaction):
         """Test selling role when config is not found."""
         sale_manager = RoleSaleManager(mock_bot)
 
@@ -244,9 +218,7 @@ class TestRoleSaleManager:
         # Role not in config
         mock_role.name = "UnknownRole"
 
-        success, message, refund = await sale_manager.sell_role(
-            mock_member, mock_role, mock_interaction
-        )
+        success, message, refund = await sale_manager.sell_role(mock_member, mock_role, mock_interaction)
 
         assert success is False
         assert "Nie można znaleźć konfiguracji roli" in message

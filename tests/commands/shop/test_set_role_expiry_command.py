@@ -27,11 +27,11 @@ def test_role_expiry_hours_validation():
     """Test valid hours ranges for role expiry"""
     # Arrange
     valid_hours_ranges = [
-        1,      # 1 hour
-        24,     # 1 day
-        168,    # 1 week (24 * 7)
-        720,    # 1 month (24 * 30)
-        8760    # 1 year (24 * 365)
+        1,  # 1 hour
+        24,  # 1 day
+        168,  # 1 week (24 * 7)
+        720,  # 1 month (24 * 30)
+        8760,  # 1 year (24 * 365)
     ]
 
     # Act & Assert
@@ -120,7 +120,7 @@ def test_member_premium_roles_structure():
     mock_premium_role_data = {
         "role_name": "zG50",
         "expiration_date": datetime.now(timezone.utc) + timedelta(days=30),
-        "is_active": True
+        "is_active": True,
     }
 
     # Act & Assert

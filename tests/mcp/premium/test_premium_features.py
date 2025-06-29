@@ -22,13 +22,11 @@ async def test_premium_workflow():
                 "command": "addbalance",
                 "args": f"<@{test_user_id}> 2000",
                 "channel_id": channel_id,
-                "author_id": owner_id  # Execute as owner
+                "author_id": owner_id,  # Execute as owner
             }
 
             async with session.post(
-                f"{base_url}/execute",
-                json=command_data,
-                timeout=aiohttp.ClientTimeout(total=10)
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
                 data = await response.json()
                 if data.get("success"):
@@ -43,17 +41,10 @@ async def test_premium_workflow():
         # Step 2: Test color command (should fail without premium)
         print("\n2. Testing color command without premium...")
         try:
-            command_data = {
-                "command": "color",
-                "args": "#FF0000",
-                "channel_id": channel_id,
-                "author_id": test_user_id
-            }
+            command_data = {"command": "color", "args": "#FF0000", "channel_id": channel_id, "author_id": test_user_id}
 
             async with session.post(
-                f"{base_url}/execute",
-                json=command_data,
-                timeout=aiohttp.ClientTimeout(total=10)
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
                 data = await response.json()
                 print(f"   Response: {data}")
@@ -71,13 +62,11 @@ async def test_premium_workflow():
                 "command": "team",
                 "args": "create TestTeam",
                 "channel_id": channel_id,
-                "author_id": test_user_id
+                "author_id": test_user_id,
             }
 
             async with session.post(
-                f"{base_url}/execute",
-                json=command_data,
-                timeout=aiohttp.ClientTimeout(total=10)
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
                 data = await response.json()
                 print(f"   Response: {data}")

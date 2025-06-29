@@ -50,9 +50,7 @@ def test_gender_messages():
     # Test message formatting
     user_mention = "<@123456789>"
 
-    male_add_msg = male_type.success_message_add.format(
-        user_mention=user_mention, role_symbol=male_type.role_symbol
-    )
+    male_add_msg = male_type.success_message_add.format(user_mention=user_mention, role_symbol=male_type.role_symbol)
     assert user_mention in male_add_msg
     assert "♂" in male_add_msg
     assert "✅" in male_add_msg
@@ -105,9 +103,7 @@ def test_database_integration_concepts():
     # Test that we have the expected role tracking structure
     class MockRoleQueries:
         @staticmethod
-        async def add_or_update_role_to_member(
-            session, user_id, role_id, duration=None
-        ):
+        async def add_or_update_role_to_member(session, user_id, role_id, duration=None):
             # Gender roles should not have duration (unlike mutes)
             assert duration is None, "Gender roles should not have expiration"
             return True

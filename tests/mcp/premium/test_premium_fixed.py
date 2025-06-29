@@ -20,7 +20,7 @@ async def test_premium_fixed():
                 {"cmd": "color", "args": "#FF0000", "desc": "Set red color"},
                 {"cmd": "color", "args": "blue", "desc": "Set blue color"},
                 {"cmd": "color", "args": "", "desc": "Remove color"},
-            ]
+            ],
         },
         {
             "name": "Team Command Test",
@@ -28,15 +28,15 @@ async def test_premium_fixed():
                 {"cmd": "team", "args": "", "desc": "Check team status"},
                 {"cmd": "team", "args": "create TestTeam2025", "desc": "Create team"},
                 {"cmd": "team", "args": "delete", "desc": "Delete team"},
-            ]
+            ],
         },
         {
             "name": "Shop Command Test",
             "commands": [
                 {"cmd": "shop", "args": "", "desc": "Open shop"},
                 {"cmd": "profile", "args": "", "desc": "Check profile"},
-            ]
-        }
+            ],
+        },
     ]
 
     async with aiohttp.ClientSession() as session:
@@ -53,24 +53,18 @@ async def test_premium_fixed():
             print(f"📋 {scenario['name']}")
             print(f"{'=' * 60}")
 
-            for i, test in enumerate(scenario['commands'], 1):
+            for i, test in enumerate(scenario["commands"], 1):
                 print(f"\n{i}. {test['desc']}")
                 print(f"   Command: ,{test['cmd']} {test['args']}")
 
-                command_data = {
-                    "command": test['cmd'],
-                    "channel_id": channel_id,
-                    "author_id": test_user_id
-                }
+                command_data = {"command": test["cmd"], "channel_id": channel_id, "author_id": test_user_id}
 
-                if test['args']:
-                    command_data["args"] = test['args']
+                if test["args"]:
+                    command_data["args"] = test["args"]
 
                 try:
                     async with session.post(
-                        f"{base_url}/execute",
-                        json=command_data,
-                        timeout=aiohttp.ClientTimeout(total=10)
+                        f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
                     ) as response:
                         data = await response.json()
                         status = "✅ Sent" if data.get("success") else "❌ Failed"

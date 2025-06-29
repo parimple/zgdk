@@ -9,10 +9,7 @@ import aiohttp
 
 async def test_ranking():
     async with aiohttp.ClientSession() as session:
-        payload = {
-            "command": "ranking",
-            "user_id": "956602391891947592"
-        }
+        payload = {"command": "ranking", "user_id": "956602391891947592"}
 
         async with session.post("http://localhost:8090/execute", json=payload) as resp:
             result = await resp.json()
@@ -27,6 +24,7 @@ async def test_ranking():
                 print("\n❌ Still getting error in response")
             else:
                 print("\n✅ Ranking command seems to work!")
+
 
 if __name__ == "__main__":
     asyncio.run(test_ranking())

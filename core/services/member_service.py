@@ -401,7 +401,7 @@ class ActivityService(BaseService, IActivityService):
         """Track text message activity."""
         try:
             # Ensure member exists
-            member = await self.member_repository.get_or_create(member_id)
+            await self.member_repository.get_or_create(member_id)
 
             # Calculate points based on message length (1-3 points)
             message_length = len(message_content.strip())
@@ -436,7 +436,7 @@ class ActivityService(BaseService, IActivityService):
         """Track voice channel activity."""
         try:
             # Ensure member exists
-            member = await self.member_repository.get_or_create(member_id)
+            await self.member_repository.get_or_create(member_id)
 
             # Award more points when with others (social bonus)
             points = 2 if is_with_others else 1
@@ -466,7 +466,7 @@ class ActivityService(BaseService, IActivityService):
         """Track server promotion activity."""
         try:
             # Ensure member exists
-            member = await self.member_repository.get_or_create(member_id)
+            await self.member_repository.get_or_create(member_id)
 
             # Award bonus points for promoting the server
             points = 5
@@ -559,8 +559,8 @@ class ActivityService(BaseService, IActivityService):
             self._log_error("get_server_activity_stats", e)
             return {}
 
-    async def get_server_activity_stats(self, days: int = 30) -> dict[str, Any]:
-        """Get overall server activity statistics."""
+    async def get_server_activity_stats_leaderboard(self, days: int = 30) -> dict[str, Any]:
+        """Get overall server activity statistics with leaderboard."""
         try:
             start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
@@ -621,10 +621,6 @@ class ModerationService(BaseService, IModerationService):
             await self.member_repository.get_or_create(target.id)
             # Ensure moderator exists in database
             await self.member_repository.get_or_create(moderator.id)
-
-            expires_at = None
-            if duration_seconds:
-                expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
 
             if channel_id is None:
                 channel_id = 0  # Default fallback

@@ -37,8 +37,7 @@ class TestClient:
 
         try:
             async with self.session.get(
-                f"{self.base_url}/status",
-                timeout=aiohttp.ClientTimeout(total=CONNECTION_TIMEOUT)
+                f"{self.base_url}/status", timeout=aiohttp.ClientTimeout(total=CONNECTION_TIMEOUT)
             ) as response:
                 return await response.json()
         except asyncio.TimeoutError:
@@ -46,23 +45,16 @@ class TestClient:
         except Exception as e:
             return {"error": str(e)}
 
-    async def execute_command(self, command: str, args: str = "",
-                            send_to_channel: bool = False) -> Dict[str, Any]:
+    async def execute_command(self, command: str, args: str = "", send_to_channel: bool = False) -> Dict[str, Any]:
         """Execute a Discord command."""
         if not self.session:
             self.session = aiohttp.ClientSession()
 
-        payload = {
-            "command": command,
-            "args": args,
-            "send_to_channel": send_to_channel
-        }
+        payload = {"command": command, "args": args, "send_to_channel": send_to_channel}
 
         try:
             async with self.session.post(
-                f"{self.base_url}/execute",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=COMMAND_TIMEOUT)
+                f"{self.base_url}/execute", json=payload, timeout=aiohttp.ClientTimeout(total=COMMAND_TIMEOUT)
             ) as response:
                 return await response.json()
         except asyncio.TimeoutError:
@@ -77,8 +69,7 @@ class TestClient:
 
         try:
             async with self.session.get(
-                f"{self.base_url}/responses",
-                timeout=aiohttp.ClientTimeout(total=CONNECTION_TIMEOUT)
+                f"{self.base_url}/responses", timeout=aiohttp.ClientTimeout(total=CONNECTION_TIMEOUT)
             ) as response:
                 return await response.json()
         except Exception as e:
@@ -91,8 +82,7 @@ class TestClient:
 
         try:
             async with self.session.get(
-                f"{self.base_url}/test",
-                timeout=aiohttp.ClientTimeout(total=CONNECTION_TIMEOUT)
+                f"{self.base_url}/test", timeout=aiohttp.ClientTimeout(total=CONNECTION_TIMEOUT)
             ) as response:
                 return await response.json()
         except Exception as e:

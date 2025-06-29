@@ -9,7 +9,7 @@ import pytest
 from tests.base.base_command_test import BaseCommandTest
 from tests.config import TEST_USER_ID
 
-pytest_plugins = ('pytest_asyncio',)
+pytest_plugins = ("pytest_asyncio",)
 from tests.utils.assertions import VoiceAssertions
 from tests.utils.client import TestClient
 
@@ -76,7 +76,7 @@ class TestVoiceWorkflow(BaseCommandTest):
         VoiceAssertions.assert_permission_updated(response, "send_messages", True)
 
         # Step 5: Test live command (requires premium)
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock premium service to allow access
             premium_service = AsyncMock()
             premium_service.check_command_access.return_value = (True, "Access granted")
@@ -100,9 +100,7 @@ class TestVoiceWorkflow(BaseCommandTest):
         self.author.roles.append(premium_role)
 
         # Update bot config for the test
-        self.bot.config["premium_roles"] = [
-            {"name": "MVP", "moderator_count": 3}
-        ]
+        self.bot.config["premium_roles"] = [{"name": "MVP", "moderator_count": 3}]
 
         # Step 1: Check current mod status
         response = await client.run_command("mod")
@@ -128,7 +126,7 @@ class TestVoiceWorkflow(BaseCommandTest):
         self.voice_channel.overwrites[self.author] = mod_perms
 
         # Mock premium checker to allow access
-        with patch.object(self.bot.cogs['VoiceCog'].premium_checker, 'check_voice_access', return_value=(True, None)):
+        with patch.object(self.bot.cogs["VoiceCog"].premium_checker, "check_voice_access", return_value=(True, None)):
             # Step 1: Set channel limit
             self.voice_channel.edit = AsyncMock()
             response = await client.run_command("limit", "10")
@@ -150,7 +148,7 @@ class TestVoiceWorkflow(BaseCommandTest):
         self.voice_channel.overwrites[self.author] = owner_perms
 
         # Mock premium tier check
-        with patch.object(self.bot.cogs['VoiceCog'].premium_checker, 'check_premium_tier', return_value=(True, None)):
+        with patch.object(self.bot.cogs["VoiceCog"].premium_checker, "check_premium_tier", return_value=(True, None)):
             # Step 1: Check autokick list (empty)
             response = await client.run_command("autokick")
             assert "Lista autokick" in response.title
@@ -185,7 +183,7 @@ class TestVoiceWorkflow(BaseCommandTest):
         self.voice_channel.overwrites[test_member] = test_perms
 
         # Mock premium access check
-        with patch.object(self.bot.cogs['VoiceCog'].premium_checker, 'check_voice_access', return_value=(True, None)):
+        with patch.object(self.bot.cogs["VoiceCog"].premium_checker, "check_voice_access", return_value=(True, None)):
             # Step 1: Reset specific user permissions
             response = await client.run_command("reset", f"<@{TEST_USER_ID}>")
             assert "Zresetowano uprawnienia" in response.content
@@ -217,7 +215,9 @@ class TestVoiceWorkflow(BaseCommandTest):
         self.voice_channel.overwrites[self.author] = owner_perms
 
         # This should be blocked
-        with patch.object(self.bot.cogs['VoiceCog'].permission_commands['speak'], 'permission_name', 'priority_speaker'):
+        with patch.object(
+            self.bot.cogs["VoiceCog"].permission_commands["speak"], "permission_name", "priority_speaker"
+        ):
             response = await client.run_command("speak", "@everyone -")
             assert "priority_speaker" in response.content
 
@@ -227,16 +227,23 @@ class TestVoiceWorkflow(BaseCommandTest):
         client = TestClient(self.bot)
 
         # Test speak command without premium
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock premium service to deny access
             premium_service = AsyncMock()
-            premium_service.check_command_access.return_value = (False, "Komenda dostępna tylko dla użytkowników premium")
+            premium_service.check_command_access.return_value = (
+                False,
+                "Komenda dostępna tylko dla użytkowników premium",
+            )
             mock_get_service.return_value = premium_service
 
             response = await client.run_command("speak", "@everyone -")
             assert "dostępna tylko dla użytkowników premium" in response.content
 
         # Test autokick command without premium tier
-        with patch.object(self.bot.cogs['VoiceCog'].premium_checker, 'check_premium_tier', return_value=(False, "Funkcja dostępna od poziomu VIP")):
+        with patch.object(
+            self.bot.cogs["VoiceCog"].premium_checker,
+            "check_premium_tier",
+            return_value=(False, "Funkcja dostępna od poziomu VIP"),
+        ):
             response = await client.run_command("autokick")
             assert "dostępna od poziomu VIP" in response.content

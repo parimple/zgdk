@@ -126,7 +126,7 @@ async def test_mock_shop_with_realistic_data():
         "role_id": ROLE_ZG50_ID,
         "role_name": "zG50",
         "expiration_date": datetime.now(timezone.utc),
-        "is_active": True
+        "is_active": True,
     }
 
     async def mock_shop_method(ctx, member=None):

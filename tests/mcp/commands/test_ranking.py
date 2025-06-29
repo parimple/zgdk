@@ -10,8 +10,13 @@ async def test_ranking():
 
     # Test through docker exec with direct Python
     cmd = [
-        "docker", "exec", "-i", "zgdk-mcp-1",
-        "python", "-c", """
+        "docker",
+        "exec",
+        "-i",
+        "zgdk-mcp-1",
+        "python",
+        "-c",
+        """
 import asyncio
 import aiohttp
 
@@ -24,13 +29,14 @@ async def test():
             print(f"Ranking result: {result}")
 
 asyncio.run(test())
-"""
+""",
     ]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     print("stdout:", result.stdout)
     print("stderr:", result.stderr)
     print("returncode:", result.returncode)
+
 
 if __name__ == "__main__":
     asyncio.run(test_ranking())

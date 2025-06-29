@@ -7,18 +7,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # Mock Discord before any imports
-sys.modules['discord'] = MagicMock()
-sys.modules['discord.ext'] = MagicMock()
-sys.modules['discord.ext.commands'] = MagicMock()
-sys.modules['utils.permissions'] = MagicMock()
-sys.modules['core.interfaces.member_interfaces'] = MagicMock()
-sys.modules['datasources.queries'] = MagicMock()
+sys.modules["discord"] = MagicMock()
+sys.modules["discord.ext"] = MagicMock()
+sys.modules["discord.ext.commands"] = MagicMock()
+sys.modules["utils.permissions"] = MagicMock()
+sys.modules["core.interfaces.member_interfaces"] = MagicMock()
+sys.modules["datasources.queries"] = MagicMock()
 
 import types
 
 # Mock utils.premium but allow PaymentData import
 
-mock_premium = types.ModuleType('utils.premium')
+mock_premium = types.ModuleType("utils.premium")
 
 # Create a real PaymentData class for testing
 class PaymentData:
@@ -28,23 +28,26 @@ class PaymentData:
         self.paid_at = paid_at
         self.payment_type = payment_type
 
+
 mock_premium.PaymentData = PaymentData
 mock_premium.PremiumManager = MagicMock()
 mock_premium.TipplyDataProvider = MagicMock()
-sys.modules['utils.premium'] = mock_premium
+sys.modules["utils.premium"] = mock_premium
 
 # Also mock utils module
-mock_utils = types.ModuleType('utils')
+mock_utils = types.ModuleType("utils")
 mock_utils.PremiumManager = MagicMock()
 mock_utils.TipplyDataProvider = MagicMock()
-sys.modules['utils'] = mock_utils
+sys.modules["utils"] = mock_utils
 
 from cogs.commands.shop import ShopCog
 
 
 @pytest.mark.asyncio
-@patch('cogs.commands.shop.HandledPaymentQueries.add_payment', new_callable=AsyncMock)
-async def test_addbalance_positive_amount(mock_add_payment, mock_bot_with_services, mock_discord_context, mock_discord_user):
+@patch("cogs.commands.shop.HandledPaymentQueries.add_payment", new_callable=AsyncMock)
+async def test_addbalance_positive_amount(
+    mock_add_payment, mock_bot_with_services, mock_discord_context, mock_discord_user
+):
     """Test addbalance command with positive amount"""
     # Arrange
     amount = 500
@@ -76,7 +79,7 @@ async def test_addbalance_negative_amount(mock_bot_with_services, mock_discord_c
     # Arrange
     amount = -100
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.add_payment") as mock_add_payment:
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
@@ -96,7 +99,7 @@ async def test_addbalance_zero_amount(mock_bot_with_services, mock_discord_conte
     # Arrange
     amount = 0
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.add_payment") as mock_add_payment:
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
@@ -112,7 +115,7 @@ async def test_addbalance_large_amount(mock_bot_with_services, mock_discord_cont
     # Arrange
     amount = 999999
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.add_payment") as mock_add_payment:
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
@@ -128,7 +131,7 @@ async def test_addbalance_payment_data_creation(mock_bot_with_services, mock_dis
     # Arrange
     amount = 500
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.add_payment") as mock_add_payment:
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
@@ -149,13 +152,13 @@ async def test_addbalance_member_service_integration(mock_bot_with_services, moc
     # Arrange
     amount = 500
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.add_payment'):
+    with patch("cogs.commands.shop.HandledPaymentQueries.add_payment"):
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
 
     # Assert member service was called
-    member_service = mock_bot_with_services.get_service('IMemberService')
+    member_service = mock_bot_with_services.get_service("IMemberService")
     member_service.get_or_create_member.assert_called_once_with(mock_discord_user)
     member_service.update_member_info.assert_called_once()
 
@@ -166,7 +169,7 @@ async def test_addbalance_database_session_usage(mock_bot_with_services, mock_di
     # Arrange
     amount = 500
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.add_payment'):
+    with patch("cogs.commands.shop.HandledPaymentQueries.add_payment"):
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)
@@ -179,7 +182,7 @@ def test_addbalance_command_signature():
     """Test addbalance command has correct signature"""
     # Test the command exists and has correct parameters
     shop_cog = ShopCog(None)
-    assert hasattr(shop_cog, 'add_balance')
+    assert hasattr(shop_cog, "add_balance")
     assert callable(shop_cog.add_balance)
 
 
@@ -190,7 +193,7 @@ async def test_addbalance_commit_transaction(mock_bot_with_services, mock_discor
     amount = 500
     mock_session = mock_bot_with_services.get_db.return_value.__aenter__.return_value
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.add_payment'):
+    with patch("cogs.commands.shop.HandledPaymentQueries.add_payment"):
         # Act
         shop_cog = ShopCog(mock_bot_with_services)
         await shop_cog.add_balance(mock_discord_context, mock_discord_user, amount)

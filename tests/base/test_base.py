@@ -12,7 +12,6 @@ from typing import Any, Dict, Optional
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
-
 class BaseDiscordTest(unittest.TestCase):
     """Base class for Discord bot tests."""
 
@@ -41,6 +40,7 @@ class CommandTestCase(BaseDiscordTest):
     def setUp(self):
         """Set up each test."""
         from tests.utils.client import TestClient
+
         self.client = TestClient()
 
         # Check bot connection
@@ -50,19 +50,16 @@ class CommandTestCase(BaseDiscordTest):
 
     def tearDown(self):
         """Clean up after each test."""
-        if hasattr(self, 'client') and self.client:
+        if hasattr(self, "client") and self.client:
             self.run_async(self.client.close())
 
-    async def execute_command(self, command: str, args: str = "",
-                            send_to_channel: bool = False) -> Dict[str, Any]:
+    async def execute_command(self, command: str, args: str = "", send_to_channel: bool = False) -> Dict[str, Any]:
         """Execute a command and return result."""
         return await self.client.execute_command(command, args, send_to_channel)
 
-    def assert_command_success(self, result: Dict[str, Any],
-                             expected_content: Optional[str] = None):
+    def assert_command_success(self, result: Dict[str, Any], expected_content: Optional[str] = None):
         """Assert that a command executed successfully."""
-        self.assertTrue(result.get("success"),
-                       f"Command failed: {result.get('error', 'Unknown error')}")
+        self.assertTrue(result.get("success"), f"Command failed: {result.get('error', 'Unknown error')}")
 
         if expected_content:
             responses = result.get("responses", [])
@@ -91,11 +88,9 @@ class CommandTestCase(BaseDiscordTest):
                 if found:
                     break
 
-            self.assertTrue(found,
-                          f"Expected content '{expected_content}' not found in responses")
+            self.assertTrue(found, f"Expected content '{expected_content}' not found in responses")
 
-    def assert_embed_field(self, result: Dict[str, Any], field_name: str,
-                          expected_value: Optional[str] = None):
+    def assert_embed_field(self, result: Dict[str, Any], field_name: str, expected_value: Optional[str] = None):
         """Assert that an embed contains a specific field."""
         responses = result.get("responses", [])
         self.assertTrue(responses, "No responses received")
@@ -126,5 +121,4 @@ class CommandTestCase(BaseDiscordTest):
             self.assertTrue(embeds, "No embeds in response")
 
             color = embeds[0].get("color")
-            self.assertEqual(color, expected_color,
-                           f"Expected color {expected_color}, got {color}")
+            self.assertEqual(color, expected_color, f"Expected color {expected_color}, got {color}")

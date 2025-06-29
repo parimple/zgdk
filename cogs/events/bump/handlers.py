@@ -46,7 +46,9 @@ class BumpHandler:
         except Exception as e:
             logger.error(f"Error adding bypass time: {e}", exc_info=True)
 
-    async def check_cooldown(self, session, user_id: int, service: str, cooldown_hours: int, guild_id: Optional[int] = None) -> bool:
+    async def check_cooldown(
+        self, session, user_id: int, service: str, cooldown_hours: int, guild_id: Optional[int] = None
+    ) -> bool:
         """Check if user is on cooldown for a service."""
         # For global services like disboard, use guild_id
         if guild_id is None:
@@ -311,7 +313,9 @@ class DiscordServersHandler(BumpHandler):
         async with self.bot.get_db() as session:
             # Check if user is on cooldown
             guild_id = message.guild.id if message.guild else None
-            if await self.check_cooldown(session, user.id, "discordservers", SERVICE_COOLDOWNS["discordservers"], guild_id):
+            if await self.check_cooldown(
+                session, user.id, "discordservers", SERVICE_COOLDOWNS["discordservers"], guild_id
+            ):
                 logger.info(f"User {user.name} is on cooldown for DiscordServers")
                 return
 

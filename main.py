@@ -3,6 +3,7 @@
 Main file for Zagadka bot.
 """
 
+import asyncio
 import logging
 import os
 import subprocess
@@ -156,9 +157,7 @@ class Zagadka(commands.Bot):
         postgres_host: str = os.environ.get("POSTGRES_HOST", "db")
         postgres_port: str = os.environ.get("POSTGRES_PORT", "5432")
 
-        return (
-            f"postgresql+asyncpg://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
-        )
+        return f"postgresql+asyncpg://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
 
     @asynccontextmanager
     async def get_db(self) -> AsyncGenerator[AsyncSession, None]:

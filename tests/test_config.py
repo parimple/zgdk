@@ -24,7 +24,7 @@ TEST_SCENARIOS = {
     },
     "shop_display": {
         "expected_roles": ["zG50", "zG100", "zG500", "zG1000"],
-    }
+    },
 }
 
 # Commands to Test

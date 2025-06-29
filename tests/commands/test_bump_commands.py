@@ -12,9 +12,7 @@ class TestBumpCommands(CommandTestCase):
 
     def test_bump_success(self):
         """Test successful bump command."""
-        result = self.run_async(
-            self.execute_command("bump", send_to_channel=True)
-        )
+        result = self.run_async(self.execute_command("bump", send_to_channel=True))
 
         self.assert_command_success(result)
 
@@ -32,15 +30,11 @@ class TestBumpCommands(CommandTestCase):
     def test_bump_cooldown(self):
         """Test bump command during cooldown."""
         # First bump
-        result1 = self.run_async(
-            self.execute_command("bump", send_to_channel=True)
-        )
+        result1 = self.run_async(self.execute_command("bump", send_to_channel=True))
         self.assert_command_success(result1)
 
         # Second bump immediately after
-        result2 = self.run_async(
-            self.execute_command("bump", send_to_channel=True)
-        )
+        result2 = self.run_async(self.execute_command("bump", send_to_channel=True))
 
         # Should still succeed but with cooldown message
         self.assert_command_success(result2)
@@ -52,16 +46,14 @@ class TestBumpCommands(CommandTestCase):
             # Check for cooldown indicators
             self.assertTrue(
                 any(word in content.lower() for word in ["cooldown", "poczekaj", "wait"]),
-                "Response should indicate cooldown"
+                "Response should indicate cooldown",
             )
 
     def test_bump_streak(self):
         """Test bump streak tracking."""
         # This test would need mock data or database setup
         # For now, just test that command executes
-        result = self.run_async(
-            self.execute_command("bump", send_to_channel=True)
-        )
+        result = self.run_async(self.execute_command("bump", send_to_channel=True))
 
         self.assert_command_success(result)
 
@@ -69,9 +61,7 @@ class TestBumpCommands(CommandTestCase):
         """Test bump rewards are given."""
         # This test would need to verify database changes
         # For now, just test command execution
-        result = self.run_async(
-            self.execute_command("bump", send_to_channel=True)
-        )
+        result = self.run_async(self.execute_command("bump", send_to_channel=True))
 
         self.assert_command_success(result)
 
@@ -86,9 +76,7 @@ class TestBumpInfoCommands(CommandTestCase):
 
     def test_bump_check(self):
         """Test bump check command."""
-        result = self.run_async(
-            self.execute_command("bumpcheck")
-        )
+        result = self.run_async(self.execute_command("bumpcheck"))
 
         self.assert_command_success(result)
 
@@ -103,9 +91,7 @@ class TestBumpInfoCommands(CommandTestCase):
 
     def test_bump_top(self):
         """Test bump leaderboard command."""
-        result = self.run_async(
-            self.execute_command("bumptop")
-        )
+        result = self.run_async(self.execute_command("bumptop"))
 
         self.assert_command_success(result)
 

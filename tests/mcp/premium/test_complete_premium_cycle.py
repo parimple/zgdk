@@ -34,8 +34,8 @@ async def test_complete_premium_cycle():
     # Configuration
     base_url = "http://localhost:8090"  # Using command_tester API for better response capture
     test_user_id = "489328381972971520"  # User executing the tests
-    owner_id = "489328381972971520"      # Same user has owner permissions
-    channel_id = "1387864734002446407"    # Test channel from config
+    owner_id = "489328381972971520"  # Same user has owner permissions
+    channel_id = "1387864734002446407"  # Test channel from config
 
     # Test data
     test_balance = 10000
@@ -77,10 +77,12 @@ async def test_complete_premium_cycle():
                 "command": "addbalance",
                 "args": f"<@{test_user_id}> {test_balance}",
                 "channel_id": channel_id,
-                "author_id": owner_id  # Owner executes this
+                "author_id": owner_id,  # Owner executes this
             }
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 if data.get("success"):
                     print(f"   ✅ {msg_balance_added}")
@@ -98,10 +100,12 @@ async def test_complete_premium_cycle():
             command_data = {
                 "command": "shop",
                 "channel_id": channel_id,
-                "author_id": test_user_id  # Test user executes
+                "author_id": test_user_id,  # Test user executes
             }
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 if data.get("success"):
                     print(f"   ✅ {msg_shop_displayed}")
@@ -119,10 +123,12 @@ async def test_complete_premium_cycle():
                 "command": "color",
                 "args": test_color_red,
                 "channel_id": channel_id,
-                "author_id": test_user_id
+                "author_id": test_user_id,
             }
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 print(f"   Result: {data.get('success')}")
                 print(f"   Response: {format_response(data)}")
@@ -133,10 +139,12 @@ async def test_complete_premium_cycle():
                 "command": "team",
                 "args": f"create {test_team_name}",
                 "channel_id": channel_id,
-                "author_id": test_user_id
+                "author_id": test_user_id,
             }
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 print(f"   Result: {data.get('success')}")
                 print(f"   Response: {format_response(data)}")
@@ -163,10 +171,12 @@ async def test_complete_premium_cycle():
                 "command": "color",
                 "args": test_color_red,
                 "channel_id": channel_id,
-                "author_id": test_user_id
+                "author_id": test_user_id,
             }
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 if data.get("success"):
                     print(f"   ✅ {msg_color_success}")
@@ -182,10 +192,12 @@ async def test_complete_premium_cycle():
                 "command": "team",
                 "args": f"create {test_team_name}",
                 "channel_id": channel_id,
-                "author_id": test_user_id
+                "author_id": test_user_id,
             }
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 if data.get("success"):
                     print(f"   ✅ {msg_team_success}")
@@ -199,13 +211,11 @@ async def test_complete_premium_cycle():
             print("-" * 50)
 
             print("\n6.1. test user checking team info...")
-            command_data = {
-                "command": "team",
-                "channel_id": channel_id,
-                "author_id": test_user_id
-            }
+            command_data = {"command": "team", "channel_id": channel_id, "author_id": test_user_id}
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 print(f"   Result: {data.get('success')}")
                 print(f"   Response: {format_response(data)}")
@@ -216,14 +226,11 @@ async def test_complete_premium_cycle():
             print("-" * 50)
 
             print("\n7.1. test user deleting team...")
-            command_data = {
-                "command": "team",
-                "args": "delete",
-                "channel_id": channel_id,
-                "author_id": test_user_id
-            }
+            command_data = {"command": "team", "args": "delete", "channel_id": channel_id, "author_id": test_user_id}
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 if data.get("success"):
                     print("   ✅ Team deletion initiated")
@@ -235,10 +242,12 @@ async def test_complete_premium_cycle():
             command_data = {
                 "command": "color",  # No args = remove color
                 "channel_id": channel_id,
-                "author_id": test_user_id
+                "author_id": test_user_id,
             }
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 if data.get("success"):
                     print("   ✅ Color removed")
@@ -250,13 +259,11 @@ async def test_complete_premium_cycle():
             print("-" * 50)
 
             print("\n8.1. test user opening shop to sell zG500...")
-            command_data = {
-                "command": "shop",
-                "channel_id": channel_id,
-                "author_id": test_user_id
-            }
+            command_data = {"command": "shop", "channel_id": channel_id, "author_id": test_user_id}
 
-            async with session.post(f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.post(
+                f"{base_url}/execute", json=command_data, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 data = await response.json()
                 if data.get("success"):
                     print("   ✅ Shop opened")

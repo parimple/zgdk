@@ -24,14 +24,10 @@ def mock_bot():
             {"name": "zG50", "price": 500, "duration": 30},
             {"name": "zG100", "price": 999, "duration": 30},
             {"name": "zG500", "price": 4999, "duration": 30},
-            {"name": "zG1000", "price": 9999, "duration": 30}
+            {"name": "zG1000", "price": 9999, "duration": 30},
         ],
-        "emojis": {
-            "mastercard": "💳",
-            "success": "✅",
-            "error": "❌"
-        },
-        "admin_roles": ["Admin", "Moderator"]
+        "emojis": {"mastercard": "💳", "success": "✅", "error": "❌"},
+        "admin_roles": ["Admin", "Moderator"],
     }
 
     # Mock get_db
@@ -144,12 +140,7 @@ def mock_premium_service():
 
     # Mock premium roles data
     premium_roles = [
-        {
-            "role_id": 123456789,
-            "role_name": "zG50",
-            "expiration_date": datetime.now(timezone.utc),
-            "is_active": True
-        }
+        {"role_id": 123456789, "role_name": "zG50", "expiration_date": datetime.now(timezone.utc), "is_active": True}
     ]
 
     service.get_member_premium_roles = AsyncMock(return_value=premium_roles)
@@ -178,7 +169,7 @@ def mock_activity_service():
     leaderboard = [
         {"member_id": 111, "points": 1000, "rank": 1},
         {"member_id": 222, "points": 800, "rank": 2},
-        {"member_id": 333, "points": 600, "rank": 3}
+        {"member_id": 333, "points": 600, "rank": 3},
     ]
 
     service.get_leaderboard = AsyncMock(return_value=leaderboard)
@@ -215,7 +206,7 @@ def mock_payment_data():
         "amount": 500,
         "payment_type": "role_purchase",
         "role_name": "zG50",
-        "duration_days": 30
+        "duration_days": 30,
     }
 
 
@@ -247,13 +238,7 @@ def mock_premium_role():
 @pytest.fixture
 def mock_role_config():
     """Mock role configuration"""
-    return {
-        "name": "zG50",
-        "price": 500,
-        "duration": 30,
-        "color": "#FFD700",
-        "permissions": ["premium_access"]
-    }
+    return {"name": "zG50", "price": 500, "duration": 30, "color": "#FFD700", "permissions": ["premium_access"]}
 
 
 # Error scenarios
@@ -261,6 +246,7 @@ def mock_role_config():
 def mock_db_error():
     """Mock database error"""
     from sqlalchemy.exc import SQLAlchemyError
+
     return SQLAlchemyError("Database connection failed")
 
 
@@ -286,7 +272,7 @@ def sample_users():
     return [
         {"id": 111, "name": "User1", "balance": 1000, "roles": []},
         {"id": 222, "name": "User2", "balance": 0, "roles": ["zG50"]},
-        {"id": 333, "name": "User3", "balance": 5000, "roles": ["zG100", "zG500"]}
+        {"id": 333, "name": "User3", "balance": 5000, "roles": ["zG100", "zG500"]},
     ]
 
 
@@ -297,5 +283,5 @@ def sample_roles():
         {"name": "zG50", "price": 500, "members": 100},
         {"name": "zG100", "price": 999, "members": 50},
         {"name": "zG500", "price": 4999, "members": 10},
-        {"name": "zG1000", "price": 9999, "members": 5}
+        {"name": "zG1000", "price": 9999, "members": 5},
     ]

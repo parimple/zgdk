@@ -15,8 +15,9 @@ async def test_shop_command_with_real_db(mock_db_session_with_data, mock_bot_wit
     mock_bot_with_services.get_db.return_value.__aenter__.return_value = mock_db_session_with_data
 
     # Mock external dependencies
-    with patch('cogs.commands.shop.RoleShopView') as mock_view, \
-         patch('cogs.commands.shop.create_shop_embed') as mock_embed:
+    with patch("cogs.commands.shop.RoleShopView") as mock_view, patch(
+        "cogs.commands.shop.create_shop_embed"
+    ) as mock_embed:
 
         mock_view.return_value = mock_view
         mock_embed.return_value = mock_embed
@@ -40,7 +41,7 @@ async def test_addbalance_with_services(mock_bot_with_services, mock_discord_con
     # Arrange
     amount = 500
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.add_payment') as mock_add_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.add_payment") as mock_add_payment:
         from cogs.commands.shop import ShopCog
 
         # Act
@@ -52,18 +53,20 @@ async def test_addbalance_with_services(mock_bot_with_services, mock_discord_con
     mock_discord_context.reply.assert_called_once()
 
     # Verify service interactions
-    member_service = mock_bot_with_services.get_service('IMemberService')
+    member_service = mock_bot_with_services.get_service("IMemberService")
     assert member_service.get_or_create_member.called
     assert member_service.update_member_info.called
 
 
 @pytest.mark.asyncio
-async def test_assign_payment_with_mocked_queries(mock_payment_queries, mock_bot_with_services, mock_discord_context, mock_discord_user):
+async def test_assign_payment_with_mocked_queries(
+    mock_payment_queries, mock_bot_with_services, mock_discord_context, mock_discord_user
+):
     """Test assign_payment with mocked database queries"""
     # Arrange
     payment_id = 123
 
-    with patch('cogs.commands.shop.HandledPaymentQueries', mock_payment_queries):
+    with patch("cogs.commands.shop.HandledPaymentQueries", mock_payment_queries):
         from cogs.commands.shop import ShopCog
 
         # Act
@@ -81,7 +84,7 @@ def test_database_fixtures_setup(default_database_items):
     assert len(default_database_items) >= 7  # members, roles, activities, payments, etc.
 
     # Check member data
-    members = [item for item in default_database_items if hasattr(item, 'wallet_balance')]
+    members = [item for item in default_database_items if hasattr(item, "wallet_balance")]
     assert len(members) >= 2
 
     # Check first member has expected properties
@@ -161,9 +164,7 @@ async def test_real_database_operations(mock_empty_db_session, sample_member_dat
     await mock_empty_db_session.commit()
 
     # Query the member back using SQLAlchemy ORM
-    result = await mock_empty_db_session.execute(
-        select(Member).where(Member.id == TEST_USER_1_ID)
-    )
+    result = await mock_empty_db_session.execute(select(Member).where(Member.id == TEST_USER_1_ID))
     found_member = result.scalar_one_or_none()
 
     # Verify data was saved correctly

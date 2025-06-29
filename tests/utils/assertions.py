@@ -63,7 +63,7 @@ def assert_premium_info(response: Dict[str, Any]) -> bool:
         "<#960665316109713421>",  # Premium channel
         "<:mastercard:",  # Mastercard emoji
         "premium",
-        "Wybierz swój"
+        "Wybierz swój",
     ]
 
     # Check in content
@@ -96,7 +96,7 @@ def extract_embed_info(response: Dict[str, Any]) -> Dict[str, Any]:
         "title": embed.get("title"),
         "description": embed.get("description"),
         "color": embed.get("color"),
-        "fields": {}
+        "fields": {},
     }
 
     # Extract fields
@@ -109,8 +109,7 @@ def extract_embed_info(response: Dict[str, Any]) -> Dict[str, Any]:
     return info
 
 
-def assert_mute_response_valid(response: Dict[str, Any], user_id: str,
-                             mute_type: str, is_unmute: bool = False) -> bool:
+def assert_mute_response_valid(response: Dict[str, Any], user_id: str, mute_type: str, is_unmute: bool = False) -> bool:
     """Assert that a mute/unmute response is valid."""
     if not response.get("embeds"):
         return False
@@ -131,7 +130,7 @@ def assert_mute_response_valid(response: Dict[str, Any], user_id: str,
         "img": "wysyłania obrazków i linków",
         "nick": "zmiany nicku",
         "live": "streamowania",
-        "rank": "zdobywania punktów rankingowych"
+        "rank": "zdobywania punktów rankingowych",
     }
 
     expected_action = action_texts.get(mute_type)
@@ -141,8 +140,9 @@ def assert_mute_response_valid(response: Dict[str, Any], user_id: str,
     if is_unmute:
         return f"Przywrócono możliwość {expected_action}" in embed_desc
     else:
-        return f"Zablokowano możliwość {expected_action}" in embed_desc or \
-               "Nałożono karę" in embed_desc  # For nick mute
+        return (
+            f"Zablokowano możliwość {expected_action}" in embed_desc or "Nałożono karę" in embed_desc
+        )  # For nick mute
 
 
 class ModAssertions:
@@ -178,10 +178,10 @@ class VoiceAssertions:
     @staticmethod
     def assert_permission_updated(response, permission_name, value):
         """Assert voice permission was updated."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         # Check permission name (handle both English and Polish names)
         permission_map = {
@@ -190,7 +190,7 @@ class VoiceAssertions:
             "connect": "połączenia",
             "send_messages": "pisania",
             "stream": "streamowania",
-            "manage_messages": "moderatora"
+            "manage_messages": "moderatora",
         }
 
         polish_name = permission_map.get(permission_name, permission_name)
@@ -205,10 +205,10 @@ class VoiceAssertions:
     @staticmethod
     def assert_mod_updated(response, user, added):
         """Assert channel moderator was added/removed."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert user.mention in content
         if added:
@@ -219,10 +219,10 @@ class VoiceAssertions:
     @staticmethod
     def assert_channel_limit_set(response, limit):
         """Assert channel limit was set."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert "limit" in content.lower()
         assert str(limit) in content
@@ -230,10 +230,10 @@ class VoiceAssertions:
     @staticmethod
     def assert_autokick_updated(response, user, added):
         """Assert user was added/removed from autokick list."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert user.mention in content
         assert "autokick" in content.lower()
@@ -249,10 +249,10 @@ class ShopAssertions:
     @staticmethod
     def assert_balance_updated(response, user, amount):
         """Assert user balance was updated."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert user.mention in content
         assert str(amount) in content
@@ -261,10 +261,10 @@ class ShopAssertions:
     @staticmethod
     def assert_role_purchased(response, user, role_name):
         """Assert role was purchased successfully."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert "zakupiono" in content.lower() or "kupiono" in content.lower()
         assert role_name in content
@@ -272,10 +272,10 @@ class ShopAssertions:
     @staticmethod
     def assert_role_sold(response, user, role_name, refund_amount):
         """Assert role was sold successfully."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert "sprzedano" in content.lower() or "zwrócono" in content.lower()
         assert role_name in content
@@ -284,12 +284,12 @@ class ShopAssertions:
     @staticmethod
     def assert_shop_displayed(response, balance):
         """Assert shop is displayed with correct balance."""
-        assert hasattr(response, 'title') or hasattr(response, 'embeds')
+        assert hasattr(response, "title") or hasattr(response, "embeds")
 
-        if hasattr(response, 'title'):
+        if hasattr(response, "title"):
             assert "sklep" in response.title.lower()
 
-        if hasattr(response, 'footer'):
+        if hasattr(response, "footer"):
             assert f"Portfel: {balance} G" in response.footer.text
 
 
@@ -299,20 +299,20 @@ class PremiumAssertions:
     @staticmethod
     def assert_premium_required(response):
         """Assert premium access is required."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert "premium" in content.lower() or "wymagana" in content.lower()
 
     @staticmethod
     def assert_color_changed(response, color):
         """Assert color was changed successfully."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert "kolor" in content.lower()
         assert "zmieniono" in content.lower() or "ustawiono" in content.lower()
@@ -320,10 +320,10 @@ class PremiumAssertions:
     @staticmethod
     def assert_team_created(response, team_name):
         """Assert team was created successfully."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert "utworzono" in content.lower()
         assert "team" in content.lower()
@@ -332,10 +332,10 @@ class PremiumAssertions:
     @staticmethod
     def assert_payment_assigned(response, payment_id, user):
         """Assert payment was assigned to user."""
-        if hasattr(response, 'content'):
+        if hasattr(response, "content"):
             content = response.content
         else:
-            content = response.description if hasattr(response, 'description') else str(response)
+            content = response.description if hasattr(response, "description") else str(response)
 
         assert str(payment_id) in content
         assert user.mention in content

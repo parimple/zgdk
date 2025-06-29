@@ -38,7 +38,7 @@ class MCPTestRunner:
         """Execute a command through MCP and return the result."""
 
         # Create the Python script to run inside the container
-        script = '''
+        script = """
 import asyncio
 import json
 import sys
@@ -88,87 +88,56 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-'''
+"""
 
         # Execute the script in the Docker container
-        cmd = [
-            "docker", "exec", "-i", self.container_name,
-            "python", "-c", script
-        ]
+        cmd = ["docker", "exec", "-i", self.container_name, "python", "-c", script]
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=True
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=True)
 
             # Parse the JSON output
             if result.stdout:
                 return json.loads(result.stdout.strip())
             else:
-                return {
-                    'success': False,
-                    'error': 'No output from command',
-                    'stderr': result.stderr
-                }
+                return {"success": False, "error": "No output from command", "stderr": result.stderr}
 
         except subprocess.TimeoutExpired:
-            return {
-                'success': False,
-                'error': 'Command execution timeout (30s)',
-                'command': command,
-                'args': args
-            }
+            return {"success": False, "error": "Command execution timeout (30s)", "command": command, "args": args}
         except subprocess.CalledProcessError as e:
             return {
-                'success': False,
-                'error': f'Docker execution failed: {e}',
-                'stdout': e.stdout,
-                'stderr': e.stderr,
-                'command': command,
-                'args': args
+                "success": False,
+                "error": f"Docker execution failed: {e}",
+                "stdout": e.stdout,
+                "stderr": e.stderr,
+                "command": command,
+                "args": args,
             }
         except json.JSONDecodeError as e:
             return {
-                'success': False,
-                'error': f'Failed to parse JSON output: {e}',
-                'raw_output': result.stdout if 'result' in locals() else None,
-                'command': command,
-                'args': args
+                "success": False,
+                "error": f"Failed to parse JSON output: {e}",
+                "raw_output": result.stdout if "result" in locals() else None,
+                "command": command,
+                "args": args,
             }
         except Exception as e:
-            return {
-                'success': False,
-                'error': f'Unexpected error: {str(e)}',
-                'command': command,
-                'args': args
-            }
+            return {"success": False, "error": f"Unexpected error: {str(e)}", "command": command, "args": args}
 
     def check_docker_logs(self, lines: int = 50) -> List[str]:
         """Check recent Docker logs for errors."""
-        cmd = [
-            "docker-compose", "logs", "app",
-            f"--tail={lines}"
-        ]
+        cmd = ["docker-compose", "logs", "app", f"--tail={lines}"]
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=str(project_root)
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(project_root))
 
             # Filter for errors and warnings
-            log_lines = result.stdout.split('\n')
+            log_lines = result.stdout.split("\n")
             important_lines = []
 
             for line in log_lines:
                 lower_line = line.lower()
-                if any(keyword in lower_line for keyword in ['error', 'failed', 'exception', 'warning']):
+                if any(keyword in lower_line for keyword in ["error", "failed", "exception", "warning"]):
                     important_lines.append(line)
 
             return important_lines
@@ -187,24 +156,19 @@ if __name__ == "__main__":
             result = test_func()
 
             # Check if test passed
-            passed = result.get('success', False)
+            passed = result.get("success", False)
 
             # Calculate duration
             duration = (datetime.now() - start_time).total_seconds()
 
             # Record result
-            test_result = {
-                'name': test_name,
-                'passed': passed,
-                'duration': duration,
-                'result': result
-            }
+            test_result = {"name": test_name, "passed": passed, "duration": duration, "result": result}
 
             if passed:
                 print(f"  ✅ PASSED ({duration:.2f}s)")
             else:
                 print(f"  ❌ FAILED ({duration:.2f}s)")
-                if 'error' in result:
+                if "error" in result:
                     print(f"     Error: {result['error']}")
 
             self.results.append(test_result)
@@ -212,12 +176,7 @@ if __name__ == "__main__":
 
         except Exception as e:
             duration = (datetime.now() - start_time).total_seconds()
-            test_result = {
-                'name': test_name,
-                'passed': False,
-                'duration': duration,
-                'error': str(e)
-            }
+            test_result = {"name": test_name, "passed": False, "duration": duration, "error": str(e)}
             print(f"  ❌ EXCEPTION ({duration:.2f}s): {e}")
             self.results.append(test_result)
             return test_result
@@ -225,9 +184,9 @@ if __name__ == "__main__":
     def generate_report(self) -> str:
         """Generate a test report."""
         total_tests = len(self.results)
-        passed_tests = sum(1 for r in self.results if r['passed'])
+        passed_tests = sum(1 for r in self.results if r["passed"])
         failed_tests = total_tests - passed_tests
-        total_duration = sum(r['duration'] for r in self.results)
+        total_duration = sum(r["duration"] for r in self.results)
 
         report = [
             "=" * 60,
@@ -239,22 +198,17 @@ if __name__ == "__main__":
             f"Total Duration: {total_duration:.2f}s",
             "",
             "Detailed Results:",
-            "-" * 60
+            "-" * 60,
         ]
 
         for result in self.results:
-            status = "✅ PASS" if result['passed'] else "❌ FAIL"
+            status = "✅ PASS" if result["passed"] else "❌ FAIL"
             report.append(f"{status} {result['name']} ({result['duration']:.2f}s)")
 
-            if not result['passed'] and 'error' in result:
+            if not result["passed"] and "error" in result:
                 report.append(f"     Error: {result['error']}")
 
-        report.extend([
-            "-" * 60,
-            "",
-            "Recent Docker Errors:",
-            "-" * 60
-        ])
+        report.extend(["-" * 60, "", "Recent Docker Errors:", "-" * 60])
 
         # Add recent errors from logs
         errors = self.check_docker_logs()
@@ -339,7 +293,7 @@ def main():
     print("\n" + runner.generate_report())
 
     # Return exit code based on results
-    if all(r['passed'] for r in runner.results):
+    if all(r["passed"] for r in runner.results):
         print("\n✅ All tests passed!")
         return 0
     else:

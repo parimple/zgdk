@@ -23,26 +23,32 @@ discord_mock.Embed = MagicMock()
 discord_mock.utils = MagicMock()
 discord_mock.utils.format_dt = MagicMock()
 discord_mock.Forbidden = Exception
-sys.modules['discord'] = discord_mock
-sys.modules['discord.ui'] = discord_mock.ui
-sys.modules['discord.ext'] = discord_mock.ext
+sys.modules["discord"] = discord_mock
+sys.modules["discord.ui"] = discord_mock.ui
+sys.modules["discord.ext"] = discord_mock.ext
 # Note: discord.ext.commands now stubbed per-test for flexibility
 
 # Mock the permission decorators
 permissions_mock = MagicMock()
+
+
 def is_zagadka_owner():
     def decorator(func):
         return func
+
     return decorator
+
 
 def is_admin():
     def decorator(func):
         return func
+
     return decorator
+
 
 permissions_mock.is_zagadka_owner = is_zagadka_owner
 permissions_mock.is_admin = is_admin
-sys.modules['utils.permissions'] = permissions_mock
+sys.modules["utils.permissions"] = permissions_mock
 
 from tests.data.test_constants import (
     BOT_CONFIG,

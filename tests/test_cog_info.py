@@ -17,9 +17,7 @@ def info_cog(bot: Zagadka) -> InfoCog:
 
 
 @pytest.mark.asyncio
-async def test_ping_command(
-    info_cog: InfoCog, ctx: commands.Context
-):  # pylint: disable=redefined-outer-name
+async def test_ping_command(info_cog: InfoCog, ctx: commands.Context):  # pylint: disable=redefined-outer-name
     """Test the ping command."""
     ping_command = get_command(info_cog, "ping")
     await ping_command.callback(info_cog, ctx)  # type: ignore

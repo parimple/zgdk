@@ -14,7 +14,7 @@ def test_shop_command_configuration():
         {"name": "zG50", "price": 49, "duration": 30},
         {"name": "zG100", "price": 99, "duration": 30},
         {"name": "zG500", "price": 499, "duration": 30},
-        {"name": "zG1000", "price": 999, "duration": 30}
+        {"name": "zG1000", "price": 999, "duration": 30},
     ]
 
     # Verify structure
@@ -74,7 +74,7 @@ def test_premium_role_price_mapping():
         "zG50": WALLET_BALANCES["zg50_price"],
         "zG100": WALLET_BALANCES["zg100_price"],
         "zG500": WALLET_BALANCES["zg500_price"],
-        "zG1000": WALLET_BALANCES["zg1000_price"]
+        "zG1000": WALLET_BALANCES["zg1000_price"],
     }
 
     # Verify all prices are positive
@@ -95,7 +95,7 @@ def test_member_balance_validation():
         WALLET_BALANCES["empty"],
         WALLET_BALANCES["low"],
         WALLET_BALANCES["medium"],
-        WALLET_BALANCES["high"]
+        WALLET_BALANCES["high"],
     ]
 
     for balance in test_balances:
@@ -150,13 +150,7 @@ def test_error_message_constants():
     from tests.data.test_constants import ERROR_MESSAGES
 
     # Verify required error messages exist
-    required_errors = [
-        "no_balance",
-        "no_permission",
-        "invalid_amount",
-        "role_not_found",
-        "database_error"
-    ]
+    required_errors = ["no_balance", "no_permission", "invalid_amount", "role_not_found", "database_error"]
 
     for error_key in required_errors:
         assert error_key in ERROR_MESSAGES
@@ -171,6 +165,7 @@ def test_time_calculations():
     hours_to_add = 24 * 30  # 30 days
 
     from datetime import timedelta
+
     expiry_time = base_time + timedelta(hours=hours_to_add)
 
     # Verify time calculations work

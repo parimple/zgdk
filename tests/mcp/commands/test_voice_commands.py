@@ -9,10 +9,7 @@ import aiohttp
 async def test_command(command: str, params: dict = None):
     """Test a single command."""
     async with aiohttp.ClientSession() as session:
-        payload = {
-            "command": command,
-            "user_id": "956602391891947592"
-        }
+        payload = {"command": command, "user_id": "956602391891947592"}
         if params:
             payload.update(params)
 
@@ -30,9 +27,9 @@ async def test_command(command: str, params: dict = None):
             if "embeds" in response and response["embeds"]:
                 embed = response["embeds"][0]
                 print("✅ Embed received")
-                if embed.get('title'):
+                if embed.get("title"):
                     print(f"Title: {embed['title']}")
-                if embed.get('description'):
+                if embed.get("description"):
                     print(f"Description: {embed['description'][:100]}...")
             elif "content" in response:
                 print(f"✅ Content: {response['content'][:200]}...")
@@ -62,6 +59,7 @@ async def main():
     # Moderator commands
     await test_command("mod")
     await test_command("autokick")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

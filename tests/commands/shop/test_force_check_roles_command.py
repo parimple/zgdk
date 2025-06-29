@@ -17,9 +17,7 @@ from tests.data.test_constants import (
 def test_premium_role_names_mapping():
     """Test premium role names mapping from config"""
     # Arrange
-    premium_role_names = {
-        role["name"]: role for role in PREMIUM_ROLES_CONFIG
-    }
+    premium_role_names = {role["name"]: role for role in PREMIUM_ROLES_CONFIG}
 
     # Act & Assert
     assert "zG50" in premium_role_names
@@ -46,23 +44,19 @@ def test_role_expiry_check_logic():
         {
             "expiry": now - timedelta(hours=1),  # Expired 1 hour ago
             "should_remove": True,
-            "description": "Expired role"
+            "description": "Expired role",
         },
-        {
-            "expiry": now + timedelta(hours=1),  # Valid for 1 hour
-            "should_remove": False,
-            "description": "Valid role"
-        },
+        {"expiry": now + timedelta(hours=1), "should_remove": False, "description": "Valid role"},  # Valid for 1 hour
         {
             "expiry": now - timedelta(minutes=1),  # Expired 1 minute ago
             "should_remove": True,
-            "description": "Recently expired"
+            "description": "Recently expired",
         },
         {
             "expiry": now + timedelta(days=30),  # Valid for 30 days
             "should_remove": False,
-            "description": "Long-term valid"
-        }
+            "description": "Long-term valid",
+        },
     ]
 
     # Act & Assert
@@ -89,7 +83,7 @@ def test_guild_roles_filtering():
         ("Regular Role", 123456),
         ("zG500", ROLE_ZG500_ID),
         ("Admin", 789012),
-        ("zG1000", ROLE_ZG1000_ID)
+        ("zG1000", ROLE_ZG1000_ID),
     ]:
         role = MagicMock()
         role.name = role_name
@@ -99,10 +93,7 @@ def test_guild_roles_filtering():
     premium_role_names = {role["name"]: role for role in PREMIUM_ROLES_CONFIG}
 
     # Act - Filter as command does
-    premium_roles = [
-        role for role in mock_guild_roles
-        if role.name in premium_role_names
-    ]
+    premium_roles = [role for role in mock_guild_roles if role.name in premium_role_names]
 
     # Assert
     assert len(premium_roles) == 4  # Only premium roles
@@ -124,7 +115,7 @@ def test_role_member_iteration():
     mock_members = [
         MagicMock(id=TEST_USER_1_ID, display_name="User1"),
         MagicMock(id=TEST_USER_1_ID + 1, display_name="User2"),
-        MagicMock(id=TEST_USER_1_ID + 2, display_name="User3")
+        MagicMock(id=TEST_USER_1_ID + 2, display_name="User3"),
     ]
 
     mock_role = MagicMock()
@@ -143,7 +134,7 @@ def test_role_member_iteration():
 
     # Verify all have display names
     for member in mock_role.members:
-        assert hasattr(member, 'display_name')
+        assert hasattr(member, "display_name")
         assert len(member.display_name) > 0
 
 
@@ -154,7 +145,7 @@ def test_role_removal_counter():
     roles_to_remove = [
         {"member": "User1", "role": "zG50"},
         {"member": "User2", "role": "zG100"},
-        {"member": "User3", "role": "zG50"}
+        {"member": "User3", "role": "zG50"},
     ]
 
     # Act - Simulate counter increment
@@ -188,11 +179,7 @@ def test_final_message_format():
 def test_premium_service_methods():
     """Test premium service method calls"""
     # Arrange
-    expected_methods = [
-        "has_premium_role",
-        "get_member_premium_roles",
-        "set_guild"
-    ]
+    expected_methods = ["has_premium_role", "get_member_premium_roles", "set_guild"]
 
     # Act & Assert
     for method_name in expected_methods:
@@ -211,7 +198,7 @@ def test_role_data_structure():
     mock_role_data = {
         "role_name": "zG50",
         "expiration_date": datetime.now(timezone.utc) + timedelta(days=15),
-        "is_active": True
+        "is_active": True,
     }
 
     # Act & Assert
@@ -240,8 +227,12 @@ def test_admin_permission_requirement():
 
     # Verify this is a valid Discord permission
     valid_permissions = [
-        "administrator", "manage_guild", "manage_roles",
-        "manage_channels", "kick_members", "ban_members"
+        "administrator",
+        "manage_guild",
+        "manage_roles",
+        "manage_channels",
+        "kick_members",
+        "ban_members",
     ]
     assert required_permission in valid_permissions
 

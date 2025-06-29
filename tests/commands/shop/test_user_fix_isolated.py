@@ -9,18 +9,20 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 # Mock Discord modules BEFORE any imports
-sys.modules['discord'] = MagicMock()
-sys.modules['discord.ext'] = MagicMock()
+sys.modules["discord"] = MagicMock()
+sys.modules["discord.ext"] = MagicMock()
 
 # --- USER'S BRILLIANT STUB FOR discord.ext.commands --------------------------
 commands_stub = types.ModuleType("discord.ext.commands")
-sys.modules['discord.ext.commands'] = commands_stub
+sys.modules["discord.ext.commands"] = commands_stub
 
 # pass‑through decorators so wrapped coroutine stays a coroutine
 def _dummy_decorator(*d_args, **d_kwargs):
     def _wrap(fn):
         return fn
+
     return _wrap
+
 
 commands_stub.hybrid_command = _dummy_decorator
 commands_stub.command = _dummy_decorator
@@ -29,6 +31,8 @@ commands_stub.command = _dummy_decorator
 class _Cog:
     def __init__(self, bot):
         self.bot = bot
+
+
 commands_stub.Cog = _Cog
 
 # Add Context class
@@ -39,23 +43,27 @@ commands_stub.Context = MagicMock
 permissions_mock = MagicMock()
 permissions_mock.is_zagadka_owner = _dummy_decorator
 permissions_mock.is_admin = _dummy_decorator
-sys.modules['utils.permissions'] = permissions_mock
+sys.modules["utils.permissions"] = permissions_mock
 
 # Mock utils.premium with working PaymentData
 premium_mock = MagicMock()
+
+
 class PaymentData:
     def __init__(self, name, amount, paid_at, payment_type):
         self.name = name
         self.amount = amount
         self.paid_at = paid_at
         self.payment_type = payment_type
-premium_mock.PaymentData = PaymentData
-sys.modules['utils.premium'] = premium_mock
 
-sys.modules['cogs.ui.shop_embeds'] = MagicMock()
-sys.modules['cogs.views.shop_views'] = MagicMock()
-sys.modules['core.interfaces.member_interfaces'] = MagicMock()
-sys.modules['core.interfaces.premium_interfaces'] = MagicMock()
+
+premium_mock.PaymentData = PaymentData
+sys.modules["utils.premium"] = premium_mock
+
+sys.modules["cogs.ui.shop_embeds"] = MagicMock()
+sys.modules["cogs.views.shop_views"] = MagicMock()
+sys.modules["core.interfaces.member_interfaces"] = MagicMock()
+sys.modules["core.interfaces.premium_interfaces"] = MagicMock()
 
 # Mock datasources.queries with AsyncMock
 queries_mock = MagicMock()
@@ -63,7 +71,7 @@ queries_mock.HandledPaymentQueries = MagicMock()
 queries_mock.HandledPaymentQueries.add_payment = AsyncMock()
 queries_mock.HandledPaymentQueries.get_payment_by_id = AsyncMock()
 queries_mock.HandledPaymentQueries.get_last_payments = AsyncMock()
-sys.modules['datasources.queries'] = queries_mock
+sys.modules["datasources.queries"] = queries_mock
 
 
 def test_user_fix_preserves_coroutine():
@@ -85,11 +93,12 @@ def test_user_fix_preserves_coroutine():
     print(f"shop_cog.__class__: {shop_cog.__class__}")
 
     # Check that the method exists and is callable
-    assert hasattr(shop_cog, 'add_balance')
+    assert hasattr(shop_cog, "add_balance")
     assert callable(shop_cog.add_balance)
 
     # Check that it's still a coroutine function
     import inspect
+
     print(f"Method type: {type(shop_cog.add_balance)}")
     print(f"Is coroutine function: {inspect.iscoroutinefunction(shop_cog.add_balance)}")
 

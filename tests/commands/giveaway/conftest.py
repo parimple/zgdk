@@ -67,7 +67,7 @@ def mock_test_roles():
         ("test2", TEST_ROLE_2_ID, ROLE_NAMES["test2"]),
         ("test3", TEST_ROLE_3_ID, ROLE_NAMES["test3"]),
         ("premium", PREMIUM_ROLE_ID, ROLE_NAMES["premium"]),
-        ("vip", VIP_ROLE_ID, ROLE_NAMES["vip"])
+        ("vip", VIP_ROLE_ID, ROLE_NAMES["vip"]),
     ]
 
     for key, role_id, role_name in role_configs:
@@ -115,46 +115,31 @@ def mock_test_members(mock_test_roles, mock_member_factory):
 
     # Admin user with test role 1
     members["admin_with_test1"] = mock_member_factory.create_member(
-        ADMIN_USER_ID,
-        roles=[mock_test_roles["test1"]],
-        name="AdminUser"
+        ADMIN_USER_ID, roles=[mock_test_roles["test1"]], name="AdminUser"
     )
 
     # Regular user with test roles 1 and 2
     members["user_test1_test2"] = mock_member_factory.create_member(
-        TEST_USER_1_ID,
-        roles=[mock_test_roles["test1"], mock_test_roles["test2"]],
-        name="TestUser1"
+        TEST_USER_1_ID, roles=[mock_test_roles["test1"], mock_test_roles["test2"]], name="TestUser1"
     )
 
     # User with test roles 2 and 3
     members["user_test2_test3"] = mock_member_factory.create_member(
-        TEST_USER_2_ID,
-        roles=[mock_test_roles["test2"], mock_test_roles["test3"]],
-        name="TestUser2"
+        TEST_USER_2_ID, roles=[mock_test_roles["test2"], mock_test_roles["test3"]], name="TestUser2"
     )
 
     # User with only premium role
     members["user_premium_only"] = mock_member_factory.create_member(
-        TEST_USER_3_ID,
-        roles=[mock_test_roles["premium"]],
-        name="PremiumUser"
+        TEST_USER_3_ID, roles=[mock_test_roles["premium"]], name="PremiumUser"
     )
 
     # Bot user (should be filtered out)
     members["bot_with_test1"] = mock_member_factory.create_member(
-        BOT_USER_ID,
-        roles=[mock_test_roles["test1"]],
-        is_bot=True,
-        name="BotUser"
+        BOT_USER_ID, roles=[mock_test_roles["test1"]], is_bot=True, name="BotUser"
     )
 
     # User with no relevant roles
-    members["user_no_roles"] = mock_member_factory.create_member(
-        TEST_USER_4_ID,
-        roles=[],
-        name="NoRolesUser"
-    )
+    members["user_no_roles"] = mock_member_factory.create_member(TEST_USER_4_ID, roles=[], name="NoRolesUser")
 
     return members
 
@@ -163,8 +148,9 @@ class MockMessageFactory:
     """Factory for creating mock messages with different configurations"""
 
     @staticmethod
-    def create_message(message_id: int, author_id: int, is_bot: bool = False,
-                      webhook_id: str = None, content: str = None):
+    def create_message(
+        message_id: int, author_id: int, is_bot: bool = False, webhook_id: str = None, content: str = None
+    ):
         """Create a mock message with specified configuration"""
         message = MagicMock(spec=discord.Message)
         message.id = message_id
@@ -196,9 +182,7 @@ def mock_regular_messages(mock_message_factory):
     messages = []
     for i in range(10):
         message = mock_message_factory.create_message(
-            message_id=MESSAGE_BASE_ID + i,
-            author_id=TEST_USER_1_ID + i,
-            content=f"Regular message {i}"
+            message_id=MESSAGE_BASE_ID + i, author_id=TEST_USER_1_ID + i, content=f"Regular message {i}"
         )
         messages.append(message)
     return messages
@@ -210,10 +194,7 @@ def mock_bot_messages(mock_message_factory):
     messages = []
     for i in range(3):
         message = mock_message_factory.create_message(
-            message_id=BOT_MESSAGE_BASE_ID + i,
-            author_id=BOT_USER_ID + i,
-            is_bot=True,
-            content=f"Bot message {i}"
+            message_id=BOT_MESSAGE_BASE_ID + i, author_id=BOT_USER_ID + i, is_bot=True, content=f"Bot message {i}"
         )
         messages.append(message)
     return messages
@@ -229,7 +210,7 @@ def mock_webhook_messages(mock_message_factory):
             author_id=BOT_USER_ID + i,
             is_bot=True,
             webhook_id=f"webhook_{i}",
-            content=f"Webhook message {i}"
+            content=f"Webhook message {i}",
         )
         messages.append(message)
     return messages
@@ -243,7 +224,7 @@ def mock_messages_same_author(mock_message_factory):
         message = mock_message_factory.create_message(
             message_id=MESSAGE_BASE_ID + 100 + i,
             author_id=TEST_USER_1_ID,  # Same author
-            content=f"Same author message {i}"
+            content=f"Same author message {i}",
         )
         messages.append(message)
     return messages
@@ -252,8 +233,10 @@ def mock_messages_same_author(mock_message_factory):
 @pytest.fixture
 def mock_channel_with_history(mock_ctx):
     """Create mock channel with configurable message history"""
+
     def setup_history(messages):
         """Setup channel history with provided messages"""
+
         async def async_iter():
             for message in messages:
                 yield message

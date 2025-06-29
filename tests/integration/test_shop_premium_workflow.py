@@ -28,7 +28,7 @@ class TestShopPremiumWorkflow(BaseCommandTest):
                 "color": "#FF0000",
                 "description": "Basic premium role",
                 "team_members": 5,
-                "moderator_count": 2
+                "moderator_count": 2,
             },
             {
                 "id": 1027629916951326761,
@@ -37,7 +37,7 @@ class TestShopPremiumWorkflow(BaseCommandTest):
                 "color": "#00FF00",
                 "description": "Advanced premium role",
                 "team_members": 10,
-                "moderator_count": 5
+                "moderator_count": 5,
             },
             {
                 "id": 1027630008227659826,
@@ -46,8 +46,8 @@ class TestShopPremiumWorkflow(BaseCommandTest):
                 "color": "#0000FF",
                 "description": "Ultimate premium role",
                 "team_members": 15,
-                "moderator_count": 10
-            }
+                "moderator_count": 10,
+            },
         ]
 
         # Create mock premium roles
@@ -62,11 +62,13 @@ class TestShopPremiumWorkflow(BaseCommandTest):
 
         # Mock guild.get_role to return our premium roles
         original_get_role = self.guild.get_role
+
         def mock_get_role(role_id):
             for role in self.premium_roles.values():
                 if role.id == role_id:
                     return role
             return original_get_role(role_id)
+
         self.guild.get_role = mock_get_role
 
         yield
@@ -85,7 +87,7 @@ class TestShopPremiumWorkflow(BaseCommandTest):
         test_user.remove_roles = AsyncMock()
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock member service
             member_service = AsyncMock()
             db_member = MagicMock()
@@ -150,14 +152,14 @@ class TestShopPremiumWorkflow(BaseCommandTest):
             # In real test, this would check if the color was changed
 
             # Test team creation (should work with zG100)
-            with patch.object(self.bot.cogs.get('TeamCog', None), '_get_user_team_role', return_value=None):
+            with patch.object(self.bot.cogs.get("TeamCog", None), "_get_user_team_role", return_value=None):
                 response = await client.run_command("team create", "MyTeam")
                 # This would create a team with 5 member limit
 
             # Step 5: Buy zG500 role
             premium_service.get_member_premium_roles.return_value = [
                 self.premium_roles["zG100"],
-                self.premium_roles["zG500"]
+                self.premium_roles["zG500"],
             ]
             premium_service.get_highest_premium_role.return_value = self.premium_roles["zG500"]
             test_user.roles.append(self.premium_roles["zG500"])
@@ -171,7 +173,7 @@ class TestShopPremiumWorkflow(BaseCommandTest):
             premium_service.get_member_premium_roles.return_value = [
                 self.premium_roles["zG100"],
                 self.premium_roles["zG500"],
-                self.premium_roles["zG1000"]
+                self.premium_roles["zG1000"],
             ]
             premium_service.get_highest_premium_role.return_value = self.premium_roles["zG1000"]
             test_user.roles.append(self.premium_roles["zG1000"])
@@ -179,7 +181,7 @@ class TestShopPremiumWorkflow(BaseCommandTest):
 
             # Step 8: Test ultimate features with zG1000
             # Team emoji support
-            with patch.object(self.bot.cogs.get('TeamCog', None), '_get_user_team_role') as mock_team:
+            with patch.object(self.bot.cogs.get("TeamCog", None), "_get_user_team_role") as mock_team:
                 team_role = MagicMock()
                 team_role.name = "☫ MyTeam"
                 team_role.edit = AsyncMock()
@@ -192,15 +194,13 @@ class TestShopPremiumWorkflow(BaseCommandTest):
             # Sell zG1000 (should get 700G back - 70% of 1000)
             premium_service.get_member_premium_roles.return_value = [
                 self.premium_roles["zG100"],
-                self.premium_roles["zG500"]
+                self.premium_roles["zG500"],
             ]
             test_user.roles.remove(self.premium_roles["zG1000"])
             db_member.wallet_balance = 1100  # After sale
 
             # Sell zG500 (should get 350G back - 70% of 500)
-            premium_service.get_member_premium_roles.return_value = [
-                self.premium_roles["zG100"]
-            ]
+            premium_service.get_member_premium_roles.return_value = [self.premium_roles["zG100"]]
             test_user.roles.remove(self.premium_roles["zG500"])
             db_member.wallet_balance = 1450  # After sale
 
@@ -233,7 +233,7 @@ class TestShopPremiumWorkflow(BaseCommandTest):
         self.ctx.author = owner
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock member service
             member_service = AsyncMock()
             db_member = MagicMock()
@@ -292,7 +292,7 @@ class TestShopPremiumWorkflow(BaseCommandTest):
         test_user = self.create_member(int(TEST_USER_ID), "TestUser")
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock member service
             member_service = AsyncMock()
             member_service.get_or_create_member = AsyncMock()
@@ -339,7 +339,7 @@ class TestShopPremiumWorkflow(BaseCommandTest):
         test_user.roles.append(self.premium_roles["zG100"])
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock role service
             role_service = AsyncMock()
             db_ownership = MagicMock()
@@ -360,7 +360,7 @@ class TestShopPremiumWorkflow(BaseCommandTest):
             mock_get_service.side_effect = get_service
 
             # Mock get_db context manager
-            with patch.object(self.bot, 'get_db') as mock_get_db:
+            with patch.object(self.bot, "get_db") as mock_get_db:
                 mock_get_db.return_value.__aenter__.return_value = session
                 mock_get_db.return_value.__aexit__.return_value = None
 
@@ -379,14 +379,12 @@ class TestShopPremiumWorkflow(BaseCommandTest):
         self.ctx.author = test_user
 
         # Mock services
-        with patch.object(self.bot, 'get_service') as mock_get_service:
+        with patch.object(self.bot, "get_service") as mock_get_service:
             # Mock premium service to deny access
             premium_service = AsyncMock()
             premium_service.set_guild = MagicMock()
             premium_service.has_premium_role = AsyncMock(return_value=False)
-            premium_service.check_command_access = AsyncMock(
-                return_value=(False, "Ta komenda wymaga rangi premium")
-            )
+            premium_service.check_command_access = AsyncMock(return_value=(False, "Ta komenda wymaga rangi premium"))
 
             async def get_service(service_type, session):
                 from core.interfaces.premium_interfaces import IPremiumService

@@ -28,11 +28,7 @@ class SimpleMCPClient:
 
     async def execute_command(self, command: str, args: str = "", send_to_channel: bool = False) -> Dict[str, Any]:
         """Execute a Discord bot command."""
-        payload = {
-            "command": command,
-            "args": args,
-            "send_to_channel": send_to_channel
-        }
+        payload = {"command": command, "args": args, "send_to_channel": send_to_channel}
 
         async with aiohttp.ClientSession() as session:
             try:
@@ -64,8 +60,8 @@ class SimpleMCPClient:
                     for embed in resp["embeds"]:
                         output += f"Embed: {embed.get('title', 'No title')}\n"
                         if embed.get("description"):
-                            desc = embed['description'][:200]
-                            if len(embed['description']) > 200:
+                            desc = embed["description"][:200]
+                            if len(embed["description"]) > 200:
                                 desc += "..."
                             output += f"Description: {desc}\n"
                         if embed.get("fields"):

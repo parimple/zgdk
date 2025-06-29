@@ -25,21 +25,12 @@ def test_discord_commands_simple():
     print()
 
     # Test results
-    results = {
-        "start_time": datetime.now().isoformat(),
-        "tests": [],
-        "summary": {}
-    }
+    results = {"start_time": datetime.now().isoformat(), "tests": [], "summary": {}}
 
     # Test 1: Check if bot is online
     print("🔍 Test 1: Check bot health")
     try:
-        health_result = subprocess.run(
-            ["./scripts/docker/health_check.sh"],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        health_result = subprocess.run(["./scripts/docker/health_check.sh"], capture_output=True, text=True, timeout=30)
         if health_result.returncode == 0:
             print("✅ Bot is healthy and running")
             bot_status = "HEALTHY"
@@ -50,20 +41,13 @@ def test_discord_commands_simple():
         print(f"❌ Health check error: {e}")
         bot_status = "ERROR"
 
-    results["tests"].append({
-        "test": "bot_health_check",
-        "status": bot_status,
-        "timestamp": datetime.now().isoformat()
-    })
+    results["tests"].append({"test": "bot_health_check", "status": bot_status, "timestamp": datetime.now().isoformat()})
 
     # Test 2: Check recent bot logs for command activity
     print("\n🔍 Test 2: Check recent bot activity")
     try:
         logs_result = subprocess.run(
-            ["docker-compose", "logs", "app", "--tail=20"],
-            capture_output=True,
-            text=True,
-            timeout=10
+            ["docker-compose", "logs", "app", "--tail=20"], capture_output=True, text=True, timeout=10
         )
 
         if logs_result.returncode == 0:
@@ -87,20 +71,15 @@ def test_discord_commands_simple():
         print(f"❌ Log check error: {e}")
         activity_status = "ERROR"
 
-    results["tests"].append({
-        "test": "bot_activity_check",
-        "status": activity_status,
-        "timestamp": datetime.now().isoformat()
-    })
+    results["tests"].append(
+        {"test": "bot_activity_check", "status": activity_status, "timestamp": datetime.now().isoformat()}
+    )
 
     # Test 3: Check if permissions system is working (via logs)
     print("\n🔍 Test 3: Check permissions system")
     try:
         perm_result = subprocess.run(
-            ["docker-compose", "logs", "app", "--tail=50"],
-            capture_output=True,
-            text=True,
-            timeout=10
+            ["docker-compose", "logs", "app", "--tail=50"], capture_output=True, text=True, timeout=10
         )
 
         if perm_result.returncode == 0:
@@ -124,11 +103,9 @@ def test_discord_commands_simple():
         print(f"❌ Permission check error: {e}")
         perm_status = "ERROR"
 
-    results["tests"].append({
-        "test": "permissions_check",
-        "status": perm_status,
-        "timestamp": datetime.now().isoformat()
-    })
+    results["tests"].append(
+        {"test": "permissions_check", "status": perm_status, "timestamp": datetime.now().isoformat()}
+    )
 
     # Summary
     print("\n" + "=" * 40)
@@ -154,7 +131,7 @@ def test_discord_commands_simple():
     results["summary"] = {
         "total_tests": total_tests,
         "passed_tests": passed_tests,
-        "success_rate": round(success_rate, 1)
+        "success_rate": round(success_rate, 1),
     }
 
     print(f"\nSuccess Rate: {success_rate:.1f}%")
@@ -177,7 +154,7 @@ def test_discord_commands_simple():
 
     try:
         os.makedirs("tests/results", exist_ok=True)
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(results, f, indent=2, default=str)
         print(f"\n📄 Results saved to: {filename}")
     except Exception as e:
@@ -193,6 +170,7 @@ def test_discord_commands_simple():
     print("4. Verify bot responds to all commands")
 
     return results
+
 
 if __name__ == "__main__":
     test_discord_commands_simple()

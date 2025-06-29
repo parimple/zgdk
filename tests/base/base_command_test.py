@@ -18,12 +18,7 @@ class BaseCommandTest:
         """Set up base test environment."""
         # Create mock bot
         self.bot = MagicMock()
-        self.bot.config = {
-            "premium_roles": [],
-            "mute_roles": [],
-            "team": {},
-            "channels_voice": {"afk": 12345}
-        }
+        self.bot.config = {"premium_roles": [], "mute_roles": [], "team": {}, "channels_voice": {"afk": 12345}}
         self.bot.command_prefix = [","]
         self.bot.get_cog = MagicMock()
         self.bot.cogs = {}

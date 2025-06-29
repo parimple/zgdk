@@ -7,19 +7,21 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Mock Discord before any imports
-sys.modules['discord'] = MagicMock()
-sys.modules['discord.ext'] = MagicMock()
-sys.modules['discord.ext.commands'] = MagicMock()
-sys.modules['utils.permissions'] = MagicMock()
-sys.modules['core.interfaces.member_interfaces'] = MagicMock()
-sys.modules['datasources.queries'] = MagicMock()
+sys.modules["discord"] = MagicMock()
+sys.modules["discord.ext"] = MagicMock()
+sys.modules["discord.ext.commands"] = MagicMock()
+sys.modules["utils.permissions"] = MagicMock()
+sys.modules["core.interfaces.member_interfaces"] = MagicMock()
+sys.modules["datasources.queries"] = MagicMock()
 
 from cogs.commands.shop import ShopCog
 
 
 @pytest.mark.asyncio
-@patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id')
-async def test_assign_payment_success(mock_get_payment, mock_bot_with_services, mock_discord_context, mock_discord_user):
+@patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id")
+async def test_assign_payment_success(
+    mock_get_payment, mock_bot_with_services, mock_discord_context, mock_discord_user
+):
     """Test successful payment assignment"""
     # Arrange
     payment_id = 123
@@ -48,7 +50,7 @@ async def test_assign_payment_not_found(mock_bot_with_services, mock_discord_con
     # Arrange
     payment_id = 999
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         mock_get_payment.return_value = None
 
         # Act
@@ -67,7 +69,7 @@ async def test_assign_payment_dm_success(mock_bot_with_services, mock_discord_co
     # Arrange
     payment_id = 123
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         mock_payment = MagicMock()
         mock_payment.amount = 500
         mock_payment.member_id = None
@@ -95,7 +97,7 @@ async def test_assign_payment_dm_forbidden(mock_bot_with_services, mock_discord_
     # Arrange
     payment_id = 123
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         mock_payment = MagicMock()
         mock_payment.amount = 500
         mock_payment.member_id = None
@@ -103,6 +105,7 @@ async def test_assign_payment_dm_forbidden(mock_bot_with_services, mock_discord_
 
         # Mock DM failure
         import discord
+
         mock_discord_user.send.side_effect = discord.Forbidden(MagicMock(), "Cannot send DM")
 
         # Act
@@ -123,7 +126,7 @@ async def test_assign_payment_balance_update(mock_bot_with_services, mock_discor
     payment_id = 123
     payment_amount = 500
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         mock_payment = MagicMock()
         mock_payment.amount = payment_amount
         mock_payment.member_id = None
@@ -134,7 +137,7 @@ async def test_assign_payment_balance_update(mock_bot_with_services, mock_discor
         await shop_cog.assign_payment(mock_discord_context, payment_id, mock_discord_user)
 
     # Assert member service was called
-    member_service = mock_bot_with_services.get_service('IMemberService')
+    member_service = mock_bot_with_services.get_service("IMemberService")
     member_service.get_or_create_member.assert_called_once_with(mock_discord_user)
     member_service.update_member_info.assert_called_once()
 
@@ -146,7 +149,7 @@ async def test_assign_payment_transaction_commit(mock_bot_with_services, mock_di
     payment_id = 123
     mock_session = mock_bot_with_services.get_db.return_value.__aenter__.return_value
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         mock_payment = MagicMock()
         mock_payment.amount = 500
         mock_payment.member_id = None
@@ -167,7 +170,7 @@ async def test_assign_payment_large_amount(mock_bot_with_services, mock_discord_
     payment_id = 123
     large_amount = 999999
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         mock_payment = MagicMock()
         mock_payment.amount = large_amount
         mock_payment.member_id = None
@@ -184,7 +187,7 @@ async def test_assign_payment_large_amount(mock_bot_with_services, mock_discord_
 def test_assign_payment_command_signature():
     """Test assign_payment command has correct signature"""
     shop_cog = ShopCog(None)
-    assert hasattr(shop_cog, 'assign_payment')
+    assert hasattr(shop_cog, "assign_payment")
     assert callable(shop_cog.assign_payment)
 
 
@@ -194,7 +197,7 @@ async def test_assign_payment_database_session_usage(mock_bot_with_services, moc
     # Arrange
     payment_id = 123
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         mock_payment = MagicMock()
         mock_payment.amount = 500
         mock_payment.member_id = None
@@ -214,7 +217,7 @@ async def test_assign_payment_member_creation(mock_bot_with_services, mock_disco
     # Arrange
     payment_id = 123
 
-    with patch('cogs.commands.shop.HandledPaymentQueries.get_payment_by_id') as mock_get_payment:
+    with patch("cogs.commands.shop.HandledPaymentQueries.get_payment_by_id") as mock_get_payment:
         mock_payment = MagicMock()
         mock_payment.amount = 500
         mock_payment.member_id = None
@@ -225,5 +228,5 @@ async def test_assign_payment_member_creation(mock_bot_with_services, mock_disco
         await shop_cog.assign_payment(mock_discord_context, payment_id, mock_discord_user)
 
     # Assert member service get_or_create was called
-    member_service = mock_bot_with_services.get_service('IMemberService')
+    member_service = mock_bot_with_services.get_service("IMemberService")
     member_service.get_or_create_member.assert_called_once_with(mock_discord_user)

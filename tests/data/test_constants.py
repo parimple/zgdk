@@ -100,7 +100,7 @@ ROLE_NAMES = {
     "premium": "Premium",
     "vip": "VIP",
     "nitro_booster": "♵",
-    "server_booster": "♼"
+    "server_booster": "♼",
 }
 
 # Premium Roles Configuration (from config.yml)
@@ -119,8 +119,8 @@ PREMIUM_ROLES_CONFIG = [
             "Dowolny kolor dostępny za pomocą komendy ?color",
             "Dostęp do kanału głosowego Git",
             "Dostęp do emotek i stickerów z każdego serwera",
-            "50% więcej punktów do aktywności"
-        ]
+            "50% więcej punktów do aktywności",
+        ],
     },
     {
         "name": "zG100",
@@ -138,8 +138,8 @@ PREMIUM_ROLES_CONFIG = [
             "Kanał Git Plus do tworzenia kanałów głosowych",
             "Moderator kanału głosowego",
             "Dostęp do emotek i stickerów z każdego serwera",
-            "100% więcej punktów do aktywności"
-        ]
+            "100% więcej punktów do aktywności",
+        ],
     },
     {
         "name": "zG500",
@@ -160,8 +160,8 @@ PREMIUM_ROLES_CONFIG = [
             "Wszyscy w drużynie mają kolor klanu na serwerze",
             "Dostęp do emotek i stickerów z każdego serwera",
             "200% więcej punktów do aktywności",
-            "Autokick 1 osoby na każdym kanale"
-        ]
+            "Autokick 1 osoby na każdym kanale",
+        ],
     },
     {
         "name": "zG1000",
@@ -183,9 +183,9 @@ PREMIUM_ROLES_CONFIG = [
             "Moliwość dodania emotki na serwer raz w miesiącu",
             "Moliwość dodania odznaki emotki całej drużynie",
             "300% więcej punktów do aktywności",
-            "Autokick 3 osób na każdym kanale"
-        ]
-    }
+            "Autokick 3 osób na każdym kanale",
+        ],
+    },
 ]
 
 # Bot Configuration for Tests
@@ -193,24 +193,21 @@ BOT_CONFIG = {
     "guild_id": GUILD_ID,
     "prefix": PREFIX,
     "owner_ids": [MAIN_OWNER_ID, TEST_USER_OWNER_ID, CLAUDE_USER_ID],
-    "admin_roles": {
-        "mod": ROLE_MOD_ID,
-        "admin": ROLE_ADMIN_ID
-    },
+    "admin_roles": {"mod": ROLE_MOD_ID, "admin": ROLE_ADMIN_ID},
     "premium_roles": PREMIUM_ROLES_CONFIG,
     "emojis": {
         "proxy_bunny": EMOJI_PROXY_BUNNY,
         "mastercard": EMOJI_MASTERCARD,
         "success": EMOJI_SUCCESS,
-        "error": EMOJI_ERROR
+        "error": EMOJI_ERROR,
     },
     "channels": {
         "on_join": CHANNEL_ON_JOIN,
         "lounge": CHANNEL_LOUNGE,
         "donation": CHANNEL_DONATION,
         "premium_info": CHANNEL_PREMIUM_INFO,
-        "bots": CHANNEL_BOTS
-    }
+        "bots": CHANNEL_BOTS,
+    },
 }
 
 # Wallet Balances for Testing
@@ -223,7 +220,7 @@ WALLET_BALANCES = {
     "zg100_price": 99,
     "zg500_price": 499,
     "zg1000_price": 999,
-    "maximum": 999999999
+    "maximum": 999999999,
 }
 
 # Sample Payment Data
@@ -235,7 +232,7 @@ SAMPLE_PAYMENT_DATA = {
     "payment_type": "role_purchase",
     "role_name": "zG50",
     "duration_days": 30,
-    "paid_at": "2024-01-01T00:00:00Z"
+    "paid_at": "2024-01-01T00:00:00Z",
 }
 
 # Error Messages
@@ -248,32 +245,24 @@ ERROR_MESSAGES = {
     "no_premium_role": "nie ma żadnej roli premium",
     "admin_only": "administratorów",
     "no_messages": "Brak wiadomości do wylosowania",
-    "no_eligible_users": "Nie znaleziono żadnych użytkowników"
+    "no_eligible_users": "Nie znaleziono żadnych użytkowników",
 }
 
 # Legacy System Configuration (from config.yml)
-LEGACY_SYSTEM = {
-    "enabled": True,
-    "amounts": {
-        15: 49,   # zG50
-        25: 99,   # zG100
-        45: 499,  # zG500
-        85: 999   # zG1000
-    }
-}
+LEGACY_SYSTEM = {"enabled": True, "amounts": {15: 49, 25: 99, 45: 499, 85: 999}}  # zG50  # zG100  # zG500  # zG1000
 
 # Voice Channel Categories (from config.yml)
 VC_CATEGORIES = [
     1325436667359662100,  # git ultra
     1325436219714441267,  # git pro
     1325435639260516442,  # git plus
-    960665318475325454,   # git
+    960665318475325454,  # git
     1325439014488117278,  # priv
     1325439940351229962,  # publ
     1325440354648068206,  # max2
     1325440407605346335,  # max3
     1325440479499649075,  # max4
-    1325440557161648160   # max5
+    1325440557161648160,  # max5
 ]
 
 # Channel Creation IDs
@@ -287,5 +276,5 @@ CHANNELS_CREATE = [
     1325445657858670622,  # max2
     1325445711436714095,  # max3
     1325445884967780442,  # max4
-    1325445638002970684   # max5
+    1325445638002970684,  # max5
 ]

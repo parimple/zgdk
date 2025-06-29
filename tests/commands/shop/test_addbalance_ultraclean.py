@@ -53,9 +53,10 @@ def test_addbalance_signature_ultraclean():
 
     bot = make_mock_bot()
     shop = ShopCog(bot)
-    assert hasattr(shop, 'add_balance')
+    assert hasattr(shop, "add_balance")
     assert callable(shop.add_balance)
 
     # Bonus: verify it's a real coroutine function
     import inspect
+
     assert inspect.iscoroutinefunction(shop.add_balance)
