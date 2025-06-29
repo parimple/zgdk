@@ -10,13 +10,7 @@ from datasources.queries import MemberQueries
 from utils.message_sender import MessageSender
 
 from .constants import DISBOARD, DISCADIA, DISCORDSERVERS, DSME, DZIK
-from .handlers import (
-    DisboardHandler,
-    DiscadiaHandler,
-    DiscordServersHandler,
-    DSMEHandler,
-    DzikHandler,
-)
+from .handlers import DisboardHandler, DiscadiaHandler, DiscordServersHandler, DSMEHandler, DzikHandler
 from .status import BumpStatusHandler
 
 logger = logging.getLogger(__name__)
