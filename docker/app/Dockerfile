@@ -40,7 +40,7 @@ RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # Download the browser
-# RUN python -m playwright install chromium  # Temporarily disabled - playwright not in requirements
+RUN python -m playwright install chromium --with-deps
 
 # Check the executable permission of python binary
 RUN ls -la $(which python)
