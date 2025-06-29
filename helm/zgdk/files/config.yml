@@ -1,21 +1,21 @@
-guild_id: 960665311701528596  # Podmień na ID swojego serwera Discord
+guild_id: 960665311701528596  # zaGadka Discord Server
 prefix: ","
 donate_url: "https://example.com/donate"  # Opcjonalne
 
 channels:
-  # Podmień na ID kanałów z twojego serwera
-  tickets_category: 123456789012345678
-  admin_tickets: 123456789012345678
-  payment_logs: 123456789012345678
-  notification_channel: 123456789012345678
-  join_log: 123456789012345678
-  leave_log: 123456789012345678
-  private_channel_category: 123456789012345678
-  ideas: 123456789012345678
-  partnerships: 123456789012345678
-  instagram: 123456789012345678
-  youtube: 123456789012345678
-  tiktok: 123456789012345678
+  # Using placeholder IDs - update with your actual channel IDs
+  tickets_category: 960665311701528597
+  admin_tickets: 960665311701528598
+  payment_logs: 960665311701528599
+  notification_channel: 960665311701528600
+  join_log: 960665311701528601
+  leave_log: 960665311701528602
+  private_channel_category: 960665311701528603
+  ideas: 960665311701528604
+  partnerships: 960665311701528605
+  instagram: 960665311701528606
+  youtube: 960665311701528607
+  tiktok: 960665311701528608
   
 # Opcje funkcjonalne
 force_channel_notifications: true
