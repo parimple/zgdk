@@ -268,7 +268,7 @@ jobs:
       - name: Validate Docker Compose
         run: |
           echo "Validating Docker Compose configuration..."
-          docker-compose config > /dev/null
+          docker compose config > /dev/null || docker-compose config > /dev/null
           echo "✅ Docker Compose configuration is valid"
 
       - name: Check Dockerfile syntax
