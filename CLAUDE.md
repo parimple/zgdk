@@ -288,3 +288,11 @@ find tests/ -name "*feature*"
 - Verify error logs in Docker containers
 - Modify and test scripts thoroughly before deployment
 - Carefully examine logs to ensure all components load correctly
+```
+
+## Memory Notes
+
+- **Push/Deployment Workflow Notes**:
+  - After pushing changes, always verify that everything has been deployed correctly
+  - If any issues are detected, continue working and addressing them immediately
+  - Reminder: zapamietaj by po pushu sprawdzic jeszcze czy wszystko przeszlo i jak nie to pracuj dalej
