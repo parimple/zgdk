@@ -108,7 +108,7 @@ jobs:
           CLAUDE_BOT: ${{ secrets.CLAUDE_BOT }}
           ZAGADKA_TOKEN: ${{ secrets.ZAGADKA_TOKEN }}
           TIPO_API_TOKEN: ${{ secrets.TIPO_API_TOKEN }}
-          run: |
+        run: |
           if [ -n "$CLAUDE_BOT" ]; then
             echo "Running integration tests with bot tokens..."
             python tests/integration/test_shop_integration.py
