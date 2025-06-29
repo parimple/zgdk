@@ -8,7 +8,7 @@ This helps identify what commands are available for testing.
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 class CommandDocGenerator:
