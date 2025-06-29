@@ -146,12 +146,27 @@ jobs:
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           IMAGE_TAG="main-${SHORT_SHA}"
           
+          echo "Updating image tag to: ${IMAGE_TAG}"
+          
+          # Check current values
+          echo "Current values.yaml tag:"
+          grep "tag:" helm/zgdk/values.yaml || true
+          
+          echo "Current Chart.yaml appVersion:"
+          grep "appVersion:" helm/zgdk/Chart.yaml || true
+          
           # Update the image tag in values.yaml
           sed -i "s/tag: .*/tag: ${IMAGE_TAG}/" helm/zgdk/values.yaml
           
           # Update the appVersion in Chart.yaml
-          CURRENT_VERSION=$(grep '^version:' helm/zgdk/Chart.yaml | awk '{print $2}')
           sed -i "s/appVersion: .*/appVersion: \"${IMAGE_TAG}\"/" helm/zgdk/Chart.yaml
+          
+          # Verify changes
+          echo "Updated values.yaml tag:"
+          grep "tag:" helm/zgdk/values.yaml || true
+          
+          echo "Updated Chart.yaml appVersion:"
+          grep "appVersion:" helm/zgdk/Chart.yaml || true
           
       - name: Commit and push changes
         run: |

@@ -10,4 +10,3 @@ keywords:
   - ai
 maintainers:
   - name: ZGDK Team
-# Dependencies removed - deploying PostgreSQL and Redis separately

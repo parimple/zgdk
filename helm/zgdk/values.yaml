@@ -84,3 +84,4 @@ postgresql:
   
 redis:
   enabled: false  # Use external Redis
+
