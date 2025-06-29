@@ -448,7 +448,11 @@ class OnPaymentEvent(commands.Cog):
                     if final_amount in [role_price, rounded_price]:
                         try:
                             # Use PremiumRoleManager to handle role assignment/extension
-                            (embed, refund, add_to_wallet,) = await self.role_manager.assign_or_extend_premium_role(
+                            (
+                                embed,
+                                refund,
+                                add_to_wallet,
+                            ) = await self.role_manager.assign_or_extend_premium_role(
                                 session=session,
                                 member=member,
                                 role_name=role_name,

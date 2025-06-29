@@ -222,6 +222,7 @@ class OnBumpEvent(commands.Cog):
     @commands.hybrid_command(name="bump", description="Sprawdź status swoich bumpów")
     async def bump_status(self, ctx: commands.Context):
         """Check bump status for all services (text command)."""
+
         # Create fake interaction for compatibility
         class FakeResponse:
             def __init__(self, ctx):

@@ -136,7 +136,6 @@ class InteractiveShopTester:
                         and hasattr(self.shop_message.components[0], "children")
                         and len(self.shop_message.components[0].children) > 0
                     ):
-
                         first_button = self.shop_message.components[0].children[0]
                         button_label = getattr(first_button, "label", "Unknown")
                         print(f"🎯 Clicking button: '{button_label}'")
