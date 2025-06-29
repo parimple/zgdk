@@ -203,7 +203,7 @@ class DecisionLogger:
         if not self.current_session:
             return {"message": "No decisions logged yet"}
 
-        summary = {
+        summary: Dict[str, Any] = {
             "total_decisions": len(self.current_session),
             "by_type": {},
             "by_result": {"approved": 0, "denied": 0, "executed": 0, "rejected": 0},
@@ -214,16 +214,16 @@ class DecisionLogger:
         for decision in self.current_session:
             # Count by type
             dtype = decision.decision_type.value
-            summary["by_type"][dtype] = summary["by_type"].get(dtype, 0) + 1
+            summary["by_type"][dtype] = summary["by_type"].get(dtype, 0) + 1  # type: ignore
 
             # Count by result
-            if decision.result in summary["by_result"]:
-                summary["by_result"][decision.result] += 1
+            if decision.result in summary["by_result"]:  # type: ignore[operator]
+                summary["by_result"][decision.result] += 1  # type: ignore[index]
 
             # Sum confidence
-            summary["average_confidence"] += decision.confidence
+            summary["average_confidence"] += decision.confidence  # type: ignore
 
-        summary["average_confidence"] /= len(self.current_session)
+        summary["average_confidence"] /= len(self.current_session)  # type: ignore
 
         return summary
 

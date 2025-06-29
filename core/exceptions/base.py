@@ -127,7 +127,7 @@ class ExternalServiceError(BotError):
         """Initialize external service error."""
         details = {"service": service}
         if status_code:
-            details["status_code"] = status_code
+            details["status_code"] = str(status_code)
 
         super().__init__(
             message=message or f"External service error: {service}",

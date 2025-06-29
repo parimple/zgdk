@@ -57,7 +57,7 @@ class CommandTester:
             ("clear", "10", "Clear messages (no perms)"),
         ]
 
-    def execute_command(self, command: str, args: str = "") -> Dict:
+    def execute_command(self, command: str, args: str = "") -> Dict:  # type: ignore[type-arg]
         """Execute a single command via MCP."""
         script = """
 import asyncio
@@ -99,7 +99,7 @@ asyncio.run(main())
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, check=True)
 
             if result.stdout:
-                return json.loads(result.stdout.strip())
+                return json.loads(result.stdout.strip())  # type: ignore[no-any-return]
             return {"success": False, "error": "No output"}
 
         except subprocess.TimeoutExpired:

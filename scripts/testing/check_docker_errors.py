@@ -23,7 +23,7 @@ def get_docker_logs(tail: int = 200) -> str:
         return ""
 
 
-def parse_errors(logs: str) -> List[Dict[str, str]]:
+def parse_errors(logs: str) -> List[Dict[str, str]]:  # type: ignore[type-arg]
     """Parse errors from logs."""
     errors = []
     lines = logs.split("\n")
@@ -72,15 +72,15 @@ def parse_errors(logs: str) -> List[Dict[str, str]]:
 
             errors.append(error_info)
 
-    return errors
+    return errors  # type: ignore[return-value]
 
 
-def load_existing_errors() -> Dict[str, List[Dict]]:
+def load_existing_errors() -> Dict[str, List[Dict]]:  # type: ignore[type-arg]
     """Load existing errors from file."""
     if os.path.exists(ERROR_LOG_FILE):
         try:
             with open(ERROR_LOG_FILE, "r") as f:
-                return json.load(f)
+                return json.load(f)  # type: ignore[no-any-return]
         except Exception:
             return {}
     return {}

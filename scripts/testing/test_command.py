@@ -18,8 +18,9 @@ import json
 import subprocess
 
 
-def test_command(command: str, args: str = "") -> dict:
+def test_command(command: str, args: str = "") -> dict:  # type: ignore[type-arg]
     """Test a single command via MCP."""
+    data: dict = {}  # Initialize data variable
 
     # Create the test script
     script = """
@@ -97,7 +98,7 @@ asyncio.run(main())
                     if len(str(response)) > 500:
                         print("... (truncated)")
 
-            return data
+            return data  # type: ignore[no-any-return]
 
         else:
             print("❌ No output from command")

@@ -73,7 +73,7 @@ class RateLimitError(DiscordError):
         """Initialize rate limit error."""
         details = {"retry_after": retry_after}
         if endpoint:
-            details["endpoint"] = endpoint
+            details["endpoint"] = str(endpoint)
 
         super().__init__(
             message=f"Rate limited for {retry_after}s",

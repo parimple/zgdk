@@ -48,7 +48,7 @@ class CooldownException(BotError):
             "cooldown_seconds": cooldown_seconds,
         }
         if action:
-            details["action"] = action
+            details["action"] = str(action)
 
         if not user_message:
             user_message = f"⏱️ Musisz poczekać {cooldown_seconds} sekund przed ponownym użyciem."

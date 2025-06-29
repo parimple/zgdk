@@ -24,12 +24,12 @@ def log_message(message: str) -> None:
     print(f"[{timestamp}] {message}")
 
 
-def load_errors() -> Dict[str, List[Dict]]:
+def load_errors() -> Dict[str, List[Dict]]:  # type: ignore[type-arg]
     """Load error log."""
     if os.path.exists(ERROR_LOG_FILE):
         try:
             with open(ERROR_LOG_FILE, "r") as f:
-                return json.load(f)
+                return json.load(f)  # type: ignore[no-any-return]
         except Exception:
             return {}
     return {}

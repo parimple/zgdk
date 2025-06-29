@@ -59,7 +59,7 @@ def test_bot_command(command: str, check_patterns: Optional[List[str]] = None) -
     # Determine success
     success = found_command and len(errors_found) == 0
 
-    result = {
+    result: Dict[str, Any] = {
         "command": command,
         "success": success,
         "found_command": found_command,

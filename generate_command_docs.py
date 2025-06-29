@@ -16,7 +16,7 @@ class CommandDocGenerator:
 
     def __init__(self, cogs_dir: str = "cogs/commands"):
         self.cogs_dir = Path(cogs_dir)
-        self.commands = []
+        self.commands: List[Dict[str, Any]] = []
 
     def extract_commands_from_file(self, filepath: Path) -> List[Dict]:
         """Extract command definitions from a Python file."""
@@ -120,7 +120,7 @@ class CommandDocGenerator:
         doc.append("\n---\n")
 
         # Group by cog
-        cogs = {}
+        cogs: Dict[str, List[Dict[str, Any]]] = {}
         for cmd in self.commands:
             cog = cmd["cog"]
             if cog not in cogs:

@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
             # Parse the JSON output
             if result.stdout:
-                return json.loads(result.stdout.strip())
+                return json.loads(result.stdout.strip())  # type: ignore[no-any-return]
             else:
                 return {"success": False, "error": "No output from command", "stderr": result.stderr}
 
