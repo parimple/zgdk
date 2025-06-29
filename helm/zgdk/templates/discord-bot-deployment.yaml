@@ -30,6 +30,11 @@ spec:
             secretKeyRef:
               name: {{ .Values.discord.tokenSecret }}
               key: {{ .Values.discord.tokenKey }}
+        - name: ZAGADKA_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.discord.tokenSecret }}
+              key: {{ .Values.discord.tokenKey }}
         - name: POSTGRES_HOST
           value: {{ .Values.postgresql.host }}
         - name: POSTGRES_USER
@@ -41,13 +46,19 @@ spec:
               key: {{ .Values.postgresql.passwordKey }}
         - name: POSTGRES_DB
           value: {{ .Values.postgresql.database }}
+        - name: POSTGRES_PORT
+          value: "{{ .Values.postgresql.port }}"
         - name: REDIS_HOST
           value: {{ .Values.redis.host }}
+        - name: REDIS_PORT
+          value: "{{ .Values.redis.port }}"
+        {{- if .Values.gemini.apiKeySecret }}
         - name: GEMINI_API_KEY
           valueFrom:
             secretKeyRef:
               name: {{ .Values.gemini.apiKeySecret }}
               key: {{ .Values.gemini.apiKeyKey }}
+        {{- end }}
         volumeMounts:
         - name: config
           mountPath: /app/config.yml

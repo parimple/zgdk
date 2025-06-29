@@ -345,39 +345,35 @@ class TipplyDataProvider(DataProvider):
             if not all_payments:
                 return []
 
-            # Get the 10 last handled payments of type "tipply"
-            async with self.get_db() as session:
-                payment_repo = PaymentRepository(session)
-                last_handled_payments = await payment_repo.get_last_payments(
-                    offset=0, limit=10, payment_type=self.payment_type
-                )
+            # Get the 10 last handled payments of type "tipply" - use the passed session
+            payment_repo = PaymentRepository(session)
+            last_handled_payments = await payment_repo.get_last_payments(
+                offset=0, limit=10, payment_type=self.payment_type
+            )
             logger.debug("last_handled_payments: %s", last_handled_payments[:3])
 
             # Transform both lists to contain only (name, amount) tuples
-            all_payments = [(payment.name, payment.amount) for payment in all_payments]
-            last_handled_payments = [(payment.name, payment.amount) for payment in last_handled_payments]
-            logger.debug("all_payments: %s", all_payments[:3])
+            all_payments_tuples = [(payment.name, payment.amount) for payment in all_payments]
+            last_handled_tuples = [(payment.name, payment.amount) for payment in last_handled_payments]
+            logger.debug("all_payments: %s", all_payments_tuples[:3])
 
-            # Iterate over the fetched payments from newest to oldest
-            for i in range(len(all_payments) - 10, -1, -1):
-                if all_payments[i : i + 10] == last_handled_payments:
-                    new_payments = all_payments[:i]
-                    break
+            # Create a set of last handled payments for efficient lookup
+            last_handled_set = set(last_handled_tuples)
+            
+            # Find truly new payments by checking which ones aren't in the last handled set
+            new_payments = []
+            for payment in all_payments:
+                payment_tuple = (payment.name, payment.amount)
+                if payment_tuple not in last_handled_set:
+                    new_payments.append(payment)
+                    logger.debug(f"New payment found: {payment_tuple}")
+
+            if new_payments:
+                logger.info("Found %d new payments", len(new_payments))
             else:
-                # If no matching payment is found, all fetched payments are new
-                new_payments = all_payments
+                logger.debug("No new payments found")
 
-            # Transform back to PaymentData
-            current_time = datetime.now(timezone.utc)
-            payment_data_list = []
-            for i, (name, amount) in enumerate(new_payments[::-1]):
-                payment_time = current_time + timedelta(seconds=i)
-                payment_data_list.append(PaymentData(name, amount, payment_time, self.payment_type))
-
-            if payment_data_list:
-                logger.info("Found %d new payments", len(payment_data_list))
-
-            return payment_data_list
+            return new_payments
         except Exception as e:
             logger.error(f"Error in get_data: {str(e)}")
             return []

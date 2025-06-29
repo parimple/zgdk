@@ -30,13 +30,28 @@ spec:
           value: {{ $agent }}
         - name: REDIS_HOST
           value: {{ $.Values.redis.host }}
+        - name: REDIS_PORT
+          value: "{{ $.Values.redis.port }}"
         - name: POSTGRES_HOST
           value: {{ $.Values.postgresql.host }}
+        - name: POSTGRES_PORT
+          value: "{{ $.Values.postgresql.port }}"
+        - name: POSTGRES_USER
+          value: {{ $.Values.postgresql.user }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.postgresql.passwordSecret }}
+              key: {{ $.Values.postgresql.passwordKey }}
+        - name: POSTGRES_DB
+          value: {{ $.Values.postgresql.database }}
+        {{- if $.Values.gemini.apiKeySecret }}
         - name: GEMINI_API_KEY
           valueFrom:
             secretKeyRef:
               name: {{ $.Values.gemini.apiKeySecret }}
               key: {{ $.Values.gemini.apiKeyKey }}
+        {{- end }}
         - name: MCP_ENABLED
           value: "{{ $.Values.mcp.enabled }}"
         - name: MCP_ENDPOINT

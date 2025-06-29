@@ -41,7 +41,7 @@ postgresql:
   passwordKey: POSTGRES_PASSWORD
 
 gemini:
-  apiKeySecret: ai-secrets
+  apiKeySecret: ""  # Optional - will be created if provided
   apiKeyKey: GEMINI_API_KEY
 
 # MCP for Claude access through Claude Code

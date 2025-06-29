@@ -1,21 +1,71 @@
 guild_id: 960665311701528596  # zaGadka Discord Server
 prefix: ","
-donate_url: "https://example.com/donate"  # Opcjonalne
+donate_url: "https://tipply.pl/u/zagadka"
 
+# Owner configuration
+owner_ids:
+  - 956602391891947592  # Main owner
+  - 968632323916566579  # Original test user  
+  - 1387857653748732046  # claude_username for Discord API testing
+  - 489328381972971520  # Authorization ID - owner permissions
+owner_id: 956602391891947592  # Backward compatibility
+
+# Kanały z oryginalnego config.yml
 channels:
-  # Using placeholder IDs - update with your actual channel IDs
-  tickets_category: 960665311701528597
-  admin_tickets: 960665311701528598
-  payment_logs: 960665311701528599
-  notification_channel: 960665311701528600
-  join_log: 960665311701528601
-  leave_log: 960665311701528602
-  private_channel_category: 960665311701528603
-  ideas: 960665311701528604
-  partnerships: 960665311701528605
-  instagram: 960665311701528606
-  youtube: 960665311701528607
-  tiktok: 960665311701528608
+  # Główne kanały
+  on_join: 1105588284555546634
+  lounge: 1143990867946913845
+  donation: 960665312200626201
+  premium_info: 960665316109713421
+  bots: 960665312200626198
+  mute_notifications: 1336368306940018739
+  mute_logs: 1379568677623562300
+  unmute_logs: 1379568677623562300
+  test_channel: 1387864734002446407
+  
+  # Dodatkowe kanały dla kompatybilności
+  tickets_category: 960665312376807530
+  admin_tickets: 960665316109713423
+  payment_logs: 960665312200626201
+  notification_channel: 1336368306940018739
+  join_log: 1105588284555546634
+  leave_log: 1105588284555546634
+  private_channel_category: 960665318475325454
+  ideas: 960665312200626198
+  partnerships: 960665312200626198
+  instagram: 960665312200626198
+  youtube: 960665312200626198
+  tiktok: 960665312200626198
+
+# Voice channels
+channels_voice:
+  afk: 1052997299233636402
+
+# Create channels
+channels_create:
+  - 1325445547586359307  # git ultra
+  - 1057676020209168436  # git pro
+  - 1325445609074987100  # git plus
+  - 1325445576946614274  # git
+  - 1325445737206513727  # priv
+  - 1325445679706935296  # publ
+  - 1325445657858670622  # max2
+  - 1325445711436714095  # max3
+  - 1325445884967780442  # max4
+  - 1325445638002970684  # max5
+
+# VC categories
+vc_categories:
+  - 1325436667359662100  # git ultra
+  - 1325436219714441267  # git pro
+  - 1325435639260516442  # git plus
+  - 960665318475325454   # git
+  - 1325439014488117278  # priv
+  - 1325439940351229962  # publ
+  - 1325440354648068206  # max2
+  - 1325440407605346335  # max3
+  - 1325440479499649075  # max4
+  - 1325440557161648160  # max5
   
 # Opcje funkcjonalne
 force_channel_notifications: true
@@ -29,3 +79,157 @@ activity_multiplier: 1.5
 cooldowns:
   daily: 86400  # 24h w sekundach
   bump: 7200    # 2h w sekundach
+
+# Role
+admin_roles:
+  mod: 960665311953174564  # ID roli moderatora (✪)
+  admin: 960665311953174565  # ID roli administratora (✪)
+
+gender_roles:
+  male: 960665311701528599  # ID roli mężczyzny
+  female: 960665311701528600  # ID roli kobiety
+
+color_roles:
+  blue: 960665311730868235
+  green: 960665311730868236
+  red: 960665311730868237
+
+mute_roles:
+  - id: 960665311760248873
+    name: "⚠︎"
+    description: "stream_off"
+  - id: 960665311953174559
+    name: "⌀"
+    description: "send_messages_off"
+  - id: 960665311953174558
+    name: "☢︎"
+    description: "attach_files_off"
+  - id: 960665311760248877
+    name: "♺"
+    description: "points_off"
+
+# Premium roles
+premium_roles:
+  - name: "zG50"
+    premium: "Git"
+    usd: 14
+    price: 49
+    features:
+      - "Dowolny kolor dostępny za pomocą komendy ?color"
+      - "Dostęp do kanału głosowego Git"
+      - "Dostęp do emotek i stickerów z każdego serwera"
+      - "50% więcej punktów do aktywności"
+    team_size: 0
+    moderator_count: 1
+    points_multiplier: 50
+    emojis_access: false
+    override_limit: true
+
+  - name: "zG100"
+    premium: "Git Plus"
+    price: 99
+    usd: 29
+    features:
+      - "Rola na samej górze serwera"
+      - "Kanał drużynowy dla 15 osób"
+      - "Kanał Git Plus do tworzenia kanałów głosowych"
+      - "Moderator kanału głosowego"
+      - "Dostęp do emotek i stickerów z każdego serwera"
+      - "100% więcej punktów do aktywności"
+    team_size: 10
+    moderator_count: 2
+    points_multiplier: 100
+    emojis_access: false
+    override_limit: true
+
+  - name: "zG500"
+    premium: "Git Pro"
+    price: 499
+    usd: 149
+    features:
+      - "Rola wyżej niż top1"
+      - "Kanał Git Pro nad lounge do tworzenia kanałów głosowych"
+      - "Drużyna do 30 osób"
+      - "3 moderatorów kanału głosowego"
+      - "Wszyscy w drużynie mają kolor klanu na serwerze"
+      - "Dostęp do emotek i stickerów z każdego serwera"
+      - "200% więcej punktów do aktywności"
+      - "Autokick 1 osoby na każdym kanale"
+    team_size: 20
+    moderator_count: 3
+    points_multiplier: 200
+    emojis_access: false
+    override_limit: false
+    auto_kick: 1
+
+  - name: "zG1000"
+    premium: "Git Ultra"
+    price: 999
+    usd: 299
+    features:
+      - "Moderator na serwerze"
+      - "Kanał Git Ultra nad info do tworzenia kanałów głosowych"
+      - "Drużyna do 50 osób"
+      - "6 moderatorów kanału głosowego"
+      - "Wszyscy w drużynie mają kolor klanu na serwerze"
+      - "Moliwość dodania emotki na serwer raz w miesiącu"
+      - "Moliwość dodania odznaki emotki całej drużynie"
+      - "300% więcej punktów do aktywności"
+      - "Autokick 3 osób na każdym kanale"
+    team_size: 30
+    moderator_count: 5
+    points_multiplier: 400
+    emojis_access: false
+    override_limit: false
+    auto_kick: 3
+
+# Emojis
+emojis:
+  proxy_bunny: "<a:bunnyProxy:1301144820349403157>"
+  mastercard: "<:mastercard:1270433919233425545>"
+  disboard: "<:botDisboard:1336275527241044069>"
+  dzik: "<:botDzik:1336275532991565824>"
+  discadia: "<:botDiscadia:1336275880703561758>"
+  discordservers: "<:botDiscordServers:1336322514170806383>"
+  dsme: "<:botDSME:1336311501765476352>"
+
+# GIFs
+gifs:
+  donation: "https://media1.tenor.com/m/tn_MOQB9pV4AAAAd/tony-tonylife.gif"
+
+# Channel emojis
+channel_emojis: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑',
+          '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶', '️🌽', '🥕', '🧅', '🧄', '🥔', '🍠', '🎃',
+          '🫑', '🫒', '🍄']
+
+# Bypass configuration
+bypass:
+  duration:
+    bump: 12  # godziny dodawane za bump
+    activity: 6  # godziny dodawane za aktywność
+    services:
+      disboard: 3
+      dzik: 3
+      discadia: 6
+      discordservers: 6
+      dsme: 3
+  cooldown:
+    disboard: 2
+    dzik: 3
+    discadia: 24
+    discordservers: 12
+    dsme: 6
+
+# Team configuration
+team:
+  symbol: "☫"
+  base_role_id: 960665311730868240
+  category_id: 1344105013357842522
+
+# Color configuration
+color:
+  role_name: "✎"
+  base_role_id: 960665311772803184
+
+# Default mute nickname
+default_mute_nickname: "random"
