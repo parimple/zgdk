@@ -6,21 +6,20 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
+from core.base_cog import ServiceCog
 from core.exceptions import InvalidChannelType, ValidationException
 from core.interfaces import IMemberService, IPremiumService
-from utils.message_sender import MessageSender
 from utils.permissions import is_admin, is_owner
 
 logger = logging.getLogger(__name__)
 
 
-class CategoryCommands(commands.Cog):
+class CategoryCommands(ServiceCog):
     """Commands for managing Discord categories."""
 
     def __init__(self, bot):
         """Initialize category commands."""
-        self.bot = bot
-        self.message_sender = MessageSender(bot)
+        super().__init__(bot)
 
     @commands.hybrid_command(
         name="createcategory",
@@ -55,10 +54,10 @@ class CategoryCommands(commands.Cog):
                     has_premium = any(role["role_name"] in high_tier_roles for role in premium_roles)
                     
                     if not has_premium and not await ctx.bot.is_owner(ctx.author):
-                        await self.message_sender.send(
+                        await self.send_error(
                             ctx,
-                            text="❌ Kopiowanie uprawnień wymaga rangi **zG500** lub wyższej!",
-                            reply=True
+                            "Brak uprawnień",
+                            "Kopiowanie uprawnień wymaga rangi **zG500** lub wyższej!"
                         )
                         return
 
@@ -109,20 +108,25 @@ class CategoryCommands(commands.Cog):
                     inline=True
                 )
 
-            await self.message_sender._send_embed(ctx, embed, reply=True)
+            # Send using service
+            message_service = await self.get_message_service()
+            if message_service:
+                await message_service.send_embed(ctx, embed)
+            else:
+                await self.message_sender._send_embed(ctx, embed, reply=True)
 
         except discord.Forbidden:
-            await self.message_sender.send(
+            await self.send_error(
                 ctx,
-                text="❌ Bot nie ma uprawnień do tworzenia kategorii!",
-                reply=True
+                "Brak uprawnień",
+                "Bot nie ma uprawnień do tworzenia kategorii!"
             )
         except Exception as e:
             logger.error(f"Error creating category: {e}", exc_info=True)
-            await self.message_sender.send(
+            await self.send_error(
                 ctx,
-                text=f"❌ Wystąpił błąd podczas tworzenia kategorii: {str(e)}",
-                reply=True
+                "Błąd",
+                f"Wystąpił błąd podczas tworzenia kategorii: {str(e)}"
             )
 
     @commands.hybrid_command(

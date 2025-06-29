@@ -6,18 +6,17 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from core.base_cog import ServiceCog
 from core.interfaces import IActivityTrackingService
-from utils.message_sender import MessageSender
 
 logger = logging.getLogger(__name__)
 
 
-class RankingCommands(commands.Cog):
+class RankingCommands(ServiceCog):
     """Commands for checking rankings and activity stats."""
 
     def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.message_sender = MessageSender(bot)
+        super().__init__(bot)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -58,18 +57,22 @@ class RankingCommands(commands.Cog):
                 logger.info(f"Leaderboard result: {len(leaderboard) if leaderboard else 0} entries")
 
             if not leaderboard:
-                embed = self.message_sender._create_embed(
-                    title="🏆 Ranking Aktywności",
-                    description="Brak danych aktywności w tym okresie.",
-                    color="error",
-                    ctx=ctx,
+                await self.send_info(
+                    ctx,
+                    "🏆 Ranking Aktywności",
+                    "Brak danych aktywności w tym okresie."
                 )
-                await self.message_sender._send_embed(ctx, embed)
                 return
 
-            # Format leaderboard into embed using MessageSender
+            # Format leaderboard into embed
             embed = self._format_leaderboard_embed(leaderboard, ctx, days)
-            await self.message_sender._send_embed(ctx, embed)
+            
+            # Send using service or fallback
+            message_service = await self.get_message_service()
+            if message_service:
+                await message_service.send_embed(ctx, embed)
+            else:
+                await self.message_sender._send_embed(ctx, embed)
 
         except Exception as e:
             logger.error(f"Error in ranking command: {e}")
