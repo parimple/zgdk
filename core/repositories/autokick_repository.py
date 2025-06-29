@@ -28,7 +28,7 @@ class AutoKickRepository(BaseRepository):
         Args:
             session: Database session
         """
-        super().__init__(session, AutoKick)
+        super().__init__(AutoKick, session)
         self.member_repo = MemberRepository(session)
 
     async def add_autokick(self, owner_id: int, target_id: int) -> AutoKick:

@@ -28,7 +28,7 @@ class ChannelRepository(BaseRepository):
         Args:
             session: Database session
         """
-        super().__init__(session, ChannelPermission)
+        super().__init__(ChannelPermission, session)
 
     async def add_or_update_permission(
         self,
